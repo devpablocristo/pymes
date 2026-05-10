@@ -14,7 +14,7 @@ import (
 
 // BuildIdentityResolver construye el resolver JWT de verticales, alineado con claims de Clerk/core/saas.
 func BuildIdentityResolver(cfg verticalconfig.Config, log zerolog.Logger, cpHTTP *pymescorehttp.Client) *auth.IdentityResolver {
-	var tenantRes auth.TenantRefResolver
+	var tenantRes auth.OrgRefResolver
 	if cpHTTP != nil {
 		tenantRes = NewCoreTenantRefResolver(cpHTTP)
 	}
@@ -23,7 +23,7 @@ func BuildIdentityResolver(cfg verticalconfig.Config, log zerolog.Logger, cpHTTP
 		Audience:          strings.TrimSpace(cfg.JWTAudience),
 		OrgClaim:          strings.TrimSpace(cfg.JWTTenantClaim),
 		RoleClaim:         strings.TrimSpace(cfg.JWTRoleClaim),
-		TenantRefResolver: tenantRes,
+		OrgRefResolver: tenantRes,
 	}
 	if cfg.JWKSURL == "" {
 		log.Warn().Msg("JWKS_URL not set; JWT auth will fail unless AUTH_ENABLE_JWT=false")
@@ -37,25 +37,25 @@ func BuildIdentityResolver(cfg verticalconfig.Config, log zerolog.Logger, cpHTTP
 	return auth.NewIdentityResolverWithConfig(verifier, ic)
 }
 
-// CoreTenantRefResolver resuelve Clerk organization id, slug o UUID a tenant_id vía pymes-core internal API.
-type CoreTenantRefResolver struct {
+// CoreOrgRefResolver resuelve Clerk organization id, slug o UUID a tenant_id vía pymes-core internal API.
+type CoreOrgRefResolver struct {
 	client *pymescorehttp.Client
 }
 
 // NewCoreTenantRefResolver crea un resolver que llama a GET /v1/internal/v1/tenants/resolve-ref.
-func NewCoreTenantRefResolver(client *pymescorehttp.Client) *CoreTenantRefResolver {
-	return &CoreTenantRefResolver{client: client}
+func NewCoreTenantRefResolver(client *pymescorehttp.Client) *CoreOrgRefResolver {
+	return &CoreOrgRefResolver{client: client}
 }
 
-func (r *CoreTenantRefResolver) ResolveTenantID(ctx context.Context, ref string) (string, error) {
+func (r *CoreOrgRefResolver) ResolveOrgID(ctx context.Context, ref string) (string, error) {
 	if r == nil || r.client == nil {
 		return "", fmt.Errorf("pymes-core client not configured")
 	}
-	m, err := r.client.ResolveTenantRef(ctx, ref)
+	m, err := r.client.ResolveOrgRef(ctx, ref)
 	if err != nil {
 		return "", err
 	}
-	s, _ := m["tenant_id"].(string)
+	s, _ := m["org_id"].(string)
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return "", fmt.Errorf("missing tenant_id in core response")

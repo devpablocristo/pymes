@@ -24,7 +24,7 @@ func TestPendingApprovalSourceListPendingApprovalsDecodesGovernanceDataShape(t *
 			"data": [
 				{
 					"id": "approval-1",
-					"tenant_id": "00000000-0000-0000-0000-000000000001",
+					"org_id": "00000000-0000-0000-0000-000000000001",
 					"request_id": "request-1",
 					"status": "pending",
 					"created_at": "2026-04-01T17:30:00Z",
@@ -44,8 +44,8 @@ func TestPendingApprovalSourceListPendingApprovalsDecodesGovernanceDataShape(t *
 	if approvals[0].ID != "approval-1" {
 		t.Fatalf("expected approval id approval-1, got %q", approvals[0].ID)
 	}
-	if approvals[0].TenantID != "00000000-0000-0000-0000-000000000001" {
-		t.Fatalf("expected org id from governance payload, got %q", approvals[0].TenantID)
+	if approvals[0].OrgID != "00000000-0000-0000-0000-000000000001" {
+		t.Fatalf("expected org id from governance payload, got %q", approvals[0].OrgID)
 	}
 	if approvals[0].RequestID != "request-1" {
 		t.Fatalf("expected request id request-1, got %q", approvals[0].RequestID)
@@ -61,7 +61,7 @@ func TestPendingApprovalSourceListPendingApprovalsSupportsLegacyProxyShape(t *te
 			"approvals": [
 				{
 					"id": "approval-imported",
-					"tenant_id": "00000000-0000-0000-0000-000000000001",
+					"org_id": "00000000-0000-0000-0000-000000000001",
 					"request_id": "request-imported",
 					"status": "pending",
 					"created_at": "2026-04-01T17:30:00Z"

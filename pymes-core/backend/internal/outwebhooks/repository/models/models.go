@@ -9,7 +9,7 @@ import (
 
 type EndpointModel struct {
 	ID        uuid.UUID      `gorm:"type:uuid;primaryKey"`
-	TenantID  uuid.UUID      `gorm:"type:uuid;index;not null"`
+	OrgID  uuid.UUID      `gorm:"type:uuid;index;not null"`
 	URL       string         `gorm:"not null"`
 	Secret    string         `gorm:"not null"`
 	Events    pq.StringArray `gorm:"type:text[];not null"`
@@ -38,7 +38,7 @@ func (DeliveryModel) TableName() string { return "webhook_deliveries" }
 
 type OutboxModel struct {
 	ID           uuid.UUID `gorm:"type:uuid;primaryKey"`
-	TenantID     uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID     uuid.UUID `gorm:"type:uuid;index;not null"`
 	EventType    string    `gorm:"not null"`
 	Payload      []byte    `gorm:"type:jsonb;not null"`
 	Status       string    `gorm:"not null;default:pending"`

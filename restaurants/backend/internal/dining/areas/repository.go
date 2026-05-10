@@ -23,10 +23,10 @@ type Repository struct {
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
-func (r *Repository) ExistsForOrg(ctx context.Context, tenantID, areaID uuid.UUID) (bool, error) {
+func (r *Repository) ExistsForOrg(ctx context.Context, orgID, areaID uuid.UUID) (bool, error) {
 	var n int64
 	err := r.db.WithContext(ctx).Model(&models.DiningAreaModel{}).
-		Where("tenant_id = ? AND id = ?", tenantID, areaID).
+		Where("org_id = ? AND id = ?", orgID, areaID).
 		Limit(1).
 		Count(&n).Error
 	if err != nil {
@@ -37,7 +37,7 @@ func (r *Repository) ExistsForOrg(ctx context.Context, tenantID, areaID uuid.UUI
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.DiningArea, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.DiningAreaModel{}).Where("tenant_id = ?", p.TenantID)
+	q := r.db.WithContext(ctx).Model(&models.DiningAreaModel{}).Where("org_id = ?", p.OrgID)
 	if p.Archived {
 		q = q.Where("deleted_at IS NOT NULL")
 	} else {
@@ -84,7 +84,7 @@ func (r *Repository) Create(ctx context.Context, in domain.DiningArea) (domain.D
 	meta, _ := json.Marshal(md)
 	row := models.DiningAreaModel{
 		ID:         uuid.New(),
-		TenantID:   in.TenantID,
+		OrgID:   in.OrgID,
 		Name:       in.Name,
 		SortOrder:  in.SortOrder,
 		IsFavorite: in.IsFavorite,
@@ -99,9 +99,9 @@ func (r *Repository) Create(ctx context.Context, in domain.DiningArea) (domain.D
 	return toDomain(row), nil
 }
 
-func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.DiningArea, error) {
+func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.DiningArea, error) {
 	var row models.DiningAreaModel
-	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Take(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.DiningArea{}, gorm.ErrRecordNotFound
 		}
@@ -125,7 +125,7 @@ func (r *Repository) Update(ctx context.Context, in domain.DiningArea) (domain.D
 		"updated_at":  time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.DiningAreaModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", in.TenantID, in.ID).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		return domain.DiningArea{}, res.Error
@@ -133,11 +133,11 @@ func (r *Repository) Update(ctx context.Context, in domain.DiningArea) (domain.D
 	if res.RowsAffected == 0 {
 		return domain.DiningArea{}, gorm.ErrRecordNotFound
 	}
-	return r.GetByID(ctx, in.TenantID, in.ID)
+	return r.GetByID(ctx, in.OrgID, in.ID)
 }
 
-func (r *Repository) Archive(ctx context.Context, tenantID, id uuid.UUID) error {
-	state, err := r.lookupState(ctx, tenantID, id)
+func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, orgID, id)
 	if err != nil {
 		return err
 	}
@@ -145,13 +145,13 @@ func (r *Repository) Archive(ctx context.Context, tenantID, id uuid.UUID) error 
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.DiningAreaModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
 		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 	return res.Error
 }
 
-func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error {
-	state, err := r.lookupState(ctx, tenantID, id)
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, orgID, id)
 	if err != nil {
 		return err
 	}
@@ -159,14 +159,14 @@ func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error 
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.DiningAreaModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
 		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
 	return res.Error
 }
 
-func (r *Repository) Delete(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Unscoped().
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
 		Delete(&models.DiningAreaModel{})
 	if res.Error != nil {
 		return res.Error
@@ -177,11 +177,11 @@ func (r *Repository) Delete(ctx context.Context, tenantID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *Repository) lookupState(ctx context.Context, tenantID, id uuid.UUID) (models.DiningAreaModel, error) {
+func (r *Repository) lookupState(ctx context.Context, orgID, id uuid.UUID) (models.DiningAreaModel, error) {
 	var row models.DiningAreaModel
 	err := r.db.WithContext(ctx).
 		Select("id, deleted_at").
-		Where("tenant_id = ? AND id = ?", tenantID, id).
+		Where("org_id = ? AND id = ?", orgID, id).
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -202,7 +202,7 @@ func toDomain(row models.DiningAreaModel) domain.DiningArea {
 	}
 	return domain.DiningArea{
 		ID:         row.ID,
-		TenantID:   row.TenantID,
+		OrgID:   row.OrgID,
 		Name:       row.Name,
 		SortOrder:  row.SortOrder,
 		IsFavorite: row.IsFavorite,

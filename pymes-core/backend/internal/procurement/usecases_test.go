@@ -26,11 +26,11 @@ func (f *fakeProcurementRepo) Update(_ context.Context, req domain.ProcurementRe
 	return req, f.err
 }
 
-func (f *fakeProcurementRepo) GetByID(_ context.Context, tenantID, id uuid.UUID) (domain.ProcurementRequest, error) {
+func (f *fakeProcurementRepo) GetByID(_ context.Context, orgID, id uuid.UUID) (domain.ProcurementRequest, error) {
 	if f.err != nil {
 		return domain.ProcurementRequest{}, f.err
 	}
-	if f.item.ID != id || f.item.TenantID != tenantID {
+	if f.item.ID != id || f.item.OrgID != orgID {
 		return domain.ProcurementRequest{}, ErrNotFound
 	}
 	return f.item, nil
@@ -110,11 +110,11 @@ func TestBuildPurchaseItemsFromLines(t *testing.T) {
 
 func TestSubmitAllowsViaNexusSimulate(t *testing.T) {
 	t.Parallel()
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	reqID := uuid.New()
 	repo := &fakeProcurementRepo{item: domain.ProcurementRequest{
 		ID:             reqID,
-		TenantID:       tenantID,
+		OrgID:       orgID,
 		RequesterActor: "owner@example.com",
 		Title:          "Compra chica",
 		Status:         domain.StatusDraft,
@@ -130,7 +130,7 @@ func TestSubmitAllowsViaNexusSimulate(t *testing.T) {
 	}}
 	uc := NewUsecases(repo, gov, nil, nil, nil)
 
-	out, err := uc.Submit(context.Background(), tenantID, reqID, "owner@example.com")
+	out, err := uc.Submit(context.Background(), orgID, reqID, "owner@example.com")
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
@@ -144,11 +144,11 @@ func TestSubmitAllowsViaNexusSimulate(t *testing.T) {
 
 func TestSubmitEscalatesRequireApprovalToNexusSubmit(t *testing.T) {
 	t.Parallel()
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	reqID := uuid.New()
 	repo := &fakeProcurementRepo{item: domain.ProcurementRequest{
 		ID:             reqID,
-		TenantID:       tenantID,
+		OrgID:       orgID,
 		RequesterActor: "owner@example.com",
 		Title:          "Compra grande",
 		Status:         domain.StatusDraft,
@@ -167,7 +167,7 @@ func TestSubmitEscalatesRequireApprovalToNexusSubmit(t *testing.T) {
 	}
 	uc := NewUsecases(repo, gov, nil, nil, nil)
 
-	out, err := uc.Submit(context.Background(), tenantID, reqID, "owner@example.com")
+	out, err := uc.Submit(context.Background(), orgID, reqID, "owner@example.com")
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
@@ -181,11 +181,11 @@ func TestSubmitEscalatesRequireApprovalToNexusSubmit(t *testing.T) {
 
 func TestSubmitDenyRejectsWithoutLocalFallback(t *testing.T) {
 	t.Parallel()
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	reqID := uuid.New()
 	repo := &fakeProcurementRepo{item: domain.ProcurementRequest{
 		ID:             reqID,
-		TenantID:       tenantID,
+		OrgID:       orgID,
 		RequesterActor: "owner@example.com",
 		Title:          "Compra bloqueada",
 		Status:         domain.StatusDraft,
@@ -200,7 +200,7 @@ func TestSubmitDenyRejectsWithoutLocalFallback(t *testing.T) {
 	}}
 	uc := NewUsecases(repo, gov, nil, nil, nil)
 
-	out, err := uc.Submit(context.Background(), tenantID, reqID, "owner@example.com")
+	out, err := uc.Submit(context.Background(), orgID, reqID, "owner@example.com")
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
@@ -214,11 +214,11 @@ func TestSubmitDenyRejectsWithoutLocalFallback(t *testing.T) {
 
 func TestSubmitFailsClosedWhenNexusSimulateFails(t *testing.T) {
 	t.Parallel()
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	reqID := uuid.New()
 	repo := &fakeProcurementRepo{item: domain.ProcurementRequest{
 		ID:             reqID,
-		TenantID:       tenantID,
+		OrgID:       orgID,
 		RequesterActor: "owner@example.com",
 		Title:          "Compra sin Nexus",
 		Status:         domain.StatusDraft,
@@ -228,7 +228,7 @@ func TestSubmitFailsClosedWhenNexusSimulateFails(t *testing.T) {
 	gov := &fakeGovernance{simulateErr: errors.New("nexus unavailable")}
 	uc := NewUsecases(repo, gov, nil, nil, nil)
 
-	_, err := uc.Submit(context.Background(), tenantID, reqID, "owner@example.com")
+	_, err := uc.Submit(context.Background(), orgID, reqID, "owner@example.com")
 	if err == nil {
 		t.Fatal("expected submit to fail closed when Nexus simulate fails")
 	}

@@ -22,7 +22,7 @@ type Repository struct{ db *gorm.DB }
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 type ListParams struct {
-	TenantID uuid.UUID
+	OrgID uuid.UUID
 	Limit    int
 	After    *uuid.UUID
 	Search   string
@@ -33,7 +33,7 @@ type ListParams struct {
 
 type supplierPartyRow struct {
 	ID          uuid.UUID
-	TenantID    uuid.UUID
+	OrgID    uuid.UUID
 	DisplayName string `gorm:"column:display_name"`
 	Email       string
 	Phone       string
@@ -52,7 +52,7 @@ type supplierPartyRow struct {
 func (r *Repository) List(ctx context.Context, p ListParams) ([]supplierdomain.Supplier, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
-	q := r.baseQuery(ctx, p.TenantID).Where("p.deleted_at IS NULL")
+	q := r.baseQuery(ctx, p.OrgID).Where("p.deleted_at IS NULL")
 	if tag := strings.TrimSpace(p.Tag); tag != "" {
 		q = q.Where("? = ANY(p.tags)", tag)
 	}
@@ -106,7 +106,7 @@ func (r *Repository) Create(ctx context.Context, in supplierdomain.Supplier) (su
 	if err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Table("parties").Create(map[string]any{
 			"id":           partyID,
-			"tenant_id":    in.TenantID,
+			"org_id":    in.OrgID,
 			"party_type":   "organization",
 			"display_name": strings.TrimSpace(in.Name),
 			"email":        strings.TrimSpace(in.Email),
@@ -131,22 +131,22 @@ func (r *Repository) Create(ctx context.Context, in supplierdomain.Supplier) (su
 		}
 		roleMetadata, _ := json.Marshal(map[string]any{"contact_name": strings.TrimSpace(in.ContactName)})
 		if err := tx.Exec(`
-			INSERT INTO party_roles (id, party_id, tenant_id, role, is_active, metadata, created_at)
+			INSERT INTO party_roles (id, party_id, org_id, role, is_active, metadata, created_at)
 			VALUES (?, ?, ?, 'supplier', true, ?::jsonb, now())
-			ON CONFLICT (party_id, tenant_id, role) DO UPDATE SET is_active = true, metadata = EXCLUDED.metadata
-		`, uuid.New(), partyID, in.TenantID, string(roleMetadata)).Error; err != nil {
+			ON CONFLICT (party_id, org_id, role) DO UPDATE SET is_active = true, metadata = EXCLUDED.metadata
+		`, uuid.New(), partyID, in.OrgID, string(roleMetadata)).Error; err != nil {
 			return err
 		}
 		return nil
 	}); err != nil {
 		return supplierdomain.Supplier{}, err
 	}
-	return r.GetByID(ctx, in.TenantID, partyID)
+	return r.GetByID(ctx, in.OrgID, partyID)
 }
 
-func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (supplierdomain.Supplier, error) {
+func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (supplierdomain.Supplier, error) {
 	var row supplierPartyRow
-	err := r.baseQuery(ctx, tenantID).Where("p.id = ?", id).Take(&row).Error
+	err := r.baseQuery(ctx, orgID).Where("p.id = ?", id).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return supplierdomain.Supplier{}, gorm.ErrRecordNotFound
@@ -166,7 +166,7 @@ func (r *Repository) Update(ctx context.Context, in supplierdomain.Supplier) (su
 	roleMetadata, _ := json.Marshal(map[string]any{"contact_name": strings.TrimSpace(in.ContactName)})
 	if err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		res := tx.Table("parties").
-			Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", in.TenantID, in.ID).
+			Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
 			Updates(map[string]any{
 				"party_type":   "organization",
 				"display_name": strings.TrimSpace(in.Name),
@@ -194,8 +194,8 @@ func (r *Repository) Update(ctx context.Context, in supplierdomain.Supplier) (su
 			return err
 		}
 		if err := tx.Exec(`
-			UPDATE party_roles SET metadata = ?::jsonb, is_active = true WHERE tenant_id = ? AND party_id = ? AND role = 'supplier'
-		`, string(roleMetadata), in.TenantID, in.ID).Error; err != nil {
+			UPDATE party_roles SET metadata = ?::jsonb, is_active = true WHERE org_id = ? AND party_id = ? AND role = 'supplier'
+		`, string(roleMetadata), in.OrgID, in.ID).Error; err != nil {
 			return err
 		}
 		in.Metadata = metadata
@@ -203,13 +203,13 @@ func (r *Repository) Update(ctx context.Context, in supplierdomain.Supplier) (su
 	}); err != nil {
 		return supplierdomain.Supplier{}, err
 	}
-	return r.GetByID(ctx, in.TenantID, in.ID)
+	return r.GetByID(ctx, in.OrgID, in.ID)
 }
 
-func (r *Repository) SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	if err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		res := tx.Table("parties").
-			Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).
+			Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
 			Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 		if res.Error != nil {
 			return res.Error
@@ -224,13 +224,13 @@ func (r *Repository) SoftDelete(ctx context.Context, tenantID, id uuid.UUID) err
 	return nil
 }
 
-func (r *Repository) ListArchived(ctx context.Context, tenantID uuid.UUID) ([]supplierdomain.Supplier, error) {
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]supplierdomain.Supplier, error) {
 	var rows []supplierPartyRow
 	err := r.db.WithContext(ctx).
 		Table("parties p").
 		Select(`
 			p.id,
-			p.tenant_id,
+			p.org_id,
 			p.display_name,
 			p.email,
 			p.phone,
@@ -245,8 +245,8 @@ func (r *Repository) ListArchived(ctx context.Context, tenantID uuid.UUID) ([]su
 			p.deleted_at,
 			COALESCE(pr.metadata->>'contact_name', p.metadata->>'contact_name', '') AS contact_name
 		`).
-		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.tenant_id = p.tenant_id AND pr.role = 'supplier'").
-		Where("p.tenant_id = ? AND p.deleted_at IS NOT NULL", tenantID).
+		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'supplier'").
+		Where("p.org_id = ? AND p.deleted_at IS NOT NULL", orgID).
 		Order("p.updated_at DESC").
 		Limit(200).
 		Scan(&rows).Error
@@ -260,10 +260,10 @@ func (r *Repository) ListArchived(ctx context.Context, tenantID uuid.UUID) ([]su
 	return out, nil
 }
 
-func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		res := tx.Table("parties").
-			Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
+			Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
 			Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
 		if res.Error != nil {
 			return res.Error
@@ -275,12 +275,12 @@ func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error 
 	})
 }
 
-func (r *Repository) HardDelete(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Verificar que está archivado antes de eliminar permanentemente.
 		var count int64
 		if err := tx.Table("parties").
-			Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
+			Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
 			Count(&count).Error; err != nil {
 			return err
 		}
@@ -300,19 +300,19 @@ func (r *Repository) HardDelete(ctx context.Context, tenantID, id uuid.UUID) err
 			"payment_preferences",
 			"recurring_expenses",
 		} {
-			if err := tx.Exec("UPDATE "+table+" SET party_id = NULL WHERE party_id = ? AND tenant_id = ?", id, tenantID).Error; err != nil {
+			if err := tx.Exec("UPDATE "+table+" SET party_id = NULL WHERE party_id = ? AND org_id = ?", id, orgID).Error; err != nil {
 				return err
 			}
 		}
 
 		// La cuenta corriente del proveedor es una dependencia dura del party:
 		// en hard delete también se elimina, junto con sus movimientos por cascade.
-		if err := tx.Exec("DELETE FROM accounts WHERE party_id = ? AND tenant_id = ? AND type = 'payable'", id, tenantID).Error; err != nil {
+		if err := tx.Exec("DELETE FROM accounts WHERE party_id = ? AND org_id = ? AND type = 'payable'", id, orgID).Error; err != nil {
 			return err
 		}
 
 		// Eliminar roles y extensiones del party.
-		if err := tx.Exec("DELETE FROM party_roles WHERE party_id = ? AND tenant_id = ?", id, tenantID).Error; err != nil {
+		if err := tx.Exec("DELETE FROM party_roles WHERE party_id = ? AND org_id = ?", id, orgID).Error; err != nil {
 			return err
 		}
 		if err := tx.Exec("DELETE FROM party_organizations WHERE party_id = ?", id).Error; err != nil {
@@ -321,17 +321,17 @@ func (r *Repository) HardDelete(ctx context.Context, tenantID, id uuid.UUID) err
 
 		// Eliminar el party.
 		return tx.Table("parties").
-			Where("tenant_id = ? AND id = ?", tenantID, id).
+			Where("org_id = ? AND id = ?", orgID, id).
 			Delete(nil).Error
 	})
 }
 
-func (r *Repository) baseQuery(ctx context.Context, tenantID uuid.UUID) *gorm.DB {
+func (r *Repository) baseQuery(ctx context.Context, orgID uuid.UUID) *gorm.DB {
 	return r.db.WithContext(ctx).
 		Table("parties p").
 		Select(`
 			p.id,
-			p.tenant_id,
+			p.org_id,
 			p.display_name,
 			p.email,
 			p.phone,
@@ -346,8 +346,8 @@ func (r *Repository) baseQuery(ctx context.Context, tenantID uuid.UUID) *gorm.DB
 			p.deleted_at,
 			COALESCE(pr.metadata->>'contact_name', p.metadata->>'contact_name', '') AS contact_name
 		`).
-		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.tenant_id = p.tenant_id AND pr.role = 'supplier' AND pr.is_active = true").
-		Where("p.tenant_id = ?", tenantID)
+		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'supplier' AND pr.is_active = true").
+		Where("p.org_id = ?", orgID)
 }
 
 func supplierFromPartyRow(row supplierPartyRow) supplierdomain.Supplier {
@@ -362,7 +362,7 @@ func supplierFromPartyRow(row supplierPartyRow) supplierdomain.Supplier {
 	}
 	return supplierdomain.Supplier{
 		ID:          row.ID,
-		TenantID:    row.TenantID,
+		OrgID:    row.OrgID,
 		Name:        row.DisplayName,
 		TaxID:       row.TaxID,
 		Email:       row.Email,

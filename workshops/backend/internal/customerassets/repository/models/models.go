@@ -9,7 +9,7 @@ import (
 
 type CustomerAssetModel struct {
 	ID           uuid.UUID      `gorm:"type:uuid;primaryKey"`
-	TenantID     uuid.UUID      `gorm:"type:uuid;index;not null"`
+	OrgID     uuid.UUID      `gorm:"type:uuid;index;not null"`
 	AssetType    string         `gorm:"not null"`
 	CustomerID   *uuid.UUID     `gorm:"type:uuid"`
 	CustomerName string         `gorm:"not null;default:''"`

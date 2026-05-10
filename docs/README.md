@@ -15,6 +15,8 @@
 | [Estándar CRUD Pymes](CRUD_STANDARD.md) | Contrato objetivo para rutas, listas, errores, arquitectura hexagonal y compatibilidad de CRUDs. |
 | [Ledger de deuda técnica](TECH_DEBT_LEDGER.md) | Registro explícito de compatibilidades, fallbacks y parches con criterio de retiro. |
 | [UI System](UI_SYSTEM.md) | Tokens de diseño, fuentes, dark mode, componentes shared y reglas para CSS nuevo. Estado de la migración Wooko → Pymes. |
+| [Database Init](DATABASE_INIT.md) | Bootstrap del schema desde DB vacía, orden de migraciones post-squash, debug y convenciones (identidad `orgs`, soft-delete `archived_at`, etc). |
+| [Migrations Audit](MIGRATIONS_AUDIT.md) | Inventario pre-squash de las 125 migraciones legacy + diagnóstico del drift cross-source que motivó el cutover. |
 
 `architecture/` — diagramas o notas adicionales (vacío hasta que se agregue contenido).
 

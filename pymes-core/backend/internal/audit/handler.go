@@ -12,9 +12,9 @@ import (
 )
 
 type usecasesPort interface {
-	List(ctx context.Context, tenantID string, limit int) ([]auditdomain.Entry, error)
-	Export(ctx context.Context, tenantID, format string) (string, string, error)
-	Verify(ctx context.Context, tenantID string) (auditdomain.VerifyResult, error)
+	List(ctx context.Context, orgID string, limit int) ([]auditdomain.Entry, error)
+	Export(ctx context.Context, orgID, format string) (string, string, error)
+	Verify(ctx context.Context, orgID string) (auditdomain.VerifyResult, error)
 }
 
 type Handler struct {
@@ -33,7 +33,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup) {
 
 func (h *Handler) List(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	entries, err := h.uc.List(c.Request.Context(), authCtx.TenantID, 200)
+	entries, err := h.uc.List(c.Request.Context(), authCtx.OrgID, 200)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -43,7 +43,7 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Export(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	format, content, err := h.uc.Export(c.Request.Context(), authCtx.TenantID, c.Query("format"))
+	format, content, err := h.uc.Export(c.Request.Context(), authCtx.OrgID, c.Query("format"))
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -60,7 +60,7 @@ func (h *Handler) Export(c *gin.Context) {
 
 func (h *Handler) Verify(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	out, err := h.uc.Verify(c.Request.Context(), authCtx.TenantID)
+	out, err := h.uc.Verify(c.Request.Context(), authCtx.OrgID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

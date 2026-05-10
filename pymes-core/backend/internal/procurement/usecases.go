@@ -20,11 +20,11 @@ import (
 )
 
 type auditPort interface {
-	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type timelinePort interface {
-	RecordEvent(ctx context.Context, tenantID uuid.UUID, entityType string, entityID uuid.UUID, eventType, title, description, actor string, metadata map[string]any) error
+	RecordEvent(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, eventType, title, description, actor string, metadata map[string]any) error
 }
 
 type purchasesPort interface {
@@ -34,24 +34,24 @@ type purchasesPort interface {
 type repositoryPort interface {
 	Create(ctx context.Context, req domain.ProcurementRequest) (domain.ProcurementRequest, error)
 	Update(ctx context.Context, req domain.ProcurementRequest) (domain.ProcurementRequest, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.ProcurementRequest, error)
-	List(ctx context.Context, tenantID uuid.UUID, includeArchived bool, limit int) ([]domain.ProcurementRequest, error)
-	Delete(ctx context.Context, tenantID, id uuid.UUID) error
-	Archive(ctx context.Context, tenantID, id uuid.UUID) error
-	Restore(ctx context.Context, tenantID, id uuid.UUID) error
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.ProcurementRequest, error)
+	List(ctx context.Context, orgID uuid.UUID, includeArchived bool, limit int) ([]domain.ProcurementRequest, error)
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
+	Archive(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 // governancePort es la superficie del client de Nexus que procurement consume.
 // Contrato HTTP: Pymes nunca evalúa policies en proceso. Nexus es source of
 // truth y las policies viven en Nexus por tenant.
 type governancePort interface {
-	SimulateRequestForTenant(ctx context.Context, tenantID string, body governanceclient.SimulateRequestBody) (governanceclient.SimulateResponse, error)
-	SubmitRequestForTenant(ctx context.Context, tenantID, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
-	ListPoliciesForTenant(ctx context.Context, tenantID string) (int, []byte, error)
-	GetPolicyForTenant(ctx context.Context, tenantID, id string) (int, []byte, error)
-	CreatePolicyForTenant(ctx context.Context, tenantID string, body any) (int, []byte, error)
-	UpdatePolicyForTenant(ctx context.Context, tenantID, id string, body any) (int, []byte, error)
-	DeletePolicyForTenant(ctx context.Context, tenantID, id string) (int, error)
+	SimulateRequestForTenant(ctx context.Context, orgID string, body governanceclient.SimulateRequestBody) (governanceclient.SimulateResponse, error)
+	SubmitRequestForTenant(ctx context.Context, orgID, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
+	ListPoliciesForTenant(ctx context.Context, orgID string) (int, []byte, error)
+	GetPolicyForTenant(ctx context.Context, orgID, id string) (int, []byte, error)
+	CreatePolicyForTenant(ctx context.Context, orgID string, body any) (int, []byte, error)
+	UpdatePolicyForTenant(ctx context.Context, orgID, id string, body any) (int, []byte, error)
+	DeletePolicyForTenant(ctx context.Context, orgID, id string) (int, error)
 }
 
 type Usecases struct {
@@ -93,7 +93,7 @@ func NewUsecases(
 }
 
 type CreateInput struct {
-	TenantID       uuid.UUID
+	OrgID       uuid.UUID
 	Actor          string
 	Title          string
 	Description    string
@@ -107,8 +107,8 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (domain.Procureme
 	if strings.TrimSpace(in.Title) == "" {
 		return domain.ProcurementRequest{}, domainerr.Validation("title is required")
 	}
-	if in.TenantID == uuid.Nil {
-		return domain.ProcurementRequest{}, domainerr.Validation("tenant_id is required")
+	if in.OrgID == uuid.Nil {
+		return domain.ProcurementRequest{}, domainerr.Validation("org_id is required")
 	}
 	actor := strings.TrimSpace(in.Actor)
 	if actor == "" {
@@ -121,7 +121,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (domain.Procureme
 	}
 	req := domain.ProcurementRequest{
 		ID:             uuid.New(),
-		TenantID:       in.TenantID,
+		OrgID:       in.OrgID,
 		RequesterActor: actor,
 		Title:          strings.TrimSpace(in.Title),
 		Description:    strings.TrimSpace(in.Description),
@@ -137,8 +137,8 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (domain.Procureme
 	if err != nil {
 		return domain.ProcurementRequest{}, err
 	}
-	u.logAudit(ctx, in.TenantID, actor, "procurement_request.created", out.ID.String(), map[string]any{"title": out.Title})
-	u.emitWebhook(ctx, in.TenantID, "procurement_request.created", map[string]any{
+	u.logAudit(ctx, in.OrgID, actor, "procurement_request.created", out.ID.String(), map[string]any{"title": out.Title})
+	u.emitWebhook(ctx, in.OrgID, "procurement_request.created", map[string]any{
 		"procurement_request_id": out.ID.String(),
 		"title":                  out.Title,
 		"status":                 string(out.Status),
@@ -147,7 +147,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (domain.Procureme
 }
 
 type UpdateInput struct {
-	TenantID       uuid.UUID
+	OrgID       uuid.UUID
 	ID             uuid.UUID
 	Actor          string
 	Title          string
@@ -159,7 +159,7 @@ type UpdateInput struct {
 }
 
 func (u *Usecases) Update(ctx context.Context, in UpdateInput) (domain.ProcurementRequest, error) {
-	cur, err := u.repo.GetByID(ctx, in.TenantID, in.ID)
+	cur, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return domain.ProcurementRequest{}, domainerr.NotFoundf("procurement_request", in.ID.String())
@@ -194,16 +194,16 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput) (domain.Procureme
 		}
 		return domain.ProcurementRequest{}, err
 	}
-	u.logAudit(ctx, in.TenantID, in.Actor, "procurement_request.updated", out.ID.String(), nil)
-	u.emitWebhook(ctx, in.TenantID, "procurement_request.updated", map[string]any{
+	u.logAudit(ctx, in.OrgID, in.Actor, "procurement_request.updated", out.ID.String(), nil)
+	u.emitWebhook(ctx, in.OrgID, "procurement_request.updated", map[string]any{
 		"procurement_request_id": out.ID.String(),
 		"status":                 string(out.Status),
 	})
 	return out, nil
 }
 
-func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.ProcurementRequest, error) {
-	out, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.ProcurementRequest, error) {
+	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return domain.ProcurementRequest{}, domainerr.NotFoundf("procurement_request", id.String())
@@ -213,43 +213,43 @@ func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.
 	return out, nil
 }
 
-func (u *Usecases) List(ctx context.Context, tenantID uuid.UUID, archived bool, limit int) ([]domain.ProcurementRequest, error) {
-	return u.repo.List(ctx, tenantID, archived, limit)
+func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, archived bool, limit int) ([]domain.ProcurementRequest, error) {
+	return u.repo.List(ctx, orgID, archived, limit)
 }
 
-func (u *Usecases) Delete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Delete(ctx, tenantID, id); err != nil {
+func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Delete(ctx, orgID, id); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return domainerr.NotFoundf("procurement_request", id.String())
 		}
 		return err
 	}
-	u.logAudit(ctx, tenantID, actor, "procurement_request.deleted", id.String(), nil)
-	u.emitWebhook(ctx, tenantID, "procurement_request.deleted", map[string]any{"procurement_request_id": id.String()})
+	u.logAudit(ctx, orgID, actor, "procurement_request.deleted", id.String(), nil)
+	u.emitWebhook(ctx, orgID, "procurement_request.deleted", map[string]any{"procurement_request_id": id.String()})
 	return nil
 }
 
-func (u *Usecases) Archive(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Archive(ctx, tenantID, id); err != nil {
+func (u *Usecases) Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Archive(ctx, orgID, id); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return domainerr.NotFoundf("procurement_request", id.String())
 		}
 		return err
 	}
-	u.logAudit(ctx, tenantID, actor, "procurement_request.archived", id.String(), nil)
-	u.emitWebhook(ctx, tenantID, "procurement_request.archived", map[string]any{"procurement_request_id": id.String()})
+	u.logAudit(ctx, orgID, actor, "procurement_request.archived", id.String(), nil)
+	u.emitWebhook(ctx, orgID, "procurement_request.archived", map[string]any{"procurement_request_id": id.String()})
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return domainerr.NotFoundf("procurement_request", id.String())
 		}
 		return err
 	}
-	u.logAudit(ctx, tenantID, actor, "procurement_request.restored", id.String(), nil)
-	u.emitWebhook(ctx, tenantID, "procurement_request.restored", map[string]any{"procurement_request_id": id.String()})
+	u.logAudit(ctx, orgID, actor, "procurement_request.restored", id.String(), nil)
+	u.emitWebhook(ctx, orgID, "procurement_request.restored", map[string]any{"procurement_request_id": id.String()})
 	return nil
 }
 
@@ -261,7 +261,7 @@ func procurementSubmitParams(req domain.ProcurementRequest, total float64) map[s
 		"estimated_total": total,
 		"category":        req.Category,
 		"currency":        req.Currency,
-		"tenant_id":       req.TenantID.String(),
+		"org_id":       req.OrgID.String(),
 	}
 }
 
@@ -272,8 +272,8 @@ func procurementSubmitParams(req domain.ProcurementRequest, total float64) map[s
 // deniega, se rechaza.
 //
 // El motor de policies vive 100% en Nexus — Pymes ya no embebe nada.
-func (u *Usecases) Submit(ctx context.Context, tenantID, id uuid.UUID, actor string) (domain.ProcurementRequest, error) {
-	req, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) Submit(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.ProcurementRequest, error) {
+	req, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return domain.ProcurementRequest{}, domainerr.NotFoundf("procurement_request", id.String())
@@ -298,7 +298,7 @@ func (u *Usecases) Submit(ctx context.Context, tenantID, id uuid.UUID, actor str
 		TargetResource: "procurement_request",
 		Params:         procurementSubmitParams(req, total),
 	}
-	sim, err := u.governance.SimulateRequestForTenant(ctx, tenantID.String(), body)
+	sim, err := u.governance.SimulateRequestForTenant(ctx, orgID.String(), body)
 	if err != nil {
 		return domain.ProcurementRequest{}, fmt.Errorf("nexus simulate procurement.submit: %w", err)
 	}
@@ -335,8 +335,8 @@ func (u *Usecases) Submit(ctx context.Context, tenantID, id uuid.UUID, actor str
 			Reason:         fmt.Sprintf("procurement request %s", req.ID),
 			Context:        "pymes-core procurement.submit",
 		}
-		idemKey := fmt.Sprintf("procurement-%s-%s", tenantID.String(), req.ID)
-		submitResp, subErr := u.governance.SubmitRequestForTenant(ctx, tenantID.String(), idemKey, submitBody)
+		idemKey := fmt.Sprintf("procurement-%s-%s", orgID.String(), req.ID)
+		submitResp, subErr := u.governance.SubmitRequestForTenant(ctx, orgID.String(), idemKey, submitBody)
 		if subErr != nil {
 			return domain.ProcurementRequest{}, fmt.Errorf("nexus submit procurement.submit (require_approval escalation): %w", subErr)
 		}
@@ -372,12 +372,12 @@ func (u *Usecases) Submit(ctx context.Context, tenantID, id uuid.UUID, actor str
 		}
 	}
 
-	u.logAudit(ctx, tenantID, actor, "procurement_request.submitted", out.ID.String(), map[string]any{"decision": sim.Decision})
+	u.logAudit(ctx, orgID, actor, "procurement_request.submitted", out.ID.String(), map[string]any{"decision": sim.Decision})
 	if u.timeline != nil {
-		_ = u.timeline.RecordEvent(ctx, tenantID, "procurement_request", out.ID, "procurement_request.submitted",
+		_ = u.timeline.RecordEvent(ctx, orgID, "procurement_request", out.ID, "procurement_request.submitted",
 			"Solicitud de compra enviada", out.Title, actor, map[string]any{"decision": sim.Decision})
 	}
-	u.emitWebhook(ctx, tenantID, "procurement_request.submitted", map[string]any{
+	u.emitWebhook(ctx, orgID, "procurement_request.submitted", map[string]any{
 		"procurement_request_id": out.ID.String(),
 		"decision":               sim.Decision,
 		"status":                 string(out.Status),
@@ -395,8 +395,8 @@ func (u *Usecases) Submit(ctx context.Context, tenantID, id uuid.UUID, actor str
 // caller (UI Pymes) debería redirigir al admin a consola Nexus para casos
 // que requieren approval. La validación cross-source queda para el contract
 // test de la Fase 5.
-func (u *Usecases) Approve(ctx context.Context, tenantID, id uuid.UUID, actor string) (domain.ProcurementRequest, error) {
-	req, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) Approve(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.ProcurementRequest, error) {
+	req, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return domain.ProcurementRequest{}, domainerr.NotFoundf("procurement_request", id.String())
@@ -424,8 +424,8 @@ func (u *Usecases) Approve(ctx context.Context, tenantID, id uuid.UUID, actor st
 			}
 		}
 	}
-	u.logAudit(ctx, tenantID, actor, "procurement_request.approved", out.ID.String(), nil)
-	u.emitWebhook(ctx, tenantID, "procurement_request.approved", map[string]any{
+	u.logAudit(ctx, orgID, actor, "procurement_request.approved", out.ID.String(), nil)
+	u.emitWebhook(ctx, orgID, "procurement_request.approved", map[string]any{
 		"procurement_request_id": out.ID.String(),
 		"status":                 string(out.Status),
 		"purchase_id":            nullableUUIDPtr(out.PurchaseID),
@@ -433,8 +433,8 @@ func (u *Usecases) Approve(ctx context.Context, tenantID, id uuid.UUID, actor st
 	return out, nil
 }
 
-func (u *Usecases) Reject(ctx context.Context, tenantID, id uuid.UUID, actor string) (domain.ProcurementRequest, error) {
-	req, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) Reject(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.ProcurementRequest, error) {
+	req, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return domain.ProcurementRequest{}, domainerr.NotFoundf("procurement_request", id.String())
@@ -450,8 +450,8 @@ func (u *Usecases) Reject(ctx context.Context, tenantID, id uuid.UUID, actor str
 	if err != nil {
 		return domain.ProcurementRequest{}, err
 	}
-	u.logAudit(ctx, tenantID, actor, "procurement_request.rejected", out.ID.String(), nil)
-	u.emitWebhook(ctx, tenantID, "procurement_request.rejected", map[string]any{
+	u.logAudit(ctx, orgID, actor, "procurement_request.rejected", out.ID.String(), nil)
+	u.emitWebhook(ctx, orgID, "procurement_request.rejected", map[string]any{
 		"procurement_request_id": out.ID.String(),
 		"status":                 string(out.Status),
 	})
@@ -465,7 +465,7 @@ func (u *Usecases) createPurchaseFromRequest(ctx context.Context, req domain.Pro
 	}
 	notes := fmt.Sprintf("Generado desde solicitud interna %s", req.ID.String())
 	return u.purchases.Create(ctx, purchases.CreateInput{
-		TenantID:      req.TenantID,
+		OrgID:      req.OrgID,
 		SupplierName:  "Pendiente (solicitud interna)",
 		Status:        "draft",
 		PaymentStatus: "pending",
@@ -521,18 +521,18 @@ func buildPurchaseItems(req domain.ProcurementRequest) []purchasesdomain.Purchas
 	return out
 }
 
-func (u *Usecases) logAudit(ctx context.Context, tenantID uuid.UUID, actor, action, resourceID string, payload map[string]any) {
+func (u *Usecases) logAudit(ctx context.Context, orgID uuid.UUID, actor, action, resourceID string, payload map[string]any) {
 	if u.audit == nil {
 		return
 	}
-	u.audit.Log(ctx, tenantID.String(), actor, action, "procurement_request", resourceID, payload)
+	u.audit.Log(ctx, orgID.String(), actor, action, "procurement_request", resourceID, payload)
 }
 
-func (u *Usecases) emitWebhook(ctx context.Context, tenantID uuid.UUID, eventType string, payload map[string]any) {
+func (u *Usecases) emitWebhook(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) {
 	if u.webhooks == nil {
 		return
 	}
-	_ = u.webhooks.Enqueue(ctx, tenantID, eventType, payload)
+	_ = u.webhooks.Enqueue(ctx, orgID, eventType, payload)
 }
 
 func nullableUUIDPtr(id *uuid.UUID) any {

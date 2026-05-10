@@ -17,9 +17,9 @@ type Repository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
-func (r *Repository) List(ctx context.Context, tenantID uuid.UUID, accountType, entityType string, onlyNonZero bool, limit int) ([]accountsdomain.Account, error) {
+func (r *Repository) List(ctx context.Context, orgID uuid.UUID, accountType, entityType string, onlyNonZero bool, limit int) ([]accountsdomain.Account, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.AccountModel{}).Where("tenant_id = ?", tenantID)
+	q := r.db.WithContext(ctx).Model(&models.AccountModel{}).Where("org_id = ?", orgID)
 	if accountType != "" {
 		q = q.Where("type = ?", accountType)
 	}
@@ -42,10 +42,10 @@ func (r *Repository) List(ctx context.Context, tenantID uuid.UUID, accountType, 
 	return out, nil
 }
 
-func (r *Repository) ListMovements(ctx context.Context, tenantID, accountID uuid.UUID, limit int) ([]accountsdomain.Movement, error) {
+func (r *Repository) ListMovements(ctx context.Context, orgID, accountID uuid.UUID, limit int) ([]accountsdomain.Movement, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	var rows []models.MovementModel
-	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND account_id = ?", tenantID, accountID).Order("created_at DESC").Limit(limit).Find(&rows).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND account_id = ?", orgID, accountID).Order("created_at DESC").Limit(limit).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]accountsdomain.Movement, 0, len(rows))
@@ -59,7 +59,7 @@ func (r *Repository) CreateOrAdjust(ctx context.Context, in accountsdomain.Accou
 	var out accountsdomain.Account
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var row models.AccountModel
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("tenant_id = ? AND type = ? AND party_id = ?", in.TenantID, in.Type, in.EntityID).Take(&row).Error
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("org_id = ? AND type = ? AND party_id = ?", in.OrgID, in.Type, in.EntityID).Take(&row).Error
 		now := time.Now().UTC()
 		if err != nil {
 			if err != gorm.ErrRecordNotFound {
@@ -67,7 +67,7 @@ func (r *Repository) CreateOrAdjust(ctx context.Context, in accountsdomain.Accou
 			}
 			row = models.AccountModel{
 				ID:          uuid.New(),
-				TenantID:    in.TenantID,
+				OrgID:    in.OrgID,
 				Type:        in.Type,
 				PartyID:     in.EntityID,
 				PartyName:   in.EntityName,
@@ -92,7 +92,7 @@ func (r *Repository) CreateOrAdjust(ctx context.Context, in accountsdomain.Accou
 		if err := tx.Save(&row).Error; err != nil {
 			return err
 		}
-		mv := models.MovementModel{ID: uuid.New(), AccountID: row.ID, TenantID: in.TenantID, Type: "adjustment", Amount: amount, Balance: row.Balance, Description: defaultString(description, "manual adjustment"), ReferenceType: "manual", CreatedBy: actor, CreatedAt: now}
+		mv := models.MovementModel{ID: uuid.New(), AccountID: row.ID, OrgID: in.OrgID, Type: "adjustment", Amount: amount, Balance: row.Balance, Description: defaultString(description, "manual adjustment"), ReferenceType: "manual", CreatedBy: actor, CreatedAt: now}
 		if err := tx.Create(&mv).Error; err != nil {
 			return err
 		}
@@ -108,7 +108,7 @@ func (r *Repository) CreateOrAdjust(ctx context.Context, in accountsdomain.Accou
 func toAccountDomain(row models.AccountModel, movements []models.MovementModel) accountsdomain.Account {
 	out := accountsdomain.Account{
 		ID:          row.ID,
-		TenantID:    row.TenantID,
+		OrgID:    row.OrgID,
 		Type:        row.Type,
 		EntityType:  entityTypeFromAccountType(row.Type),
 		EntityID:    row.PartyID,
@@ -125,7 +125,7 @@ func toAccountDomain(row models.AccountModel, movements []models.MovementModel) 
 }
 
 func toMovementDomain(row models.MovementModel) accountsdomain.Movement {
-	return accountsdomain.Movement{ID: row.ID, AccountID: row.AccountID, TenantID: row.TenantID, Type: row.Type, Amount: row.Amount, Balance: row.Balance, Description: row.Description, ReferenceType: row.ReferenceType, ReferenceID: row.ReferenceID, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt}
+	return accountsdomain.Movement{ID: row.ID, AccountID: row.AccountID, OrgID: row.OrgID, Type: row.Type, Amount: row.Amount, Balance: row.Balance, Description: row.Description, ReferenceType: row.ReferenceType, ReferenceID: row.ReferenceID, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt}
 }
 
 func defaultString(v, def string) string {

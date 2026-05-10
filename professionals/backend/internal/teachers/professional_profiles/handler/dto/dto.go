@@ -2,7 +2,7 @@ package dto
 
 type ProfileItem struct {
 	ID                string         `json:"id"`
-	TenantID          string         `json:"tenant_id"`
+	OrgID          string         `json:"org_id"`
 	PartyID           string         `json:"party_id"`
 	PublicSlug        string         `json:"public_slug"`
 	Bio               string         `json:"bio"`

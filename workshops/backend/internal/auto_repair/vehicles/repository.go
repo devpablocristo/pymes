@@ -31,7 +31,7 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Vehicle, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&assetmodels.CustomerAssetModel{}).
-		Where("tenant_id = ? AND asset_type = ? AND archived_at IS NULL", p.TenantID, vehicleAssetType)
+		Where("org_id = ? AND asset_type = ? AND archived_at IS NULL", p.OrgID, vehicleAssetType)
 	if search := strings.TrimSpace(p.Search); search != "" {
 		like := "%" + search + "%"
 		q = q.Where("(label ILIKE ? OR brand ILIKE ? OR model ILIKE ? OR customer_name ILIKE ? OR serial_number ILIKE ? OR metadata->>'license_plate' ILIKE ?)", like, like, like, like, like, like)
@@ -66,11 +66,11 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Vehicle, 
 	return out, total, hasMore, next, nil
 }
 
-func (r *Repository) ListArchived(ctx context.Context, tenantID uuid.UUID) ([]domain.Vehicle, error) {
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.Vehicle, error) {
 	var rows []assetmodels.CustomerAssetModel
 	err := r.db.WithContext(ctx).
 		Model(&assetmodels.CustomerAssetModel{}).
-		Where("tenant_id = ? AND asset_type = ? AND archived_at IS NOT NULL", tenantID, vehicleAssetType).
+		Where("org_id = ? AND asset_type = ? AND archived_at IS NOT NULL", orgID, vehicleAssetType).
 		Order("updated_at DESC").
 		Limit(200).
 		Find(&rows).Error
@@ -96,10 +96,10 @@ func (r *Repository) Create(ctx context.Context, in domain.Vehicle) (domain.Vehi
 	return toDomain(row), nil
 }
 
-func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Vehicle, error) {
+func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Vehicle, error) {
 	var row assetmodels.CustomerAssetModel
 	if err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND asset_type = ? AND id = ?", tenantID, vehicleAssetType, id).
+		Where("org_id = ? AND asset_type = ? AND id = ?", orgID, vehicleAssetType, id).
 		Take(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Vehicle{}, gorm.ErrRecordNotFound
@@ -127,7 +127,7 @@ func (r *Repository) Update(ctx context.Context, in domain.Vehicle) (domain.Vehi
 		"updated_at":    time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&assetmodels.CustomerAssetModel{}).
-		Where("tenant_id = ? AND asset_type = ? AND id = ? AND archived_at IS NULL", in.TenantID, vehicleAssetType, in.ID).
+		Where("org_id = ? AND asset_type = ? AND id = ? AND archived_at IS NULL", in.OrgID, vehicleAssetType, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		return domain.Vehicle{}, res.Error
@@ -135,13 +135,13 @@ func (r *Repository) Update(ctx context.Context, in domain.Vehicle) (domain.Vehi
 	if res.RowsAffected == 0 {
 		return domain.Vehicle{}, gorm.ErrRecordNotFound
 	}
-	return r.GetByID(ctx, in.TenantID, in.ID)
+	return r.GetByID(ctx, in.OrgID, in.ID)
 }
 
-func (r *Repository) SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	now := time.Now().UTC()
 	res := r.db.WithContext(ctx).Model(&assetmodels.CustomerAssetModel{}).
-		Where("tenant_id = ? AND asset_type = ? AND id = ? AND archived_at IS NULL", tenantID, vehicleAssetType, id).
+		Where("org_id = ? AND asset_type = ? AND id = ? AND archived_at IS NULL", orgID, vehicleAssetType, id).
 		Updates(map[string]any{"archived_at": now, "updated_at": now})
 	if res.Error != nil {
 		return res.Error
@@ -152,10 +152,10 @@ func (r *Repository) SoftDelete(ctx context.Context, tenantID, id uuid.UUID) err
 	return nil
 }
 
-func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	now := time.Now().UTC()
 	res := r.db.WithContext(ctx).Model(&assetmodels.CustomerAssetModel{}).
-		Where("tenant_id = ? AND asset_type = ? AND id = ? AND archived_at IS NOT NULL", tenantID, vehicleAssetType, id).
+		Where("org_id = ? AND asset_type = ? AND id = ? AND archived_at IS NOT NULL", orgID, vehicleAssetType, id).
 		Updates(map[string]any{"archived_at": nil, "updated_at": now})
 	if res.Error != nil {
 		return res.Error
@@ -166,10 +166,10 @@ func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error 
 	return nil
 }
 
-func (r *Repository) HardDelete(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	var count int64
 	if err := r.db.WithContext(ctx).Table("workshops.work_orders").
-		Where("tenant_id = ? AND asset_type = ? AND asset_id = ?", tenantID, vehicleAssetType, id).
+		Where("org_id = ? AND asset_type = ? AND asset_id = ?", orgID, vehicleAssetType, id).
 		Count(&count).Error; err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func (r *Repository) HardDelete(ctx context.Context, tenantID, id uuid.UUID) err
 	}
 	var row assetmodels.CustomerAssetModel
 	if err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND asset_type = ? AND id = ?", tenantID, vehicleAssetType, id).
+		Where("org_id = ? AND asset_type = ? AND id = ?", orgID, vehicleAssetType, id).
 		Take(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return gorm.ErrRecordNotFound
@@ -189,7 +189,7 @@ func (r *Repository) HardDelete(ctx context.Context, tenantID, id uuid.UUID) err
 		return gorm.ErrRecordNotFound
 	}
 	res := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND asset_type = ? AND id = ?", tenantID, vehicleAssetType, id).
+		Where("org_id = ? AND asset_type = ? AND id = ?", orgID, vehicleAssetType, id).
 		Delete(&assetmodels.CustomerAssetModel{})
 	if res.Error != nil {
 		return res.Error
@@ -209,7 +209,7 @@ func toAssetModel(in domain.Vehicle) assetmodels.CustomerAssetModel {
 	metadataJSON, _ := json.Marshal(metadata)
 	return assetmodels.CustomerAssetModel{
 		ID:           in.ID,
-		TenantID:     in.TenantID,
+		OrgID:     in.OrgID,
 		AssetType:    vehicleAssetType,
 		CustomerID:   in.CustomerID,
 		CustomerName: in.CustomerName,
@@ -236,7 +236,7 @@ func toDomain(row assetmodels.CustomerAssetModel) domain.Vehicle {
 	}
 	return domain.Vehicle{
 		ID:           row.ID,
-		TenantID:     row.TenantID,
+		OrgID:     row.OrgID,
 		CustomerID:   row.CustomerID,
 		CustomerName: row.CustomerName,
 		LicensePlate: stringFromMetadata(metadata, "license_plate", row.Label),

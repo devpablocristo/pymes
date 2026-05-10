@@ -12,11 +12,11 @@ import (
 )
 
 func (h *Handler) ListWAConversations(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
-	convs, err := h.uc.ListConversations(c.Request.Context(), tenantID, c.Query("assigned_to"), c.Query("status"), 100)
+	convs, err := h.uc.ListConversations(c.Request.Context(), orgID, c.Query("assigned_to"), c.Query("status"), 100)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -29,7 +29,7 @@ func (h *Handler) ListWAConversations(c *gin.Context) {
 }
 
 func (h *Handler) AssignWAConversation(c *gin.Context) {
-	tenantID, convID, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, convID, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -38,7 +38,7 @@ func (h *Handler) AssignWAConversation(c *gin.Context) {
 		writeBadRequest(c, "invalid request body")
 		return
 	}
-	if err := h.uc.AssignConversation(c.Request.Context(), tenantID, convID, body.AssignedTo); err != nil {
+	if err := h.uc.AssignConversation(c.Request.Context(), orgID, convID, body.AssignedTo); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -46,11 +46,11 @@ func (h *Handler) AssignWAConversation(c *gin.Context) {
 }
 
 func (h *Handler) MarkWAConversationRead(c *gin.Context) {
-	tenantID, convID, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, convID, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.MarkConversationRead(c.Request.Context(), tenantID, convID); err != nil {
+	if err := h.uc.MarkConversationRead(c.Request.Context(), orgID, convID); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -58,11 +58,11 @@ func (h *Handler) MarkWAConversationRead(c *gin.Context) {
 }
 
 func (h *Handler) ResolveWAConversation(c *gin.Context) {
-	tenantID, convID, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, convID, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.ResolveConversation(c.Request.Context(), tenantID, convID); err != nil {
+	if err := h.uc.ResolveConversation(c.Request.Context(), orgID, convID); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}

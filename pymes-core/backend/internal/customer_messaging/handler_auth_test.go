@@ -20,9 +20,9 @@ import (
 // allowAllRBAC deja pasar cualquier RequirePermission (tests de handler HTTP).
 type allowAllRBAC struct{}
 
-func (allowAllRBAC) HasPermission(ctx context.Context, tenantID, actor, role string, scopes []string, authMethod, resource, action string) bool {
+func (allowAllRBAC) HasPermission(ctx context.Context, orgID, actor, role string, scopes []string, authMethod, resource, action string) bool {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	_ = actor
 	_ = role
 	_ = scopes
@@ -32,9 +32,9 @@ func (allowAllRBAC) HasPermission(ctx context.Context, tenantID, actor, role str
 	return true
 }
 
-func authContextMiddleware(tenantID uuid.UUID, actor string) gin.HandlerFunc {
+func authContextMiddleware(orgID uuid.UUID, actor string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Set(types.CtxKeyTenantID, tenantID.String())
+		c.Set(types.CtxKeyTenantID, orgID.String())
 		c.Set(types.CtxKeyActor, actor)
 		c.Set(types.CtxKeyRole, "member")
 		c.Set(types.CtxKeyScopes, []string{})
@@ -43,10 +43,10 @@ func authContextMiddleware(tenantID uuid.UUID, actor string) gin.HandlerFunc {
 	}
 }
 
-func newAuthenticatedCustomerMessagingRouter(uc *Usecases, tenantID uuid.UUID) *gin.Engine {
+func newAuthenticatedCustomerMessagingRouter(uc *Usecases, orgID uuid.UUID) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(authContextMiddleware(tenantID, "admin"))
+	r.Use(authContextMiddleware(orgID, "admin"))
 	rbac := handlers.NewRBACMiddleware(allowAllRBAC{})
 	v1 := r.Group("/v1")
 	NewHandler(uc).RegisterRoutes(v1, rbac)
@@ -55,11 +55,11 @@ func newAuthenticatedCustomerMessagingRouter(uc *Usecases, tenantID uuid.UUID) *
 
 func TestHTTPSendText(t *testing.T) {
 	t.Parallel()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	partyID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	repo := &testRepo{
 		domainConn: domain.Connection{
-			TenantID:      tenantID,
+			OrgID:      orgID,
 			PhoneNumberID: "123456789",
 			AccessToken:   "plain-token",
 			IsActive:      true,
@@ -67,14 +67,14 @@ func TestHTTPSendText(t *testing.T) {
 		partyPhone: "+5491112345678",
 		partyName:  "Juan",
 		optIns: []domain.OptIn{{
-			TenantID: tenantID,
+			OrgID: orgID,
 			PartyID:  partyID,
 			Status:   domain.OptInStatusOptedIn,
 		}},
 	}
 	metaClient := &testMetaClient{}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, metaClient, nil, "", "")
-	r := newAuthenticatedCustomerMessagingRouter(uc, tenantID)
+	r := newAuthenticatedCustomerMessagingRouter(uc, orgID)
 
 	body := map[string]string{
 		"party_id": partyID.String(),
@@ -100,9 +100,9 @@ func TestHTTPSendText(t *testing.T) {
 
 func TestHTTPSendText_InvalidPartyID(t *testing.T) {
 	t.Parallel()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	uc := NewUsecases(&testRepo{}, nil, "http://localhost:5173", nil, &testMetaClient{}, nil, "", "")
-	r := newAuthenticatedCustomerMessagingRouter(uc, tenantID)
+	r := newAuthenticatedCustomerMessagingRouter(uc, orgID)
 
 	body := map[string]string{
 		"party_id": "not-a-uuid",
@@ -121,12 +121,12 @@ func TestHTTPSendText_InvalidPartyID(t *testing.T) {
 
 func TestHTTPListMessages(t *testing.T) {
 	t.Parallel()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	msgID := uuid.MustParse("00000000-0000-0000-0000-0000000000aa")
 	repo := &testRepo{
 		messages: []domain.Message{{
 			ID:            msgID,
-			TenantID:      tenantID,
+			OrgID:      orgID,
 			PhoneNumberID: "pn",
 			Direction:     domain.DirectionOutbound,
 			WAMessageID:   "wamid-1",
@@ -139,7 +139,7 @@ func TestHTTPListMessages(t *testing.T) {
 		}},
 	}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, nil, nil, "", "")
-	r := newAuthenticatedCustomerMessagingRouter(uc, tenantID)
+	r := newAuthenticatedCustomerMessagingRouter(uc, orgID)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/customer-messaging/messages", nil)
 	rec := httptest.NewRecorder()
@@ -165,11 +165,11 @@ func TestHTTPListMessages(t *testing.T) {
 
 func TestHTTPGetConnection(t *testing.T) {
 	t.Parallel()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	at := time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC)
 	repo := &testRepo{
 		domainConn: domain.Connection{
-			TenantID:           tenantID,
+			OrgID:           orgID,
 			PhoneNumberID:      "phone-1",
 			WABAID:             "waba-1",
 			DisplayPhoneNumber: "+54 11 1234",
@@ -181,7 +181,7 @@ func TestHTTPGetConnection(t *testing.T) {
 		},
 	}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, nil, nil, "", "")
-	r := newAuthenticatedCustomerMessagingRouter(uc, tenantID)
+	r := newAuthenticatedCustomerMessagingRouter(uc, orgID)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/customer-messaging/connections/whatsapp", nil)
 	rec := httptest.NewRecorder()
@@ -201,9 +201,9 @@ func TestHTTPGetConnection(t *testing.T) {
 
 func TestHTTPListMessages_InvalidPartyIDQuery(t *testing.T) {
 	t.Parallel()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	uc := NewUsecases(&testRepo{}, nil, "http://localhost:5173", nil, nil, nil, "", "")
-	r := newAuthenticatedCustomerMessagingRouter(uc, tenantID)
+	r := newAuthenticatedCustomerMessagingRouter(uc, orgID)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/customer-messaging/messages?party_id=bad-uuid", nil)
 	rec := httptest.NewRecorder()

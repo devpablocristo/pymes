@@ -17,17 +17,17 @@ import (
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.Specialty, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in domain.Specialty) (domain.Specialty, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Specialty, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Specialty, error)
 	Update(ctx context.Context, in domain.Specialty) (domain.Specialty, error)
-	CodeExists(ctx context.Context, tenantID uuid.UUID, code string, excludeID *uuid.UUID) (bool, error)
-	AssignProfessionals(ctx context.Context, tenantID, specialtyID uuid.UUID, profileIDs []uuid.UUID) error
-	Archive(ctx context.Context, tenantID, id uuid.UUID) error
-	Restore(ctx context.Context, tenantID, id uuid.UUID) error
-	Delete(ctx context.Context, tenantID, id uuid.UUID) error
+	CodeExists(ctx context.Context, orgID uuid.UUID, code string, excludeID *uuid.UUID) (bool, error)
+	AssignProfessionals(ctx context.Context, orgID, specialtyID uuid.UUID, profileIDs []uuid.UUID) error
+	Archive(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type Usecases struct {
@@ -54,7 +54,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.Specialty, actor string
 		return domain.Specialty{}, fmt.Errorf("name must be at least 2 characters: %w", httperrors.ErrBadInput)
 	}
 
-	exists, err := u.repo.CodeExists(ctx, in.TenantID, in.Code, nil)
+	exists, err := u.repo.CodeExists(ctx, in.OrgID, in.Code, nil)
 	if err != nil {
 		return domain.Specialty{}, err
 	}
@@ -67,13 +67,13 @@ func (u *Usecases) Create(ctx context.Context, in domain.Specialty, actor string
 		return domain.Specialty{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.TenantID.String(), actor, "specialty.created", "specialty", out.ID.String(), map[string]any{"code": out.Code, "name": out.Name})
+		u.audit.Log(ctx, out.OrgID.String(), actor, "specialty.created", "specialty", out.ID.String(), map[string]any{"code": out.Code, "name": out.Name})
 	}
 	return out, nil
 }
 
-func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Specialty, error) {
-	out, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Specialty, error) {
+	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Specialty{}, fmt.Errorf("specialty not found: %w", httperrors.ErrNotFound)
@@ -93,8 +93,8 @@ type UpdateInput struct {
 	Metadata    *map[string]any
 }
 
-func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (domain.Specialty, error) {
-	current, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Specialty, error) {
+	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Specialty{}, fmt.Errorf("specialty not found: %w", httperrors.ErrNotFound)
@@ -108,7 +108,7 @@ func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in Update
 	if in.Code != nil {
 		code := strings.TrimSpace(*in.Code)
 		if code != current.Code {
-			exists, err := u.repo.CodeExists(ctx, tenantID, code, &id)
+			exists, err := u.repo.CodeExists(ctx, orgID, code, &id)
 			if err != nil {
 				return domain.Specialty{}, err
 			}
@@ -152,62 +152,62 @@ func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in Update
 		return domain.Specialty{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.TenantID.String(), actor, "specialty.updated", "specialty", out.ID.String(), map[string]any{"code": out.Code, "name": out.Name})
+		u.audit.Log(ctx, out.OrgID.String(), actor, "specialty.updated", "specialty", out.ID.String(), map[string]any{"code": out.Code, "name": out.Name})
 	}
 	return out, nil
 }
 
-func (u *Usecases) Archive(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Archive(ctx, tenantID, id); err != nil {
+func (u *Usecases) Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Archive(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("specialty not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "specialty.archived", "specialty", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "specialty.archived", "specialty", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("specialty not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "specialty.restored", "specialty", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "specialty.restored", "specialty", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) Delete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Delete(ctx, tenantID, id); err != nil {
+func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Delete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("specialty not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "specialty.deleted", "specialty", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "specialty.deleted", "specialty", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) AssignProfessionals(ctx context.Context, tenantID, specialtyID uuid.UUID, profileIDs []uuid.UUID, actor string) error {
-	if _, err := u.repo.GetByID(ctx, tenantID, specialtyID); err != nil {
+func (u *Usecases) AssignProfessionals(ctx context.Context, orgID, specialtyID uuid.UUID, profileIDs []uuid.UUID, actor string) error {
+	if _, err := u.repo.GetByID(ctx, orgID, specialtyID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("specialty not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
-	if err := u.repo.AssignProfessionals(ctx, tenantID, specialtyID, profileIDs); err != nil {
+	if err := u.repo.AssignProfessionals(ctx, orgID, specialtyID, profileIDs); err != nil {
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "specialty.professionals_assigned", "specialty", specialtyID.String(), map[string]any{"count": len(profileIDs)})
+		u.audit.Log(ctx, orgID.String(), actor, "specialty.professionals_assigned", "specialty", specialtyID.String(), map[string]any{"count": len(profileIDs)})
 	}
 	return nil
 }

@@ -2,7 +2,7 @@ package dto
 
 type TableSessionItem struct {
 	ID         string  `json:"id"`
-	TenantID   string  `json:"tenant_id"`
+	OrgID   string  `json:"org_id"`
 	TableID    string  `json:"table_id"`
 	TableCode  string  `json:"table_code,omitempty"`
 	AreaName   string  `json:"area_name,omitempty"`

@@ -13,9 +13,9 @@ import (
 )
 
 // ListPublicServices mantiene el shape compacto usado por el adapter externo schedulingpublichttp.
-func (r *Repository) ListPublicServices(ctx context.Context, tenantID uuid.UUID, limit int) ([]PublicService, error) {
+func (r *Repository) ListPublicServices(ctx context.Context, orgID uuid.UUID, limit int) ([]PublicService, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	if items, ok, err := r.listSchedulingPublicServices(ctx, tenantID, limit); err != nil {
+	if items, ok, err := r.listSchedulingPublicServices(ctx, orgID, limit); err != nil {
 		return nil, err
 	} else if ok {
 		return items, nil
@@ -25,7 +25,7 @@ func (r *Repository) ListPublicServices(ctx context.Context, tenantID uuid.UUID,
 	err := r.db.WithContext(ctx).
 		Table("services").
 		Select("id, name, 'service' as type, description, '' as unit, sale_price as price, currency").
-		Where("tenant_id = ? AND deleted_at IS NULL AND is_active = true", tenantID).
+		Where("org_id = ? AND deleted_at IS NULL AND is_active = true", orgID).
 		Order("name ASC").
 		Limit(limit).
 		Scan(&rows).Error
@@ -35,11 +35,11 @@ func (r *Repository) ListPublicServices(ctx context.Context, tenantID uuid.UUID,
 	return rows, nil
 }
 
-func (r *Repository) listSchedulingPublicServices(ctx context.Context, tenantID uuid.UUID, limit int) ([]PublicService, bool, error) {
+func (r *Repository) listSchedulingPublicServices(ctx context.Context, orgID uuid.UUID, limit int) ([]PublicService, bool, error) {
 	if r.scheduling == nil {
 		return nil, false, nil
 	}
-	services, err := r.scheduling.ListServices(ctx, tenantID)
+	services, err := r.scheduling.ListServices(ctx, orgID)
 	if err != nil {
 		return nil, false, err
 	}
@@ -109,14 +109,14 @@ type publicServiceCatalogRow struct {
 
 // ListPublicServiceCatalog lee el catálogo rico desde public.services con filtros
 // opcionales por metadata.vertical / metadata.segment y un search por nombre/código.
-func (r *Repository) ListPublicServiceCatalog(ctx context.Context, tenantID uuid.UUID, vertical, segment, search string, limit int) ([]PublicServiceCatalogItem, error) {
+func (r *Repository) ListPublicServiceCatalog(ctx context.Context, orgID uuid.UUID, vertical, segment, search string, limit int) ([]PublicServiceCatalogItem, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
 	q := r.db.WithContext(ctx).
 		Table("services").
 		Select(`id, code, name, description, category_code, sale_price, currency,
 			tax_rate, default_duration_minutes, metadata`).
-		Where("tenant_id = ? AND deleted_at IS NULL AND is_active = true", tenantID)
+		Where("org_id = ? AND deleted_at IS NULL AND is_active = true", orgID)
 
 	if v := strings.TrimSpace(vertical); v != "" {
 		q = q.Where("metadata->>'vertical' = ?", v)

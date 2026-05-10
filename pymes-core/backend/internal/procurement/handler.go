@@ -19,20 +19,20 @@ import (
 type usecasesPort interface {
 	Create(ctx context.Context, in CreateInput) (domain.ProcurementRequest, error)
 	Update(ctx context.Context, in UpdateInput) (domain.ProcurementRequest, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.ProcurementRequest, error)
-	List(ctx context.Context, tenantID uuid.UUID, archived bool, limit int) ([]domain.ProcurementRequest, error)
-	Delete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
-	Archive(ctx context.Context, tenantID, id uuid.UUID, actor string) error
-	Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error
-	Submit(ctx context.Context, tenantID, id uuid.UUID, actor string) (domain.ProcurementRequest, error)
-	Approve(ctx context.Context, tenantID, id uuid.UUID, actor string) (domain.ProcurementRequest, error)
-	Reject(ctx context.Context, tenantID, id uuid.UUID, actor string) (domain.ProcurementRequest, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.ProcurementRequest, error)
+	List(ctx context.Context, orgID uuid.UUID, archived bool, limit int) ([]domain.ProcurementRequest, error)
+	Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Submit(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.ProcurementRequest, error)
+	Approve(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.ProcurementRequest, error)
+	Reject(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.ProcurementRequest, error)
 
-	ListPoliciesForTenant(ctx context.Context, tenantID uuid.UUID) ([]domain.ProcurementPolicy, error)
-	GetPolicy(ctx context.Context, tenantID, id uuid.UUID) (domain.ProcurementPolicy, error)
+	ListPoliciesForTenant(ctx context.Context, orgID uuid.UUID) ([]domain.ProcurementPolicy, error)
+	GetPolicy(ctx context.Context, orgID, id uuid.UUID) (domain.ProcurementPolicy, error)
 	CreatePolicy(ctx context.Context, in PolicyCreateInput) (domain.ProcurementPolicy, error)
 	UpdatePolicy(ctx context.Context, in PolicyUpdateInput) (domain.ProcurementPolicy, error)
-	DeletePolicy(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	DeletePolicy(ctx context.Context, orgID, id uuid.UUID, actor string) error
 }
 
 type Handler struct{ uc usecasesPort }
@@ -67,13 +67,13 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) List(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
 	archived := strings.EqualFold(strings.TrimSpace(c.Query("archived")), "true")
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.List(c.Request.Context(), tenantID, archived, limit)
+	items, err := h.uc.List(c.Request.Context(), orgID, archived, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -86,7 +86,7 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) Create(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -98,7 +98,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	lines := toDomainLines(body.Lines)
 	created, err := h.uc.Create(c.Request.Context(), CreateInput{
-		TenantID:       tenantID,
+		OrgID:       orgID,
 		Actor:          auth.Actor,
 		Title:          body.Title,
 		Description:    body.Description,
@@ -115,11 +115,11 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	item, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
+	item, err := h.uc.GetByID(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -128,7 +128,7 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -140,7 +140,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	lines := toDomainLines(body.Lines)
 	updated, err := h.uc.Update(c.Request.Context(), UpdateInput{
-		TenantID:       tenantID,
+		OrgID:       orgID,
 		ID:             id,
 		Actor:          auth.Actor,
 		Title:          body.Title,
@@ -158,12 +158,12 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	if err := h.uc.Delete(c.Request.Context(), tenantID, id, auth.Actor); err != nil {
+	if err := h.uc.Delete(c.Request.Context(), orgID, id, auth.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -171,12 +171,12 @@ func (h *Handler) Delete(c *gin.Context) {
 }
 
 func (h *Handler) Archive(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	if err := h.uc.Archive(c.Request.Context(), tenantID, id, auth.Actor); err != nil {
+	if err := h.uc.Archive(c.Request.Context(), orgID, id, auth.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -184,12 +184,12 @@ func (h *Handler) Archive(c *gin.Context) {
 }
 
 func (h *Handler) Restore(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	if err := h.uc.Restore(c.Request.Context(), tenantID, id, auth.Actor); err != nil {
+	if err := h.uc.Restore(c.Request.Context(), orgID, id, auth.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -197,12 +197,12 @@ func (h *Handler) Restore(c *gin.Context) {
 }
 
 func (h *Handler) Submit(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	out, err := h.uc.Submit(c.Request.Context(), tenantID, id, auth.Actor)
+	out, err := h.uc.Submit(c.Request.Context(), orgID, id, auth.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -211,12 +211,12 @@ func (h *Handler) Submit(c *gin.Context) {
 }
 
 func (h *Handler) Approve(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	out, err := h.uc.Approve(c.Request.Context(), tenantID, id, auth.Actor)
+	out, err := h.uc.Approve(c.Request.Context(), orgID, id, auth.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -225,12 +225,12 @@ func (h *Handler) Approve(c *gin.Context) {
 }
 
 func (h *Handler) Reject(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	out, err := h.uc.Reject(c.Request.Context(), tenantID, id, auth.Actor)
+	out, err := h.uc.Reject(c.Request.Context(), orgID, id, auth.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -239,11 +239,11 @@ func (h *Handler) Reject(c *gin.Context) {
 }
 
 func (h *Handler) ListPolicies(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
-	items, err := h.uc.ListPoliciesForTenant(c.Request.Context(), tenantID)
+	items, err := h.uc.ListPoliciesForTenant(c.Request.Context(), orgID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -256,11 +256,11 @@ func (h *Handler) ListPolicies(c *gin.Context) {
 }
 
 func (h *Handler) GetPolicy(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	item, err := h.uc.GetPolicy(c.Request.Context(), tenantID, id)
+	item, err := h.uc.GetPolicy(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -269,7 +269,7 @@ func (h *Handler) GetPolicy(c *gin.Context) {
 }
 
 func (h *Handler) CreatePolicy(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -280,7 +280,7 @@ func (h *Handler) CreatePolicy(c *gin.Context) {
 		return
 	}
 	created, err := h.uc.CreatePolicy(c.Request.Context(), PolicyCreateInput{
-		TenantID:     tenantID,
+		OrgID:     orgID,
 		Actor:        auth.Actor,
 		Name:         body.Name,
 		Expression:   body.Expression,
@@ -299,7 +299,7 @@ func (h *Handler) CreatePolicy(c *gin.Context) {
 }
 
 func (h *Handler) UpdatePolicy(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -310,7 +310,7 @@ func (h *Handler) UpdatePolicy(c *gin.Context) {
 		return
 	}
 	updated, err := h.uc.UpdatePolicy(c.Request.Context(), PolicyUpdateInput{
-		TenantID:     tenantID,
+		OrgID:     orgID,
 		ID:           id,
 		Actor:        auth.Actor,
 		Name:         body.Name,
@@ -330,12 +330,12 @@ func (h *Handler) UpdatePolicy(c *gin.Context) {
 }
 
 func (h *Handler) DeletePolicy(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	if err := h.uc.DeletePolicy(c.Request.Context(), tenantID, id, auth.Actor); err != nil {
+	if err := h.uc.DeletePolicy(c.Request.Context(), orgID, id, auth.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -345,7 +345,7 @@ func (h *Handler) DeletePolicy(c *gin.Context) {
 func toPolicyResponse(p domain.ProcurementPolicy) dto.PolicyResponse {
 	return dto.PolicyResponse{
 		ID:           p.ID,
-		TenantID:     p.TenantID,
+		OrgID:     p.OrgID,
 		Name:         p.Name,
 		Expression:   p.Expression,
 		Effect:       p.Effect,
@@ -390,7 +390,7 @@ func toResponse(r domain.ProcurementRequest) dto.RequestResponse {
 	}
 	return dto.RequestResponse{
 		ID:             r.ID,
-		TenantID:       r.TenantID,
+		OrgID:       r.OrgID,
 		RequesterActor: r.RequesterActor,
 		Title:          r.Title,
 		Description:    r.Description,

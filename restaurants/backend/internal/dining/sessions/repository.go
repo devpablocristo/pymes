@@ -29,9 +29,9 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.TableSess
 		AreaName  string `gorm:"column:area_name"`
 	}
 	base := r.db.WithContext(ctx).Table("restaurant.table_sessions AS s").
-		Joins("JOIN restaurant.dining_tables t ON t.id = s.table_id AND t.tenant_id = s.tenant_id").
-		Joins("JOIN restaurant.dining_areas a ON a.id = t.area_id AND a.tenant_id = s.tenant_id").
-		Where("s.tenant_id = ?", p.TenantID)
+		Joins("JOIN restaurant.dining_tables t ON t.id = s.table_id AND t.org_id = s.org_id").
+		Joins("JOIN restaurant.dining_areas a ON a.id = t.area_id AND a.org_id = s.org_id").
+		Where("s.org_id = ?", p.OrgID)
 	if p.OpenOnly {
 		base = base.Where("s.closed_at IS NULL")
 	}
@@ -55,7 +55,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.TableSess
 		out = append(out, domain.TableSessionListItem{
 			TableSession: domain.TableSession{
 				ID:         rw.ID,
-				TenantID:   rw.TenantID,
+				OrgID:   rw.OrgID,
 				TableID:    rw.TableID,
 				GuestCount: rw.GuestCount,
 				PartyLabel: rw.PartyLabel,
@@ -72,12 +72,12 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.TableSess
 	return out, total, nil
 }
 
-func (r *Repository) OpenSession(ctx context.Context, tenantID, tableID uuid.UUID, guestCount int, partyLabel, notes string) (domain.TableSession, error) {
+func (r *Repository) OpenSession(ctx context.Context, orgID, tableID uuid.UUID, guestCount int, partyLabel, notes string) (domain.TableSession, error) {
 	var out domain.TableSession
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var t tablemodels.DiningTableModel
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("tenant_id = ? AND id = ?", tenantID, tableID).
+			Where("org_id = ? AND id = ?", orgID, tableID).
 			First(&t).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return fmt.Errorf("dining table not found: %w", httperrors.ErrNotFound)
@@ -99,7 +99,7 @@ func (r *Repository) OpenSession(ctx context.Context, tenantID, tableID uuid.UUI
 		now := time.Now().UTC()
 		row := models.TableSessionModel{
 			ID:         uuid.New(),
-			TenantID:   tenantID,
+			OrgID:   orgID,
 			TableID:    tableID,
 			GuestCount: guestCount,
 			PartyLabel: partyLabel,
@@ -113,7 +113,7 @@ func (r *Repository) OpenSession(ctx context.Context, tenantID, tableID uuid.UUI
 			return err
 		}
 		if err := tx.Model(&tablemodels.DiningTableModel{}).
-			Where("tenant_id = ? AND id = ?", tenantID, tableID).
+			Where("org_id = ? AND id = ?", orgID, tableID).
 			Updates(map[string]any{"status": "occupied", "updated_at": now}).Error; err != nil {
 			return err
 		}
@@ -123,12 +123,12 @@ func (r *Repository) OpenSession(ctx context.Context, tenantID, tableID uuid.UUI
 	return out, err
 }
 
-func (r *Repository) CloseSession(ctx context.Context, tenantID, sessionID uuid.UUID) (domain.TableSession, error) {
+func (r *Repository) CloseSession(ctx context.Context, orgID, sessionID uuid.UUID) (domain.TableSession, error) {
 	var out domain.TableSession
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var s models.TableSessionModel
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("tenant_id = ? AND id = ?", tenantID, sessionID).
+			Where("org_id = ? AND id = ?", orgID, sessionID).
 			First(&s).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
@@ -140,12 +140,12 @@ func (r *Repository) CloseSession(ctx context.Context, tenantID, sessionID uuid.
 		}
 		now := time.Now().UTC()
 		if err := tx.Model(&models.TableSessionModel{}).
-			Where("tenant_id = ? AND id = ?", tenantID, sessionID).
+			Where("org_id = ? AND id = ?", orgID, sessionID).
 			Updates(map[string]any{"closed_at": now, "updated_at": now}).Error; err != nil {
 			return err
 		}
 		if err := tx.Model(&tablemodels.DiningTableModel{}).
-			Where("tenant_id = ? AND id = ?", tenantID, s.TableID).
+			Where("org_id = ? AND id = ?", orgID, s.TableID).
 			Updates(map[string]any{"status": "available", "updated_at": now}).Error; err != nil {
 			return err
 		}
@@ -160,7 +160,7 @@ func (r *Repository) CloseSession(ctx context.Context, tenantID, sessionID uuid.
 func toDomain(row models.TableSessionModel) domain.TableSession {
 	return domain.TableSession{
 		ID:         row.ID,
-		TenantID:   row.TenantID,
+		OrgID:   row.OrgID,
 		TableID:    row.TableID,
 		GuestCount: row.GuestCount,
 		PartyLabel: row.PartyLabel,

@@ -35,9 +35,9 @@ type testRepo struct {
 	updateCalls int
 }
 
-func (r *testRepo) ListEndpoints(ctx context.Context, tenantID uuid.UUID) ([]webhookdomain.Endpoint, error) {
+func (r *testRepo) ListEndpoints(ctx context.Context, orgID uuid.UUID) ([]webhookdomain.Endpoint, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	return nil, nil
 }
 
@@ -48,9 +48,9 @@ func (r *testRepo) CreateEndpoint(ctx context.Context, in webhookdomain.Endpoint
 	return in, nil
 }
 
-func (r *testRepo) GetEndpoint(ctx context.Context, tenantID, id uuid.UUID) (webhookdomain.Endpoint, error) {
+func (r *testRepo) GetEndpoint(ctx context.Context, orgID, id uuid.UUID) (webhookdomain.Endpoint, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	_ = id
 	return r.current, nil
 }
@@ -62,24 +62,24 @@ func (r *testRepo) UpdateEndpoint(ctx context.Context, in webhookdomain.Endpoint
 	return in, nil
 }
 
-func (r *testRepo) DeleteEndpoint(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *testRepo) DeleteEndpoint(ctx context.Context, orgID, id uuid.UUID) error {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	_ = id
 	return nil
 }
 
-func (r *testRepo) ListDeliveries(ctx context.Context, tenantID, endpointID uuid.UUID, limit int) ([]webhookdomain.Delivery, error) {
+func (r *testRepo) ListDeliveries(ctx context.Context, orgID, endpointID uuid.UUID, limit int) ([]webhookdomain.Delivery, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	_ = endpointID
 	_ = limit
 	return nil, nil
 }
 
-func (r *testRepo) CreateOutbox(ctx context.Context, tenantID uuid.UUID, eventType string, payload map[string]any) error {
+func (r *testRepo) CreateOutbox(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) error {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	_ = eventType
 	_ = payload
 	return nil
@@ -99,9 +99,9 @@ func (r *testRepo) MarkOutbox(ctx context.Context, id uuid.UUID, status, lastErr
 	return nil
 }
 
-func (r *testRepo) ListEndpointsForEvent(ctx context.Context, tenantID uuid.UUID, eventType string) ([]webhookdomain.Endpoint, error) {
+func (r *testRepo) ListEndpointsForEvent(ctx context.Context, orgID uuid.UUID, eventType string) ([]webhookdomain.Endpoint, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	_ = eventType
 	return nil, nil
 }
@@ -164,7 +164,7 @@ func TestCreateEndpointRejectsResolvedPrivateHost(t *testing.T) {
 	}
 
 	_, err := uc.CreateEndpoint(context.Background(), webhookdomain.Endpoint{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		URL:      "https://internal.example/hooks",
 	})
 	if err == nil {
@@ -184,7 +184,7 @@ func TestCreateEndpointRejectsUnresolvedHost(t *testing.T) {
 	uc.resolver = testResolver{err: errors.New("lookup failed")}
 
 	_, err := uc.CreateEndpoint(context.Background(), webhookdomain.Endpoint{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		URL:      "https://missing.example/hooks",
 	})
 	if err == nil {
@@ -205,7 +205,7 @@ func TestCreateEndpointAllowsResolvedPublicHost(t *testing.T) {
 	}
 
 	got, err := uc.CreateEndpoint(context.Background(), webhookdomain.Endpoint{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		URL:      "https://public.example/hooks",
 		IsActive: true,
 		Events:   []string{"sales.created"},

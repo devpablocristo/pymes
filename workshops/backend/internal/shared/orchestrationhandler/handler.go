@@ -14,10 +14,10 @@ import (
 )
 
 type UsecasesPort interface {
-	CreateBooking(ctx context.Context, tenantID string, payload map[string]any) (map[string]any, error)
-	CreateQuoteFromWorkOrder(ctx context.Context, tenantID string, workOrderID uuid.UUID, actor string) (map[string]any, error)
-	CreateSaleFromWorkOrder(ctx context.Context, tenantID string, workOrderID uuid.UUID, actor string) (map[string]any, error)
-	CreatePaymentLinkFromWorkOrder(ctx context.Context, tenantID string, workOrderID uuid.UUID, actor string) (map[string]any, error)
+	CreateBooking(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error)
+	CreateQuoteFromWorkOrder(ctx context.Context, orgID string, workOrderID uuid.UUID, actor string) (map[string]any, error)
+	CreateSaleFromWorkOrder(ctx context.Context, orgID string, workOrderID uuid.UUID, actor string) (map[string]any, error)
+	CreatePaymentLinkFromWorkOrder(ctx context.Context, orgID string, workOrderID uuid.UUID, actor string) (map[string]any, error)
 }
 
 type Handler struct {
@@ -50,7 +50,7 @@ func (h *Handler) CreateBooking(c *gin.Context) {
 	if payload == nil {
 		payload = map[string]any{}
 	}
-	out, err := h.uc.CreateBooking(c.Request.Context(), auth.GetAuthContext(c).TenantID, payload)
+	out, err := h.uc.CreateBooking(c.Request.Context(), auth.GetAuthContext(c).OrgID, payload)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -63,7 +63,7 @@ func (h *Handler) CreateQuote(c *gin.Context) {
 	if !ok {
 		return
 	}
-	out, err := h.uc.CreateQuoteFromWorkOrder(c.Request.Context(), auth.GetAuthContext(c).TenantID, id, auth.GetAuthContext(c).Actor)
+	out, err := h.uc.CreateQuoteFromWorkOrder(c.Request.Context(), auth.GetAuthContext(c).OrgID, id, auth.GetAuthContext(c).Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -76,7 +76,7 @@ func (h *Handler) CreateSale(c *gin.Context) {
 	if !ok {
 		return
 	}
-	out, err := h.uc.CreateSaleFromWorkOrder(c.Request.Context(), auth.GetAuthContext(c).TenantID, id, auth.GetAuthContext(c).Actor)
+	out, err := h.uc.CreateSaleFromWorkOrder(c.Request.Context(), auth.GetAuthContext(c).OrgID, id, auth.GetAuthContext(c).Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -89,7 +89,7 @@ func (h *Handler) CreatePaymentLink(c *gin.Context) {
 	if !ok {
 		return
 	}
-	out, err := h.uc.CreatePaymentLinkFromWorkOrder(c.Request.Context(), auth.GetAuthContext(c).TenantID, id, auth.GetAuthContext(c).Actor)
+	out, err := h.uc.CreatePaymentLinkFromWorkOrder(c.Request.Context(), auth.GetAuthContext(c).OrgID, id, auth.GetAuthContext(c).Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

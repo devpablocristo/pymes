@@ -51,7 +51,7 @@ describe('BranchProvider', () => {
     apiMocks.getSession.mockReset();
     apiMocks.getSession.mockResolvedValue({
       auth: {
-        tenant_id: 'tenant-1',
+        org_id: 'tenant-1',
         tenant_name: 'Tenant Demo',
         role: 'admin',
         product_role: 'admin',

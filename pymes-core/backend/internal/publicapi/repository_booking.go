@@ -19,18 +19,18 @@ type schedulingSelection struct {
 	Resource *schedulingdomain.Resource
 }
 
-func (r *Repository) GetAvailability(ctx context.Context, tenantID uuid.UUID, query AvailabilityQuery) ([]AvailabilitySlot, error) {
+func (r *Repository) GetAvailability(ctx context.Context, orgID uuid.UUID, query AvailabilityQuery) ([]AvailabilitySlot, error) {
 	if query.Duration < 0 || query.Duration > 720 {
 		return nil, ErrInvalidInput
 	}
-	selection, ok, err := r.resolveSchedulingSelection(ctx, tenantID, query.BranchID, query.ServiceID, query.ResourceID)
+	selection, ok, err := r.resolveSchedulingSelection(ctx, orgID, query.BranchID, query.ServiceID, query.ResourceID)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return nil, fmt.Errorf("scheduling not configured for this tenant")
 	}
-	slots, err := r.scheduling.ListAvailableSlots(ctx, tenantID, schedulingdomain.SlotQuery{
+	slots, err := r.scheduling.ListAvailableSlots(ctx, orgID, schedulingdomain.SlotQuery{
 		BranchID:   selection.Branch.ID,
 		ServiceID:  selection.Service.ID,
 		Date:       query.Date.UTC(),
@@ -50,7 +50,7 @@ func (r *Repository) GetAvailability(ctx context.Context, tenantID uuid.UUID, qu
 	return out, nil
 }
 
-func (r *Repository) Book(ctx context.Context, tenantID uuid.UUID, payload map[string]any) (BookingPublic, error) {
+func (r *Repository) Book(ctx context.Context, orgID uuid.UUID, payload map[string]any) (BookingPublic, error) {
 	branchID, err := uuidPtrFromPayload(payload, "branch_id")
 	if err != nil {
 		return BookingPublic{}, ErrInvalidInput
@@ -63,26 +63,26 @@ func (r *Repository) Book(ctx context.Context, tenantID uuid.UUID, payload map[s
 	if err != nil {
 		return BookingPublic{}, ErrInvalidInput
 	}
-	selection, ok, err := r.resolveSchedulingSelection(ctx, tenantID, branchID, serviceID, resourceID)
+	selection, ok, err := r.resolveSchedulingSelection(ctx, orgID, branchID, serviceID, resourceID)
 	if err != nil {
 		return BookingPublic{}, err
 	}
 	if !ok {
 		return BookingPublic{}, fmt.Errorf("scheduling not configured for this tenant")
 	}
-	return r.bookScheduling(ctx, tenantID, selection, payload)
+	return r.bookScheduling(ctx, orgID, selection, payload)
 }
 
-func (r *Repository) ListByPhone(ctx context.Context, tenantID uuid.UUID, phone string, limit int) ([]BookingPublic, error) {
+func (r *Repository) ListByPhone(ctx context.Context, orgID uuid.UUID, phone string, limit int) ([]BookingPublic, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	phoneDigits := digitsOnly(phone)
 	if phoneDigits == "" {
 		return nil, ErrInvalidInput
 	}
-	return r.listSchedulingBookingsByPhone(ctx, tenantID, phoneDigits, limit)
+	return r.listSchedulingBookingsByPhone(ctx, orgID, phoneDigits, limit)
 }
 
-func (r *Repository) ConfirmBookingByToken(ctx context.Context, tenantID uuid.UUID, token string) (BookingPublic, error) {
+func (r *Repository) ConfirmBookingByToken(ctx context.Context, orgID uuid.UUID, token string) (BookingPublic, error) {
 	if r.scheduling == nil {
 		return BookingPublic{}, ErrInvalidInput
 	}
@@ -90,13 +90,13 @@ func (r *Repository) ConfirmBookingByToken(ctx context.Context, tenantID uuid.UU
 	if err != nil {
 		return BookingPublic{}, mapSchedulingErr(err)
 	}
-	if item.OrgID != tenantID {
+	if item.OrgID != orgID {
 		return BookingPublic{}, ErrInvalidInput
 	}
 	return bookingFromSchedulingBooking(item), nil
 }
 
-func (r *Repository) CancelBookingByToken(ctx context.Context, tenantID uuid.UUID, token, reason string) (BookingPublic, error) {
+func (r *Repository) CancelBookingByToken(ctx context.Context, orgID uuid.UUID, token, reason string) (BookingPublic, error) {
 	if r.scheduling == nil {
 		return BookingPublic{}, ErrInvalidInput
 	}
@@ -104,17 +104,17 @@ func (r *Repository) CancelBookingByToken(ctx context.Context, tenantID uuid.UUI
 	if err != nil {
 		return BookingPublic{}, mapSchedulingErr(err)
 	}
-	if item.OrgID != tenantID {
+	if item.OrgID != orgID {
 		return BookingPublic{}, ErrInvalidInput
 	}
 	return bookingFromSchedulingBooking(item), nil
 }
 
-func (r *Repository) resolveSchedulingSelection(ctx context.Context, tenantID uuid.UUID, branchID, serviceID, resourceID *uuid.UUID) (schedulingSelection, bool, error) {
+func (r *Repository) resolveSchedulingSelection(ctx context.Context, orgID uuid.UUID, branchID, serviceID, resourceID *uuid.UUID) (schedulingSelection, bool, error) {
 	if r.scheduling == nil {
 		return schedulingSelection{}, false, nil
 	}
-	branches, err := r.scheduling.ListBranches(ctx, tenantID)
+	branches, err := r.scheduling.ListBranches(ctx, orgID)
 	if err != nil {
 		return schedulingSelection{}, false, err
 	}
@@ -124,7 +124,7 @@ func (r *Repository) resolveSchedulingSelection(ctx context.Context, tenantID uu
 			activeBranches = append(activeBranches, branch)
 		}
 	}
-	services, err := r.scheduling.ListServices(ctx, tenantID)
+	services, err := r.scheduling.ListServices(ctx, orgID)
 	if err != nil {
 		return schedulingSelection{}, false, err
 	}
@@ -153,7 +153,7 @@ func (r *Repository) resolveSchedulingSelection(ctx context.Context, tenantID uu
 
 	var resource *schedulingdomain.Resource
 	if resourceID != nil && *resourceID != uuid.Nil {
-		resources, err := r.scheduling.ListResources(ctx, tenantID, &branch.ID)
+		resources, err := r.scheduling.ListResources(ctx, orgID, &branch.ID)
 		if err != nil {
 			return schedulingSelection{}, true, err
 		}
@@ -208,7 +208,7 @@ func chooseService(services []schedulingdomain.Service, serviceID *uuid.UUID) (s
 	return schedulingdomain.Service{}, ErrInvalidInput
 }
 
-func (r *Repository) bookScheduling(ctx context.Context, tenantID uuid.UUID, selection schedulingSelection, payload map[string]any) (BookingPublic, error) {
+func (r *Repository) bookScheduling(ctx context.Context, orgID uuid.UUID, selection schedulingSelection, payload map[string]any) (BookingPublic, error) {
 	startAt, err := timeValueFromPayload(payload, "start_at")
 	if err != nil || startAt.IsZero() {
 		return BookingPublic{}, ErrInvalidInput
@@ -258,7 +258,7 @@ func (r *Repository) bookScheduling(ctx context.Context, tenantID uuid.UUID, sel
 	if selection.Resource != nil {
 		input.ResourceID = &selection.Resource.ID
 	}
-	booking, err := r.scheduling.CreateBooking(ctx, tenantID, "public-api", input)
+	booking, err := r.scheduling.CreateBooking(ctx, orgID, "public-api", input)
 	if err != nil {
 		return BookingPublic{}, mapSchedulingErr(err)
 	}
@@ -268,7 +268,7 @@ func (r *Repository) bookScheduling(ctx context.Context, tenantID uuid.UUID, sel
 	}
 	actions := schedulingpublic.ActionLinks{}
 	if r.scheduling != nil {
-		if tokens, err := r.scheduling.CreateBookingActionTokens(ctx, tenantID, booking.ID, 72*time.Hour); err == nil {
+		if tokens, err := r.scheduling.CreateBookingActionTokens(ctx, orgID, booking.ID, 72*time.Hour); err == nil {
 			actions = buildActionLinks(tokens)
 		}
 	}
@@ -286,7 +286,7 @@ func (r *Repository) bookScheduling(ctx context.Context, tenantID uuid.UUID, sel
 	}, nil
 }
 
-func (r *Repository) listSchedulingBookingsByPhone(ctx context.Context, tenantID uuid.UUID, phoneDigits string, limit int) ([]BookingPublic, error) {
+func (r *Repository) listSchedulingBookingsByPhone(ctx context.Context, orgID uuid.UUID, phoneDigits string, limit int) ([]BookingPublic, error) {
 	var rows []BookingPublic
 	err := r.db.WithContext(ctx).
 		Table("scheduling_bookings tb").
@@ -302,7 +302,7 @@ func (r *Repository) listSchedulingBookingsByPhone(ctx context.Context, tenantID
 			EXTRACT(EPOCH FROM (tb.end_at - tb.start_at))::int / 60 as duration
 		`).
 		Joins("LEFT JOIN scheduling_services ts ON ts.id = tb.service_id").
-		Where("tb.tenant_id = ? AND regexp_replace(tb.customer_phone, '[^0-9]', '', 'g') = ?", tenantID, phoneDigits).
+		Where("tb.org_id = ? AND regexp_replace(tb.customer_phone, '[^0-9]', '', 'g') = ?", orgID, phoneDigits).
 		Order("tb.start_at DESC").
 		Limit(limit).
 		Scan(&rows).Error

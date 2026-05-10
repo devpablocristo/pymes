@@ -8,7 +8,7 @@ import (
 
 type ProfessionalProfile struct {
 	ID                uuid.UUID
-	TenantID          uuid.UUID
+	OrgID          uuid.UUID
 	PartyID           uuid.UUID
 	PublicSlug        string
 	Bio               string
@@ -27,7 +27,7 @@ type ProfessionalProfile struct {
 
 type Specialty struct {
 	ID          uuid.UUID
-	TenantID    uuid.UUID
+	OrgID    uuid.UUID
 	Code        string
 	Name        string
 	Description string

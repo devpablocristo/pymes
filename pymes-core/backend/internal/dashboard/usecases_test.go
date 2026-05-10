@@ -23,64 +23,64 @@ func (f *fakeDashboardRepo) ListWidgets(ctx context.Context) ([]dashboarddomain.
 	return append([]dashboarddomain.WidgetDefinition(nil), f.widgets...), nil
 }
 
-func (f *fakeDashboardRepo) LoadSalesSummary(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.SalesSummaryData, error) {
+func (f *fakeDashboardRepo) LoadSalesSummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.SalesSummaryData, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	f.lastBranchID = branchID
 	return dashboarddomain.SalesSummaryData{}, nil
 }
 
-func (f *fakeDashboardRepo) LoadCashflowSummary(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.CashflowSummaryData, error) {
+func (f *fakeDashboardRepo) LoadCashflowSummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.CashflowSummaryData, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	f.lastBranchID = branchID
 	return dashboarddomain.CashflowSummaryData{}, nil
 }
 
-func (f *fakeDashboardRepo) LoadQuotesPipeline(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.QuotesPipelineData, error) {
+func (f *fakeDashboardRepo) LoadQuotesPipeline(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.QuotesPipelineData, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	f.lastBranchID = branchID
 	return dashboarddomain.QuotesPipelineData{}, nil
 }
 
-func (f *fakeDashboardRepo) LoadLowStock(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.LowStockData, error) {
+func (f *fakeDashboardRepo) LoadLowStock(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.LowStockData, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	f.lastBranchID = branchID
 	return dashboarddomain.LowStockData{}, nil
 }
 
-func (f *fakeDashboardRepo) LoadRecentSales(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.RecentSalesData, error) {
+func (f *fakeDashboardRepo) LoadRecentSales(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.RecentSalesData, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	f.lastBranchID = branchID
 	return dashboarddomain.RecentSalesData{}, nil
 }
 
-func (f *fakeDashboardRepo) LoadTopProducts(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopProductsData, error) {
+func (f *fakeDashboardRepo) LoadTopProducts(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopProductsData, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	f.lastBranchID = branchID
 	return dashboarddomain.TopProductsData{}, nil
 }
 
-func (f *fakeDashboardRepo) LoadTopServices(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopServicesData, error) {
+func (f *fakeDashboardRepo) LoadTopServices(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopServicesData, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	f.lastBranchID = branchID
 	return f.topServices, f.topServicesErr
 }
 
-func (f *fakeDashboardRepo) LoadBillingStatus(ctx context.Context, tenantID uuid.UUID) (dashboarddomain.BillingStatusData, error) {
+func (f *fakeDashboardRepo) LoadBillingStatus(ctx context.Context, orgID uuid.UUID) (dashboarddomain.BillingStatusData, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	return dashboarddomain.BillingStatusData{}, nil
 }
 
-func (f *fakeDashboardRepo) LoadAuditActivity(ctx context.Context, tenantID uuid.UUID) (dashboarddomain.AuditActivityData, error) {
+func (f *fakeDashboardRepo) LoadAuditActivity(ctx context.Context, orgID uuid.UUID) (dashboarddomain.AuditActivityData, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	return dashboarddomain.AuditActivityData{}, nil
 }
 
@@ -106,7 +106,7 @@ func TestGetWidgetDataReturnsTopServices(t *testing.T) {
 	uc := NewUsecases(repo)
 
 	out, err := uc.GetWidgetData(context.Background(), dashboarddomain.Viewer{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		Role:     "admin",
 	}, "home", "top-services")
 	if err != nil {
@@ -141,7 +141,7 @@ func TestGetWidgetDataRejectsWidgetHiddenByRole(t *testing.T) {
 	uc := NewUsecases(repo)
 
 	_, err := uc.GetWidgetData(context.Background(), dashboarddomain.Viewer{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		Role:     "member",
 	}, "home", "billing-status")
 	if !errors.Is(err, httperrors.ErrNotFound) {
@@ -149,7 +149,7 @@ func TestGetWidgetDataRejectsWidgetHiddenByRole(t *testing.T) {
 	}
 }
 
-func TestGetWidgetDataRequiresTenantID(t *testing.T) {
+func TestGetWidgetDataRequiresOrgID(t *testing.T) {
 	repo := &fakeDashboardRepo{
 		widgets: []dashboarddomain.WidgetDefinition{
 			{
@@ -194,7 +194,7 @@ func TestGetWidgetDataAllowsScopedViewerWithoutRole(t *testing.T) {
 	uc := NewUsecases(repo)
 
 	out, err := uc.GetWidgetData(context.Background(), dashboarddomain.Viewer{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		Scopes:   []string{"admin:console:read"},
 	}, "home", "top-services")
 	if err != nil {
@@ -227,7 +227,7 @@ func TestGetWidgetDataForwardsViewerBranchID(t *testing.T) {
 	branchID := uuid.New()
 
 	if _, err := uc.GetWidgetData(context.Background(), dashboarddomain.Viewer{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		BranchID: &branchID,
 		Role:     "admin",
 	}, "home", "top-services"); err != nil {

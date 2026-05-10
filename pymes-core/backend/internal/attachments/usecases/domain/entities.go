@@ -8,7 +8,7 @@ import (
 
 type Attachment struct {
 	ID             uuid.UUID `json:"id"`
-	TenantID       uuid.UUID `json:"tenant_id"`
+	OrgID       uuid.UUID `json:"org_id"`
 	AttachableType string    `json:"attachable_type"`
 	AttachableID   uuid.UUID `json:"attachable_id"`
 	FileName       string    `json:"file_name"`

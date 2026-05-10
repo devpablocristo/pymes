@@ -36,9 +36,9 @@ func normalizeBranchID(branchID *uuid.UUID) *uuid.UUID {
 	return branchID
 }
 
-func (r *Repository) List(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
+func (r *Repository) List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).Where("tenant_id = ? AND deleted_at IS NULL", tenantID)
+	q := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).Where("org_id = ? AND deleted_at IS NULL", orgID)
 	if branchID != nil && *branchID != uuid.Nil {
 		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *branchID)
 	}
@@ -56,9 +56,9 @@ func (r *Repository) List(ctx context.Context, tenantID uuid.UUID, branchID *uui
 	return out, nil
 }
 
-func (r *Repository) ListArchived(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).Where("tenant_id = ? AND deleted_at IS NOT NULL", tenantID)
+	q := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).Where("org_id = ? AND deleted_at IS NOT NULL", orgID)
 	if branchID != nil && *branchID != uuid.Nil {
 		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *branchID)
 	}
@@ -79,13 +79,13 @@ func (r *Repository) ListArchived(ctx context.Context, tenantID uuid.UUID, branc
 func (r *Repository) Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error) {
 	var out purchasesdomain.Purchase
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		tenant, err := r.getOrCreateTenantSettingsForUpdate(ctx, tx, in.TenantID)
+		tenant, err := r.getOrCreateTenantSettingsForUpdate(ctx, tx, in.OrgID)
 		if err != nil {
 			return err
 		}
 		number := fmt.Sprintf("%s-%05d", tenant.PurchasePrefix, tenant.NextPurchaseNumber)
 		subtotal, taxTotal, total := totals(in.Items)
-		purchaseRow := models.PurchaseModel{ID: uuid.New(), TenantID: in.TenantID, BranchID: in.BranchID, Number: number, SupplierID: in.SupplierID, SupplierName: in.SupplierName, Status: in.Status, PaymentStatus: in.PaymentStatus, Subtotal: subtotal, TaxTotal: taxTotal, Total: total, Currency: tenant.Currency, IsFavorite: in.IsFavorite, Tags: pq.StringArray(utils.NormalizeTags(in.Tags)), Notes: in.Notes, ReceivedAt: markReceivedAt(in.Status), CreatedBy: in.CreatedBy, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+		purchaseRow := models.PurchaseModel{ID: uuid.New(), OrgID: in.OrgID, BranchID: in.BranchID, Number: number, SupplierID: in.SupplierID, SupplierName: in.SupplierName, Status: in.Status, PaymentStatus: in.PaymentStatus, Subtotal: subtotal, TaxTotal: taxTotal, Total: total, Currency: tenant.Currency, IsFavorite: in.IsFavorite, Tags: pq.StringArray(utils.NormalizeTags(in.Tags)), Notes: in.Notes, ReceivedAt: markReceivedAt(in.Status), CreatedBy: in.CreatedBy, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
 		if err := tx.Create(&purchaseRow).Error; err != nil {
 			return err
 		}
@@ -103,11 +103,11 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (purchasesdomai
 				return err
 			}
 		}
-		if err := tx.Table("tenant_settings").Where("tenant_id = ?", in.TenantID).Updates(map[string]any{"next_purchase_number": tenant.NextPurchaseNumber + 1, "updated_at": gorm.Expr("now()")}).Error; err != nil {
+		if err := tx.Table("tenant_settings").Where("org_id = ?", in.OrgID).Updates(map[string]any{"next_purchase_number": tenant.NextPurchaseNumber + 1, "updated_at": gorm.Expr("now()")}).Error; err != nil {
 			return err
 		}
 		if in.Status == "received" {
-			if err := r.applyStock(ctx, tx, in.TenantID, in.BranchID, purchaseRow.ID, items, in.CreatedBy); err != nil {
+			if err := r.applyStock(ctx, tx, in.OrgID, in.BranchID, purchaseRow.ID, items, in.CreatedBy); err != nil {
 				return err
 			}
 		}
@@ -120,13 +120,13 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (purchasesdomai
 	return out, nil
 }
 
-func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (purchasesdomain.Purchase, error) {
-	return r.getByIDWithDB(ctx, r.db, tenantID, id)
+func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error) {
+	return r.getByIDWithDB(ctx, r.db, orgID, id)
 }
 
-func (r *Repository) getByIDWithDB(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (purchasesdomain.Purchase, error) {
+func (r *Repository) getByIDWithDB(ctx context.Context, db *gorm.DB, orgID, id uuid.UUID) (purchasesdomain.Purchase, error) {
 	var row models.PurchaseModel
-	if err := db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Take(&row).Error; err != nil {
+	if err := db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error; err != nil {
 		return purchasesdomain.Purchase{}, err
 	}
 	var items []models.PurchaseItemModel
@@ -136,9 +136,9 @@ func (r *Repository) getByIDWithDB(ctx context.Context, db *gorm.DB, tenantID, i
 	return toDomain(row, items), nil
 }
 
-func (r *Repository) SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
 		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
@@ -149,9 +149,9 @@ func (r *Repository) SoftDelete(ctx context.Context, tenantID, id uuid.UUID) err
 	return nil
 }
 
-func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
 		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
@@ -162,9 +162,9 @@ func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error 
 	return nil
 }
 
-func (r *Repository) HardDelete(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
 		Delete(&models.PurchaseModel{})
 	if res.Error != nil {
 		return res.Error
@@ -179,7 +179,7 @@ func (r *Repository) Update(ctx context.Context, in UpdateInput) (purchasesdomai
 	var out purchasesdomain.Purchase
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var current models.PurchaseModel
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("tenant_id = ? AND id = ?", in.TenantID, in.ID).Take(&current).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("org_id = ? AND id = ?", in.OrgID, in.ID).Take(&current).Error; err != nil {
 			return err
 		}
 		var currentItems []models.PurchaseItemModel
@@ -193,7 +193,7 @@ func (r *Repository) Update(ctx context.Context, in UpdateInput) (purchasesdomai
 		if in.Status == "received" && current.ReceivedAt == nil {
 			updates["received_at"] = time.Now().UTC()
 		}
-		if err := tx.Model(&models.PurchaseModel{}).Where("tenant_id = ? AND id = ?", in.TenantID, in.ID).Updates(updates).Error; err != nil {
+		if err := tx.Model(&models.PurchaseModel{}).Where("org_id = ? AND id = ?", in.OrgID, in.ID).Updates(updates).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("purchase_id = ?", in.ID).Delete(&models.PurchaseItemModel{}).Error; err != nil {
@@ -213,16 +213,16 @@ func (r *Repository) Update(ctx context.Context, in UpdateInput) (purchasesdomai
 			}
 		}
 		if current.Status == "received" {
-			if err := r.reverseStock(ctx, tx, in.TenantID, current.BranchID, in.ID, currentItems, current.CreatedBy); err != nil {
+			if err := r.reverseStock(ctx, tx, in.OrgID, current.BranchID, in.ID, currentItems, current.CreatedBy); err != nil {
 				return err
 			}
 		}
 		if in.Status == "received" {
-			if err := r.applyStock(ctx, tx, in.TenantID, in.BranchID, in.ID, items, current.CreatedBy); err != nil {
+			if err := r.applyStock(ctx, tx, in.OrgID, in.BranchID, in.ID, items, current.CreatedBy); err != nil {
 				return err
 			}
 		}
-		updated, err := r.getByIDWithDB(ctx, tx, in.TenantID, in.ID)
+		updated, err := r.getByIDWithDB(ctx, tx, in.OrgID, in.ID)
 		if err != nil {
 			return err
 		}
@@ -239,7 +239,7 @@ func (r *Repository) UpdateStatus(ctx context.Context, in UpdateStatusInput) (pu
 	var out purchasesdomain.Purchase
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var current models.PurchaseModel
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("tenant_id = ? AND id = ?", in.TenantID, in.ID).Take(&current).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("org_id = ? AND id = ?", in.OrgID, in.ID).Take(&current).Error; err != nil {
 			return err
 		}
 
@@ -252,12 +252,12 @@ func (r *Repository) UpdateStatus(ctx context.Context, in UpdateStatusInput) (pu
 		} else if in.Status != "received" && current.ReceivedAt != nil {
 			updates["received_at"] = nil
 		}
-		if err := tx.Model(&models.PurchaseModel{}).Where("tenant_id = ? AND id = ?", in.TenantID, in.ID).Updates(updates).Error; err != nil {
+		if err := tx.Model(&models.PurchaseModel{}).Where("org_id = ? AND id = ?", in.OrgID, in.ID).Updates(updates).Error; err != nil {
 			return err
 		}
 
 		if current.Status == in.Status {
-			updated, err := r.getByIDWithDB(ctx, tx, in.TenantID, in.ID)
+			updated, err := r.getByIDWithDB(ctx, tx, in.OrgID, in.ID)
 			if err != nil {
 				return err
 			}
@@ -273,18 +273,18 @@ func (r *Repository) UpdateStatus(ctx context.Context, in UpdateStatusInput) (pu
 				return err
 			}
 			if needsStockRevert {
-				if err := r.reverseStock(ctx, tx, in.TenantID, current.BranchID, in.ID, items, current.CreatedBy); err != nil {
+				if err := r.reverseStock(ctx, tx, in.OrgID, current.BranchID, in.ID, items, current.CreatedBy); err != nil {
 					return err
 				}
 			}
 			if needsStockApply {
-				if err := r.applyStock(ctx, tx, in.TenantID, current.BranchID, in.ID, items, current.CreatedBy); err != nil {
+				if err := r.applyStock(ctx, tx, in.OrgID, current.BranchID, in.ID, items, current.CreatedBy); err != nil {
 					return err
 				}
 			}
 		}
 
-		updated, err := r.getByIDWithDB(ctx, tx, in.TenantID, in.ID)
+		updated, err := r.getByIDWithDB(ctx, tx, in.OrgID, in.ID)
 		if err != nil {
 			return err
 		}
@@ -297,53 +297,53 @@ func (r *Repository) UpdateStatus(ctx context.Context, in UpdateStatusInput) (pu
 	return out, nil
 }
 
-func (r *Repository) reverseStock(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, branchID *uuid.UUID, purchaseID uuid.UUID, items []models.PurchaseItemModel, actor string) error {
+func (r *Repository) reverseStock(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, branchID *uuid.UUID, purchaseID uuid.UUID, items []models.PurchaseItemModel, actor string) error {
 	for _, item := range items {
 		if item.ProductID == nil || *item.ProductID == uuid.Nil || item.Quantity <= 0 {
 			continue
 		}
-		if err := r.adjustStockLevel(ctx, tx, tenantID, branchID, *item.ProductID, -item.Quantity); err != nil {
+		if err := r.adjustStockLevel(ctx, tx, orgID, branchID, *item.ProductID, -item.Quantity); err != nil {
 			return err
 		}
 		if err := tx.Exec(`
-			INSERT INTO stock_movements (id, tenant_id, branch_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at)
+			INSERT INTO stock_movements (id, org_id, branch_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at)
 			VALUES (gen_random_uuid(), ?, ?, ?, 'out', ?, 'purchase_revert', ?, ?, ?, now())
-		`, tenantID, normalizeBranchID(branchID), *item.ProductID, item.Quantity, purchaseID, item.Description, actor).Error; err != nil {
+		`, orgID, normalizeBranchID(branchID), *item.ProductID, item.Quantity, purchaseID, item.Description, actor).Error; err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *Repository) GetSupplierName(ctx context.Context, tenantID, supplierID uuid.UUID) (string, error) {
+func (r *Repository) GetSupplierName(ctx context.Context, orgID, supplierID uuid.UUID) (string, error) {
 	var name string
 	err := r.db.WithContext(ctx).
 		Table("parties p").
 		Select("p.display_name").
-		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.tenant_id = p.tenant_id AND pr.role = 'supplier' AND pr.is_active = true").
-		Where("p.tenant_id = ? AND p.id = ? AND p.deleted_at IS NULL", tenantID, supplierID).
+		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'supplier' AND pr.is_active = true").
+		Where("p.org_id = ? AND p.id = ? AND p.deleted_at IS NULL", orgID, supplierID).
 		Take(&name).Error
 	return name, err
 }
 
-func (r *Repository) GetCurrency(ctx context.Context, tenantID uuid.UUID) string {
-	tenant, err := r.loadTenant(ctx, r.db, tenantID)
+func (r *Repository) GetCurrency(ctx context.Context, orgID uuid.UUID) string {
+	tenant, err := r.loadTenant(ctx, r.db, orgID)
 	if err != nil {
 		return "ARS"
 	}
 	return tenant.Currency
 }
-func (r *Repository) GetTaxRate(ctx context.Context, tenantID uuid.UUID) float64 {
-	tenant, err := r.loadTenant(ctx, r.db, tenantID)
+func (r *Repository) GetTaxRate(ctx context.Context, orgID uuid.UUID) float64 {
+	tenant, err := r.loadTenant(ctx, r.db, orgID)
 	if err != nil {
 		return 21
 	}
 	return tenant.TaxRate
 }
 
-func (r *Repository) loadTenant(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (tenantSettings, error) {
+func (r *Repository) loadTenant(ctx context.Context, db *gorm.DB, orgID uuid.UUID) (tenantSettings, error) {
 	var row tenantSettings
-	err := db.WithContext(ctx).Table("tenant_settings").Select("purchase_prefix, next_purchase_number, currency, tax_rate").Where("tenant_id = ?", tenantID).Take(&row).Error
+	err := db.WithContext(ctx).Table("tenant_settings").Select("purchase_prefix, next_purchase_number, currency, tax_rate").Where("org_id = ?", orgID).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return tenantSettings{PurchasePrefix: "CPA", NextPurchaseNumber: 1, Currency: "ARS", TaxRate: 21}, nil
@@ -365,18 +365,18 @@ func (r *Repository) loadTenant(ctx context.Context, db *gorm.DB, tenantID uuid.
 	return row, nil
 }
 
-func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID) (tenantSettings, error) {
-	row, err := r.loadTenant(ctx, tx.Clauses(clause.Locking{Strength: "UPDATE"}), tenantID)
+func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx *gorm.DB, orgID uuid.UUID) (tenantSettings, error) {
+	row, err := r.loadTenant(ctx, tx.Clauses(clause.Locking{Strength: "UPDATE"}), orgID)
 	if err == nil {
 		return row, nil
 	}
-	if err := tx.WithContext(ctx).Exec(`INSERT INTO tenant_settings (tenant_id, plan_code, hard_limits, currency, tax_rate, purchase_prefix, next_purchase_number, created_at, updated_at) VALUES (?, 'starter', '{}'::jsonb, 'ARS', 21.0, 'CPA', 1, now(), now()) ON CONFLICT (tenant_id) DO NOTHING`, tenantID).Error; err != nil {
+	if err := tx.WithContext(ctx).Exec(`INSERT INTO tenant_settings (org_id, plan_code, hard_limits, currency, tax_rate, purchase_prefix, next_purchase_number, created_at, updated_at) VALUES (?, 'starter', '{}'::jsonb, 'ARS', 21.0, 'CPA', 1, now(), now()) ON CONFLICT (org_id) DO NOTHING`, orgID).Error; err != nil {
 		return tenantSettings{}, err
 	}
-	return r.loadTenant(ctx, tx.Clauses(clause.Locking{Strength: "UPDATE"}), tenantID)
+	return r.loadTenant(ctx, tx.Clauses(clause.Locking{Strength: "UPDATE"}), orgID)
 }
 
-func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID, delta float64) error {
+func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID, delta float64) error {
 	normalizedBranchID := normalizeBranchID(branchID)
 	now := time.Now().UTC()
 	updates := map[string]any{
@@ -387,7 +387,7 @@ func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, tenantID
 	if normalizedBranchID != nil {
 		res := tx.WithContext(ctx).
 			Table("stock_levels").
-			Where("tenant_id = ? AND product_id = ? AND branch_id = ?", tenantID, productID, *normalizedBranchID).
+			Where("org_id = ? AND product_id = ? AND branch_id = ?", orgID, productID, *normalizedBranchID).
 			Updates(updates)
 		if res.Error != nil {
 			return res.Error
@@ -397,7 +397,7 @@ func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, tenantID
 		}
 		res = tx.WithContext(ctx).
 			Table("stock_levels").
-			Where("tenant_id = ? AND product_id = ? AND branch_id IS NULL", tenantID, productID).
+			Where("org_id = ? AND product_id = ? AND branch_id IS NULL", orgID, productID).
 			Updates(map[string]any{
 				"branch_id":  *normalizedBranchID,
 				"quantity":   gorm.Expr("quantity + ?", delta),
@@ -414,7 +414,7 @@ func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, tenantID
 	if normalizedBranchID == nil {
 		res := tx.WithContext(ctx).
 			Table("stock_levels").
-			Where("tenant_id = ? AND product_id = ? AND branch_id IS NULL", tenantID, productID).
+			Where("org_id = ? AND product_id = ? AND branch_id IS NULL", orgID, productID).
 			Updates(updates)
 		if res.Error != nil {
 			return res.Error
@@ -425,27 +425,27 @@ func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, tenantID
 	}
 
 	return tx.WithContext(ctx).Exec(
-		`INSERT INTO stock_levels (product_id, tenant_id, branch_id, quantity, min_quantity, updated_at) VALUES (?, ?, ?, ?, 0, ?)`,
+		`INSERT INTO stock_levels (product_id, org_id, branch_id, quantity, min_quantity, updated_at) VALUES (?, ?, ?, ?, 0, ?)`,
 		productID,
-		tenantID,
+		orgID,
 		normalizedBranchID,
 		delta,
 		now,
 	).Error
 }
 
-func (r *Repository) applyStock(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, branchID *uuid.UUID, purchaseID uuid.UUID, items []models.PurchaseItemModel, actor string) error {
+func (r *Repository) applyStock(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, branchID *uuid.UUID, purchaseID uuid.UUID, items []models.PurchaseItemModel, actor string) error {
 	for _, item := range items {
 		if item.ProductID == nil || *item.ProductID == uuid.Nil || item.Quantity <= 0 {
 			continue
 		}
-		if err := r.adjustStockLevel(ctx, tx, tenantID, branchID, *item.ProductID, item.Quantity); err != nil {
+		if err := r.adjustStockLevel(ctx, tx, orgID, branchID, *item.ProductID, item.Quantity); err != nil {
 			return err
 		}
 		if err := tx.Exec(`
-			INSERT INTO stock_movements (id, tenant_id, branch_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at)
+			INSERT INTO stock_movements (id, org_id, branch_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at)
 			VALUES (gen_random_uuid(), ?, ?, ?, 'in', ?, 'purchase', ?, ?, ?, now())
-		`, tenantID, normalizeBranchID(branchID), *item.ProductID, item.Quantity, purchaseID, item.Description, actor).Error; err != nil {
+		`, orgID, normalizeBranchID(branchID), *item.ProductID, item.Quantity, purchaseID, item.Description, actor).Error; err != nil {
 			return err
 		}
 	}
@@ -464,7 +464,7 @@ func totals(items []purchasesdomain.PurchaseItem) (float64, float64, float64) {
 }
 
 func toDomain(row models.PurchaseModel, items []models.PurchaseItemModel) purchasesdomain.Purchase {
-	out := purchasesdomain.Purchase{ID: row.ID, TenantID: row.TenantID, BranchID: row.BranchID, Number: row.Number, SupplierID: row.SupplierID, SupplierName: row.SupplierName, Status: row.Status, PaymentStatus: row.PaymentStatus, Subtotal: row.Subtotal, TaxTotal: row.TaxTotal, Total: row.Total, Currency: row.Currency, IsFavorite: row.IsFavorite, Tags: append([]string(nil), row.Tags...), Notes: row.Notes, ReceivedAt: row.ReceivedAt, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, DeletedAt: row.DeletedAt}
+	out := purchasesdomain.Purchase{ID: row.ID, OrgID: row.OrgID, BranchID: row.BranchID, Number: row.Number, SupplierID: row.SupplierID, SupplierName: row.SupplierName, Status: row.Status, PaymentStatus: row.PaymentStatus, Subtotal: row.Subtotal, TaxTotal: row.TaxTotal, Total: row.Total, Currency: row.Currency, IsFavorite: row.IsFavorite, Tags: append([]string(nil), row.Tags...), Notes: row.Notes, ReceivedAt: row.ReceivedAt, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, DeletedAt: row.DeletedAt}
 	for _, item := range items {
 		out.Items = append(out.Items, purchasesdomain.PurchaseItem{ID: item.ID, PurchaseID: item.PurchaseID, ProductID: item.ProductID, ServiceID: item.ServiceID, Description: item.Description, Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: item.TaxRate, Subtotal: item.Subtotal, SortOrder: item.SortOrder})
 	}

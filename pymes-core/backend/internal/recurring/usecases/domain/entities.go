@@ -8,7 +8,7 @@ import (
 
 type RecurringExpense struct {
 	ID            uuid.UUID  `json:"id"`
-	TenantID      uuid.UUID  `json:"tenant_id"`
+	OrgID      uuid.UUID  `json:"org_id"`
 	Description   string     `json:"description"`
 	Amount        float64    `json:"amount"`
 	Currency      string     `json:"currency"`

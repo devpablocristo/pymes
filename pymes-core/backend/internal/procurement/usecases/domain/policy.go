@@ -9,7 +9,7 @@ import (
 // ProcurementPolicy regla CEL por tenant (mapea a kernel.Policy al evaluar).
 type ProcurementPolicy struct {
 	ID           uuid.UUID
-	TenantID     uuid.UUID
+	OrgID     uuid.UUID
 	Name         string
 	Expression   string
 	Effect       string

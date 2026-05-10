@@ -11,20 +11,20 @@ import (
 )
 
 func (h *Handler) GetConnection(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
-	conn, err := h.uc.GetConnection(c.Request.Context(), tenantID)
+	conn, err := h.uc.GetConnection(c.Request.Context(), orgID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.ConnectionResponse{TenantID: conn.TenantID, PhoneNumberID: conn.PhoneNumberID, WABAID: conn.WABAID, DisplayPhoneNumber: conn.DisplayPhoneNumber, VerifiedName: conn.VerifiedName, QualityRating: conn.QualityRating, MessagingLimit: conn.MessagingLimit, IsActive: conn.IsActive, ConnectedAt: conn.ConnectedAt.Format("2006-01-02T15:04:05Z07:00")})
+	c.JSON(http.StatusOK, dto.ConnectionResponse{OrgID: conn.OrgID, PhoneNumberID: conn.PhoneNumberID, WABAID: conn.WABAID, DisplayPhoneNumber: conn.DisplayPhoneNumber, VerifiedName: conn.VerifiedName, QualityRating: conn.QualityRating, MessagingLimit: conn.MessagingLimit, IsActive: conn.IsActive, ConnectedAt: conn.ConnectedAt.Format("2006-01-02T15:04:05Z07:00")})
 }
 
 func (h *Handler) Connect(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -33,20 +33,20 @@ func (h *Handler) Connect(c *gin.Context) {
 		writeBadRequest(c, "invalid request body")
 		return
 	}
-	conn, err := h.uc.Connect(c.Request.Context(), tenantID, body.PhoneNumberID, body.WABAID, body.AccessToken, body.DisplayPhoneNumber, body.VerifiedName)
+	conn, err := h.uc.Connect(c.Request.Context(), orgID, body.PhoneNumberID, body.WABAID, body.AccessToken, body.DisplayPhoneNumber, body.VerifiedName)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, dto.ConnectionResponse{TenantID: conn.TenantID, PhoneNumberID: conn.PhoneNumberID, WABAID: conn.WABAID, DisplayPhoneNumber: conn.DisplayPhoneNumber, VerifiedName: conn.VerifiedName, QualityRating: conn.QualityRating, MessagingLimit: conn.MessagingLimit, IsActive: conn.IsActive, ConnectedAt: conn.ConnectedAt.Format("2006-01-02T15:04:05Z07:00")})
+	c.JSON(http.StatusCreated, dto.ConnectionResponse{OrgID: conn.OrgID, PhoneNumberID: conn.PhoneNumberID, WABAID: conn.WABAID, DisplayPhoneNumber: conn.DisplayPhoneNumber, VerifiedName: conn.VerifiedName, QualityRating: conn.QualityRating, MessagingLimit: conn.MessagingLimit, IsActive: conn.IsActive, ConnectedAt: conn.ConnectedAt.Format("2006-01-02T15:04:05Z07:00")})
 }
 
 func (h *Handler) Disconnect(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.Disconnect(c.Request.Context(), tenantID); err != nil {
+	if err := h.uc.Disconnect(c.Request.Context(), orgID); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -54,11 +54,11 @@ func (h *Handler) Disconnect(c *gin.Context) {
 }
 
 func (h *Handler) GetConnectionStats(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
-	stats, err := h.uc.GetConnectionStats(c.Request.Context(), tenantID)
+	stats, err := h.uc.GetConnectionStats(c.Request.Context(), orgID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

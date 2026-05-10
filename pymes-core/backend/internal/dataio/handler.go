@@ -20,9 +20,9 @@ const maxImportFileSize = 5 << 20
 
 type usecasesPort interface {
 	Preview(ctx context.Context, entity, filename string, fileData []byte) (Preview, error)
-	ConfirmImport(ctx context.Context, entity string, tenantID uuid.UUID, previewID, mode, actor string) (ImportResult, error)
+	ConfirmImport(ctx context.Context, entity string, orgID uuid.UUID, previewID, mode, actor string) (ImportResult, error)
 	Template(entity, format string) ([]byte, string, string, error)
-	Export(ctx context.Context, entity string, tenantID uuid.UUID, format string, from, to *time.Time) ([]byte, string, string, error)
+	Export(ctx context.Context, entity string, orgID uuid.UUID, format string, from, to *time.Time) ([]byte, string, string, error)
 }
 
 type Handler struct{ uc usecasesPort }
@@ -56,7 +56,7 @@ type confirmRequest struct {
 }
 
 func (h *Handler) Confirm(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -66,7 +66,7 @@ func (h *Handler) Confirm(c *gin.Context) {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	out, err := h.uc.ConfirmImport(c.Request.Context(), c.Param("entity"), tenantID, strings.TrimSpace(req.PreviewID), strings.TrimSpace(req.Mode), auth.Actor)
+	out, err := h.uc.ConfirmImport(c.Request.Context(), c.Param("entity"), orgID, strings.TrimSpace(req.PreviewID), strings.TrimSpace(req.Mode), auth.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -85,7 +85,7 @@ func (h *Handler) Template(c *gin.Context) {
 }
 
 func (h *Handler) Export(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -99,7 +99,7 @@ func (h *Handler) Export(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	content, contentType, filename, err := h.uc.Export(c.Request.Context(), c.Param("entity"), tenantID, c.Query("format"), from, to)
+	content, contentType, filename, err := h.uc.Export(c.Request.Context(), c.Param("entity"), orgID, c.Query("format"), from, to)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

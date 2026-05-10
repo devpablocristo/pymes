@@ -12,8 +12,8 @@ import (
 	gatewaydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway/usecases/domain"
 )
 
-func (u *Usecases) GetConnectionStatus(ctx context.Context, tenantID uuid.UUID) (gatewaydomain.ConnectionStatus, error) {
-	conn, err := u.repo.GetConnection(ctx, tenantID)
+func (u *Usecases) GetConnectionStatus(ctx context.Context, orgID uuid.UUID) (gatewaydomain.ConnectionStatus, error) {
+	conn, err := u.repo.GetConnection(ctx, orgID)
 	if err != nil {
 		if errors.Is(err, ErrGatewayNotConnected) {
 			return gatewaydomain.ConnectionStatus{Connected: false}, nil
@@ -31,11 +31,11 @@ func (u *Usecases) GetConnectionStatus(ctx context.Context, tenantID uuid.UUID) 
 	}, nil
 }
 
-func (u *Usecases) InitOAuth(ctx context.Context, tenantID uuid.UUID) (string, error) {
+func (u *Usecases) InitOAuth(ctx context.Context, orgID uuid.UUID) (string, error) {
 	if err := u.validateMPConfig(); err != nil {
 		return "", err
 	}
-	state, err := u.signOAuthState(tenantID)
+	state, err := u.signOAuthState(orgID)
 	if err != nil {
 		return "", err
 	}
@@ -56,7 +56,7 @@ func (u *Usecases) HandleOAuthCallback(ctx context.Context, state, code string) 
 	if strings.TrimSpace(code) == "" {
 		return uuid.Nil, ErrInvalidOAuthState
 	}
-	tenantID, err := u.verifyOAuthState(state)
+	orgID, err := u.verifyOAuthState(state)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -81,7 +81,7 @@ func (u *Usecases) HandleOAuthCallback(ctx context.Context, state, code string) 
 	}
 
 	err = u.repo.SaveConnection(ctx, gatewaydomain.PaymentGatewayConnection{
-		TenantID:       tenantID,
+		OrgID:       orgID,
 		Provider:       providerMercadoPago,
 		ExternalUserID: strings.TrimSpace(tokens.UserID),
 		AccessToken:    encAccess,
@@ -93,18 +93,18 @@ func (u *Usecases) HandleOAuthCallback(ctx context.Context, state, code string) 
 		return uuid.Nil, err
 	}
 
-	return tenantID, nil
+	return orgID, nil
 }
 
-func (u *Usecases) Disconnect(ctx context.Context, tenantID uuid.UUID) error {
-	return u.repo.Disconnect(ctx, tenantID)
+func (u *Usecases) Disconnect(ctx context.Context, orgID uuid.UUID) error {
+	return u.repo.Disconnect(ctx, orgID)
 }
 
 func (u *Usecases) ensureConnectionAccessToken(
 	ctx context.Context,
-	tenantID uuid.UUID,
+	orgID uuid.UUID,
 ) (gatewaydomain.PaymentGatewayConnection, string, error) {
-	conn, err := u.repo.GetConnection(ctx, tenantID)
+	conn, err := u.repo.GetConnection(ctx, orgID)
 	if err != nil {
 		return gatewaydomain.PaymentGatewayConnection{}, "", err
 	}
@@ -157,7 +157,7 @@ func (u *Usecases) refreshConnection(
 	}
 
 	updated := gatewaydomain.PaymentGatewayConnection{
-		TenantID:       conn.TenantID,
+		OrgID:       conn.OrgID,
 		Provider:       providerMercadoPago,
 		ExternalUserID: coalesce(tokens.UserID, conn.ExternalUserID),
 		AccessToken:    encAccess,

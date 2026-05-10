@@ -12,9 +12,9 @@ import (
 )
 
 type RepositoryPort interface {
-	GetTenantSettings(tenantID uuid.UUID) domain.TenantSettings
-	UpdateTenantSettings(tenantID uuid.UUID, patch domain.TenantSettingsPatch, actor *string) domain.TenantSettings
-	ListActivity(tenantID uuid.UUID, limit int) []domain.ActivityEvent
+	GetTenantSettings(orgID uuid.UUID) domain.TenantSettings
+	UpdateTenantSettings(orgID uuid.UUID, patch domain.TenantSettingsPatch, actor *string) domain.TenantSettings
+	ListActivity(orgID uuid.UUID, limit int) []domain.ActivityEvent
 }
 
 type Usecases struct {
@@ -25,15 +25,15 @@ func NewUsecases(repo RepositoryPort) *Usecases {
 	return &Usecases{repo: repo}
 }
 
-func (u *Usecases) GetBootstrap(ctx context.Context, tenantID string, role string, scopes []string, actor string, authMethod string) (map[string]any, error) {
+func (u *Usecases) GetBootstrap(ctx context.Context, orgID string, role string, scopes []string, actor string, authMethod string) (map[string]any, error) {
 	_ = ctx
-	settings, err := u.GetTenantSettings(ctx, tenantID)
+	settings, err := u.GetTenantSettings(ctx, orgID)
 	if err != nil {
 		return nil, err
 	}
 	return map[string]any{
 		"auth": map[string]any{
-			"tenant_id":    tenantID,
+			"org_id":    orgID,
 			"role":         role,
 			"product_role": authz.ProductRole(role, scopes),
 			"scopes":       scopes,
@@ -44,20 +44,20 @@ func (u *Usecases) GetBootstrap(ctx context.Context, tenantID string, role strin
 	}, nil
 }
 
-func (u *Usecases) GetTenantSettings(ctx context.Context, tenantID string) (domain.TenantSettings, error) {
+func (u *Usecases) GetTenantSettings(ctx context.Context, orgID string) (domain.TenantSettings, error) {
 	_ = ctx
-	id, err := uuid.Parse(tenantID)
+	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return domain.TenantSettings{}, domainerr.Validation("invalid tenant_id")
+		return domain.TenantSettings{}, domainerr.Validation("invalid org_id")
 	}
 	return u.repo.GetTenantSettings(id), nil
 }
 
-func (u *Usecases) UpdateTenantSettings(ctx context.Context, tenantID string, patch domain.TenantSettingsPatch, actor *string) (domain.TenantSettings, error) {
+func (u *Usecases) UpdateTenantSettings(ctx context.Context, orgID string, patch domain.TenantSettingsPatch, actor *string) (domain.TenantSettings, error) {
 	_ = ctx
-	id, err := uuid.Parse(tenantID)
+	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return domain.TenantSettings{}, domainerr.Validation("invalid tenant_id")
+		return domain.TenantSettings{}, domainerr.Validation("invalid org_id")
 	}
 	if patch.SchedulingReminderHours != nil && *patch.SchedulingReminderHours < 0 {
 		return domain.TenantSettings{}, domainerr.Validation("scheduling_reminder_hours must be >= 0")
@@ -110,11 +110,11 @@ func (u *Usecases) UpdateTenantSettings(ctx context.Context, tenantID string, pa
 	return u.repo.UpdateTenantSettings(id, patch, actor), nil
 }
 
-func (u *Usecases) ListActivity(ctx context.Context, tenantID string, limit int) ([]domain.ActivityEvent, error) {
+func (u *Usecases) ListActivity(ctx context.Context, orgID string, limit int) ([]domain.ActivityEvent, error) {
 	_ = ctx
-	id, err := uuid.Parse(tenantID)
+	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid tenant_id: %w", domainerr.Validation("invalid tenant_id"))
+		return nil, fmt.Errorf("invalid org_id: %w", domainerr.Validation("invalid org_id"))
 	}
 	return u.repo.ListActivity(id, limit), nil
 }

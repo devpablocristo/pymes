@@ -11,7 +11,7 @@ import (
 )
 
 type TenantSettings struct {
-	TenantID                uuid.UUID      `json:"tenant_id"`
+	OrgID                uuid.UUID      `json:"org_id"`
 	PlanCode                string         `json:"plan_code"`
 	HardLimits              map[string]any `json:"hard_limits"`
 	BillingStatus           string         `json:"billing_status"`
@@ -209,7 +209,7 @@ func NormalizeSupportedCurrencies(raw []string) ([]string, error) {
 
 type ActivityEvent struct {
 	ID           uuid.UUID      `json:"id"`
-	TenantID     uuid.UUID      `json:"tenant_id"`
+	OrgID     uuid.UUID      `json:"org_id"`
 	Actor        string         `json:"actor,omitempty"`
 	Action       string         `json:"action"`
 	ResourceType string         `json:"resource_type"`

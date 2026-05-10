@@ -8,7 +8,7 @@ import (
 
 type Endpoint struct {
 	ID        uuid.UUID `json:"id"`
-	TenantID  uuid.UUID `json:"tenant_id"`
+	OrgID  uuid.UUID `json:"org_id"`
 	URL       string    `json:"url"`
 	Secret    string    `json:"secret,omitempty"`
 	Events    []string  `json:"events"`

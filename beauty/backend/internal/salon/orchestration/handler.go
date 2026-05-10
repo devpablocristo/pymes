@@ -12,7 +12,7 @@ import (
 )
 
 type usecasesPort interface {
-	CreateBooking(ctx context.Context, tenantID string, payload map[string]any) (map[string]any, error)
+	CreateBooking(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error)
 }
 
 type Handler struct {
@@ -34,7 +34,7 @@ func (h *Handler) CreateBooking(c *gin.Context) {
 	if payload == nil {
 		payload = map[string]any{}
 	}
-	out, err := h.uc.CreateBooking(c.Request.Context(), auth.GetAuthContext(c).TenantID, payload)
+	out, err := h.uc.CreateBooking(c.Request.Context(), auth.GetAuthContext(c).OrgID, payload)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

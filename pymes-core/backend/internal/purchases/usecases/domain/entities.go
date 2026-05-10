@@ -8,7 +8,7 @@ import (
 
 type Purchase struct {
 	ID            uuid.UUID      `json:"id"`
-	TenantID      uuid.UUID      `json:"tenant_id"`
+	OrgID      uuid.UUID      `json:"org_id"`
 	BranchID      *uuid.UUID     `json:"branch_id,omitempty"`
 	Number        string         `json:"number"`
 	SupplierID    *uuid.UUID     `json:"supplier_id,omitempty"`

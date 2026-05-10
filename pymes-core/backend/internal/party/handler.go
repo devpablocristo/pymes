@@ -20,12 +20,12 @@ import (
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]partydomain.Party, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in partydomain.Party, actor string) (partydomain.Party, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (partydomain.Party, error)
-	Update(ctx context.Context, tenantID, id uuid.UUID, in partydomain.Party, actor string) (partydomain.Party, error)
-	Delete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
-	AddRole(ctx context.Context, tenantID, partyID uuid.UUID, role string, priceListID *uuid.UUID, metadata map[string]any, actor string) (partydomain.PartyRole, error)
-	RemoveRole(ctx context.Context, tenantID, partyID uuid.UUID, role, actor string) error
-	ListRelationships(ctx context.Context, tenantID, partyID uuid.UUID) ([]partydomain.PartyRelationship, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (partydomain.Party, error)
+	Update(ctx context.Context, orgID, id uuid.UUID, in partydomain.Party, actor string) (partydomain.Party, error)
+	Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	AddRole(ctx context.Context, orgID, partyID uuid.UUID, role string, priceListID *uuid.UUID, metadata map[string]any, actor string) (partydomain.PartyRole, error)
+	RemoveRole(ctx context.Context, orgID, partyID uuid.UUID, role, actor string) error
+	ListRelationships(ctx context.Context, orgID, partyID uuid.UUID) ([]partydomain.PartyRelationship, error)
 	CreateRelationship(ctx context.Context, in partydomain.PartyRelationship, actor string) (partydomain.PartyRelationship, error)
 }
 
@@ -47,7 +47,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 
 func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -58,7 +58,7 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		TenantID:  tenantID,
+		OrgID:  orgID,
 		Limit:     limit,
 		After:     after,
 		Search:    c.Query("search"),
@@ -77,7 +77,7 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) Create(c *gin.Context) {
-	tenantID, actor, ok := parseTenantActor(c)
+	orgID, actor, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -86,7 +86,7 @@ func (h *Handler) Create(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	out, err := h.uc.Create(c.Request.Context(), fromCreateRequest(tenantID, req), actor)
+	out, err := h.uc.Create(c.Request.Context(), fromCreateRequest(orgID, req), actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -95,7 +95,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	tenantID, _, ok := parseTenantActor(c)
+	orgID, _, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -104,7 +104,7 @@ func (h *Handler) Get(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -113,7 +113,7 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	tenantID, actor, ok := parseTenantActor(c)
+	orgID, actor, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -127,7 +127,7 @@ func (h *Handler) Update(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	out, err := h.uc.Update(c.Request.Context(), tenantID, id, fromUpdateRequest(tenantID, id, req), actor)
+	out, err := h.uc.Update(c.Request.Context(), orgID, id, fromUpdateRequest(orgID, id, req), actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -136,7 +136,7 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
-	tenantID, actor, ok := parseTenantActor(c)
+	orgID, actor, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -145,7 +145,7 @@ func (h *Handler) Delete(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	if err := h.uc.Delete(c.Request.Context(), tenantID, id, actor); err != nil {
+	if err := h.uc.Delete(c.Request.Context(), orgID, id, actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -153,7 +153,7 @@ func (h *Handler) Delete(c *gin.Context) {
 }
 
 func (h *Handler) AddRole(c *gin.Context) {
-	tenantID, actor, ok := parseTenantActor(c)
+	orgID, actor, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -176,7 +176,7 @@ func (h *Handler) AddRole(c *gin.Context) {
 		}
 		priceListID = &parsed
 	}
-	out, err := h.uc.AddRole(c.Request.Context(), tenantID, id, req.Role, priceListID, req.Metadata, actor)
+	out, err := h.uc.AddRole(c.Request.Context(), orgID, id, req.Role, priceListID, req.Metadata, actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -185,7 +185,7 @@ func (h *Handler) AddRole(c *gin.Context) {
 }
 
 func (h *Handler) RemoveRole(c *gin.Context) {
-	tenantID, actor, ok := parseTenantActor(c)
+	orgID, actor, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -194,7 +194,7 @@ func (h *Handler) RemoveRole(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	if err := h.uc.RemoveRole(c.Request.Context(), tenantID, id, c.Param("role"), actor); err != nil {
+	if err := h.uc.RemoveRole(c.Request.Context(), orgID, id, c.Param("role"), actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -202,7 +202,7 @@ func (h *Handler) RemoveRole(c *gin.Context) {
 }
 
 func (h *Handler) ListRelationships(c *gin.Context) {
-	tenantID, _, ok := parseTenantActor(c)
+	orgID, _, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -211,7 +211,7 @@ func (h *Handler) ListRelationships(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	items, err := h.uc.ListRelationships(c.Request.Context(), tenantID, id)
+	items, err := h.uc.ListRelationships(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -220,7 +220,7 @@ func (h *Handler) ListRelationships(c *gin.Context) {
 }
 
 func (h *Handler) CreateRelationship(c *gin.Context) {
-	tenantID, actor, ok := parseTenantActor(c)
+	orgID, actor, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -245,7 +245,7 @@ func (h *Handler) CreateRelationship(c *gin.Context) {
 		return
 	}
 	out, err := h.uc.CreateRelationship(c.Request.Context(), partydomain.PartyRelationship{
-		TenantID:         tenantID,
+		OrgID:         orgID,
 		FromPartyID:      id,
 		ToPartyID:        toPartyID,
 		RelationshipType: strings.TrimSpace(req.RelationshipType),
@@ -262,15 +262,15 @@ func (h *Handler) CreateRelationship(c *gin.Context) {
 
 func parseTenantActor(c *gin.Context) (uuid.UUID, string, bool) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return uuid.Nil, "", false
 	}
-	return tenantID, a.Actor, true
+	return orgID, a.Actor, true
 }
 
-func fromCreateRequest(tenantID uuid.UUID, req dto.CreatePartyRequest) partydomain.Party {
+func fromCreateRequest(orgID uuid.UUID, req dto.CreatePartyRequest) partydomain.Party {
 	roles := make([]partydomain.PartyRole, 0, len(req.Roles))
 	for _, role := range req.Roles {
 		var priceListID *uuid.UUID
@@ -282,7 +282,7 @@ func fromCreateRequest(tenantID uuid.UUID, req dto.CreatePartyRequest) partydoma
 		roles = append(roles, partydomain.PartyRole{Role: strings.TrimSpace(role.Role), PriceListID: priceListID, Metadata: role.Metadata, IsActive: true})
 	}
 	return partydomain.Party{
-		TenantID:     tenantID,
+		OrgID:     orgID,
 		PartyType:    req.PartyType,
 		DisplayName:  req.DisplayName,
 		Email:        req.Email,
@@ -300,10 +300,10 @@ func fromCreateRequest(tenantID uuid.UUID, req dto.CreatePartyRequest) partydoma
 	}
 }
 
-func fromUpdateRequest(tenantID, id uuid.UUID, req dto.UpdatePartyRequest) partydomain.Party {
+func fromUpdateRequest(orgID, id uuid.UUID, req dto.UpdatePartyRequest) partydomain.Party {
 	return partydomain.Party{
 		ID:           id,
-		TenantID:     tenantID,
+		OrgID:     orgID,
 		PartyType:    req.PartyType,
 		DisplayName:  req.DisplayName,
 		Email:        req.Email,

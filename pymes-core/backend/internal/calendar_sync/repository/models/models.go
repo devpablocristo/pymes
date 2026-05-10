@@ -9,7 +9,7 @@ import (
 
 type CalendarSyncConnectionModel struct {
 	ID                    uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	TenantID              uuid.UUID  `gorm:"type:uuid;index;not null"`
+	OrgID              uuid.UUID  `gorm:"type:uuid;index;not null"`
 	CreatedBy             string     `gorm:"column:created_by;not null"`
 	Provider              string     `gorm:"not null"`
 	ProviderAccountEmail  string     `gorm:"column:provider_account_email"`
@@ -31,7 +31,7 @@ func (CalendarSyncConnectionModel) TableName() string { return "calendar_sync_co
 
 type CalendarSyncOAuthStateModel struct {
 	State     string    `gorm:"primaryKey"`
-	TenantID  uuid.UUID `gorm:"type:uuid;not null"`
+	OrgID  uuid.UUID `gorm:"type:uuid;not null"`
 	CreatedBy string    `gorm:"column:created_by;not null"`
 	Provider  string    `gorm:"not null"`
 	ExpiresAt time.Time `gorm:"column:expires_at;not null"`

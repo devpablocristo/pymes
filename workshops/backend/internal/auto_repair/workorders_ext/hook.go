@@ -24,7 +24,7 @@ type Hook struct {
 }
 
 type vehicleLookupPort interface {
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (vehiclesdomain.Vehicle, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (vehiclesdomain.Vehicle, error)
 }
 
 // New construye un hook nuevo para auto_repair.
@@ -78,7 +78,7 @@ func (h *Hook) syncVehicle(ctx context.Context, wo *domain.WorkOrder) error {
 	if h.assets == nil {
 		return nil
 	}
-	asset, err := h.assets.GetByID(ctx, wo.TenantID, wo.AssetID)
+	asset, err := h.assets.GetByID(ctx, wo.OrgID, wo.AssetID)
 	if err != nil {
 		if errors.Is(err, httperrors.ErrNotFound) {
 			return fmt.Errorf("asset_id is invalid: %w", httperrors.ErrBadInput)

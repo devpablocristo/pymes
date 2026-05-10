@@ -19,7 +19,7 @@ type AuthMiddleware = ginmw.AuthMiddleware
 
 // AuthContext es el contexto de autenticacion de Pymes.
 type AuthContext struct {
-	TenantID   string
+	OrgID   string
 	Actor      string
 	Role       string
 	Scopes     []string
@@ -37,7 +37,7 @@ type APIKeyResolver interface {
 // ResolvedKey identidad resuelta desde una API key.
 type ResolvedKey struct {
 	ID       uuid.UUID
-	TenantID uuid.UUID
+	OrgID uuid.UUID
 	Scopes   []string
 }
 
@@ -56,7 +56,7 @@ func (a *jwtAdapter) Authenticate(ctx context.Context, cred authn.Credential) (*
 		return nil, err
 	}
 	return &authn.Principal{
-		OrgID:      p.TenantID,
+		OrgID:      p.OrgID,
 		Actor:      p.Actor,
 		Role:       p.Role,
 		Scopes:     p.Scopes,
@@ -79,7 +79,7 @@ func (a *apiKeyAdapter) Authenticate(ctx context.Context, cred authn.Credential)
 		return nil, fmt.Errorf("authn: invalid api key")
 	}
 	return &authn.Principal{
-		OrgID:      key.TenantID.String(),
+		OrgID:      key.OrgID.String(),
 		Actor:      "api_key:" + key.ID.String(),
 		Role:       "service",
 		Scopes:     key.Scopes,
@@ -102,7 +102,7 @@ func NewAuthMiddleware(identity *IdentityResolver, keyResolver APIKeyResolver, a
 
 // RequireTenantSlugBinding fuerza que el slug de consola matchee el tenant autenticado.
 // Las API keys service-to-service pueden omitirlo; si lo envían, también debe coincidir.
-func RequireTenantSlugBinding(resolver TenantRefResolver, membershipResolvers ...TenantMembershipResolver) gin.HandlerFunc {
+func RequireTenantSlugBinding(resolver OrgRefResolver, membershipResolvers ...TenantMembershipResolver) gin.HandlerFunc {
 	var membershipResolver TenantMembershipResolver
 	if len(membershipResolvers) > 0 {
 		membershipResolver = membershipResolvers[0]
@@ -129,7 +129,7 @@ func RequireTenantSlugBinding(resolver TenantRefResolver, membershipResolvers ..
 			})
 			return
 		}
-		resolvedTenantID, err := resolver.ResolveTenantID(c.Request.Context(), slug)
+		resolvedOrgID, err := resolver.ResolveOrgID(c.Request.Context(), slug)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"code":    "tenant_mismatch",
@@ -137,9 +137,9 @@ func RequireTenantSlugBinding(resolver TenantRefResolver, membershipResolvers ..
 			})
 			return
 		}
-		if !strings.EqualFold(strings.TrimSpace(authCtx.TenantID), strings.TrimSpace(resolvedTenantID)) {
+		if !strings.EqualFold(strings.TrimSpace(authCtx.OrgID), strings.TrimSpace(resolvedOrgID)) {
 			if authMethod == "jwt" && membershipResolver != nil {
-				role, ok, membershipErr := membershipResolver.FindActiveMembershipRole(c.Request.Context(), resolvedTenantID, authCtx.Actor)
+				role, ok, membershipErr := membershipResolver.FindActiveMembershipRole(c.Request.Context(), resolvedOrgID, authCtx.Actor)
 				if membershipErr != nil {
 					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 						"code":    "tenant_mismatch",
@@ -148,7 +148,7 @@ func RequireTenantSlugBinding(resolver TenantRefResolver, membershipResolvers ..
 					return
 				}
 				if ok {
-					c.Set(ctxkeys.CtxKeyOrgID, strings.TrimSpace(resolvedTenantID))
+					c.Set(ctxkeys.CtxKeyOrgID, strings.TrimSpace(resolvedOrgID))
 					c.Set(ctxkeys.CtxKeyRole, strings.TrimSpace(role))
 					c.Next()
 					return
@@ -167,16 +167,16 @@ func RequireTenantSlugBinding(resolver TenantRefResolver, membershipResolvers ..
 // GetAuthContext extrae el contexto de autenticación. Delega a core.
 func GetAuthContext(c *gin.Context) AuthContext {
 	raw := ginmw.GetAuthContext(c)
-	tenantID := raw.OrgID
-	if tenantID == "" {
+	orgID := raw.OrgID
+	if orgID == "" {
 		if v, ok := c.Get(ctxkeys.CtxKeyTenantID); ok {
 			if s, ok := v.(string); ok {
-				tenantID = s
+				orgID = s
 			}
 		}
 	}
 	return AuthContext{
-		TenantID:   tenantID,
+		OrgID:   orgID,
 		Actor:      raw.Actor,
 		Role:       raw.Role,
 		Scopes:     raw.Scopes,
@@ -187,9 +187,9 @@ func GetAuthContext(c *gin.Context) AuthContext {
 // ParseAuthTenantID extrae y parsea el tenant_id del auth context.
 func ParseAuthTenantID(c *gin.Context) (uuid.UUID, bool) {
 	auth := GetAuthContext(c)
-	tenantID, err := uuid.Parse(auth.TenantID)
+	orgID, err := uuid.Parse(auth.OrgID)
 	if err != nil {
 		return uuid.Nil, false
 	}
-	return tenantID, true
+	return orgID, true
 }

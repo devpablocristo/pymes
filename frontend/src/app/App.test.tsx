@@ -66,7 +66,7 @@ function renderApp(initialEntries = ['/taller-norte/dashboard']) {
 
 function buildTenantSettings(overrides?: Partial<TenantSettings>): TenantSettings {
   return {
-    tenant_id: '00000000-0000-0000-0000-000000000001',
+    org_id: '00000000-0000-0000-0000-000000000001',
     plan_code: 'starter',
     hard_limits: {},
     billing_status: 'trialing',
@@ -126,7 +126,7 @@ describe('App onboarding gating', () => {
     apiMocks.apiRequest.mockReset();
     apiMocks.getSession.mockResolvedValue({
       auth: {
-        tenant_id: '00000000-0000-0000-0000-000000000001',
+        org_id: '00000000-0000-0000-0000-000000000001',
         tenant_name: 'Tenant Demo',
         tenant_slug: 'taller-norte',
         role: 'admin',

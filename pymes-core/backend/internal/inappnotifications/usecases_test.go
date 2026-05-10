@@ -26,7 +26,7 @@ type stubRepository struct {
 	countUnreadCalls     []uuid.UUID
 	markReadUserCalls    []uuid.UUID
 	markReadNotification []uuid.UUID
-	resolvedTenantIDs    []string
+	resolvedOrgIDs    []string
 	resolvedApprovalIDs  []string
 	resolvedRequestIDs   []string
 	appended             coredomain.Notification
@@ -49,26 +49,26 @@ func (s *stubRepository) GetUserIDByExternalID(externalID string) (uuid.UUID, bo
 	return id, ok
 }
 
-func (s *stubRepository) GetOnlyUserIDByTenant(tenantID uuid.UUID) (uuid.UUID, bool) {
-	id, ok := s.onlyUserByTenant[tenantID]
+func (s *stubRepository) GetOnlyUserIDByTenant(orgID uuid.UUID) (uuid.UUID, bool) {
+	id, ok := s.onlyUserByTenant[orgID]
 	return id, ok
 }
 
-func (s *stubRepository) ListUserIDsByTenant(tenantID uuid.UUID) ([]uuid.UUID, error) {
-	list := s.userIDsByTenant[tenantID]
+func (s *stubRepository) ListUserIDsByTenant(orgID uuid.UUID) ([]uuid.UUID, error) {
+	list := s.userIDsByTenant[orgID]
 	out := make([]uuid.UUID, len(list))
 	copy(out, list)
 	return out, nil
 }
 
-func (s *stubRepository) ListTenantIDsWithUsers() ([]uuid.UUID, error) {
+func (s *stubRepository) ListOrgIDsWithUsers() ([]uuid.UUID, error) {
 	out := make([]uuid.UUID, len(s.orgIDs))
 	copy(out, s.orgIDs)
 	return out, nil
 }
 
-func (s *stubRepository) ListForRecipient(_ context.Context, tenantID, recipientID string, _ int) ([]coredomain.Notification, error) {
-	tenantUUID, err := uuid.Parse(tenantID)
+func (s *stubRepository) ListForRecipient(_ context.Context, orgID, recipientID string, _ int) ([]coredomain.Notification, error) {
+	tenantUUID, err := uuid.Parse(orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -81,8 +81,8 @@ func (s *stubRepository) ListForRecipient(_ context.Context, tenantID, recipient
 	return s.items, nil
 }
 
-func (s *stubRepository) CountUnread(_ context.Context, tenantID, recipientID string) (int64, error) {
-	tenantUUID, err := uuid.Parse(tenantID)
+func (s *stubRepository) CountUnread(_ context.Context, orgID, recipientID string) (int64, error) {
+	tenantUUID, err := uuid.Parse(orgID)
 	if err != nil {
 		return 0, err
 	}
@@ -126,8 +126,8 @@ func (s *stubRepository) Append(_ context.Context, notification coredomain.Notif
 	return stored, nil
 }
 
-func (s *stubRepository) MarkRead(_ context.Context, tenantID, recipientID, notificationID string, readAt time.Time) (time.Time, error) {
-	tenantUUID, err := uuid.Parse(tenantID)
+func (s *stubRepository) MarkRead(_ context.Context, orgID, recipientID, notificationID string, readAt time.Time) (time.Time, error) {
+	tenantUUID, err := uuid.Parse(orgID)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -158,8 +158,8 @@ func (s *stubRepository) MarkRead(_ context.Context, tenantID, recipientID, noti
 	return chosenReadAt, nil
 }
 
-func (s *stubRepository) ResolveApprovalNotifications(_ context.Context, tenantID, approvalID, requestID string, readAt time.Time) (int64, error) {
-	s.resolvedTenantIDs = append(s.resolvedTenantIDs, tenantID)
+func (s *stubRepository) ResolveApprovalNotifications(_ context.Context, orgID, approvalID, requestID string, readAt time.Time) (int64, error) {
+	s.resolvedOrgIDs = append(s.resolvedOrgIDs, orgID)
 	s.resolvedApprovalIDs = append(s.resolvedApprovalIDs, approvalID)
 	s.resolvedRequestIDs = append(s.resolvedRequestIDs, requestID)
 	var affected int64
@@ -188,16 +188,16 @@ func (s *stubRepository) ResolveApprovalNotifications(_ context.Context, tenantI
 func TestListForActorUsesTenantMemberFallbackForServiceActor(t *testing.T) {
 	t.Parallel()
 
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	userID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	repo := &stubRepository{
-		onlyUserByTenant: map[uuid.UUID]uuid.UUID{tenantID: userID},
+		onlyUserByTenant: map[uuid.UUID]uuid.UUID{orgID: userID},
 		items:            []coredomain.Notification{{ID: uuid.NewString(), RecipientID: userID.String()}},
 		unread:           1,
 	}
 	uc := NewUsecases(repo)
 
-	items, unread, err := uc.ListForActor(context.Background(), tenantID.String(), "api_key:"+tenantID.String(), 50)
+	items, unread, err := uc.ListForActor(context.Background(), orgID.String(), "api_key:"+orgID.String(), 50)
 	if err != nil {
 		t.Fatalf("ListForActor() error = %v", err)
 	}
@@ -218,17 +218,17 @@ func TestListForActorUsesTenantMemberFallbackForServiceActor(t *testing.T) {
 func TestMarkReadForActorUsesTenantMemberFallbackForServiceActor(t *testing.T) {
 	t.Parallel()
 
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	userID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	notifID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	expectedReadAt := time.Date(2026, 3, 31, 11, 0, 0, 0, time.UTC)
 	repo := &stubRepository{
-		onlyUserByTenant: map[uuid.UUID]uuid.UUID{tenantID: userID},
+		onlyUserByTenant: map[uuid.UUID]uuid.UUID{orgID: userID},
 		markReadAt:       expectedReadAt,
 	}
 	uc := NewUsecases(repo)
 
-	readAt, err := uc.MarkReadForActor(context.Background(), tenantID.String(), "api_key:"+tenantID.String(), notifID)
+	readAt, err := uc.MarkReadForActor(context.Background(), orgID.String(), "api_key:"+orgID.String(), notifID)
 	if err != nil {
 		t.Fatalf("MarkReadForActor() error = %v", err)
 	}
@@ -246,12 +246,12 @@ func TestMarkReadForActorUsesTenantMemberFallbackForServiceActor(t *testing.T) {
 func TestListForActorReturnsNotFoundWhenNoTenantMemberFallbackExists(t *testing.T) {
 	t.Parallel()
 
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	uc := NewUsecases(&stubRepository{
 		onlyUserByTenant: map[uuid.UUID]uuid.UUID{},
 	})
 
-	_, _, err := uc.ListForActor(context.Background(), tenantID.String(), "api_key:"+tenantID.String(), 50)
+	_, _, err := uc.ListForActor(context.Background(), orgID.String(), "api_key:"+orgID.String(), 50)
 	if !errors.Is(err, httperrors.ErrNotFound) {
 		t.Fatalf("expected not found, got %v", err)
 	}
@@ -260,14 +260,14 @@ func TestListForActorReturnsNotFoundWhenNoTenantMemberFallbackExists(t *testing.
 func TestCreateForActorUsesResolvedRecipient(t *testing.T) {
 	t.Parallel()
 
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	userID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	repo := &stubRepository{
 		userByExternal: map[string]uuid.UUID{"user-ext-1": userID},
 	}
 	uc := NewUsecases(repo)
 
-	created, err := uc.CreateForActor(context.Background(), tenantID.String(), "user-ext-1", CreateInput{
+	created, err := uc.CreateForActor(context.Background(), orgID.String(), "user-ext-1", CreateInput{
 		ID:          "insight:sales_collections:month",
 		Title:       "Insight disponible",
 		Body:        "Hay una novedad en ventas.",
@@ -294,7 +294,7 @@ func TestCreateForActorUsesResolvedRecipient(t *testing.T) {
 func TestListForActorSyncsPendingApprovalsIntoInbox(t *testing.T) {
 	t.Parallel()
 
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	userID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	repo := &stubRepository{
 		userByExternal: map[string]uuid.UUID{"user-ext-1": userID},
@@ -311,7 +311,7 @@ func TestListForActorSyncsPendingApprovalsIntoInbox(t *testing.T) {
 	uc := NewUsecases(repo, WithApprovalSource(stubApprovalSource{
 		approvals: []PendingApproval{{
 			ID:             "appr-1",
-			TenantID:       tenantID.String(),
+			OrgID:       orgID.String(),
 			RequestID:      "req-1",
 			ActionType:     "sales.refund",
 			TargetResource: "sale-1",
@@ -322,7 +322,7 @@ func TestListForActorSyncsPendingApprovalsIntoInbox(t *testing.T) {
 		}},
 	}))
 
-	items, unread, err := uc.ListForActor(context.Background(), tenantID.String(), "user-ext-1", 50)
+	items, unread, err := uc.ListForActor(context.Background(), orgID.String(), "user-ext-1", 50)
 	if err != nil {
 		t.Fatalf("ListForActor() error = %v", err)
 	}
@@ -343,17 +343,17 @@ func TestListForActorSyncsPendingApprovalsIntoInbox(t *testing.T) {
 func TestSyncAllPendingApprovalsSyncsEachTenantMember(t *testing.T) {
 	t.Parallel()
 
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	userA := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	userB := uuid.MustParse("00000000-0000-0000-0000-000000000003")
 	repo := &stubRepository{
-		orgIDs:          []uuid.UUID{tenantID},
-		userIDsByTenant: map[uuid.UUID][]uuid.UUID{tenantID: {userA, userB}},
+		orgIDs:          []uuid.UUID{orgID},
+		userIDsByTenant: map[uuid.UUID][]uuid.UUID{orgID: {userA, userB}},
 	}
 	uc := NewUsecases(repo, WithApprovalSource(stubApprovalSource{
 		approvals: []PendingApproval{{
 			ID:             "appr-1",
-			TenantID:       tenantID.String(),
+			OrgID:       orgID.String(),
 			RequestID:      "req-1",
 			ActionType:     "sales.refund",
 			TargetResource: "sale-1",
@@ -379,7 +379,7 @@ func TestSyncAllPendingApprovalsSyncsEachTenantMember(t *testing.T) {
 func TestListForActorFiltersResolvedApprovalsAfterFreshSync(t *testing.T) {
 	t.Parallel()
 
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	userID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	staleNotificationID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	repo := &stubRepository{
@@ -387,7 +387,7 @@ func TestListForActorFiltersResolvedApprovalsAfterFreshSync(t *testing.T) {
 		items: []coredomain.Notification{
 			{
 				ID:          staleNotificationID.String(),
-				TenantID:    tenantID.String(),
+				TenantID:    orgID.String(),
 				RecipientID: userID.String(),
 				Title:       "sales.refund - sale-1",
 				Body:        "manual",
@@ -399,7 +399,7 @@ func TestListForActorFiltersResolvedApprovalsAfterFreshSync(t *testing.T) {
 			},
 			{
 				ID:          "notif-1",
-				TenantID:    tenantID.String(),
+				TenantID:    orgID.String(),
 				RecipientID: userID.String(),
 				Title:       "Insight",
 				Body:        "Hay una novedad",
@@ -422,7 +422,7 @@ func TestListForActorFiltersResolvedApprovalsAfterFreshSync(t *testing.T) {
 	}
 	uc := NewUsecases(repo, WithApprovalSource(stubApprovalSource{approvals: nil}))
 
-	items, unread, err := uc.ListForActor(context.Background(), tenantID.String(), "user-ext-1", 50)
+	items, unread, err := uc.ListForActor(context.Background(), orgID.String(), "user-ext-1", 50)
 	if err != nil {
 		t.Fatalf("ListForActor() error = %v", err)
 	}
@@ -443,18 +443,18 @@ func TestListForActorFiltersResolvedApprovalsAfterFreshSync(t *testing.T) {
 func TestApplyApprovalEventCreatesPendingNotificationsForEachTenantMember(t *testing.T) {
 	t.Parallel()
 
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	userA := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	userB := uuid.MustParse("00000000-0000-0000-0000-000000000003")
 	repo := &stubRepository{
-		userIDsByTenant: map[uuid.UUID][]uuid.UUID{tenantID: {userA, userB}},
+		userIDsByTenant: map[uuid.UUID][]uuid.UUID{orgID: {userA, userB}},
 	}
 	uc := NewUsecases(repo)
 
 	affected, err := uc.ApplyApprovalEvent(context.Background(), ApprovalEvent{
 		Event:          approvalEventPending,
 		ApprovalID:     "appr-1",
-		TenantID:       tenantID.String(),
+		OrgID:       orgID.String(),
 		RequestID:      "req-1",
 		Decision:       "pending",
 		ActionType:     "sales.refund",
@@ -477,13 +477,13 @@ func TestApplyApprovalEventCreatesPendingNotificationsForEachTenantMember(t *tes
 func TestApplyApprovalEventResolvesNotificationsByRequestID(t *testing.T) {
 	t.Parallel()
 
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	userID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	repo := &stubRepository{
 		items: []coredomain.Notification{
 			{
 				ID:          uuid.NewString(),
-				TenantID:    tenantID.String(),
+				TenantID:    orgID.String(),
 				RecipientID: userID.String(),
 				Title:       "sales.refund - sale-1",
 				Body:        "manual",

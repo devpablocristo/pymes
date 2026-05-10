@@ -75,7 +75,7 @@ import { SettingsPage } from './SettingsPage';
 
 const sessionJwt: SessionResponse = {
   auth: {
-    tenant_id: '00000000-0000-0000-0000-000000000099',
+    org_id: '00000000-0000-0000-0000-000000000099',
     role: 'admin',
     product_role: 'admin',
     scopes: [],
@@ -86,7 +86,7 @@ const sessionJwt: SessionResponse = {
 
 /** API con placeholder típico: la UI debe priorizar nombre/email de Clerk. */
 const meWithPlaceholderUser: MeProfileResponse = {
-  tenant_id: '00000000-0000-0000-0000-000000000099',
+  org_id: '00000000-0000-0000-0000-000000000099',
   external_id: 'user_clerk_test',
   role: 'admin',
   user: {
@@ -122,7 +122,7 @@ describe('SettingsPage (modo Clerk)', () => {
     apiMocks.getSession.mockResolvedValue(sessionJwt);
     apiMocks.getMe.mockResolvedValue(meWithPlaceholderUser);
     apiMocks.getBillingStatus.mockResolvedValue({
-      tenant_id: sessionJwt.auth.tenant_id,
+      org_id: sessionJwt.auth.org_id,
       plan_code: 'starter',
       status: 'active',
       hard_limits: {},

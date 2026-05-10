@@ -20,19 +20,19 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) GetTenantSettings(tenantID uuid.UUID) domain.TenantSettings {
+func (r *Repository) GetTenantSettings(orgID uuid.UUID) domain.TenantSettings {
 	var m models.TenantSettingsModel
-	if err := r.db.Where("tenant_id = ?", tenantID).First(&m).Error; err != nil {
-		return tenantSettingsToDomain(defaultTenantSettingsModel(tenantID))
+	if err := r.db.Where("org_id = ?", orgID).First(&m).Error; err != nil {
+		return tenantSettingsToDomain(defaultTenantSettingsModel(orgID))
 	}
 	return tenantSettingsToDomain(normalizeTenantSettingsModel(m))
 }
 
-func (r *Repository) UpdateTenantSettings(tenantID uuid.UUID, patch domain.TenantSettingsPatch, actor *string) domain.TenantSettings {
+func (r *Repository) UpdateTenantSettings(orgID uuid.UUID, patch domain.TenantSettingsPatch, actor *string) domain.TenantSettings {
 	var m models.TenantSettingsModel
-	result := r.db.Where("tenant_id = ?", tenantID).First(&m)
+	result := r.db.Where("org_id = ?", orgID).First(&m)
 	if result.Error != nil {
-		m = defaultTenantSettingsModel(tenantID)
+		m = defaultTenantSettingsModel(orgID)
 	} else {
 		m = normalizeTenantSettingsModel(m)
 	}
@@ -115,12 +115,12 @@ func (r *Repository) UpdateTenantSettings(tenantID uuid.UUID, patch domain.Tenan
 	return tenantSettingsToDomain(m)
 }
 
-func (r *Repository) ListActivity(tenantID uuid.UUID, limit int) []domain.ActivityEvent {
+func (r *Repository) ListActivity(orgID uuid.UUID, limit int) []domain.ActivityEvent {
 	if limit <= 0 {
 		limit = 200
 	}
 	var rows []models.AdminActivityEventModel
-	r.db.Where("tenant_id = ?", tenantID).
+	r.db.Where("org_id = ?", orgID).
 		Order("created_at DESC").
 		Limit(limit).
 		Find(&rows)
@@ -154,7 +154,7 @@ func tenantSettingsToDomain(m models.TenantSettingsModel) domain.TenantSettings 
 	}
 
 	return domain.TenantSettings{
-		TenantID:                m.TenantID,
+		OrgID:                m.OrgID,
 		PlanCode:                m.PlanCode,
 		HardLimits:              limits,
 		BillingStatus:           m.BillingStatus,
@@ -215,7 +215,7 @@ func activityToDomain(m models.AdminActivityEventModel) domain.ActivityEvent {
 	}
 	return domain.ActivityEvent{
 		ID:           m.ID,
-		TenantID:     m.TenantID,
+		OrgID:     m.OrgID,
 		Actor:        m.Actor,
 		Action:       m.Action,
 		ResourceType: m.ResourceType,
@@ -236,9 +236,9 @@ func DefaultHardLimits(plan string) map[string]any {
 	}
 }
 
-func defaultTenantSettingsModel(tenantID uuid.UUID) models.TenantSettingsModel {
+func defaultTenantSettingsModel(orgID uuid.UUID) models.TenantSettingsModel {
 	return normalizeTenantSettingsModel(models.TenantSettingsModel{
-		TenantID:            tenantID,
+		OrgID:            orgID,
 		HardLimits:          mustJSON(DefaultHardLimits("starter")),
 		SupportedCurrencies: mustJSON([]string{"ARS"}),
 	})

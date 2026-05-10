@@ -18,9 +18,9 @@ import (
 
 // usecasesPort acota lo que el handler necesita del usecase. Sirve para tests.
 type usecasesPort interface {
-	IssueToken(ctx context.Context, tenantID uuid.UUID, actor, name string) (domain.IssueResult, error)
-	ListMyTokens(ctx context.Context, tenantID uuid.UUID, actor string) ([]domain.Token, error)
-	RevokeToken(ctx context.Context, tenantID uuid.UUID, actor string, id uuid.UUID) error
+	IssueToken(ctx context.Context, orgID uuid.UUID, actor, name string) (domain.IssueResult, error)
+	ListMyTokens(ctx context.Context, orgID uuid.UUID, actor string) ([]domain.Token, error)
+	RevokeToken(ctx context.Context, orgID uuid.UUID, actor string, id uuid.UUID) error
 	RenderFeed(ctx context.Context, plaintext string) (string, domain.Token, error)
 	MarkFeedUsed(ctx context.Context, tokenID uuid.UUID) error
 }
@@ -54,8 +54,8 @@ func (h *Handler) RegisterPublicRoutes(v1 *gin.RouterGroup) {
 
 func (h *Handler) IssueToken(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(authCtx.TenantID)
-	if err != nil || tenantID == uuid.Nil {
+	orgID, err := uuid.Parse(authCtx.OrgID)
+	if err != nil || orgID == uuid.Nil {
 		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "invalid tenant context")
 		return
 	}
@@ -64,7 +64,7 @@ func (h *Handler) IssueToken(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	result, err := h.uc.IssueToken(c.Request.Context(), tenantID, authCtx.Actor, req.Name)
+	result, err := h.uc.IssueToken(c.Request.Context(), orgID, authCtx.Actor, req.Name)
 	if err != nil {
 		log.Error().Err(err).Msg("calendar_export: issue token failed")
 		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "could not issue token")
@@ -79,12 +79,12 @@ func (h *Handler) IssueToken(c *gin.Context) {
 
 func (h *Handler) ListTokens(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(authCtx.TenantID)
-	if err != nil || tenantID == uuid.Nil {
+	orgID, err := uuid.Parse(authCtx.OrgID)
+	if err != nil || orgID == uuid.Nil {
 		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "invalid tenant context")
 		return
 	}
-	tokens, err := h.uc.ListMyTokens(c.Request.Context(), tenantID, authCtx.Actor)
+	tokens, err := h.uc.ListMyTokens(c.Request.Context(), orgID, authCtx.Actor)
 	if err != nil {
 		log.Error().Err(err).Msg("calendar_export: list tokens failed")
 		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "could not list tokens")
@@ -99,8 +99,8 @@ func (h *Handler) ListTokens(c *gin.Context) {
 
 func (h *Handler) RevokeToken(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(authCtx.TenantID)
-	if err != nil || tenantID == uuid.Nil {
+	orgID, err := uuid.Parse(authCtx.OrgID)
+	if err != nil || orgID == uuid.Nil {
 		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "invalid tenant context")
 		return
 	}
@@ -109,7 +109,7 @@ func (h *Handler) RevokeToken(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	if err := h.uc.RevokeToken(c.Request.Context(), tenantID, authCtx.Actor, id); err != nil {
+	if err := h.uc.RevokeToken(c.Request.Context(), orgID, authCtx.Actor, id); err != nil {
 		if errors.Is(err, ErrTokenNotFound) {
 			httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "token not found")
 			return

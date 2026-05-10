@@ -8,7 +8,7 @@ import (
 
 type PriceList struct {
 	ID          uuid.UUID       `json:"id"`
-	TenantID    uuid.UUID       `json:"tenant_id"`
+	OrgID    uuid.UUID       `json:"org_id"`
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
 	IsDefault   bool            `json:"is_default"`

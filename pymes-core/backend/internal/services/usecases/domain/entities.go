@@ -8,7 +8,7 @@ import (
 
 type Service struct {
 	ID                     uuid.UUID
-	TenantID               uuid.UUID
+	OrgID               uuid.UUID
 	Code                   string
 	Name                   string
 	Description            string

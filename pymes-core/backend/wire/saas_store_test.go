@@ -16,15 +16,15 @@ func TestResolveTenantIDByExternalRefDoesNotAutoProvisionClerkStyleOrg(t *testin
 	db := newTestSaaSStoreDB(t)
 	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
 
-	tenantID, ok, err := store.ResolveTenantIDByExternalRef(context.Background(), "org_demo")
+	orgID, ok, err := store.ResolveTenantIDByExternalRef(context.Background(), "org_demo")
 	if err != nil {
 		t.Fatalf("ResolveTenantIDByExternalRef() error = %v", err)
 	}
 	if ok {
-		t.Fatalf("ResolveTenantIDByExternalRef() ok = true, want false (tenantID=%q)", tenantID)
+		t.Fatalf("ResolveTenantIDByExternalRef() ok = true, want false (orgID=%q)", orgID)
 	}
-	if tenantID != "" {
-		t.Fatalf("ResolveTenantIDByExternalRef() tenantID = %q, want empty", tenantID)
+	if orgID != "" {
+		t.Fatalf("ResolveTenantIDByExternalRef() orgID = %q, want empty", orgID)
 	}
 
 	var orgCount int64
@@ -40,15 +40,15 @@ func TestResolveTenantIDByExternalRefDoesNotAutoProvisionUnknownRef(t *testing.T
 	db := newTestSaaSStoreDB(t)
 	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
 
-	tenantID, ok, err := store.ResolveTenantIDByExternalRef(context.Background(), "tenant_demo")
+	orgID, ok, err := store.ResolveTenantIDByExternalRef(context.Background(), "tenant_demo")
 	if err != nil {
 		t.Fatalf("ResolveTenantIDByExternalRef() error = %v", err)
 	}
 	if ok {
-		t.Fatalf("ResolveTenantIDByExternalRef() ok = true, want false (tenantID=%q)", tenantID)
+		t.Fatalf("ResolveTenantIDByExternalRef() ok = true, want false (orgID=%q)", orgID)
 	}
-	if tenantID != "" {
-		t.Fatalf("ResolveTenantIDByExternalRef() tenantID = %q, want empty", tenantID)
+	if orgID != "" {
+		t.Fatalf("ResolveTenantIDByExternalRef() orgID = %q, want empty", orgID)
 	}
 
 	var orgCount int64
@@ -77,15 +77,15 @@ func TestResolveTenantIDByExternalRefResolvesExistingExternalRef(t *testing.T) {
 		t.Fatalf("create tenant: %v", err)
 	}
 
-	tenantID, ok, err := store.ResolveTenantIDByExternalRef(context.Background(), "org_existing")
+	orgID, ok, err := store.ResolveTenantIDByExternalRef(context.Background(), "org_existing")
 	if err != nil {
 		t.Fatalf("ResolveTenantIDByExternalRef() error = %v", err)
 	}
 	if !ok {
 		t.Fatal("ResolveTenantIDByExternalRef() ok = false, want true")
 	}
-	if tenantID != expectedID {
-		t.Fatalf("ResolveTenantIDByExternalRef() tenantID = %q, want %q", tenantID, expectedID)
+	if orgID != expectedID {
+		t.Fatalf("ResolveTenantIDByExternalRef() orgID = %q, want %q", orgID, expectedID)
 	}
 }
 

@@ -22,7 +22,7 @@ func newFakeRepo() *fakeRepo { return &fakeRepo{store: map[uuid.UUID]domain.Work
 func (r *fakeRepo) List(_ context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error) {
 	out := make([]domain.WorkOrder, 0, len(r.store))
 	for _, wo := range r.store {
-		if wo.TenantID != p.TenantID || wo.ArchivedAt != nil {
+		if wo.OrgID != p.OrgID || wo.ArchivedAt != nil {
 			continue
 		}
 		if p.BranchID != nil && (wo.BranchID == nil || *wo.BranchID != *p.BranchID) {
@@ -35,10 +35,10 @@ func (r *fakeRepo) List(_ context.Context, p ListParams) ([]domain.WorkOrder, in
 	}
 	return out, int64(len(out)), false, nil, nil
 }
-func (r *fakeRepo) ListArchived(_ context.Context, tenantID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error) {
+func (r *fakeRepo) ListArchived(_ context.Context, orgID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error) {
 	out := make([]domain.WorkOrder, 0)
 	for _, wo := range r.store {
-		if wo.TenantID != tenantID || wo.ArchivedAt == nil {
+		if wo.OrgID != orgID || wo.ArchivedAt == nil {
 			continue
 		}
 		if branchID != nil && (wo.BranchID == nil || *wo.BranchID != *branchID) {
@@ -58,9 +58,9 @@ func (r *fakeRepo) Create(_ context.Context, in domain.WorkOrder) (domain.WorkOr
 	r.store[in.ID] = in
 	return in, nil
 }
-func (r *fakeRepo) GetByID(_ context.Context, tenantID, id uuid.UUID) (domain.WorkOrder, error) {
+func (r *fakeRepo) GetByID(_ context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error) {
 	wo, ok := r.store[id]
-	if !ok || wo.TenantID != tenantID {
+	if !ok || wo.OrgID != orgID {
 		return domain.WorkOrder{}, gorm.ErrRecordNotFound
 	}
 	return wo, nil
@@ -122,7 +122,7 @@ func TestCreateWithVehicleAsset(t *testing.T) {
 	uc := NewUsecases(newFakeRepo(), nil, nil, nil, NewNoopHook("vehicle"))
 
 	in := domain.WorkOrder{
-		TenantID:   uuid.New(),
+		OrgID:   uuid.New(),
 		Number:     "OT-001",
 		AssetType:  "vehicle",
 		AssetID:    uuid.New(),
@@ -155,7 +155,7 @@ func TestCreateRequiresAssetType(t *testing.T) {
 	t.Parallel()
 	uc := NewUsecases(newFakeRepo(), nil, nil, nil)
 	_, err := uc.Create(context.Background(), domain.WorkOrder{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		Number:   "OT-002",
 		AssetID:  uuid.New(),
 		Status:   "received",
@@ -176,10 +176,10 @@ func TestListFiltersByAssetType(t *testing.T) {
 	t.Parallel()
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, nil, nil, nil)
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	for _, tt := range []struct{ assetType string }{{"vehicle"}, {"vehicle"}, {"bicycle"}} {
 		_, err := uc.Create(context.Background(), domain.WorkOrder{
-			TenantID:   tenantID,
+			OrgID:   orgID,
 			Number:     "OT-" + tt.assetType,
 			AssetType:  tt.assetType,
 			AssetID:    uuid.New(),
@@ -193,7 +193,7 @@ func TestListFiltersByAssetType(t *testing.T) {
 			t.Fatalf("create: %v", err)
 		}
 	}
-	got, _, _, _, err := uc.List(context.Background(), ListParams{TenantID: tenantID, AssetType: "vehicle"})
+	got, _, _, _, err := uc.List(context.Background(), ListParams{OrgID: orgID, AssetType: "vehicle"})
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -206,13 +206,13 @@ func TestListFiltersByBranch(t *testing.T) {
 	t.Parallel()
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, nil, nil, nil)
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	branchA := uuid.New()
 	branchB := uuid.New()
 
 	for _, branchID := range []*uuid.UUID{&branchA, &branchB, nil} {
 		_, err := uc.Create(context.Background(), domain.WorkOrder{
-			TenantID:   tenantID,
+			OrgID:   orgID,
 			BranchID:   branchID,
 			Number:     "OT-" + uuid.NewString(),
 			AssetType:  "vehicle",
@@ -228,7 +228,7 @@ func TestListFiltersByBranch(t *testing.T) {
 		}
 	}
 
-	got, _, _, _, err := uc.List(context.Background(), ListParams{TenantID: tenantID, BranchID: &branchA})
+	got, _, _, _, err := uc.List(context.Background(), ListParams{OrgID: orgID, BranchID: &branchA})
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}

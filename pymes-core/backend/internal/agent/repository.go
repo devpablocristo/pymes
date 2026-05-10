@@ -19,7 +19,7 @@ func NewRepository(db *gorm.DB) *Repository {
 
 type confirmationModel struct {
 	ID           uuid.UUID `gorm:"type:uuid;primaryKey"`
-	TenantID     uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID     uuid.UUID `gorm:"type:uuid;index;not null"`
 	Actor        string    `gorm:"not null;default:''"`
 	CapabilityID string    `gorm:"not null;index"`
 	PayloadHash  string    `gorm:"not null"`
@@ -35,7 +35,7 @@ func (confirmationModel) TableName() string { return "agent_confirmations" }
 
 type idempotencyModel struct {
 	ID             uuid.UUID `gorm:"type:uuid;primaryKey"`
-	TenantID       uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID       uuid.UUID `gorm:"type:uuid;index;not null"`
 	Actor          string    `gorm:"not null;default:''"`
 	CapabilityID   string    `gorm:"not null;index"`
 	IdempotencyKey string    `gorm:"column:idempotency_key;not null;index"`
@@ -50,7 +50,7 @@ func (idempotencyModel) TableName() string { return "agent_idempotency_records" 
 
 type agentEventModel struct {
 	ID                string          `gorm:"column:id"`
-	TenantID          string          `gorm:"column:tenant_id"`
+	OrgID          string          `gorm:"column:org_id"`
 	ConversationID    *string         `gorm:"column:conversation_id"`
 	RequestID         *string         `gorm:"column:request_id"`
 	CapabilityID      *string         `gorm:"column:capability_id"`
@@ -79,7 +79,7 @@ func (r *Repository) CreateConfirmation(ctx context.Context, in Confirmation) (C
 	now := time.Now().UTC()
 	row := confirmationModel{
 		ID:           in.ID,
-		TenantID:     in.TenantID,
+		OrgID:     in.OrgID,
 		Actor:        in.Actor,
 		CapabilityID: in.CapabilityID,
 		PayloadHash:  in.PayloadHash,
@@ -98,25 +98,25 @@ func (r *Repository) CreateConfirmation(ctx context.Context, in Confirmation) (C
 	return confirmationToDomain(row), nil
 }
 
-func (r *Repository) GetConfirmation(ctx context.Context, tenantID uuid.UUID, id uuid.UUID) (Confirmation, error) {
+func (r *Repository) GetConfirmation(ctx context.Context, orgID uuid.UUID, id uuid.UUID) (Confirmation, error) {
 	var row confirmationModel
-	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).First(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).First(&row).Error; err != nil {
 		return Confirmation{}, err
 	}
 	return confirmationToDomain(row), nil
 }
 
-func (r *Repository) MarkConfirmationUsed(ctx context.Context, tenantID uuid.UUID, id uuid.UUID) error {
+func (r *Repository) MarkConfirmationUsed(ctx context.Context, orgID uuid.UUID, id uuid.UUID) error {
 	now := time.Now().UTC()
 	return r.db.WithContext(ctx).Model(&confirmationModel{}).
-		Where("tenant_id = ? AND id = ? AND status = 'pending'", tenantID, id).
+		Where("org_id = ? AND id = ? AND status = 'pending'", orgID, id).
 		Updates(map[string]any{"status": "used", "used_at": now}).Error
 }
 
-func (r *Repository) GetIdempotencyRecord(ctx context.Context, tenantID uuid.UUID, actor, capabilityID, key string) (IdempotencyRecord, bool, error) {
+func (r *Repository) GetIdempotencyRecord(ctx context.Context, orgID uuid.UUID, actor, capabilityID, key string) (IdempotencyRecord, bool, error) {
 	var row idempotencyModel
 	err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND actor = ? AND capability_id = ? AND idempotency_key = ?", tenantID, actor, capabilityID, key).
+		Where("org_id = ? AND actor = ? AND capability_id = ? AND idempotency_key = ?", orgID, actor, capabilityID, key).
 		First(&row).Error
 	if err == nil {
 		return idempotencyToDomain(row), true, nil
@@ -131,7 +131,7 @@ func (r *Repository) SaveIdempotencyRecord(ctx context.Context, in IdempotencyRe
 	now := time.Now().UTC()
 	row := idempotencyModel{
 		ID:             in.ID,
-		TenantID:       in.TenantID,
+		OrgID:       in.OrgID,
 		Actor:          in.Actor,
 		CapabilityID:   in.CapabilityID,
 		IdempotencyKey: in.IdempotencyKey,
@@ -147,11 +147,11 @@ func (r *Repository) SaveIdempotencyRecord(ctx context.Context, in IdempotencyRe
 	return r.db.WithContext(ctx).Create(&row).Error
 }
 
-func (r *Repository) ListAgentEvents(ctx context.Context, tenantID uuid.UUID, limit int, capabilityID, requestID string) ([]AgentEvent, error) {
+func (r *Repository) ListAgentEvents(ctx context.Context, orgID uuid.UUID, limit int, capabilityID, requestID string) ([]AgentEvent, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 100
 	}
-	q := r.db.WithContext(ctx).Table("ai_agent_events").Where("tenant_id = ?", tenantID)
+	q := r.db.WithContext(ctx).Table("ai_agent_events").Where("org_id = ?", orgID)
 	if capabilityID != "" {
 		q = q.Where("capability_id = ?", capabilityID)
 	}
@@ -172,7 +172,7 @@ func (r *Repository) ListAgentEvents(ctx context.Context, tenantID uuid.UUID, li
 func confirmationToDomain(row confirmationModel) Confirmation {
 	return Confirmation{
 		ID:           row.ID,
-		TenantID:     row.TenantID,
+		OrgID:     row.OrgID,
 		Actor:        row.Actor,
 		CapabilityID: row.CapabilityID,
 		PayloadHash:  row.PayloadHash,
@@ -188,7 +188,7 @@ func confirmationToDomain(row confirmationModel) Confirmation {
 func idempotencyToDomain(row idempotencyModel) IdempotencyRecord {
 	return IdempotencyRecord{
 		ID:             row.ID,
-		TenantID:       row.TenantID,
+		OrgID:       row.OrgID,
 		Actor:          row.Actor,
 		CapabilityID:   row.CapabilityID,
 		IdempotencyKey: row.IdempotencyKey,
@@ -207,7 +207,7 @@ func eventToDomain(row agentEventModel) AgentEvent {
 	}
 	return AgentEvent{
 		ID:              row.ID,
-		TenantID:        row.TenantID,
+		OrgID:        row.OrgID,
 		ConversationID:  row.ConversationID,
 		RequestID:       row.RequestID,
 		CapabilityID:    row.CapabilityID,

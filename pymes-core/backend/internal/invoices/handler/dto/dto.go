@@ -47,7 +47,7 @@ type LineItemResponse struct {
 
 type InvoiceResponse struct {
 	ID              string             `json:"id"`
-	TenantID        string             `json:"tenant_id"`
+	OrgID        string             `json:"org_id"`
 	Number          string             `json:"number"`
 	PartyID         string             `json:"party_id,omitempty"`
 	CustomerName    string             `json:"customer_name"`

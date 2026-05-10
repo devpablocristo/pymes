@@ -26,7 +26,7 @@ vi.mock('../lib/api', () => ({
 
 const sessionFixture: SessionResponse = {
   auth: {
-    tenant_id: '00000000-0000-0000-0000-000000000001',
+    org_id: '00000000-0000-0000-0000-000000000001',
     role: 'service',
     product_role: 'admin',
     scopes: ['admin:console:read'],
@@ -36,7 +36,7 @@ const sessionFixture: SessionResponse = {
 };
 
 const meWithoutUser: MeProfileResponse = {
-  tenant_id: '00000000-0000-0000-0000-000000000001',
+  org_id: '00000000-0000-0000-0000-000000000001',
   external_id: 'ext',
   role: 'admin',
   user: null,
@@ -65,7 +65,7 @@ describe('SettingsPage (modo clave API)', () => {
     apiMocks.getSession.mockResolvedValue(sessionFixture);
     apiMocks.getMe.mockResolvedValue(meWithoutUser);
     apiMocks.getBillingStatus.mockResolvedValue({
-      tenant_id: sessionFixture.auth.tenant_id,
+      org_id: sessionFixture.auth.org_id,
       plan_code: 'starter',
       status: 'active',
       hard_limits: {},

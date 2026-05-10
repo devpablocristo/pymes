@@ -74,7 +74,7 @@ func TestResolveAPIKey(t *testing.T) {
 			ok: true,
 			key: users.ResolvedAPIKey{
 				ID:       uuid.MustParse("00000000-0000-0000-0000-000000000210"),
-				TenantID: uuid.MustParse("00000000-0000-0000-0000-000000000220"),
+				OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000220"),
 				Scopes:   []string{"admin:console:read"},
 			},
 		},
@@ -98,7 +98,7 @@ func TestResolveAPIKey(t *testing.T) {
 
 	var got struct {
 		ID       string   `json:"id"`
-		TenantID string   `json:"tenant_id"`
+		OrgID string   `json:"org_id"`
 		Scopes   []string `json:"scopes"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &got); err != nil {
@@ -108,8 +108,8 @@ func TestResolveAPIKey(t *testing.T) {
 	if got.ID != "00000000-0000-0000-0000-000000000210" {
 		t.Fatalf("unexpected key id %q", got.ID)
 	}
-	if got.TenantID != "00000000-0000-0000-0000-000000000220" {
-		t.Fatalf("unexpected org id %q", got.TenantID)
+	if got.OrgID != "00000000-0000-0000-0000-000000000220" {
+		t.Fatalf("unexpected org id %q", got.OrgID)
 	}
 	if len(got.Scopes) != 1 || got.Scopes[0] != "admin:console:read" {
 		t.Fatalf("unexpected scopes %#v", got.Scopes)
@@ -128,7 +128,7 @@ func TestCreateInAppNotification(t *testing.T) {
 
 	body, err := json.Marshal(map[string]any{
 		"id":           "insight:sales_collections:month",
-		"tenant_id":    "00000000-0000-0000-0000-000000000220",
+		"org_id":    "00000000-0000-0000-0000-000000000220",
 		"actor":        "user-ext-1",
 		"title":        "Insight disponible",
 		"body":         "Hay una novedad en ventas.",
@@ -184,7 +184,7 @@ func TestGovernanceCallback(t *testing.T) {
 	body, err := json.Marshal(map[string]any{
 		"event":       "approval_resolved",
 		"approval_id": "appr-1",
-		"tenant_id":   "00000000-0000-0000-0000-000000000220",
+		"org_id":   "00000000-0000-0000-0000-000000000220",
 		"request_id":  "req-1",
 		"decision":    "approved",
 		"decided_by":  "admin@co",

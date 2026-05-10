@@ -180,7 +180,7 @@ func TestFindActiveMembershipRoleByExternalUserUsesLocalRole(t *testing.T) {
 	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
 	ctx := context.Background()
 
-	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "Bicimax", "bicimax", "org_bicimax", "user_owner", "owner@bicimax.test", "Owner", nil)
+	orgID, _, _, _, err := store.CreateTenantWithOwner(ctx, "Bicimax", "bicimax", "org_bicimax", "user_owner", "owner@bicimax.test", "Owner", nil)
 	if err != nil {
 		t.Fatalf("CreateTenantWithOwner() error = %v", err)
 	}
@@ -188,11 +188,11 @@ func TestFindActiveMembershipRoleByExternalUserUsesLocalRole(t *testing.T) {
 	if err != nil {
 		t.Fatalf("upsertUserTx() error = %v", err)
 	}
-	if _, err := store.UpsertTenantMember(ctx, tenantID, user.ID.String(), "member"); err != nil {
+	if _, err := store.UpsertTenantMember(ctx, orgID, user.ID.String(), "member"); err != nil {
 		t.Fatalf("UpsertTenantMember() error = %v", err)
 	}
 
-	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, tenantID, "user_member")
+	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, orgID, "user_member")
 	if err != nil {
 		t.Fatalf("FindActiveMembershipRoleByExternalUser() error = %v", err)
 	}
@@ -206,7 +206,7 @@ func TestFindTenantBySlugForExternalUserFindsExistingOwnedTenant(t *testing.T) {
 	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
 	ctx := context.Background()
 
-	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
+	orgID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
 	if err != nil {
 		t.Fatalf("CreateTenantWithOwner() error = %v", err)
 	}
@@ -218,8 +218,8 @@ func TestFindTenantBySlugForExternalUserFindsExistingOwnedTenant(t *testing.T) {
 	if !ok {
 		t.Fatal("FindTenantBySlugForExternalUser() ok = false, want true")
 	}
-	if row.ID.String() != tenantID {
-		t.Fatalf("tenant id = %q, want %q", row.ID.String(), tenantID)
+	if row.ID.String() != orgID {
+		t.Fatalf("tenant id = %q, want %q", row.ID.String(), orgID)
 	}
 	if role != "owner" {
 		t.Fatalf("role = %q, want owner", role)
@@ -236,7 +236,7 @@ func TestCreateTenantWithClerkOrganizationCreatesTenantOrgAndOwner(t *testing.T)
 	store.clerk = clerk
 	ctx := context.Background()
 
-	tenantID, clerkOrgID, _, _, _, err := store.CreateTenantWithClerkOrganization(ctx, "MedLab", "medlab", "", "user_owner", "owner@medlab.test", "Owner", nil)
+	orgID, clerkOrgID, _, _, _, err := store.CreateTenantWithClerkOrganization(ctx, "MedLab", "medlab", "", "user_owner", "owner@medlab.test", "Owner", nil)
 	if err != nil {
 		t.Fatalf("CreateTenantWithClerkOrganization() error = %v", err)
 	}
@@ -253,13 +253,13 @@ func TestCreateTenantWithClerkOrganizationCreatesTenantOrgAndOwner(t *testing.T)
 		t.Fatalf("clerkOrgID = %q, want org_medlab", clerkOrgID)
 	}
 	var tenant pymesTenantRow
-	if err := db.Where("id = ?", tenantID).Take(&tenant).Error; err != nil {
+	if err := db.Where("id = ?", orgID).Take(&tenant).Error; err != nil {
 		t.Fatalf("load tenant: %v", err)
 	}
 	if clerkTenantIDFromTenant(tenant) != "org_medlab" {
 		t.Fatalf("tenant clerk org = %q, want org_medlab", clerkTenantIDFromTenant(tenant))
 	}
-	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, tenantID, "user_owner")
+	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, orgID, "user_owner")
 	if err != nil {
 		t.Fatalf("FindActiveMembershipRoleByExternalUser() error = %v", err)
 	}
@@ -273,7 +273,7 @@ func TestTransferTenantOwnershipKeepsExactlyOneOwner(t *testing.T) {
 	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
 	ctx := context.Background()
 
-	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "Bicimax", "bicimax", "org_bicimax", "user_owner", "owner@bicimax.test", "Owner", nil)
+	orgID, _, _, _, err := store.CreateTenantWithOwner(ctx, "Bicimax", "bicimax", "org_bicimax", "user_owner", "owner@bicimax.test", "Owner", nil)
 	if err != nil {
 		t.Fatalf("CreateTenantWithOwner() error = %v", err)
 	}
@@ -281,25 +281,25 @@ func TestTransferTenantOwnershipKeepsExactlyOneOwner(t *testing.T) {
 	if err != nil {
 		t.Fatalf("upsertUserTx() error = %v", err)
 	}
-	if _, err := store.UpsertTenantMember(ctx, tenantID, next.ID.String(), "admin"); err != nil {
+	if _, err := store.UpsertTenantMember(ctx, orgID, next.ID.String(), "admin"); err != nil {
 		t.Fatalf("UpsertTenantMember() error = %v", err)
 	}
 
-	if err := store.TransferTenantOwnership(ctx, tenantID, "user_owner", next.ID.String()); err != nil {
+	if err := store.TransferTenantOwnership(ctx, orgID, "user_owner", next.ID.String()); err != nil {
 		t.Fatalf("TransferTenantOwnership() error = %v", err)
 	}
 
-	tenantUUID := uuid.MustParse(tenantID)
+	tenantUUID := uuid.MustParse(orgID)
 	var owners int64
 	if err := db.Model(&pymesTenantMembershipRow{}).
-		Where("tenant_id = ? AND role = 'owner' AND status = 'active'", tenantUUID).
+		Where("org_id = ? AND role = 'owner' AND status = 'active'", tenantUUID).
 		Count(&owners).Error; err != nil {
 		t.Fatalf("count owners: %v", err)
 	}
 	if owners != 1 {
 		t.Fatalf("active owners = %d, want 1", owners)
 	}
-	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, tenantID, "user_next_owner")
+	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, orgID, "user_next_owner")
 	if err != nil {
 		t.Fatalf("FindActiveMembershipRoleByExternalUser() error = %v", err)
 	}
@@ -315,7 +315,7 @@ func TestRemoveTenantMemberRemovesClerkOrganizationMembership(t *testing.T) {
 	store.clerk = clerk
 	ctx := context.Background()
 
-	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
+	orgID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
 	if err != nil {
 		t.Fatalf("CreateTenantWithOwner() error = %v", err)
 	}
@@ -323,11 +323,11 @@ func TestRemoveTenantMemberRemovesClerkOrganizationMembership(t *testing.T) {
 	if err != nil {
 		t.Fatalf("upsertUserTx() error = %v", err)
 	}
-	if _, err := store.UpsertTenantMember(ctx, tenantID, user.ID.String(), "member"); err != nil {
+	if _, err := store.UpsertTenantMember(ctx, orgID, user.ID.String(), "member"); err != nil {
 		t.Fatalf("UpsertTenantMember() error = %v", err)
 	}
 
-	if err := store.RemoveTenantMember(ctx, tenantID, user.ID.String()); err != nil {
+	if err := store.RemoveTenantMember(ctx, orgID, user.ID.String()); err != nil {
 		t.Fatalf("RemoveTenantMember() error = %v", err)
 	}
 
@@ -337,7 +337,7 @@ func TestRemoveTenantMemberRemovesClerkOrganizationMembership(t *testing.T) {
 	if clerk.lastDeletedOrgMembershipID != "org_medlab" || clerk.lastDeletedOrgMembershipUserID != "user_member" {
 		t.Fatalf("deleted membership = org %q user %q, want org_medlab/user_member", clerk.lastDeletedOrgMembershipID, clerk.lastDeletedOrgMembershipUserID)
 	}
-	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, tenantID, "user_member")
+	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, orgID, "user_member")
 	if err != nil {
 		t.Fatalf("FindActiveMembershipRoleByExternalUser() error = %v", err)
 	}
@@ -352,7 +352,7 @@ func TestAcceptTenantInvitationCreatesMembershipForCorrectTenant(t *testing.T) {
 	store.clerk = &fakeClerkTenantClient{membershipOK: true}
 	ctx := context.Background()
 
-	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "Bicimax", "bicimax", "org_bicimax", "user_owner", "owner@bicimax.test", "Owner", nil)
+	orgID, _, _, _, err := store.CreateTenantWithOwner(ctx, "Bicimax", "bicimax", "org_bicimax", "user_owner", "owner@bicimax.test", "Owner", nil)
 	if err != nil {
 		t.Fatalf("CreateTenantWithOwner() error = %v", err)
 	}
@@ -368,7 +368,7 @@ func TestAcceptTenantInvitationCreatesMembershipForCorrectTenant(t *testing.T) {
 	now := time.Now().UTC()
 	row := pymesTenantInvitationRow{
 		ID:                inviteID,
-		TenantID:          uuid.MustParse(tenantID),
+		OrgID:          uuid.MustParse(orgID),
 		EmailNormalized:   "new@bicimax.test",
 		Role:              "member",
 		Status:            "pending",
@@ -397,7 +397,7 @@ func TestAcceptTenantInvitationCreatesMembershipForCorrectTenant(t *testing.T) {
 	if clerkTenantID != "org_bicimax" {
 		t.Fatalf("clerkTenantID = %q, want org_bicimax", clerkTenantID)
 	}
-	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, tenantID, "user_new")
+	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, orgID, "user_new")
 	if err != nil {
 		t.Fatalf("FindActiveMembershipRoleByExternalUser() error = %v", err)
 	}
@@ -412,7 +412,7 @@ func TestAcceptTenantInvitationRelinksExistingEmailAndReactivatesMembership(t *t
 	store.clerk = &fakeClerkTenantClient{membershipOK: true}
 	ctx := context.Background()
 
-	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
+	orgID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
 	if err != nil {
 		t.Fatalf("CreateTenantWithOwner() error = %v", err)
 	}
@@ -420,10 +420,10 @@ func TestAcceptTenantInvitationRelinksExistingEmailAndReactivatesMembership(t *t
 	if err != nil {
 		t.Fatalf("upsert old user: %v", err)
 	}
-	if _, err := store.UpsertTenantMember(ctx, tenantID, oldUser.ID.String(), "member"); err != nil {
+	if _, err := store.UpsertTenantMember(ctx, orgID, oldUser.ID.String(), "member"); err != nil {
 		t.Fatalf("UpsertTenantMember() error = %v", err)
 	}
-	if err := store.RemoveTenantMember(ctx, tenantID, oldUser.ID.String()); err != nil {
+	if err := store.RemoveTenantMember(ctx, orgID, oldUser.ID.String()); err != nil {
 		t.Fatalf("RemoveTenantMember() error = %v", err)
 	}
 	owner, ok, err := store.LocalUserByExternalID(ctx, "user_owner")
@@ -434,7 +434,7 @@ func TestAcceptTenantInvitationRelinksExistingEmailAndReactivatesMembership(t *t
 	now := time.Now().UTC()
 	row := pymesTenantInvitationRow{
 		ID:                uuid.New(),
-		TenantID:          uuid.MustParse(tenantID),
+		OrgID:          uuid.MustParse(orgID),
 		EmailNormalized:   "tucbox@gmail.com",
 		Role:              "admin",
 		Status:            "pending",
@@ -467,7 +467,7 @@ func TestAcceptTenantInvitationRelinksExistingEmailAndReactivatesMembership(t *t
 	if user.ID != oldUser.ID || user.ExternalID != "user_new" {
 		t.Fatalf("user = id %s external %q, want id %s external user_new", user.ID, user.ExternalID, oldUser.ID)
 	}
-	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, tenantID, "user_new")
+	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, orgID, "user_new")
 	if err != nil {
 		t.Fatalf("FindActiveMembershipRoleByExternalUser() error = %v", err)
 	}
@@ -483,12 +483,12 @@ func TestCreateTenantInvitationUsesTenantClerkOrganization(t *testing.T) {
 	store.clerk = clerk
 	ctx := context.Background()
 
-	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
+	orgID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
 	if err != nil {
 		t.Fatalf("CreateTenantWithOwner() error = %v", err)
 	}
 
-	invite, err := store.CreateTenantInvitation(ctx, tenantID, "user_owner", "admin@medlab.test", "admin")
+	invite, err := store.CreateTenantInvitation(ctx, orgID, "user_owner", "admin@medlab.test", "admin")
 	if err != nil {
 		t.Fatalf("CreateTenantInvitation() error = %v", err)
 	}
@@ -510,8 +510,8 @@ func TestCreateTenantInvitationUsesTenantClerkOrganization(t *testing.T) {
 	if clerk.lastInviteInput.Role != "org:member" {
 		t.Fatalf("Role = %q, want org:member", clerk.lastInviteInput.Role)
 	}
-	if got := clerk.lastInviteInput.PublicMetadata["pymes_tenant_id"]; got != tenantID {
-		t.Fatalf("pymes_tenant_id metadata = %v, want %s", got, tenantID)
+	if got := clerk.lastInviteInput.PublicMetadata["pymes_tenant_id"]; got != orgID {
+		t.Fatalf("pymes_tenant_id metadata = %v, want %s", got, orgID)
 	}
 	if got := clerk.lastInviteInput.PublicMetadata["pymes_tenant_slug"]; got != "medlab" {
 		t.Fatalf("pymes_tenant_slug metadata = %v, want medlab", got)
@@ -527,11 +527,11 @@ func TestPreviewTenantInvitationReturnsTenantDestinationWithoutAccepting(t *test
 	store.clerk = &fakeClerkTenantClient{}
 	ctx := context.Background()
 
-	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
+	orgID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
 	if err != nil {
 		t.Fatalf("CreateTenantWithOwner() error = %v", err)
 	}
-	invite, err := store.CreateTenantInvitation(ctx, tenantID, "user_owner", "tucbox@gmail.com", "member")
+	invite, err := store.CreateTenantInvitation(ctx, orgID, "user_owner", "tucbox@gmail.com", "member")
 	if err != nil {
 		t.Fatalf("CreateTenantInvitation() error = %v", err)
 	}
@@ -552,8 +552,8 @@ func TestPreviewTenantInvitationReturnsTenantDestinationWithoutAccepting(t *test
 	if err != nil {
 		t.Fatalf("PreviewTenantInvitation() error = %v", err)
 	}
-	if preview.TenantID != tenantID || preview.TenantSlug != "medlab" || preview.TenantName != "MedLab" {
-		t.Fatalf("preview tenant = id %q slug %q name %q, want %q medlab MedLab", preview.TenantID, preview.TenantSlug, preview.TenantName, tenantID)
+	if preview.OrgID != orgID || preview.TenantSlug != "medlab" || preview.TenantName != "MedLab" {
+		t.Fatalf("preview tenant = id %q slug %q name %q, want %q medlab MedLab", preview.OrgID, preview.TenantSlug, preview.TenantName, orgID)
 	}
 	if preview.Email != "tucbox@gmail.com" || preview.Role != "member" || preview.Status != "pending" {
 		t.Fatalf("preview invite = email %q role %q status %q", preview.Email, preview.Role, preview.Status)
@@ -573,18 +573,18 @@ func TestCreateTenantInvitationDoesNotLeavePendingInviteWhenClerkFails(t *testin
 	store.clerk = &fakeClerkTenantClient{createInviteErr: errors.New("clerk down")}
 	ctx := context.Background()
 
-	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
+	orgID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
 	if err != nil {
 		t.Fatalf("CreateTenantWithOwner() error = %v", err)
 	}
 
-	_, err = store.CreateTenantInvitation(ctx, tenantID, "user_owner", "admin@medlab.test", "admin")
+	_, err = store.CreateTenantInvitation(ctx, orgID, "user_owner", "admin@medlab.test", "admin")
 	if err == nil {
 		t.Fatal("CreateTenantInvitation() error = nil, want clerk error")
 	}
 	var count int64
 	if err := db.Model(&pymesTenantInvitationRow{}).
-		Where("tenant_id = ? AND email_normalized = ? AND status = 'pending'", uuid.MustParse(tenantID), "admin@medlab.test").
+		Where("org_id = ? AND email_normalized = ? AND status = 'pending'", uuid.MustParse(orgID), "admin@medlab.test").
 		Count(&count).Error; err != nil {
 		t.Fatalf("count invites: %v", err)
 	}
@@ -599,7 +599,7 @@ func TestAcceptTenantInvitationRejectsLocalOnlyPendingInvite(t *testing.T) {
 	store.clerk = &fakeClerkTenantClient{membershipOK: true}
 	ctx := context.Background()
 
-	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
+	orgID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
 	if err != nil {
 		t.Fatalf("CreateTenantWithOwner() error = %v", err)
 	}
@@ -614,7 +614,7 @@ func TestAcceptTenantInvitationRejectsLocalOnlyPendingInvite(t *testing.T) {
 	now := time.Now().UTC()
 	if err := db.Create(&pymesTenantInvitationRow{
 		ID:              uuid.New(),
-		TenantID:        uuid.MustParse(tenantID),
+		OrgID:        uuid.MustParse(orgID),
 		EmailNormalized: "new@medlab.test",
 		Role:            "member",
 		Status:          "pending",
@@ -649,7 +649,7 @@ func TestAcceptTenantInvitationCreatesMissingClerkMembership(t *testing.T) {
 	store.clerk = fakeClerk
 	ctx := context.Background()
 
-	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
+	orgID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
 	if err != nil {
 		t.Fatalf("CreateTenantWithOwner() error = %v", err)
 	}
@@ -664,7 +664,7 @@ func TestAcceptTenantInvitationCreatesMissingClerkMembership(t *testing.T) {
 	now := time.Now().UTC()
 	if err := db.Create(&pymesTenantInvitationRow{
 		ID:                uuid.New(),
-		TenantID:          uuid.MustParse(tenantID),
+		OrgID:          uuid.MustParse(orgID),
 		EmailNormalized:   "new@medlab.test",
 		Role:              "member",
 		Status:            "pending",
@@ -700,7 +700,7 @@ func TestAcceptTenantInvitationRejectsEmailMismatch(t *testing.T) {
 	store.clerk = &fakeClerkTenantClient{membershipOK: true}
 	ctx := context.Background()
 
-	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "Bicimax", "bicimax", "org_bicimax", "user_owner", "owner@bicimax.test", "Owner", nil)
+	orgID, _, _, _, err := store.CreateTenantWithOwner(ctx, "Bicimax", "bicimax", "org_bicimax", "user_owner", "owner@bicimax.test", "Owner", nil)
 	if err != nil {
 		t.Fatalf("CreateTenantWithOwner() error = %v", err)
 	}
@@ -715,7 +715,7 @@ func TestAcceptTenantInvitationRejectsEmailMismatch(t *testing.T) {
 	now := time.Now().UTC()
 	if err := db.Create(&pymesTenantInvitationRow{
 		ID:                uuid.New(),
-		TenantID:          uuid.MustParse(tenantID),
+		OrgID:          uuid.MustParse(orgID),
 		EmailNormalized:   "expected@bicimax.test",
 		Role:              "admin",
 		Status:            "pending",

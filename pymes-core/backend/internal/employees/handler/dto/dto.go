@@ -32,7 +32,7 @@ type UpdateEmployeeRequest struct {
 
 type EmployeeResponse struct {
 	ID         string         `json:"id"`
-	TenantID   string         `json:"tenant_id"`
+	OrgID   string         `json:"org_id"`
 	FirstName  string         `json:"first_name"`
 	LastName   string         `json:"last_name"`
 	Email      string         `json:"email"`

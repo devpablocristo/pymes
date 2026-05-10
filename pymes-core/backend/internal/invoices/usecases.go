@@ -30,17 +30,17 @@ func parseDate(raw string) (time.Time, error) {
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]invdomain.Invoice, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]invdomain.Invoice, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (invdomain.Invoice, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]invdomain.Invoice, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (invdomain.Invoice, error)
 	Create(ctx context.Context, in invdomain.Invoice) (invdomain.Invoice, error)
 	Update(ctx context.Context, in invdomain.Invoice) (invdomain.Invoice, error)
-	SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error
-	Restore(ctx context.Context, tenantID, id uuid.UUID) error
-	HardDelete(ctx context.Context, tenantID, id uuid.UUID) error
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type Usecases struct {
@@ -56,12 +56,12 @@ func (u *Usecases) List(ctx context.Context, p ListParams) ([]invdomain.Invoice,
 	return u.repo.List(ctx, p)
 }
 
-func (u *Usecases) ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]invdomain.Invoice, error) {
-	return u.repo.ListArchived(ctx, tenantID, limit)
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]invdomain.Invoice, error) {
+	return u.repo.ListArchived(ctx, orgID, limit)
 }
 
-func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (invdomain.Invoice, error) {
-	out, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (invdomain.Invoice, error) {
+	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return invdomain.Invoice{}, domainerr.NotFoundf("invoice", id.String())
@@ -72,7 +72,7 @@ func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (invdoma
 }
 
 type CreateInput struct {
-	TenantID        uuid.UUID
+	OrgID        uuid.UUID
 	Number          string
 	PartyID         *uuid.UUID
 	CustomerName    string
@@ -142,7 +142,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (invdomain.Invoic
 	total := subtotal * (1 - in.DiscountPercent/100.0) * (1 + in.TaxPercent/100.0)
 
 	out, err := u.repo.Create(ctx, invdomain.Invoice{
-		TenantID:        in.TenantID,
+		OrgID:        in.OrgID,
 		Number:          in.Number,
 		PartyID:         in.PartyID,
 		CustomerName:    strings.TrimSpace(in.CustomerName),
@@ -163,7 +163,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (invdomain.Invoic
 		return invdomain.Invoice{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, in.TenantID.String(), in.CreatedBy, "invoice.created", "invoice", out.ID.String(), map[string]any{
+		u.audit.Log(ctx, in.OrgID.String(), in.CreatedBy, "invoice.created", "invoice", out.ID.String(), map[string]any{
 			"number": out.Number,
 			"total":  out.Total,
 		})
@@ -172,7 +172,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (invdomain.Invoic
 }
 
 type UpdateInput struct {
-	TenantID        uuid.UUID
+	OrgID        uuid.UUID
 	ID              uuid.UUID
 	Status          *string
 	DiscountPercent *float64
@@ -186,7 +186,7 @@ type UpdateInput struct {
 }
 
 func (u *Usecases) Update(ctx context.Context, in UpdateInput) (invdomain.Invoice, error) {
-	current, err := u.repo.GetByID(ctx, in.TenantID, in.ID)
+	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return invdomain.Invoice{}, domainerr.NotFoundf("invoice", in.ID.String())
@@ -243,46 +243,46 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput) (invdomain.Invoic
 		return invdomain.Invoice{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, in.TenantID.String(), in.Actor, "invoice.updated", "invoice", out.ID.String(), nil)
+		u.audit.Log(ctx, in.OrgID.String(), in.Actor, "invoice.updated", "invoice", out.ID.String(), nil)
 	}
 	return out, nil
 }
 
-func (u *Usecases) SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.SoftDelete(ctx, tenantID, id); err != nil {
+func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("invoice", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "invoice.archived", "invoice", id.String(), nil)
+		u.audit.Log(ctx, orgID.String(), actor, "invoice.archived", "invoice", id.String(), nil)
 	}
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("invoice", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "invoice.restored", "invoice", id.String(), nil)
+		u.audit.Log(ctx, orgID.String(), actor, "invoice.restored", "invoice", id.String(), nil)
 	}
 	return nil
 }
 
-func (u *Usecases) HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.HardDelete(ctx, tenantID, id); err != nil {
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("invoice", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "invoice.hard_deleted", "invoice", id.String(), nil)
+		u.audit.Log(ctx, orgID.String(), actor, "invoice.hard_deleted", "invoice", id.String(), nil)
 	}
 	return nil
 }

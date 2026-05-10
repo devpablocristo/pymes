@@ -9,7 +9,7 @@ import (
 
 type CalendarExportTokenModel struct {
 	ID         uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	TenantID   uuid.UUID  `gorm:"type:uuid;index;not null"`
+	OrgID   uuid.UUID  `gorm:"type:uuid;index;not null"`
 	CreatedBy  string     `gorm:"column:created_by;not null"`
 	Name       string     `gorm:"not null"`
 	TokenHash  string     `gorm:"column:token_hash;not null;uniqueIndex"`

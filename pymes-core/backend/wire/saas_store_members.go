@@ -12,8 +12,8 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-func (s *pymesSaaSStore) UpsertTenantMember(ctx context.Context, tenantID, userID, role string) (tenantMemberDTO, error) {
-	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
+func (s *pymesSaaSStore) UpsertTenantMember(ctx context.Context, orgID, userID, role string) (tenantMemberDTO, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
 		return tenantMemberDTO{}, err
 	}
@@ -23,11 +23,11 @@ func (s *pymesSaaSStore) UpsertTenantMember(ctx context.Context, tenantID, userI
 	}
 	var row pymesTenantMembershipRow
 	tx := s.db.WithContext(ctx)
-	err = tx.Where("tenant_id = ? AND user_id = ?", tenantUUID, userUUID).Preload("User").Take(&row).Error
+	err = tx.Where("org_id = ? AND user_id = ?", tenantUUID, userUUID).Preload("User").Take(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		row = pymesTenantMembershipRow{
 			ID:        uuid.New(),
-			TenantID:  tenantUUID,
+			OrgID:  tenantUUID,
 			UserID:    userUUID,
 			Role:      normalizeTenantRole(role),
 			Status:    "active",
@@ -57,14 +57,14 @@ func (s *pymesSaaSStore) UpsertTenantMember(ctx context.Context, tenantID, userI
 	return memberDTOFromRow(row), nil
 }
 
-func (s *pymesSaaSStore) ListTenantMembers(ctx context.Context, tenantID string) ([]tenantMemberDTO, error) {
-	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
+func (s *pymesSaaSStore) ListTenantMembers(ctx context.Context, orgID string) ([]tenantMemberDTO, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
 		return nil, err
 	}
 	var rows []pymesTenantMembershipRow
 	if err := s.db.WithContext(ctx).
-		Where("tenant_id = ?", tenantUUID).
+		Where("org_id = ?", tenantUUID).
 		Where("status = 'active'").
 		Preload("User").
 		Order("created_at ASC").
@@ -78,8 +78,8 @@ func (s *pymesSaaSStore) ListTenantMembers(ctx context.Context, tenantID string)
 	return items, nil
 }
 
-func (s *pymesSaaSStore) FindActiveMembershipRoleByExternalUser(ctx context.Context, tenantID, userExternalID string) (string, bool, error) {
-	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
+func (s *pymesSaaSStore) FindActiveMembershipRoleByExternalUser(ctx context.Context, orgID, userExternalID string) (string, bool, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
 		return "", false, err
 	}
@@ -87,10 +87,10 @@ func (s *pymesSaaSStore) FindActiveMembershipRoleByExternalUser(ctx context.Cont
 		Role string
 	}
 	err = s.db.WithContext(ctx).
-		Table("tenant_memberships AS om").
+		Table("org_members AS om").
 		Select("om.role").
 		Joins("JOIN users u ON u.id = om.user_id").
-		Where("om.tenant_id = ? AND om.status = 'active' AND u.external_id = ? AND u.deleted_at IS NULL", tenantUUID, strings.TrimSpace(userExternalID)).
+		Where("om.org_id = ? AND om.status = 'active' AND u.external_id = ? AND u.deleted_at IS NULL", tenantUUID, strings.TrimSpace(userExternalID)).
 		Take(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return "", false, nil
@@ -113,18 +113,18 @@ func (s *pymesSaaSStore) LocalUserByExternalID(ctx context.Context, userExternal
 	return row, true, nil
 }
 
-func (s *pymesSaaSStore) requireTenantOwner(ctx context.Context, tenantID, actorExternalID string) (pymesUserRow, error) {
-	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
+func (s *pymesSaaSStore) requireTenantOwner(ctx context.Context, orgID, actorExternalID string) (pymesUserRow, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
-		return pymesUserRow{}, domainerr.Validation("invalid tenant_id")
+		return pymesUserRow{}, domainerr.Validation("invalid org_id")
 	}
 	var user pymesUserRow
 	err = s.db.WithContext(ctx).
 		Table("users").
 		Select("users.*").
-		Joins("JOIN tenant_memberships om ON om.user_id = users.id").
+		Joins("JOIN org_members om ON om.user_id = users.id").
 		Where("users.external_id = ? AND users.deleted_at IS NULL", strings.TrimSpace(actorExternalID)).
-		Where("om.tenant_id = ? AND om.role = 'owner' AND om.status = 'active'", tenantUUID).
+		Where("om.org_id = ? AND om.role = 'owner' AND om.status = 'active'", tenantUUID).
 		Take(&user).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return pymesUserRow{}, domainerr.Forbidden("tenant owner privileges required")
@@ -169,7 +169,7 @@ func (s *pymesSaaSStore) acceptPendingInviteForWebhook(ctx context.Context, tena
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var invite pymesTenantInvitationRow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("tenant_id = ? AND email_normalized = ? AND status = 'pending' AND expires_at > now()", tenantUUID, email).
+			Where("org_id = ? AND email_normalized = ? AND status = 'pending' AND expires_at > now()", tenantUUID, email).
 			Order("created_at ASC").
 			Take(&invite).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -180,7 +180,7 @@ func (s *pymesSaaSStore) acceptPendingInviteForWebhook(ctx context.Context, tena
 		now := time.Now().UTC()
 		row := pymesTenantMembershipRow{
 			ID:        uuid.New(),
-			TenantID:  tenantUUID,
+			OrgID:  tenantUUID,
 			UserID:    user.ID,
 			Role:      normalizeInviteRole(invite.Role),
 			Status:    "active",

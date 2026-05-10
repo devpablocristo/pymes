@@ -18,20 +18,20 @@ import (
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]cashdomain.CashMovement, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]cashdomain.CashMovement, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]cashdomain.CashMovement, error)
 	Create(ctx context.Context, in cashdomain.CashMovement) (cashdomain.CashMovement, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (cashdomain.CashMovement, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (cashdomain.CashMovement, error)
 	Update(ctx context.Context, in cashdomain.CashMovement) (cashdomain.CashMovement, error)
-	SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error
-	Restore(ctx context.Context, tenantID, id uuid.UUID) error
-	HardDelete(ctx context.Context, tenantID, id uuid.UUID) error
-	GetCurrency(ctx context.Context, tenantID uuid.UUID) string
-	Summary(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, from, to time.Time) (cashdomain.CashSummary, error)
-	DailySummary(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, days int) ([]cashdomain.CashSummary, error)
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
+	GetCurrency(ctx context.Context, orgID uuid.UUID) string
+	Summary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, from, to time.Time) (cashdomain.CashSummary, error)
+	DailySummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, days int) ([]cashdomain.CashSummary, error)
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type Usecases struct {
@@ -47,12 +47,12 @@ func (u *Usecases) List(ctx context.Context, p ListParams) ([]cashdomain.CashMov
 	return u.repo.List(ctx, p)
 }
 
-func (u *Usecases) ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]cashdomain.CashMovement, error) {
-	return u.repo.ListArchived(ctx, tenantID, limit)
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]cashdomain.CashMovement, error) {
+	return u.repo.ListArchived(ctx, orgID, limit)
 }
 
-func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (cashdomain.CashMovement, error) {
-	out, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (cashdomain.CashMovement, error) {
+	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return cashdomain.CashMovement{}, domainerr.NotFoundf("cash_movement", id.String())
@@ -63,7 +63,7 @@ func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (cashdom
 }
 
 func (u *Usecases) Update(ctx context.Context, in cashdomain.CashMovement, actor string) (cashdomain.CashMovement, error) {
-	current, err := u.repo.GetByID(ctx, in.TenantID, in.ID)
+	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return cashdomain.CashMovement{}, domainerr.NotFoundf("cash_movement", in.ID.String())
@@ -88,46 +88,46 @@ func (u *Usecases) Update(ctx context.Context, in cashdomain.CashMovement, actor
 		return cashdomain.CashMovement{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.TenantID.String(), actor, "cashflow.updated", "cash_movement", out.ID.String(), nil)
+		u.audit.Log(ctx, out.OrgID.String(), actor, "cashflow.updated", "cash_movement", out.ID.String(), nil)
 	}
 	return out, nil
 }
 
-func (u *Usecases) SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.SoftDelete(ctx, tenantID, id); err != nil {
+func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("cash_movement", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "cashflow.archived", "cash_movement", id.String(), nil)
+		u.audit.Log(ctx, orgID.String(), actor, "cashflow.archived", "cash_movement", id.String(), nil)
 	}
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("cash_movement", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "cashflow.restored", "cash_movement", id.String(), nil)
+		u.audit.Log(ctx, orgID.String(), actor, "cashflow.restored", "cash_movement", id.String(), nil)
 	}
 	return nil
 }
 
-func (u *Usecases) HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.HardDelete(ctx, tenantID, id); err != nil {
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("cash_movement", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "cashflow.hard_deleted", "cash_movement", id.String(), nil)
+		u.audit.Log(ctx, orgID.String(), actor, "cashflow.hard_deleted", "cash_movement", id.String(), nil)
 	}
 	return nil
 }
@@ -144,7 +144,7 @@ func (u *Usecases) CreateManual(ctx context.Context, in cashdomain.CashMovement)
 		in.ReferenceType = "manual"
 	}
 	if strings.TrimSpace(in.Currency) == "" {
-		in.Currency = u.repo.GetCurrency(ctx, in.TenantID)
+		in.Currency = u.repo.GetCurrency(ctx, in.OrgID)
 	}
 	if strings.TrimSpace(in.Category) == "" {
 		in.Category = "other"
@@ -157,7 +157,7 @@ func (u *Usecases) CreateManual(ctx context.Context, in cashdomain.CashMovement)
 		return cashdomain.CashMovement{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, in.TenantID.String(), in.CreatedBy, "cashflow.created", "cash_movement", out.ID.String(), map[string]any{
+		u.audit.Log(ctx, in.OrgID.String(), in.CreatedBy, "cashflow.created", "cash_movement", out.ID.String(), map[string]any{
 			"type":   out.Type,
 			"amount": out.Amount,
 		})
@@ -165,27 +165,27 @@ func (u *Usecases) CreateManual(ctx context.Context, in cashdomain.CashMovement)
 	return out, nil
 }
 
-func (u *Usecases) Summary(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, from, to time.Time) (cashdomain.CashSummary, error) {
+func (u *Usecases) Summary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, from, to time.Time) (cashdomain.CashSummary, error) {
 	if to.Before(from) {
 		return cashdomain.CashSummary{}, fmt.Errorf("invalid date range: %w", httperrors.ErrBadInput)
 	}
-	return u.repo.Summary(ctx, tenantID, branchID, from, to)
+	return u.repo.Summary(ctx, orgID, branchID, from, to)
 }
 
-func (u *Usecases) DailySummary(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, days int) ([]cashdomain.CashSummary, error) {
+func (u *Usecases) DailySummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, days int) ([]cashdomain.CashSummary, error) {
 	if days <= 0 {
 		days = 30
 	}
-	return u.repo.DailySummary(ctx, tenantID, branchID, days)
+	return u.repo.DailySummary(ctx, orgID, branchID, days)
 }
 
-func (u *Usecases) RecordSaleIncome(ctx context.Context, tenantID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
+func (u *Usecases) RecordSaleIncome(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
 	out, err := u.repo.Create(ctx, cashdomain.CashMovement{
-		TenantID:      tenantID,
+		OrgID:      orgID,
 		BranchID:      branchID,
 		Type:          "income",
 		Amount:        amount,
-		Currency:      coalesce(currency, u.repo.GetCurrency(ctx, tenantID)),
+		Currency:      coalesce(currency, u.repo.GetCurrency(ctx, orgID)),
 		Category:      "sale",
 		Description:   "sale income",
 		PaymentMethod: coalesce(paymentMethod, "cash"),
@@ -194,7 +194,7 @@ func (u *Usecases) RecordSaleIncome(ctx context.Context, tenantID, saleID uuid.U
 		CreatedBy:     actor,
 	})
 	if err == nil && u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "cashflow.sale_income", "cash_movement", out.ID.String(), map[string]any{
+		u.audit.Log(ctx, orgID.String(), actor, "cashflow.sale_income", "cash_movement", out.ID.String(), map[string]any{
 			"sale_id": saleID.String(),
 			"amount":  amount,
 		})
@@ -202,13 +202,13 @@ func (u *Usecases) RecordSaleIncome(ctx context.Context, tenantID, saleID uuid.U
 	return err
 }
 
-func (u *Usecases) RecordSaleVoidExpense(ctx context.Context, tenantID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
+func (u *Usecases) RecordSaleVoidExpense(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
 	out, err := u.repo.Create(ctx, cashdomain.CashMovement{
-		TenantID:      tenantID,
+		OrgID:      orgID,
 		BranchID:      branchID,
 		Type:          "expense",
 		Amount:        amount,
-		Currency:      coalesce(currency, u.repo.GetCurrency(ctx, tenantID)),
+		Currency:      coalesce(currency, u.repo.GetCurrency(ctx, orgID)),
 		Category:      "sale",
 		Description:   "sale void reversal",
 		PaymentMethod: coalesce(paymentMethod, "cash"),
@@ -217,7 +217,7 @@ func (u *Usecases) RecordSaleVoidExpense(ctx context.Context, tenantID, saleID u
 		CreatedBy:     actor,
 	})
 	if err == nil && u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "cashflow.sale_void", "cash_movement", out.ID.String(), map[string]any{
+		u.audit.Log(ctx, orgID.String(), actor, "cashflow.sale_void", "cash_movement", out.ID.String(), map[string]any{
 			"sale_id": saleID.String(),
 			"amount":  amount,
 		})

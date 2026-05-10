@@ -24,7 +24,7 @@ type Repository struct {
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 type ListParams struct {
-	TenantID uuid.UUID
+	OrgID uuid.UUID
 	Limit    int
 	After    *uuid.UUID
 	Search   string
@@ -34,7 +34,7 @@ type ListParams struct {
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.ProfessionalProfile, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
-	q := r.db.WithContext(ctx).Model(&models.ProfessionalProfileModel{}).Where("tenant_id = ?", p.TenantID)
+	q := r.db.WithContext(ctx).Model(&models.ProfessionalProfileModel{}).Where("org_id = ?", p.OrgID)
 	if p.Archived {
 		q = q.Where("deleted_at IS NOT NULL")
 	} else {
@@ -68,7 +68,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Professio
 	out := make([]domain.ProfessionalProfile, 0, len(rows))
 	for _, row := range rows {
 		profile := toDomain(row)
-		profile.Specialties = r.loadSpecialties(ctx, row.TenantID, row.ID)
+		profile.Specialties = r.loadSpecialties(ctx, row.OrgID, row.ID)
 		out = append(out, profile)
 	}
 
@@ -84,7 +84,7 @@ func (r *Repository) Create(ctx context.Context, in domain.ProfessionalProfile) 
 	meta, _ := json.Marshal(in.Metadata)
 	row := models.ProfessionalProfileModel{
 		ID:                uuid.New(),
-		TenantID:          in.TenantID,
+		OrgID:          in.OrgID,
 		PartyID:           in.PartyID,
 		PublicSlug:        strings.TrimSpace(in.PublicSlug),
 		Bio:               strings.TrimSpace(in.Bio),
@@ -104,9 +104,9 @@ func (r *Repository) Create(ctx context.Context, in domain.ProfessionalProfile) 
 	return toDomain(row), nil
 }
 
-func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.ProfessionalProfile, error) {
+func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.ProfessionalProfile, error) {
 	var row models.ProfessionalProfileModel
-	err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Take(&row).Error
+	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.ProfessionalProfile{}, gorm.ErrRecordNotFound
@@ -114,13 +114,13 @@ func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domai
 		return domain.ProfessionalProfile{}, err
 	}
 	profile := toDomain(row)
-	profile.Specialties = r.loadSpecialties(ctx, row.TenantID, row.ID)
+	profile.Specialties = r.loadSpecialties(ctx, row.OrgID, row.ID)
 	return profile, nil
 }
 
-func (r *Repository) GetBySlug(ctx context.Context, tenantID uuid.UUID, slug string) (domain.ProfessionalProfile, error) {
+func (r *Repository) GetBySlug(ctx context.Context, orgID uuid.UUID, slug string) (domain.ProfessionalProfile, error) {
 	var row models.ProfessionalProfileModel
-	err := r.db.WithContext(ctx).Where("tenant_id = ? AND public_slug = ?", tenantID, slug).Take(&row).Error
+	err := r.db.WithContext(ctx).Where("org_id = ? AND public_slug = ?", orgID, slug).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.ProfessionalProfile{}, gorm.ErrRecordNotFound
@@ -128,12 +128,12 @@ func (r *Repository) GetBySlug(ctx context.Context, tenantID uuid.UUID, slug str
 		return domain.ProfessionalProfile{}, err
 	}
 	profile := toDomain(row)
-	profile.Specialties = r.loadSpecialties(ctx, row.TenantID, row.ID)
+	profile.Specialties = r.loadSpecialties(ctx, row.OrgID, row.ID)
 	return profile, nil
 }
 
-func (r *Repository) SlugExists(ctx context.Context, tenantID uuid.UUID, slug string, excludeID *uuid.UUID) (bool, error) {
-	q := r.db.WithContext(ctx).Model(&models.ProfessionalProfileModel{}).Where("tenant_id = ? AND public_slug = ?", tenantID, slug)
+func (r *Repository) SlugExists(ctx context.Context, orgID uuid.UUID, slug string, excludeID *uuid.UUID) (bool, error) {
+	q := r.db.WithContext(ctx).Model(&models.ProfessionalProfileModel{}).Where("org_id = ? AND public_slug = ?", orgID, slug)
 	if excludeID != nil {
 		q = q.Where("id != ?", *excludeID)
 	}
@@ -159,7 +159,7 @@ func (r *Repository) Update(ctx context.Context, in domain.ProfessionalProfile) 
 		"updated_at":          time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.ProfessionalProfileModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", in.TenantID, in.ID).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		return domain.ProfessionalProfile{}, res.Error
@@ -167,11 +167,11 @@ func (r *Repository) Update(ctx context.Context, in domain.ProfessionalProfile) 
 	if res.RowsAffected == 0 {
 		return domain.ProfessionalProfile{}, gorm.ErrRecordNotFound
 	}
-	return r.GetByID(ctx, in.TenantID, in.ID)
+	return r.GetByID(ctx, in.OrgID, in.ID)
 }
 
-func (r *Repository) Archive(ctx context.Context, tenantID, id uuid.UUID) error {
-	state, err := r.lookupState(ctx, tenantID, id)
+func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, orgID, id)
 	if err != nil {
 		return err
 	}
@@ -179,13 +179,13 @@ func (r *Repository) Archive(ctx context.Context, tenantID, id uuid.UUID) error 
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.ProfessionalProfileModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
 		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 	return res.Error
 }
 
-func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error {
-	state, err := r.lookupState(ctx, tenantID, id)
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, orgID, id)
 	if err != nil {
 		return err
 	}
@@ -193,14 +193,14 @@ func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error 
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.ProfessionalProfileModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
 		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
 	return res.Error
 }
 
-func (r *Repository) Delete(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Unscoped().
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
 		Delete(&models.ProfessionalProfileModel{})
 	if res.Error != nil {
 		return res.Error
@@ -211,11 +211,11 @@ func (r *Repository) Delete(ctx context.Context, tenantID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *Repository) lookupState(ctx context.Context, tenantID, id uuid.UUID) (models.ProfessionalProfileModel, error) {
+func (r *Repository) lookupState(ctx context.Context, orgID, id uuid.UUID) (models.ProfessionalProfileModel, error) {
 	var row models.ProfessionalProfileModel
 	err := r.db.WithContext(ctx).
 		Select("id, deleted_at").
-		Where("tenant_id = ? AND id = ?", tenantID, id).
+		Where("org_id = ? AND id = ?", orgID, id).
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -226,10 +226,10 @@ func (r *Repository) lookupState(ctx context.Context, tenantID, id uuid.UUID) (m
 	return row, nil
 }
 
-func (r *Repository) ListPublic(ctx context.Context, tenantID uuid.UUID) ([]domain.ProfessionalProfile, error) {
+func (r *Repository) ListPublic(ctx context.Context, orgID uuid.UUID) ([]domain.ProfessionalProfile, error) {
 	var rows []models.ProfessionalProfileModel
 	err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND is_public = true AND deleted_at IS NULL", tenantID).
+		Where("org_id = ? AND is_public = true AND deleted_at IS NULL", orgID).
 		Order("headline ASC").
 		Find(&rows).Error
 	if err != nil {
@@ -238,15 +238,15 @@ func (r *Repository) ListPublic(ctx context.Context, tenantID uuid.UUID) ([]doma
 	out := make([]domain.ProfessionalProfile, 0, len(rows))
 	for _, row := range rows {
 		profile := toDomain(row)
-		profile.Specialties = r.loadSpecialties(ctx, row.TenantID, row.ID)
+		profile.Specialties = r.loadSpecialties(ctx, row.OrgID, row.ID)
 		out = append(out, profile)
 	}
 	return out, nil
 }
 
-func (r *Repository) loadSpecialties(ctx context.Context, tenantID, profileID uuid.UUID) []domain.Specialty {
+func (r *Repository) loadSpecialties(ctx context.Context, orgID, profileID uuid.UUID) []domain.Specialty {
 	var joins []models.ProfessionalSpecialtyModel
-	r.db.WithContext(ctx).Where("tenant_id = ? AND profile_id = ?", tenantID, profileID).Find(&joins)
+	r.db.WithContext(ctx).Where("org_id = ? AND profile_id = ?", orgID, profileID).Find(&joins)
 
 	if len(joins) == 0 {
 		return nil
@@ -259,7 +259,7 @@ func (r *Repository) loadSpecialties(ctx context.Context, tenantID, profileID uu
 
 	type specRow struct {
 		ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-		TenantID    uuid.UUID `gorm:"type:uuid"`
+		OrgID    uuid.UUID `gorm:"type:uuid"`
 		Code        string
 		Name        string
 		Description string
@@ -275,7 +275,7 @@ func (r *Repository) loadSpecialties(ctx context.Context, tenantID, profileID uu
 	for _, s := range specs {
 		out = append(out, domain.Specialty{
 			ID:          s.ID,
-			TenantID:    s.TenantID,
+			OrgID:    s.OrgID,
 			Code:        s.Code,
 			Name:        s.Name,
 			Description: s.Description,
@@ -297,7 +297,7 @@ func toDomain(row models.ProfessionalProfileModel) domain.ProfessionalProfile {
 	}
 	return domain.ProfessionalProfile{
 		ID:                row.ID,
-		TenantID:          row.TenantID,
+		OrgID:          row.OrgID,
 		PartyID:           row.PartyID,
 		PublicSlug:        row.PublicSlug,
 		Bio:               row.Bio,

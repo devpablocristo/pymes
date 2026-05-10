@@ -617,7 +617,7 @@ export interface components {
             /** Request Id */
             request_id: string;
             /** Tenant Id */
-            tenant_id: string;
+            org_id: string;
             /** Counterparty Id */
             counterparty_id: string;
             /**
@@ -725,7 +725,7 @@ export interface components {
         /** CustomerMessagingInboundRequest */
         CustomerMessagingInboundRequest: {
             /** Tenant Id */
-            tenant_id: string;
+            org_id: string;
             /** Phone Number Id */
             phone_number_id: string;
             /** From Phone */

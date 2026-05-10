@@ -60,7 +60,7 @@ type QuoteItemResponse struct {
 
 type QuoteResponse struct {
 	ID           string              `json:"id"`
-	TenantID     string              `json:"tenant_id"`
+	OrgID     string              `json:"org_id"`
 	BranchID     string              `json:"branch_id,omitempty"`
 	Number       string              `json:"number"`
 	CustomerID   string              `json:"customer_id,omitempty"`

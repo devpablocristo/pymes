@@ -13,29 +13,29 @@ import (
 )
 
 type mockQuoteRepo struct {
-	getTenantSettingsFn func(ctx context.Context, tenantID uuid.UUID) (string, float64, string, error)
-	getProductFn        func(ctx context.Context, tenantID, productID uuid.UUID) (ProductSnapshot, error)
-	getServiceFn        func(ctx context.Context, tenantID, serviceID uuid.UUID) (ServiceSnapshot, error)
-	listArchivedFn      func(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) ([]quotedomain.Quote, error)
+	getTenantSettingsFn func(ctx context.Context, orgID uuid.UUID) (string, float64, string, error)
+	getProductFn        func(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error)
+	getServiceFn        func(ctx context.Context, orgID, serviceID uuid.UUID) (ServiceSnapshot, error)
+	listArchivedFn      func(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) ([]quotedomain.Quote, error)
 	createFn            func(ctx context.Context, in CreateInput) (quotedomain.Quote, error)
-	getByIDFn           func(ctx context.Context, tenantID, quoteID uuid.UUID) (quotedomain.Quote, error)
-	setStatusFn         func(ctx context.Context, tenantID, quoteID uuid.UUID, status string) (quotedomain.Quote, error)
+	getByIDFn           func(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error)
+	setStatusFn         func(ctx context.Context, orgID, quoteID uuid.UUID, status string) (quotedomain.Quote, error)
 }
 
 func (m *mockQuoteRepo) List(ctx context.Context, p ListParams) ([]quotedomain.Quote, int64, bool, *uuid.UUID, error) {
 	return nil, 0, false, nil, nil
 }
-func (m *mockQuoteRepo) ListArchived(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) ([]quotedomain.Quote, error) {
+func (m *mockQuoteRepo) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) ([]quotedomain.Quote, error) {
 	if m.listArchivedFn == nil {
 		return nil, nil
 	}
-	return m.listArchivedFn(ctx, tenantID, branchID)
+	return m.listArchivedFn(ctx, orgID, branchID)
 }
 func (m *mockQuoteRepo) Create(ctx context.Context, in CreateInput) (quotedomain.Quote, error) {
 	return m.createFn(ctx, in)
 }
-func (m *mockQuoteRepo) GetByID(ctx context.Context, tenantID, quoteID uuid.UUID) (quotedomain.Quote, error) {
-	return m.getByIDFn(ctx, tenantID, quoteID)
+func (m *mockQuoteRepo) GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error) {
+	return m.getByIDFn(ctx, orgID, quoteID)
 }
 func (m *mockQuoteRepo) UpdateDraft(ctx context.Context, in UpdateInput) (quotedomain.Quote, error) {
 	return quotedomain.Quote{}, nil
@@ -45,31 +45,31 @@ func (m *mockQuoteRepo) PatchAnnotations(context.Context, uuid.UUID, uuid.UUID, 
 	return quotedomain.Quote{}, nil
 }
 
-func (m *mockQuoteRepo) DeleteDraft(ctx context.Context, tenantID, quoteID uuid.UUID) error {
+func (m *mockQuoteRepo) DeleteDraft(ctx context.Context, orgID, quoteID uuid.UUID) error {
 	return nil
 }
-func (m *mockQuoteRepo) Archive(ctx context.Context, tenantID, quoteID uuid.UUID) error { return nil }
-func (m *mockQuoteRepo) Restore(ctx context.Context, tenantID, quoteID uuid.UUID) error { return nil }
-func (m *mockQuoteRepo) HardDelete(ctx context.Context, tenantID, quoteID uuid.UUID) error {
+func (m *mockQuoteRepo) Archive(ctx context.Context, orgID, quoteID uuid.UUID) error { return nil }
+func (m *mockQuoteRepo) Restore(ctx context.Context, orgID, quoteID uuid.UUID) error { return nil }
+func (m *mockQuoteRepo) HardDelete(ctx context.Context, orgID, quoteID uuid.UUID) error {
 	return nil
 }
-func (m *mockQuoteRepo) SetStatus(ctx context.Context, tenantID, quoteID uuid.UUID, status string) (quotedomain.Quote, error) {
+func (m *mockQuoteRepo) SetStatus(ctx context.Context, orgID, quoteID uuid.UUID, status string) (quotedomain.Quote, error) {
 	if m.setStatusFn == nil {
 		return quotedomain.Quote{}, nil
 	}
-	return m.setStatusFn(ctx, tenantID, quoteID, status)
+	return m.setStatusFn(ctx, orgID, quoteID, status)
 }
-func (m *mockQuoteRepo) GetTenantSettings(ctx context.Context, tenantID uuid.UUID) (string, float64, string, error) {
-	return m.getTenantSettingsFn(ctx, tenantID)
+func (m *mockQuoteRepo) GetTenantSettings(ctx context.Context, orgID uuid.UUID) (string, float64, string, error) {
+	return m.getTenantSettingsFn(ctx, orgID)
 }
-func (m *mockQuoteRepo) GetProductSnapshot(ctx context.Context, tenantID, productID uuid.UUID) (ProductSnapshot, error) {
-	return m.getProductFn(ctx, tenantID, productID)
+func (m *mockQuoteRepo) GetProductSnapshot(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error) {
+	return m.getProductFn(ctx, orgID, productID)
 }
-func (m *mockQuoteRepo) GetServiceSnapshot(ctx context.Context, tenantID, serviceID uuid.UUID) (ServiceSnapshot, error) {
+func (m *mockQuoteRepo) GetServiceSnapshot(ctx context.Context, orgID, serviceID uuid.UUID) (ServiceSnapshot, error) {
 	if m.getServiceFn == nil {
 		return ServiceSnapshot{}, nil
 	}
-	return m.getServiceFn(ctx, tenantID, serviceID)
+	return m.getServiceFn(ctx, orgID, serviceID)
 }
 
 type mockQuoteSales struct {
@@ -82,21 +82,21 @@ func (m *mockQuoteSales) Create(ctx context.Context, in sales.CreateSaleInput) (
 
 type mockQuoteAudit struct{ calls int }
 
-func (m *mockQuoteAudit) Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any) {
+func (m *mockQuoteAudit) Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any) {
 	m.calls++
 }
 
 func TestCreateQuote_PersistsSelectedBranch(t *testing.T) {
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	branchID := uuid.New()
 	productID := uuid.New()
 	quoteID := uuid.New()
 
 	repo := &mockQuoteRepo{
-		getTenantSettingsFn: func(ctx context.Context, tenantID uuid.UUID) (string, float64, string, error) {
+		getTenantSettingsFn: func(ctx context.Context, orgID uuid.UUID) (string, float64, string, error) {
 			return "ARS", 21.0, "PRE", nil
 		},
-		getProductFn: func(ctx context.Context, tenantID, productID uuid.UUID) (ProductSnapshot, error) {
+		getProductFn: func(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error) {
 			return ProductSnapshot{
 				ID:    productID,
 				Name:  "Producto A",
@@ -112,7 +112,7 @@ func TestCreateQuote_PersistsSelectedBranch(t *testing.T) {
 			}
 			return quotedomain.Quote{
 				ID:        quoteID,
-				TenantID:  in.TenantID,
+				OrgID:  in.OrgID,
 				BranchID:  in.BranchID,
 				Number:    "PRE-00001",
 				Status:    "draft",
@@ -124,7 +124,7 @@ func TestCreateQuote_PersistsSelectedBranch(t *testing.T) {
 				UpdatedAt: time.Now().UTC(),
 			}, nil
 		},
-		getByIDFn: func(ctx context.Context, tenantID, quoteID uuid.UUID) (quotedomain.Quote, error) {
+		getByIDFn: func(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error) {
 			return quotedomain.Quote{}, nil
 		},
 	}
@@ -133,7 +133,7 @@ func TestCreateQuote_PersistsSelectedBranch(t *testing.T) {
 	uc := NewUsecases(repo, nil, audit)
 
 	out, err := uc.Create(context.Background(), CreateQuoteInput{
-		TenantID:  tenantID,
+		OrgID:  orgID,
 		BranchID:  &branchID,
 		CreatedBy: "tester",
 		Items: []QuoteItemInput{
@@ -156,7 +156,7 @@ func TestCreateQuote_PersistsSelectedBranch(t *testing.T) {
 }
 
 func TestQuoteToSale_PropagatesBranchToSales(t *testing.T) {
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	branchID := uuid.New()
 	quoteID := uuid.New()
 	productID := uuid.New()
@@ -164,20 +164,20 @@ func TestQuoteToSale_PropagatesBranchToSales(t *testing.T) {
 	statusUpdated := false
 
 	repo := &mockQuoteRepo{
-		getTenantSettingsFn: func(ctx context.Context, tenantID uuid.UUID) (string, float64, string, error) {
+		getTenantSettingsFn: func(ctx context.Context, orgID uuid.UUID) (string, float64, string, error) {
 			return "ARS", 21.0, "PRE", nil
 		},
-		getProductFn: func(ctx context.Context, tenantID, productID uuid.UUID) (ProductSnapshot, error) {
+		getProductFn: func(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error) {
 			return ProductSnapshot{}, nil
 		},
 		createFn: func(ctx context.Context, in CreateInput) (quotedomain.Quote, error) {
 			return quotedomain.Quote{}, nil
 		},
-		getByIDFn: func(ctx context.Context, tenantID, quoteID uuid.UUID) (quotedomain.Quote, error) {
+		getByIDFn: func(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error) {
 			taxRate := 21.0
 			return quotedomain.Quote{
 				ID:           quoteID,
-				TenantID:     tenantID,
+				OrgID:     orgID,
 				BranchID:     &branchID,
 				CustomerName: "Cliente Demo",
 				Status:       "sent",
@@ -193,12 +193,12 @@ func TestQuoteToSale_PropagatesBranchToSales(t *testing.T) {
 				},
 			}, nil
 		},
-		setStatusFn: func(ctx context.Context, tenantID, quoteID uuid.UUID, status string) (quotedomain.Quote, error) {
+		setStatusFn: func(ctx context.Context, orgID, quoteID uuid.UUID, status string) (quotedomain.Quote, error) {
 			if status != "accepted" {
 				t.Fatalf("expected accepted status, got %s", status)
 			}
 			statusUpdated = true
-			return quotedomain.Quote{ID: quoteID, TenantID: tenantID, Status: status}, nil
+			return quotedomain.Quote{ID: quoteID, OrgID: orgID, Status: status}, nil
 		},
 	}
 
@@ -212,7 +212,7 @@ func TestQuoteToSale_PropagatesBranchToSales(t *testing.T) {
 			}
 			return salesdomain.Sale{
 				ID:       saleID,
-				TenantID: tenantID,
+				OrgID: orgID,
 				BranchID: in.BranchID,
 				Number:   "VTA-00001",
 				Status:   "completed",
@@ -222,7 +222,7 @@ func TestQuoteToSale_PropagatesBranchToSales(t *testing.T) {
 
 	uc := NewUsecases(repo, salesUC, &mockQuoteAudit{})
 
-	out, err := uc.ToSale(context.Background(), tenantID, quoteID, "cash", "ok", "tester")
+	out, err := uc.ToSale(context.Background(), orgID, quoteID, "cash", "ok", "tester")
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}

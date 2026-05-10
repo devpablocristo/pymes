@@ -34,7 +34,7 @@ func (r *internalAPIKeyResolver) ResolveAPIKey(raw string) (users.ResolvedAPIKey
 		return users.ResolvedAPIKey{}, false
 	}
 	var scopes []string
-	_ = r.db.Table("tenant_api_key_scopes").Where("api_key_id = ?", kr.ID).Order("scope").Pluck("scope", &scopes)
+	_ = r.db.Table("org_api_key_scopes").Where("api_key_id = ?", kr.ID).Order("scope").Pluck("scope", &scopes)
 	sort.Strings(scopes)
 	return users.ResolvedAPIKey{ID: kr.ID, OrgID: kr.OrgID, Scopes: scopes}, true
 }

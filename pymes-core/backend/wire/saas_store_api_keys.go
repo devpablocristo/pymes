@@ -168,7 +168,7 @@ func (s *pymesSaaSStore) listAPIKeyRows(ctx context.Context, orgID string) ([]py
 func (s *pymesSaaSStore) loadKeyScopes(ctx context.Context, keyID uuid.UUID) ([]string, error) {
 	var scopes []string
 	if err := s.db.WithContext(ctx).
-		Table("tenant_api_key_scopes").
+		Table("org_api_key_scopes").
 		Where("api_key_id = ?", keyID).
 		Order("scope ASC").
 		Pluck("scope", &scopes).Error; err != nil {

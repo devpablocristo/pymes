@@ -33,6 +33,10 @@ type UpdateQuoteRequest struct {
 	Metadata     *map[string]any     `json:"metadata,omitempty"`
 }
 
+type UpdateQuoteStatusRequest struct {
+	Status string `json:"status" binding:"required"`
+}
+
 type PatchQuoteRequest struct {
 	Tags         *[]string       `json:"tags"`
 	Metadata     *map[string]any `json:"metadata"`

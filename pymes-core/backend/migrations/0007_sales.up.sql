@@ -2,9 +2,9 @@
 -- Ciclo comercial completo: quotes, sales, purchases, payments, returns,
 -- credit_notes, invoices, cash_movements, accounts.
 --
--- Sales usa `voided_at` (excepción documentada al patrón archived_at —
+-- Sales usa `voided_at` (excepción documentada al patrón deleted_at —
 -- semántica contable: una venta no se "archiva", se anula).
--- Purchases usa `archived_at` (no es contablemente sensitivo).
+-- Purchases usa `deleted_at` (no es contablemente sensitivo).
 --
 -- branch_id sin FK a scheduling_branches (referencia lógica, ver 0006).
 
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS quotes (
     created_by text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    archived_at timestamptz,
+    deleted_at timestamptz,
     CONSTRAINT quotes_org_number_uniq UNIQUE (org_id, number)
 );
 CREATE INDEX IF NOT EXISTS idx_quotes_org ON quotes(org_id, created_at DESC);
@@ -44,8 +44,8 @@ CREATE INDEX IF NOT EXISTS idx_quotes_org_branch_date
     ON quotes(org_id, branch_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_quotes_party
     ON quotes(party_id) WHERE party_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_quotes_org_archived_at
-    ON quotes(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_quotes_org_deleted_at
+    ON quotes(org_id, deleted_at);
 
 CREATE TRIGGER trg_quotes_updated_at
     BEFORE UPDATE ON quotes FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -166,15 +166,15 @@ CREATE TABLE IF NOT EXISTS purchases (
     created_by text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    archived_at timestamptz,
+    deleted_at timestamptz,
     CONSTRAINT purchases_org_number_uniq UNIQUE (org_id, number)
 );
 CREATE INDEX IF NOT EXISTS idx_purchases_org ON purchases(org_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_purchases_org_status ON purchases(org_id, status);
 CREATE INDEX IF NOT EXISTS idx_purchases_party
     ON purchases(party_id) WHERE party_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_purchases_org_archived_at
-    ON purchases(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_purchases_org_deleted_at
+    ON purchases(org_id, deleted_at);
 
 CREATE TRIGGER trg_purchases_updated_at
     BEFORE UPDATE ON purchases FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -212,13 +212,13 @@ CREATE TABLE IF NOT EXISTS payments (
     received_at timestamptz NOT NULL DEFAULT now(),
     created_by text,
     created_at timestamptz NOT NULL DEFAULT now(),
-    archived_at timestamptz
+    deleted_at timestamptz
 );
 CREATE INDEX IF NOT EXISTS idx_payments_reference
     ON payments(org_id, reference_type, reference_id);
 CREATE INDEX IF NOT EXISTS idx_payments_org ON payments(org_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_payments_org_archived_at
-    ON payments(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_payments_org_deleted_at
+    ON payments(org_id, deleted_at);
 
 CREATE TABLE IF NOT EXISTS returns (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -242,7 +242,7 @@ CREATE TABLE IF NOT EXISTS returns (
     tags text[] NOT NULL DEFAULT '{}',
     created_by text,
     created_at timestamptz NOT NULL DEFAULT now(),
-    archived_at timestamptz,
+    deleted_at timestamptz,
     CONSTRAINT returns_org_number_uniq UNIQUE (org_id, number)
 );
 CREATE INDEX IF NOT EXISTS idx_returns_org ON returns(org_id, created_at DESC);
@@ -304,13 +304,13 @@ CREATE TABLE IF NOT EXISTS invoices (
     created_by text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    archived_at timestamptz,
+    deleted_at timestamptz,
     CONSTRAINT invoices_org_number_uniq UNIQUE (org_id, number)
 );
 CREATE INDEX IF NOT EXISTS idx_invoices_org ON invoices(org_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_invoices_org_status ON invoices(org_id, status);
-CREATE INDEX IF NOT EXISTS idx_invoices_org_archived_at
-    ON invoices(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_invoices_org_deleted_at
+    ON invoices(org_id, deleted_at);
 
 CREATE TRIGGER trg_invoices_updated_at
     BEFORE UPDATE ON invoices FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -346,7 +346,7 @@ CREATE TABLE IF NOT EXISTS cash_movements (
     tags text[] NOT NULL DEFAULT '{}',
     created_by text,
     created_at timestamptz NOT NULL DEFAULT now(),
-    archived_at timestamptz
+    deleted_at timestamptz
 );
 CREATE INDEX IF NOT EXISTS idx_cash_movements_org
     ON cash_movements(org_id, created_at DESC);
@@ -354,8 +354,8 @@ CREATE INDEX IF NOT EXISTS idx_cash_movements_org_type
     ON cash_movements(org_id, type, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_cash_movements_org_branch
     ON cash_movements(org_id, branch_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_cash_movements_org_archived_at
-    ON cash_movements(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_cash_movements_org_deleted_at
+    ON cash_movements(org_id, deleted_at);
 
 CREATE TABLE IF NOT EXISTS recurring_expenses (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -383,14 +383,14 @@ CREATE TABLE IF NOT EXISTS recurring_expenses (
     created_by text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    archived_at timestamptz
+    deleted_at timestamptz
 );
 CREATE INDEX IF NOT EXISTS idx_recurring_expenses_org
     ON recurring_expenses(org_id) WHERE is_active = true;
 CREATE INDEX IF NOT EXISTS idx_recurring_expenses_due
     ON recurring_expenses(next_due_date) WHERE is_active = true;
-CREATE INDEX IF NOT EXISTS idx_recurring_expenses_org_archived_at
-    ON recurring_expenses(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_recurring_expenses_org_deleted_at
+    ON recurring_expenses(org_id, deleted_at);
 
 CREATE TRIGGER trg_recurring_expenses_updated_at
     BEFORE UPDATE ON recurring_expenses FOR EACH ROW EXECUTE FUNCTION set_updated_at();

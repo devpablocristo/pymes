@@ -30,17 +30,17 @@ CREATE TABLE IF NOT EXISTS products (
     metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    archived_at timestamptz
+    deleted_at timestamptz
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_products_org_sku_uniq
     ON products(org_id, sku)
-    WHERE archived_at IS NULL AND sku IS NOT NULL AND sku != '';
+    WHERE deleted_at IS NULL AND sku IS NOT NULL AND sku != '';
 CREATE INDEX IF NOT EXISTS idx_products_org
-    ON products(org_id) WHERE archived_at IS NULL;
+    ON products(org_id) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_products_org_name
-    ON products(org_id, name) WHERE archived_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_products_org_archived_at
-    ON products(org_id, archived_at);
+    ON products(org_id, name) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_products_org_deleted_at
+    ON products(org_id, deleted_at);
 
 CREATE TRIGGER trg_products_updated_at
     BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -63,17 +63,17 @@ CREATE TABLE IF NOT EXISTS services (
     metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    archived_at timestamptz
+    deleted_at timestamptz
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_services_org_code_uniq
     ON services(org_id, code)
-    WHERE archived_at IS NULL AND code IS NOT NULL AND code != '';
+    WHERE deleted_at IS NULL AND code IS NOT NULL AND code != '';
 CREATE INDEX IF NOT EXISTS idx_services_org
-    ON services(org_id) WHERE archived_at IS NULL;
+    ON services(org_id) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_services_org_name
-    ON services(org_id, name) WHERE archived_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_services_org_archived_at
-    ON services(org_id, archived_at);
+    ON services(org_id, name) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_services_org_deleted_at
+    ON services(org_id, deleted_at);
 
 CREATE TRIGGER trg_services_updated_at
     BEFORE UPDATE ON services FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -90,13 +90,13 @@ CREATE TABLE IF NOT EXISTS price_lists (
     tags text[] NOT NULL DEFAULT '{}',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    archived_at timestamptz,
+    deleted_at timestamptz,
     CONSTRAINT price_lists_org_name_uniq UNIQUE (org_id, name)
 );
 CREATE INDEX IF NOT EXISTS idx_price_lists_org
     ON price_lists(org_id) WHERE is_active = true;
-CREATE INDEX IF NOT EXISTS idx_price_lists_org_archived_at
-    ON price_lists(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_price_lists_org_deleted_at
+    ON price_lists(org_id, deleted_at);
 
 CREATE TRIGGER trg_price_lists_updated_at
     BEFORE UPDATE ON price_lists FOR EACH ROW EXECUTE FUNCTION set_updated_at();

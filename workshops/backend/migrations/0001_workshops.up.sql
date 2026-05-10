@@ -20,14 +20,14 @@ CREATE TABLE IF NOT EXISTS workshops.vehicles (
     notes text NOT NULL DEFAULT '',
     is_favorite boolean NOT NULL DEFAULT false,
     tags text[] NOT NULL DEFAULT '{}',
-    archived_at timestamptz,
+    deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_vehicles_org_plate_active
-    ON workshops.vehicles(org_id, license_plate) WHERE archived_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_vehicles_org_archived_at
-    ON workshops.vehicles(org_id, archived_at);
+    ON workshops.vehicles(org_id, license_plate) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_vehicles_org_deleted_at
+    ON workshops.vehicles(org_id, deleted_at);
 
 CREATE TRIGGER trg_vehicles_updated_at
     BEFORE UPDATE ON workshops.vehicles FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -47,12 +47,12 @@ CREATE TABLE IF NOT EXISTS workshops.services (
     linked_product_id uuid,
     linked_service_id uuid,
     is_active boolean NOT NULL DEFAULT true,
-    archived_at timestamptz,
+    deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_workshops_services_org_code_segment
-    ON workshops.services(org_id, code, segment) WHERE archived_at IS NULL;
+    ON workshops.services(org_id, code, segment) WHERE deleted_at IS NULL;
 
 CREATE TRIGGER trg_workshops_services_updated_at
     BEFORE UPDATE ON workshops.services FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -73,14 +73,14 @@ CREATE TABLE IF NOT EXISTS workshops.bicycles (
     notes text NOT NULL DEFAULT '',
     is_favorite boolean NOT NULL DEFAULT false,
     tags text[] NOT NULL DEFAULT '{}',
-    archived_at timestamptz,
+    deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_bicycles_org_frame
     ON workshops.bicycles(org_id, frame_number);
-CREATE INDEX IF NOT EXISTS idx_bicycles_org_archived_at
-    ON workshops.bicycles(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_bicycles_org_deleted_at
+    ON workshops.bicycles(org_id, deleted_at);
 
 CREATE TRIGGER trg_bicycles_updated_at
     BEFORE UPDATE ON workshops.bicycles FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -115,16 +115,16 @@ CREATE TABLE IF NOT EXISTS workshops.work_orders (
     created_by text NOT NULL DEFAULT '',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    archived_at timestamptz
+    deleted_at timestamptz
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_work_orders_org_number_active
-    ON workshops.work_orders(org_id, number) WHERE archived_at IS NULL;
+    ON workshops.work_orders(org_id, number) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_work_orders_org_target
-    ON workshops.work_orders(org_id, target_type) WHERE archived_at IS NULL;
+    ON workshops.work_orders(org_id, target_type) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_work_orders_org_status
-    ON workshops.work_orders(org_id, status) WHERE archived_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_work_orders_org_archived_at
-    ON workshops.work_orders(org_id, archived_at);
+    ON workshops.work_orders(org_id, status) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_work_orders_org_deleted_at
+    ON workshops.work_orders(org_id, deleted_at);
 
 CREATE TRIGGER trg_work_orders_updated_at
     BEFORE UPDATE ON workshops.work_orders FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -167,12 +167,12 @@ CREATE TABLE IF NOT EXISTS workshops.customer_assets (
     metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
     is_favorite boolean NOT NULL DEFAULT false,
     tags text[] NOT NULL DEFAULT '{}',
-    archived_at timestamptz,
+    deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_customer_assets_org_type_active
-    ON workshops.customer_assets(org_id, asset_type, archived_at);
+    ON workshops.customer_assets(org_id, asset_type, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_customer_assets_org_type_id
     ON workshops.customer_assets(org_id, asset_type, id DESC);
 

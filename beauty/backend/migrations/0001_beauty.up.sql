@@ -9,5 +9,5 @@ CREATE SCHEMA IF NOT EXISTS beauty;
 -- TODO(beauty-vertical): post-squash el schema queda vacío. El módulo Go
 -- (`beauty/backend/internal/`) no debe asumir tablas dropeadas. Si se
 -- reactivan stylists / salons / etc., agregar tablas aquí o en migración
--- siguiente respetando convenciones (org_id, archived_at, ON DELETE
+-- siguiente respetando convenciones (org_id, deleted_at, ON DELETE
 -- explícito, set_updated_at trigger).

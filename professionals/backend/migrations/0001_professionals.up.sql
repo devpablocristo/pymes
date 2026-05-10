@@ -15,15 +15,15 @@ CREATE TABLE IF NOT EXISTS professionals.professional_profiles (
     is_bookable boolean NOT NULL DEFAULT false,
     accepts_new_clients boolean NOT NULL DEFAULT true,
     metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-    archived_at timestamptz,
+    deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT professional_profiles_org_slug_uniq UNIQUE (org_id, public_slug)
 );
 CREATE INDEX IF NOT EXISTS idx_professional_profiles_org
     ON professionals.professional_profiles(org_id);
-CREATE INDEX IF NOT EXISTS idx_professional_profiles_archived_at
-    ON professionals.professional_profiles(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_professional_profiles_deleted_at
+    ON professionals.professional_profiles(org_id, deleted_at);
 
 CREATE TRIGGER trg_professional_profiles_updated_at
     BEFORE UPDATE ON professionals.professional_profiles
@@ -37,14 +37,14 @@ CREATE TABLE IF NOT EXISTS professionals.specialties (
     description text NOT NULL DEFAULT '',
     is_active boolean NOT NULL DEFAULT true,
     metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-    archived_at timestamptz,
+    deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT specialties_org_code_uniq UNIQUE (org_id, code)
 );
 CREATE INDEX IF NOT EXISTS idx_specialties_org ON professionals.specialties(org_id);
-CREATE INDEX IF NOT EXISTS idx_specialties_archived_at
-    ON professionals.specialties(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_specialties_deleted_at
+    ON professionals.specialties(org_id, deleted_at);
 
 CREATE TRIGGER trg_specialties_updated_at
     BEFORE UPDATE ON professionals.specialties
@@ -92,14 +92,14 @@ CREATE TABLE IF NOT EXISTS professionals.intakes (
     service_id uuid,
     status text NOT NULL DEFAULT 'draft',
     payload jsonb NOT NULL DEFAULT '{}'::jsonb,
-    archived_at timestamptz,
+    deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_intakes_org ON professionals.intakes(org_id);
 CREATE INDEX IF NOT EXISTS idx_intakes_org_status ON professionals.intakes(org_id, status);
-CREATE INDEX IF NOT EXISTS idx_intakes_archived_at
-    ON professionals.intakes(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_intakes_deleted_at
+    ON professionals.intakes(org_id, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_intakes_org_service
     ON professionals.intakes(org_id, service_id) WHERE service_id IS NOT NULL;
 
@@ -120,15 +120,15 @@ CREATE TABLE IF NOT EXISTS professionals.sessions (
     ended_at timestamptz,
     summary text NOT NULL DEFAULT '',
     metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-    archived_at timestamptz,
+    deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT sessions_org_booking_uniq UNIQUE (org_id, booking_id)
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_org ON professionals.sessions(org_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_org_status ON professionals.sessions(org_id, status);
-CREATE INDEX IF NOT EXISTS idx_sessions_archived_at
-    ON professionals.sessions(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_deleted_at
+    ON professionals.sessions(org_id, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_org_service
     ON professionals.sessions(org_id, service_id) WHERE service_id IS NOT NULL;
 

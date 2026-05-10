@@ -26,14 +26,14 @@ CREATE TABLE IF NOT EXISTS employees (
     created_by text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    archived_at timestamptz
+    deleted_at timestamptz
 );
 CREATE INDEX IF NOT EXISTS idx_employees_org ON employees(org_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_employees_org_status ON employees(org_id, status);
 CREATE INDEX IF NOT EXISTS idx_employees_org_email
     ON employees(org_id, email) WHERE email <> '';
-CREATE INDEX IF NOT EXISTS idx_employees_org_archived_at
-    ON employees(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_employees_org_deleted_at
+    ON employees(org_id, deleted_at);
 
 CREATE TRIGGER trg_employees_updated_at
     BEFORE UPDATE ON employees FOR EACH ROW EXECUTE FUNCTION set_updated_at();

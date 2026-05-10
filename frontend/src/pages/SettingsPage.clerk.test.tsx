@@ -69,6 +69,7 @@ vi.mock('../lib/api', () => ({
   getMe: () => apiMocks.getMe(),
   getBillingStatus: () => apiMocks.getBillingStatus(),
   updateTenantSettings: (...args: unknown[]) => apiMocks.updateTenantSettings(...args),
+  getNotificationsSummary: () => Promise.resolve({ unread_count: 0 }),
 }));
 
 import { SettingsPage } from './SettingsPage';

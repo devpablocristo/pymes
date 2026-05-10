@@ -20,6 +20,7 @@ type RepositoryPort interface {
 	Update(ctx context.Context, in UpdateInput) (saledomain.Sale, error)
 	GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
 	Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
+	UpdateStatus(ctx context.Context, in UpdateStatusInput) (saledomain.Sale, error)
 	PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in SalePatchFields) (saledomain.Sale, error)
 	GetTenantSettings(ctx context.Context, orgID uuid.UUID) (currency string, taxRate float64, salePrefix string, err error)
 	GetProductSnapshot(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error)
@@ -120,6 +121,12 @@ type UpdateSaleInput struct {
 	Tags       *[]string
 	Notes      *string
 	Actor      string
+}
+
+type UpdateStatusInput struct {
+	OrgID  uuid.UUID
+	ID     uuid.UUID
+	Status string
 }
 
 func (u *Usecases) List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error) {
@@ -352,6 +359,37 @@ func (u *Usecases) PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in Sa
 	return out, nil
 }
 
+func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (saledomain.Sale, error) {
+	status := strings.TrimSpace(strings.ToLower(in.Status))
+	if status == "" {
+		return saledomain.Sale{}, fmt.Errorf("status is required: %w", httperrors.ErrBadInput)
+	}
+	if !isValidSaleStatus(status) {
+		return saledomain.Sale{}, fmt.Errorf("invalid status: %w", httperrors.ErrBadInput)
+	}
+	out, err := u.repo.UpdateStatus(ctx, UpdateStatusInput{
+		OrgID:  in.OrgID,
+		ID:     in.ID,
+		Status: status,
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return saledomain.Sale{}, fmt.Errorf("sale not found: %w", httperrors.ErrNotFound)
+		}
+		return saledomain.Sale{}, fmt.Errorf("update sale status: %w", err)
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, in.OrgID.String(), actor, "sale.status_updated", "sale", out.ID.String(), map[string]any{"status": out.Status})
+	}
+	if u.timeline != nil && out.CustomerID != nil {
+		_ = u.timeline.RecordEvent(ctx, in.OrgID, "parties", *out.CustomerID, "sale.status_updated", "Estado de venta actualizado", out.Number, actor, map[string]any{"sale_id": out.ID.String(), "status": out.Status})
+	}
+	if u.webhooks != nil {
+		_ = u.webhooks.Enqueue(ctx, in.OrgID, "sale.status_updated", map[string]any{"sale_id": out.ID.String(), "customer_id": nullableUUID(out.CustomerID), "status": out.Status})
+	}
+	return out, nil
+}
+
 func (u *Usecases) Void(ctx context.Context, orgID, saleID uuid.UUID, actor string) (saledomain.Sale, error) {
 	current, err := u.repo.GetByID(ctx, orgID, saleID)
 	if err != nil {
@@ -403,6 +441,15 @@ func (u *Usecases) Void(ctx context.Context, orgID, saleID uuid.UUID, actor stri
 		_ = u.webhooks.Enqueue(ctx, orgID, "sale.voided", map[string]any{"sale_id": saleID.String(), "customer_id": nullableUUID(current.CustomerID), "total": current.Total})
 	}
 	return out, nil
+}
+
+func isValidSaleStatus(v string) bool {
+	switch strings.TrimSpace(strings.ToLower(v)) {
+	case "draft", "completed", "paid", "pending", "voided":
+		return true
+	default:
+		return false
+	}
 }
 
 func isValidPaymentMethod(v string) bool {

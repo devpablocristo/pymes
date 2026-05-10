@@ -309,6 +309,22 @@ func (r *Repository) Update(ctx context.Context, in UpdateInput) (saledomain.Sal
 	return r.GetByID(ctx, in.OrgID, in.ID)
 }
 
+func (r *Repository) UpdateStatus(ctx context.Context, in UpdateStatusInput) (saledomain.Sale, error) {
+	res := r.db.WithContext(ctx).Model(&models.SaleModel{}).
+		Where("org_id = ? AND id = ?", in.OrgID, in.ID).
+		Updates(map[string]any{
+			"status":     in.Status,
+			"updated_at": gorm.Expr("now()"),
+		})
+	if res.Error != nil {
+		return saledomain.Sale{}, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return saledomain.Sale{}, gorm.ErrRecordNotFound
+	}
+	return r.GetByID(ctx, in.OrgID, in.ID)
+}
+
 func (r *Repository) Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
 	now := time.Now().UTC()
 	res := r.db.WithContext(ctx).Model(&models.SaleModel{}).

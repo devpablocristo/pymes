@@ -47,16 +47,13 @@ export function HeaderMenu({ items = [] }: { items?: HeaderMenuItem[] }) {
       <button
         ref={buttonRef}
         type="button"
-        className="settings-menu__trigger"
+        className="settings-menu__trigger topbar-icon-btn"
         aria-label="Abrir menú"
         aria-expanded={open}
         title="Menú"
         onClick={() => setOpen((current) => !current)}
       >
-        <span className="settings-menu__avatar" aria-hidden>
-          <span className="settings-menu__avatar-head" />
-          <span className="settings-menu__avatar-body" />
-        </span>
+        <i className="ti ti-user-circle" aria-hidden="true" />
       </button>
       {open ? (
         <div className="settings-menu__panel">

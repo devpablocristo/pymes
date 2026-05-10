@@ -102,25 +102,21 @@ describe('DashboardVisualPage', () => {
     });
   });
 
-  it('registers page search and mounts the scheduling day summary with the shared client', async () => {
+  it('registers page search and mounts the dashboard sections', async () => {
     await renderDashboardVisualPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId('scheduling-day-summary')).toHaveTextContent('summary:es');
+      expect(screen.getByText('Agenda de hoy')).toBeInTheDocument();
     });
     expect(pageSearchMocks.usePageSearch).toHaveBeenCalled();
     expect(schedulingMocks.createSchedulingClient).toHaveBeenCalledTimes(1);
     expect(typeof schedulingMocks.createSchedulingClient.mock.calls[0][0]).toBe('function');
-    expect(schedulingMocks.capturedProps.at(-1)).toEqual(
-      expect.objectContaining({
-        client: schedulingMocks.client,
-        locale: 'es-AR',
-      }),
-    );
+    expect(schedulingMocks.capturedProps).toHaveLength(0);
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/sales-summary?context=home');
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/cashflow-summary?context=home');
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/quotes-pipeline?context=home');
     expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/recent-sales?context=home');
-    expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/top-products?context=home');
     expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/top-services?context=home');
-    expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/low-stock?context=home');
   });
 
   it('does not crash when dashboard payloads are incomplete', async () => {
@@ -137,7 +133,7 @@ describe('DashboardVisualPage', () => {
     await renderDashboardVisualPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Ventas')).toBeInTheDocument();
+      expect(screen.getByText('Ventas del mes')).toBeInTheDocument();
       expect(screen.queryByText('undefined')).not.toBeInTheDocument();
     });
   });
@@ -169,13 +165,16 @@ describe('DashboardVisualPage', () => {
       );
     });
     expect(apiMocks.apiRequest).toHaveBeenCalledWith(
-      '/v1/dashboard-data/top-products?context=home&branch_id=branch-active',
+      '/v1/dashboard-data/sales-summary?context=home&branch_id=branch-active',
+    );
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith(
+      '/v1/dashboard-data/cashflow-summary?context=home&branch_id=branch-active',
+    );
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith(
+      '/v1/dashboard-data/quotes-pipeline?context=home&branch_id=branch-active',
     );
     expect(apiMocks.apiRequest).toHaveBeenCalledWith(
       '/v1/dashboard-data/top-services?context=home&branch_id=branch-active',
-    );
-    expect(apiMocks.apiRequest).toHaveBeenCalledWith(
-      '/v1/dashboard-data/low-stock?context=home&branch_id=branch-active',
     );
   });
 });

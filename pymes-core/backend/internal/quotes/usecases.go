@@ -134,6 +134,47 @@ func (u *Usecases) Create(ctx context.Context, in CreateQuoteInput) (quotedomain
 	return out, nil
 }
 
+type UpdateStatusInput struct {
+	OrgID  uuid.UUID
+	ID     uuid.UUID
+	Status string
+}
+
+// validQuoteStatuses refleja el CHECK constraint quotes_status_check (migración 0007).
+var validQuoteStatuses = map[string]struct{}{
+	"draft":    {},
+	"sent":     {},
+	"accepted": {},
+	"rejected": {},
+	"expired":  {},
+}
+
+func isValidQuoteStatus(s string) bool {
+	_, ok := validQuoteStatuses[s]
+	return ok
+}
+
+func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (quotedomain.Quote, error) {
+	status := strings.TrimSpace(strings.ToLower(in.Status))
+	if status == "" {
+		return quotedomain.Quote{}, fmt.Errorf("status is required: %w", httperrors.ErrBadInput)
+	}
+	if !isValidQuoteStatus(status) {
+		return quotedomain.Quote{}, fmt.Errorf("invalid status: %w", httperrors.ErrBadInput)
+	}
+	out, err := u.repo.SetStatus(ctx, in.OrgID, in.ID, status)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return quotedomain.Quote{}, fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
+		}
+		return quotedomain.Quote{}, fmt.Errorf("update quote status: %w", err)
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, in.OrgID.String(), actor, "quote.status_updated", "quote", out.ID.String(), map[string]any{"status": out.Status})
+	}
+	return out, nil
+}
+
 type UpdateQuoteInput struct {
 	OrgID     uuid.UUID
 	ID           uuid.UUID

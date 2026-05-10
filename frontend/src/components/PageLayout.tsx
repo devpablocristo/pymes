@@ -1,9 +1,12 @@
 import { CrudPageShell } from '@devpablocristo/core-browser/crud';
 import { CrudShellHeaderActionsColumn } from '@devpablocristo/modules-crud-ui';
 import type { ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePageSearchShellControl } from './PageSearch';
 import { HeaderMenu } from './HeaderMenu';
 import { useHeaderMenuItems } from './useHeaderMenuItems';
+import { NotificationsDropdown } from './NotificationsDropdown';
+import { tenantLink, useTenantSlug } from '../lib/tenantSlug';
 
 export type PageLayoutProps = {
   title: ReactNode;
@@ -25,6 +28,8 @@ export function PageLayout({ title, lead, actions, inlineActions, menuItems, ban
   const stackClass = ['page-stack', className].filter(Boolean).join(' ');
   const pageSearch = usePageSearchShellControl();
   const hasSearch = pageSearch.visible;
+  const navigate = useNavigate();
+  const slug = useTenantSlug();
   void lead;
 
   const headerActions = (
@@ -48,6 +53,17 @@ export function PageLayout({ title, lead, actions, inlineActions, menuItems, ban
   return (
     <div className={stackClass}>
       <div className="page-layout__header-top-row">
+        <div className="topbar-actions">
+          <NotificationsDropdown />
+          <button
+            type="button"
+            className="topbar-icon-btn"
+            aria-label="Configuración"
+            onClick={() => navigate(tenantLink('/settings', slug))}
+          >
+            <i className="ti ti-settings" aria-hidden="true" />
+          </button>
+        </div>
         <HeaderMenu items={headerMenuItems} />
       </div>
       <CrudPageShell

@@ -1,8 +1,4 @@
 import { NavLink, matchPath, useLocation } from 'react-router-dom';
-import { HeaderMenu } from '../../components/HeaderMenu';
-import { useHeaderMenuItems } from '../../components/useHeaderMenuItems';
-import '../../styles/viewModeSegmentedSwitch.css';
-import '../../pages/WorkOrdersModuleSection.css';
 
 type CrudViewModeLink = {
   path: string;
@@ -25,14 +21,13 @@ type Props = {
   };
 };
 
-export function CrudViewModeSwitch({
-  modes,
-  groupAriaLabel,
-  description,
-  actionLink: _actionLink,
-}: Props) {
+export function CrudViewModeSwitch(props: Props) {
   const { pathname } = useLocation();
-  const contextualMenuItems = useHeaderMenuItems();
+
+  if (props.modes.length <= 1) {
+    return null;
+  }
+
   function isModeActive(mode: CrudViewModeLink): boolean {
     return Boolean(
       matchPath({ path: mode.path, end: true }, pathname) ||
@@ -42,10 +37,10 @@ export function CrudViewModeSwitch({
 
   return (
     <div className="wo-mod-orders__header-lead">
-      {description ? <p>{description}</p> : null}
+      {props.description ? <p>{props.description}</p> : null}
       <div className="wo-mod-orders__bar">
-        <nav className="m-view-tabs" aria-label={groupAriaLabel}>
-          {modes.map((mode) => (
+        <nav className="m-view-tabs" aria-label={props.groupAriaLabel}>
+          {props.modes.map((mode) => (
             <NavLink
               key={mode.path}
               to={mode.path}
@@ -56,7 +51,11 @@ export function CrudViewModeSwitch({
             </NavLink>
           ))}
         </nav>
-        <HeaderMenu items={contextualMenuItems} />
+        {props.actionLink ? (
+          <NavLink className="wo-mod-orders__action" to={props.actionLink.to}>
+            {props.actionLink.label}
+          </NavLink>
+        ) : null}
       </div>
     </div>
   );

@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useOrganization } from '@clerk/react';
 import { AppShell, type AppShellNavItem, type AppShellNavSection } from '../shared/frontendShell';
-import { dotIcon } from './ShellIcons';
-import { ThemeToggle } from './ThemeToggle';
 import { loadModuleCatalog } from '../lib/moduleCatalogLoader';
 import { useI18n } from '../lib/i18n';
 import { getVisibleModuleIds } from '../lib/profileFilters';
@@ -9,6 +8,20 @@ import { getTenantProfile } from '../lib/tenantProfile';
 import { vocab } from '../lib/vocabulary';
 import { toCrudResourceSlug } from '../crud/crudResourceSlug';
 import { tenantLink, useTenantSlug } from '../lib/tenantSlug';
+import { clerkEnabled } from '../lib/auth';
+import logoUrl from '../assets/logo.svg';
+import logoDarkUrl from '../assets/logo-dark.svg';
+import isoUrl from '../assets/iso.svg';
+
+/* Componente nulo: usa useOrganization (solo seguro dentro de ClerkProvider)
+   y notifica el nombre vía callback. Se monta condicionalmente. */
+function ClerkOrgNameSync({ onName }: { onName: (name: string) => void }) {
+  const { organization } = useOrganization();
+  useEffect(() => {
+    onName(organization?.name?.trim() ?? '');
+  }, [organization?.name, onName]);
+  return null;
+}
 
 type ModuleGroup = {
   id: string;
@@ -35,15 +48,33 @@ const PRIMARY_SIDEBAR_MODULE_IDS = new Set([
   'cashflow',
   'reports',
 ]);
-// Decisión de producto: TODOS los items del sidebar usan el mismo glyph
-// (un círculo simple). La diferenciación es por label, no por icono. Esto
-// elimina ruido visual y forza al usuario a leer la etiqueta. Si en el
-// futuro se vuelve a iconos por concepto, restaurar el mapeo aquí.
+
+// Tabler icon helper
+function ti(name: string): ReactNode {
+  return <i className={`ti ti-${name}`} aria-hidden="true" />;
+}
+
+// Mapeo de módulo ID → icono Tabler
+const MODULE_ICON_MAP: Record<string, string> = {
+  customers:  'users',
+  suppliers:  'building-store',
+  products:   'package',
+  services:   'scissors',
+  quotes:     'file-description',
+  sales:      'shopping-cart',
+  purchases:  'arrows-exchange',
+  inventory:  'box',
+  cashflow:   'chart-bar',
+  reports:    'chart-line',
+};
 
 export function Shell({ children }: { children: ReactNode }) {
   const { t, localizeUiText, sentenceCase } = useI18n();
   const slug = useTenantSlug();
-  const link = useCallback((path: string) => tenantLink(path, slug), [slug]);
+  const [clerkOrgName, setClerkOrgName] = useState('');
+  const profileOrgName = getTenantProfile()?.businessName ?? '';
+  const orgName = clerkOrgName || profileOrgName;
+  const link = (path: string) => tenantLink(path, slug);
   const [catalog, setCatalog] = useState<{ groups: ModuleGroup[]; modules: ModuleListItem[] }>({
     groups: [],
     modules: [],
@@ -70,90 +101,72 @@ export function Shell({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Sidebar dividido en secciones lógicas:
-  // - "Inicio" arriba.
-  // - "Día a día" para operación frecuente.
-  // - "Comercial" para lo transaccional.
-  // - "WhatsApp" como entrada a customer messaging sobre ese canal.
-  // - Verticales y módulos dinámicos en el medio.
-  // - "Sistema" al final.
-
   const homeNav = useMemo<AppShellNavItem[]>(
-    () => [{ to: link('/dashboard'), label: t('shell.nav.dashboard'), icon: dotIcon }],
-    [link, t],
+    () => [{ to: link('/dashboard'), label: t('shell.nav.dashboard'), icon: ti('layout-dashboard') }],
+    [t, slug],
   );
 
   const dailyNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: link('/agenda'), label: t('shell.nav.calendar'), icon: dotIcon },
-      { to: link('/chat'), label: t('shell.nav.chat'), icon: dotIcon },
-      { to: link('/notifications'), label: t('shell.nav.notifications'), icon: dotIcon },
+      { to: link('/agenda'),        label: t('shell.nav.calendar'),      icon: ti('calendar-event') },
+      { to: link('/chat'),          label: t('shell.nav.chat'),           icon: ti('robot') },
+      { to: link('/notifications'), label: t('shell.nav.notifications'),  icon: ti('bell') },
     ],
-    [link, t],
+    [t, slug],
   );
 
   const commercialNav = useMemo<AppShellNavItem[]>(
-    () => [
-      { to: link('/invoices'), label: t('shell.nav.invoices'), icon: dotIcon },
-      { to: link('/employees'), label: 'Empleados', icon: dotIcon },
-    ],
-    [link, t],
+    () => [{ to: link('/invoices'), label: t('shell.nav.invoices'), icon: ti('receipt-2') }],
+    [t, slug],
   );
 
   const whatsappNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: link('/customer-messaging/inbox'), label: t('shell.nav.whatsappInbox'), icon: dotIcon },
-      { to: link('/customer-messaging/campaigns'), label: t('shell.nav.whatsappCampaigns'), icon: dotIcon },
+      { to: link('/customer-messaging/inbox'),     label: t('shell.nav.whatsappInbox'),     icon: ti('brand-whatsapp') },
+      { to: link('/customer-messaging/campaigns'), label: t('shell.nav.whatsappCampaigns'), icon: ti('speakerphone') },
     ],
-    [link, t],
+    [t, slug],
   );
 
   const professionalsNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: link('/teachers'), label: t('shell.nav.teachers'), icon: dotIcon },
-      { to: link('/specialties'), label: t('shell.nav.teachersSpecialties'), icon: dotIcon },
-      { to: link('/intakes'), label: t('shell.nav.teachersIntakes'), icon: dotIcon },
-      { to: link('/sessions'), label: t('shell.nav.teachersSessions'), icon: dotIcon },
+      { to: link('/teachers'),    label: t('shell.nav.teachers'),           icon: ti('school') },
+      { to: link('/specialties'), label: t('shell.nav.teachersSpecialties'), icon: ti('certificate') },
+      { to: link('/intakes'),     label: t('shell.nav.teachersIntakes'),     icon: ti('door-enter') },
+      { to: link('/sessions'),    label: t('shell.nav.teachersSessions'),    icon: ti('calendar-time') },
     ],
-    [link, t],
+    [t, slug],
   );
 
   const workshopsNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: link(`/${toCrudResourceSlug('workshopVehicles')}`), label: t('shell.nav.autoRepairVehicles'), icon: dotIcon },
-      { to: link(`/${toCrudResourceSlug('carWorkOrders')}/list`), label: t('shell.nav.autoRepairOrders'), icon: dotIcon },
+      { to: link(`/${toCrudResourceSlug('workshopVehicles')}`),     label: t('shell.nav.autoRepairVehicles'), icon: ti('car') },
+      { to: link(`/${toCrudResourceSlug('carWorkOrders')}/list`),   label: t('shell.nav.autoRepairOrders'),   icon: ti('tool') },
     ],
-    [link, t],
+    [t, slug],
   );
 
   const bikeShopNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: link(`/${toCrudResourceSlug('bikeWorkOrders')}/list`), label: t('shell.nav.bikeOrders'), icon: dotIcon },
+      { to: link(`/${toCrudResourceSlug('bikeWorkOrders')}/list`), label: t('shell.nav.bikeOrders'), icon: ti('bike') },
     ],
-    [link, t],
+    [t, slug],
   );
 
   const beautyNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: link('/employees'), label: t('shell.nav.beautyStaff'), icon: dotIcon },
+      { to: link('/employees'), label: t('shell.nav.beautyStaff'), icon: ti('users-group') },
     ],
-    [link, t],
+    [t, slug],
   );
 
   const restaurantsNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: link(`/${toCrudResourceSlug('restaurantDiningAreas')}`), label: t('shell.nav.restaurantAreas'), icon: dotIcon },
-      { to: link(`/${toCrudResourceSlug('restaurantDiningTables')}`), label: t('shell.nav.restaurantTables'), icon: dotIcon },
-      { to: link('/restaurants/dining/sessions'), label: t('shell.nav.restaurantSessions'), icon: dotIcon },
+      { to: link(`/${toCrudResourceSlug('restaurantDiningAreas')}`),   label: t('shell.nav.restaurantAreas'),    icon: ti('layout-2') },
+      { to: link(`/${toCrudResourceSlug('restaurantDiningTables')}`),  label: t('shell.nav.restaurantTables'),   icon: ti('table') },
+      { to: link('/restaurants/dining/sessions'),                      label: t('shell.nav.restaurantSessions'), icon: ti('clock') },
     ],
-    [link, t],
-  );
-
-  const medicalNav = useMemo<AppShellNavItem[]>(
-    () => [
-      { to: link('/medical/occupational-health/exams'), label: t('shell.nav.occupationalHealthExams'), icon: dotIcon },
-    ],
-    [link, t],
+    [t, slug],
   );
 
   const sections = useMemo(() => {
@@ -175,7 +188,7 @@ export function Shell({ children }: { children: ReactNode }) {
       .map((module) => ({
         to: module.customRoute ? link(module.customRoute) : link(`/${toCrudResourceSlug(module.id)}`),
         label: localizeUiText(vocab(module.navLabel)),
-        icon: dotIcon,
+        icon: ti(MODULE_ICON_MAP[module.id] ?? 'circle-dot'),
       }));
 
     const moduleNav = catalog.groups
@@ -195,16 +208,16 @@ export function Shell({ children }: { children: ReactNode }) {
           .map((module) => ({
             to: module.customRoute ? link(module.customRoute) : link(`/${toCrudResourceSlug(module.id)}`),
             label: localizeUiText(vocab(module.navLabel)),
-            icon: dotIcon,
+            icon: ti(MODULE_ICON_MAP[module.id] ?? 'circle-dot'),
           })),
       }))
       .filter((section) => section.items.length > 0);
 
     const result: AppShellNavSection[] = [
-      { label: sentenceCase(t('shell.sections.home')), items: homeNav },
-      { label: sentenceCase(t('shell.sections.daily')), items: dailyNav },
+      { label: sentenceCase(t('shell.sections.home')),       items: homeNav },
+      { label: sentenceCase(t('shell.sections.daily')),      items: dailyNav },
       { label: sentenceCase(t('shell.sections.commercial')), items: [...commercialNav, ...commercialModuleItems] },
-      { label: sentenceCase(t('shell.sections.whatsapp')), items: whatsappNav },
+      { label: sentenceCase(t('shell.sections.whatsapp')),   items: whatsappNav },
     ];
 
     if (vertical === 'professionals') {
@@ -212,7 +225,7 @@ export function Shell({ children }: { children: ReactNode }) {
     }
     if (vertical === 'workshops') {
       if (subVertical === 'bike_shop') {
-        result.push({ label: sentenceCase(t('shell.sections.bikeShop')), items: bikeShopNav });
+        result.push({ label: sentenceCase(t('shell.sections.bikeShop')),  items: bikeShopNav });
       } else {
         result.push({ label: sentenceCase(t('shell.sections.workshops')), items: workshopsNav });
       }
@@ -222,9 +235,6 @@ export function Shell({ children }: { children: ReactNode }) {
     }
     if (vertical === 'restaurants') {
       result.push({ label: sentenceCase(t('shell.sections.restaurants')), items: restaurantsNav });
-    }
-    if (vertical === 'medical') {
-      result.push({ label: sentenceCase(t('shell.sections.occupationalHealth')), items: medicalNav });
     }
     result.push(...moduleNav);
     return result;
@@ -236,9 +246,7 @@ export function Shell({ children }: { children: ReactNode }) {
     commercialNav,
     dailyNav,
     homeNav,
-    link,
     localizeUiText,
-    medicalNav,
     professionalsNav,
     restaurantsNav,
     sentenceCase,
@@ -247,20 +255,26 @@ export function Shell({ children }: { children: ReactNode }) {
     workshopsNav,
   ]);
 
+  const brandLogo = (
+    <>
+      <img src={logoUrl} alt="Wukomo" className="brand-logo-full brand-logo-full--light" style={{ height: '22px', display: 'block' }} />
+      <img src={logoDarkUrl} alt="Wukomo" className="brand-logo-full brand-logo-full--dark" style={{ height: '22px', display: 'block' }} />
+      <img src={isoUrl} alt="W" className="brand-logo-iso" />
+    </>
+  );
+
   return (
-    <AppShell
-      brandTitle="Pymes SaaS"
-      brandSubtitle={sentenceCase(t('shell.brand.subtitle'))}
+    <>
+      {clerkEnabled && <ClerkOrgNameSync onName={setClerkOrgName} />}
+      <AppShell
+        brandTitle={brandLogo}
+        brandSubtitle={orgName || sentenceCase(t('shell.brand.subtitle'))}
       sections={sections}
       searchPlaceholder={t('shell.search.placeholder')}
       skipLinkLabel={t('shell.skipLink')}
-      footerContent={
-        <div className="sidebar-footer-controls">
-          <ThemeToggle />
-        </div>
-      }
     >
       {children}
     </AppShell>
+    </>
   );
 }

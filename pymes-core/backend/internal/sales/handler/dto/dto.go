@@ -39,6 +39,10 @@ type UpdateSaleRequest struct {
 	Notes      *string   `json:"notes"`
 }
 
+type UpdateSaleStatusRequest struct {
+	Status string `json:"status" binding:"required"`
+}
+
 type SaleItemResponse struct {
 	ID          string  `json:"id"`
 	SaleID      string  `json:"sale_id"`

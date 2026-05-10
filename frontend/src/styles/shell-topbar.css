@@ -1,45 +1,33 @@
-/* ── Shell topbar — header azul + barra blanca de acciones (Phase 2 migration) ──
- *
- * Override sobre @devpablocristo/modules-ui-page-shell + crud-ui. Cuando
- * una página renderiza CrudPageShell o equivalente, su header se separa
- * en dos zonas:
- *   - header-main (azul, solo título + breadcrumb).
- *   - header-actions (blanca, controles de página: tabs + search + acciones).
- *
- * Las acciones top-right (notificaciones, settings, theme toggle) se
- * superponen al header azul absolute-positioned vía .page-layout__header-top-row.
- *
- * Notas:
- * - Los `!important` son necesarios por el override de specificidad de la lib.
- * - Overrides ultra-específicos de módulos (products-crud-page, wo-mod-orders)
- *   se aplicarán en Phase 10 (módulos verticales), no acá.
- */
+/* ── Shell topbar — tarjeta azul estilo Spike ── */
 
-/* Padding del main reducido — iguala el gap entre la sidebar card y el contenido */
+/* El main-content tiene padding: 30px 37.5px por defecto (librería).
+   Lo reducimos para que el topbar quede ajustado igual que la sidebar card. */
 main.main-content {
   padding: 16px 25px 16px 25px !important;
 }
 
+/* Gap izquierdo entre sidebar y contenido: iguala el gap entre paneles (15px). */
 main.app-shell-main {
   padding-left: 15px !important;
 }
 
-/* page-header: la lib agrega margin-bottom que duplica el gap; lo neutralizamos */
+/* La librería pone margin-bottom: var(--space-4) en .page-header,
+   que se suma al gap de .dash y duplica el espacio. Se anula aquí. */
 .page-header {
   margin-bottom: 0 !important;
 }
 
-/* Gap entre el header card y el contenido de la página */
+/* Gap 15px entre el header (topbar + barra blanca) y el contenido de página */
 .crud-resource-shell-header + * {
   margin-top: 15px !important;
 }
 
-/* page-stack relative para que header-top-row pueda absolute */
+/* .page-layout__header-top-row contiene íconos de acción + avatar/settings.
+   Lo sacamos del flujo y lo superponemos al topbar azul (crud-page-shell__header-main). */
 .page-stack {
   position: relative;
 }
 
-/* Acciones top-right del header (notif, settings, theme): superpuestas */
 .page-layout__header-top-row {
   position: absolute !important;
   top: 0 !important;
@@ -53,14 +41,15 @@ main.app-shell-main {
   z-index: 5;
 }
 
-/* ── Header card: contenedor transparente en columna ──
- * La librería antes ponía una sola tarjeta azul con todo dentro; ahora
- * separamos en dos zonas (header-main azul + header-actions blanca). */
+/* ── Header: contenedor transparente en columna ──
+   La librería ponía una sola tarjeta azul; ahora separamos en dos zonas:
+   header-main (azul, solo título) + header-actions (blanca, controles de página). */
 .crud-page-shell__header {
   flex-direction: column !important;
   align-items: stretch !important;
   justify-content: flex-start !important;
   padding: 0 !important;
+  margin: 0 !important;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
@@ -68,11 +57,19 @@ main.app-shell-main {
   min-height: 0 !important;
   gap: 0 !important;
   flex-wrap: nowrap !important;
+  /* Forzar bounding box idéntico a la grilla hermana (.spike-grid-4 / .spike-kpi-grid):
+     ambos children directos de .page-stack deben tener el mismo ancho exacto. */
+  width: 100% !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
 }
 
-/* ── Topbar azul: solo contiene el título + breadcrumb ── */
+/* ── Topbar azul: solo contiene el título ── */
+/* La librería usa flex-direction:column + align-items:center en header-main,
+   lo que centra horizontalmente el título. Forzamos row para alinearlo a la izquierda. */
 .crud-page-shell__header-main {
-  background: var(--color-primary) !important;
+  background: #0085db !important;
   border-radius: 16px !important;
   box-shadow: 0 2px 20px rgba(0, 100, 200, 0.18) !important;
   border: 1px solid rgba(0, 100, 200, 0.12) !important;
@@ -87,36 +84,43 @@ main.app-shell-main {
   flex-wrap: nowrap !important;
 }
 
-/* Sub-elementos visualmente movidos a la barra blanca: ocultar acá */
+/* Topbar adaptado a dark: navy profundo en vez de azul brillante */
+[data-theme="dark"] .crud-page-shell__header-main {
+  background: linear-gradient(135deg, #0c2c4c 0%, #0f3a66 100%) !important;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid rgba(96, 165, 250, 0.18) !important;
+}
+
+/* Botones del topbar en dark: más translúcidos */
+[data-theme="dark"] .topbar-icon-btn {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #e2e8f0 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+[data-theme="dark"] .topbar-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.14) !important;
+}
+
+/* Ocultar pills y subtítulo de la zona azul — van en la barra blanca */
 .crud-page-shell__header-main .crud-list-header-lead,
 .crud-page-shell__header-main .text-secondary {
   display: none !important;
 }
 
-/* Título */
+/* Título de página */
 .crud-page-shell__title {
-  font-size: var(--text-lg) !important;
-  font-weight: var(--font-weight-bold) !important;
-  color: var(--color-on-primary) !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  color: #fff !important;
   line-height: 1.2 !important;
   margin: 0 !important;
 }
 
-/* Breadcrumb bajo el título */
-.crud-page-shell__title .topbar-breadcrumb {
-  display: block;
-  font-size: var(--text-xs) !important;
-  font-weight: var(--font-weight-normal) !important;
-  color: rgba(255, 255, 255, 0.72) !important;
-  margin-top: 2px;
-  line-height: 1.4;
-}
-
-/* ── Sub-toolbar blanca: tabs + search + acciones de página ──
- * Se oculta automáticamente cuando no hay controles. */
+/* ── Sub-toolbar blanca: controles de la página ──
+   Se oculta automáticamente cuando no hay inputs, botones ni links. */
 .crud-page-shell__header-actions {
-  background: var(--color-surface) !important;
-  border-radius: var(--radius-md) !important;
+  background: #fff !important;
+  border-radius: 14px !important;
   box-shadow: 0 1px 8px rgba(0, 80, 160, 0.07) !important;
   border: 1px solid rgba(0, 100, 200, 0.08) !important;
   padding: 10px 16px !important;
@@ -124,17 +128,22 @@ main.app-shell-main {
   width: 100% !important;
   box-sizing: border-box !important;
   flex-shrink: 0 !important;
+}
+
+/* Ocultar cuando no tiene controles propios de página (solo search suelto = dashboard).
+   Se muestra si tiene botones, selects o tabs de vista. */
+.crud-page-shell__header-actions:not(:has(button, select, .m-view-tabs)) {
+  display: none !important;
+}
+
+/* La barra blanca se convierte en flex-row para alojar tabs (izq) + controles (der) */
+.crud-page-shell__header-actions {
   display: flex !important;
   align-items: center !important;
   gap: 12px !important;
 }
 
-/* Ocultar cuando no tiene controles propios (solo dashboard sin tabs/buttons) */
-.crud-page-shell__header-actions:not(:has(button, select, .m-view-tabs)) {
-  display: none !important;
-}
-
-/* Outer actions-row: izquierda, expandible */
+/* Outer actions-row (contiene tabs + search + botones): izquierda, no derecha */
 .crud-page-shell__header-actions > .actions-row {
   display: flex !important;
   align-items: center !important;
@@ -145,7 +154,7 @@ main.app-shell-main {
   justify-content: flex-start !important;
 }
 
-/* Inner actions-row: botones de acción agrupados a la derecha */
+/* Inner actions-row (solo botones de acción): mantiene su comportamiento */
 .crud-page-shell__header-actions .actions-row .actions-row {
   display: flex !important;
   align-items: center !important;
@@ -154,7 +163,7 @@ main.app-shell-main {
   margin-left: auto !important;
 }
 
-/* ── Tabs de vista (board / list / gallery) en barra blanca ── */
+/* ── Tabs de vista en barra blanca ── */
 .crud-page-shell__header-actions .m-view-tabs {
   display: inline-flex !important;
   align-items: center !important;
@@ -170,8 +179,8 @@ main.app-shell-main {
   align-items: center !important;
   padding: 6px 12px !important;
   border-radius: 8px !important;
-  font-size: var(--text-sm) !important;
-  font-weight: var(--font-weight-medium) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
   color: #7a8fa6 !important;
   text-decoration: none !important;
   white-space: nowrap !important;
@@ -179,27 +188,27 @@ main.app-shell-main {
 }
 
 .crud-page-shell__header-actions .m-view-tabs__item--active {
-  background: var(--color-surface) !important;
-  color: var(--color-primary) !important;
+  background: #fff !important;
+  color: #0085db !important;
   box-shadow: 0 1px 4px rgba(0, 80, 160, 0.12) !important;
 }
 
-/* Search row: ocupa el espacio entre tabs y botones */
+/* Search row: crece para llenar el espacio entre los tabs y los botones */
 .crud-shell-header-actions-column__search-row {
   flex: 1 1 0% !important;
   min-width: 0 !important;
   max-width: 360px !important;
 }
 
-/* Search input en barra blanca */
+/* Search input — en barra blanca usa fondo gris claro con borde sutil */
 .crud-page-shell__header-actions .page-search__input,
 .crud-page-shell__header-actions .crud-resource-shell-header__search {
   background: #f7f9fa !important;
   border: 1.5px solid #e0e8f0 !important;
   border-radius: 20px !important;
   padding: 6px 18px !important;
-  font-size: var(--text-sm) !important;
-  color: var(--color-sidebar-text) !important;
+  font-size: 13px !important;
+  color: #5a6a85 !important;
   width: 240px !important;
   max-width: 320px !important;
   outline: none !important;
@@ -208,24 +217,57 @@ main.app-shell-main {
 
 .crud-page-shell__header-actions .page-search__input::placeholder,
 .crud-page-shell__header-actions .crud-resource-shell-header__search::placeholder {
-  color: var(--color-text-muted) !important;
+  color: #adb5bd !important;
 }
 
 .crud-page-shell__header-actions .page-search__input:focus,
 .crud-page-shell__header-actions .crud-resource-shell-header__search:focus {
-  border-color: var(--color-primary) !important;
-  background: var(--color-surface) !important;
+  border-color: #0085db !important;
+  background: #fff !important;
 }
 
-/* ── Botones top-right (notificaciones, settings, theme) ── */
+/* El avatar/settings button: mismo estilo que topbar-icon-btn */
+.settings-menu__trigger {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  color: #fff !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.15s !important;
+}
+
+.settings-menu__trigger i.ti {
+  font-size: 20px !important;
+  line-height: 1 !important;
+}
+
+.settings-menu__trigger:hover {
+  background: rgba(255, 255, 255, 0.30) !important;
+}
+
+/* Breadcrumb bajo el título */
+.crud-page-shell__title .topbar-breadcrumb {
+  display: block;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  color: rgba(255, 255, 255, 0.72) !important;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+/* Íconos del topbar: campana y configuración */
 .topbar-actions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.topbar-icon-btn,
-.page-layout__header-top-row .theme-toggle {
+.topbar-icon-btn {
   width: 38px !important;
   height: 38px !important;
   border-radius: 50% !important;
@@ -239,21 +281,14 @@ main.app-shell-main {
   transition: background 0.15s, color 0.15s !important;
   padding: 0 !important;
   flex-shrink: 0 !important;
-  color: var(--color-on-primary) !important;
+  color: #fff !important;
 }
 
-.topbar-icon-btn:hover,
-.page-layout__header-top-row .theme-toggle:hover {
+.topbar-icon-btn i { font-size: 18px; }
+
+.topbar-icon-btn:hover {
   background: rgba(255, 255, 255, 0.30) !important;
-  color: var(--color-on-primary) !important;
-}
-
-/* Focus contrastante sobre el fondo azul de la topbar:
-   el outline global usa --color-primary, que es invisible acá. */
-.topbar-icon-btn:focus-visible,
-.page-layout__header-top-row .theme-toggle:focus-visible {
-  outline: 2px solid var(--color-on-primary) !important;
-  outline-offset: 2px !important;
+  color: #fff !important;
 }
 
 .topbar-notification-dot {
@@ -263,25 +298,200 @@ main.app-shell-main {
   width: 8px !important;
   height: 8px !important;
   border-radius: 50% !important;
-  background: var(--color-danger) !important;
-  border: 2px solid var(--color-primary) !important;
+  background: #fb977d !important;
+  border: 2px solid #0085db !important;
 }
 
-/* Settings/avatar menu trigger: misma forma que topbar-icon-btn */
-.settings-menu__trigger {
-  width: 38px !important;
-  height: 38px !important;
-  border-radius: 50% !important;
-  background: rgba(255, 255, 255, 0.18) !important;
-  border: 1px solid rgba(255, 255, 255, 0.22) !important;
-  color: var(--color-on-primary) !important;
+/* ── Galería: cards rediseñadas (classless buttons del renderer de librería) ── */
+
+/* Contenedor grid: 3 columnas en lugar de auto-fill 200px */
+.products-crud-page > div[style*="grid-template-columns"] {
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 16px !important;
+}
+
+/* Card: blanca con acento lateral corto (estilo referencia Spike) */
+.products-crud-page > div[style*="grid-template-columns"] > button {
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  background: #fff !important;
+  border: 1px solid #e8eef5 !important;
+  border-left: none !important;
+  border-radius: 12px !important;
+  padding: 16px 18px 14px 22px !important;
+  box-shadow: 0 1px 6px rgba(0, 60, 120, 0.06) !important;
   cursor: pointer !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
+  text-align: left !important;
+  transition: box-shadow 0.15s, transform 0.12s !important;
+  min-height: 0 !important;
+  gap: 0 !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+/* Línea de acento lateral — corta, centrada verticalmente */
+.products-crud-page > div[style*="grid-template-columns"] > button::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 3px !important;
+  height: 42px !important;
+  border-radius: 0 3px 3px 0 !important;
+  background: #0085db !important; /* color por defecto */
   transition: background 0.15s !important;
 }
 
-.settings-menu__trigger:hover {
-  background: rgba(255, 255, 255, 0.30) !important;
+/* Colores por estado (inyectados por useStatusColors hook) */
+.products-crud-page > div[style*="grid-template-columns"] > button[data-status="success"]::before {
+  background: #22c55e !important;
+}
+.products-crud-page > div[style*="grid-template-columns"] > button[data-status="warning"]::before {
+  background: #f59e0b !important;
+}
+.products-crud-page > div[style*="grid-template-columns"] > button[data-status="danger"]::before {
+  background: #ef4444 !important;
+}
+.products-crud-page > div[style*="grid-template-columns"] > button[data-status="info"]::before {
+  background: #3b82f6 !important;
+}
+.products-crud-page > div[style*="grid-template-columns"] > button[data-status="neutral"]::before {
+  background: #94a3b8 !important;
+}
+
+.products-crud-page > div[style*="grid-template-columns"] > button:hover {
+  box-shadow: 0 6px 20px rgba(0, 60, 120, 0.1) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Ocultar el placeholder de imagen (primer span del card) */
+.products-crud-page > div[style*="grid-template-columns"] > button > span:first-child {
+  display: none !important;
+}
+
+/* Área de contenido (segundo span = flex con title+category+amount) */
+.products-crud-page > div[style*="grid-template-columns"] > button > span:last-child {
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 6px !important;
+  width: 100% !important;
+  padding: 0 !important;
+}
+
+/* Título del card */
+.products-crud-page > div[style*="grid-template-columns"] > button > span:last-child > span:first-child {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #1e293b !important;
+  line-height: 1.4 !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  margin-bottom: 4px !important;
+}
+
+/* Categoría / subtítulo (segunda span) — texto gris sutil, sin badge */
+.products-crud-page > div[style*="grid-template-columns"] > button > span:last-child > span:nth-child(2) {
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  color: #8fa0b5 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  background: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* Importe (tercer span) — tamaño moderado con separador superior */
+.products-crud-page > div[style*="grid-template-columns"] > button > span:last-child > span:last-child {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: #0085db !important;
+  margin-top: 10px !important;
+  padding-top: 10px !important;
+  border-top: 1px solid #eef2f7 !important;
+  width: 100% !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   DARK MODE — overrides de hardcoded colors al esquema oscuro.
+   El topbar azul mantiene el accent (#0085db); ajustamos contraste
+   del borde y la sub-toolbar blanca + tabs/search/cards de productos.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Topbar azul: bordeado más cálido sobre dark + sombra más profunda */
+[data-theme="dark"] .crud-page-shell__header-main {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45) !important;
+  border-color: rgba(96, 165, 250, 0.28) !important;
+}
+
+/* Sub-toolbar: ya no es blanca brillante, usa surface oscuro */
+[data-theme="dark"] .crud-page-shell__header-actions {
+  background: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Tabs de vista: contenedor y items adaptados al dark */
+[data-theme="dark"] .crud-page-shell__header-actions .m-view-tabs {
+  background: var(--color-surface-hover) !important;
+}
+
+[data-theme="dark"] .crud-page-shell__header-actions .m-view-tabs__item {
+  color: var(--color-text-secondary) !important;
+}
+
+[data-theme="dark"] .crud-page-shell__header-actions .m-view-tabs__item--active {
+  background: var(--color-surface) !important;
+  color: var(--color-primary) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Search input dentro de la sub-toolbar */
+[data-theme="dark"] .crud-page-shell__header-actions .page-search__input,
+[data-theme="dark"] .crud-page-shell__header-actions .crud-resource-shell-header__search {
+  background: var(--color-bg) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
+}
+
+[data-theme="dark"] .crud-page-shell__header-actions .page-search__input::placeholder,
+[data-theme="dark"] .crud-page-shell__header-actions .crud-resource-shell-header__search::placeholder {
+  color: var(--color-text-muted) !important;
+}
+
+[data-theme="dark"] .crud-page-shell__header-actions .page-search__input:focus,
+[data-theme="dark"] .crud-page-shell__header-actions .crud-resource-shell-header__search:focus {
+  background: var(--color-surface-hover) !important;
+  border-color: var(--color-primary) !important;
+}
+
+/* Notification dot: borde acorde al fondo (sigue siendo el azul del topbar) */
+[data-theme="dark"] .topbar-notification-dot {
+  border-color: var(--color-primary) !important;
+}
+
+/* Cards de productos (galería): fondo surface, borde y texto adaptados */
+[data-theme="dark"] .products-crud-page > div[style*="grid-template-columns"] > button {
+  background: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35) !important;
+}
+
+[data-theme="dark"] .products-crud-page > div[style*="grid-template-columns"] > button:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme="dark"] .products-crud-page > div[style*="grid-template-columns"] > button > span:last-child > span:first-child {
+  color: var(--color-text) !important;
+}
+
+[data-theme="dark"] .products-crud-page > div[style*="grid-template-columns"] > button > span:last-child > span:nth-child(2) {
+  color: var(--color-text-muted) !important;
+}
+
+[data-theme="dark"] .products-crud-page > div[style*="grid-template-columns"] > button > span:last-child > span:last-child {
+  color: var(--color-primary) !important;
+  border-top-color: var(--color-border-subtle) !important;
 }

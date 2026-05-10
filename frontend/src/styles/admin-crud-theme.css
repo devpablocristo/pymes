@@ -603,7 +603,7 @@ textarea.input-readonly {
   border-radius: 14px !important;
   border: 1px solid rgba(0, 100, 200, 0.09) !important;
   padding: 0 8px 8px !important;
-  min-width: 260px !important;
+  min-width: 220px !important;
 }
 
 /* Cabecera de columna */
@@ -730,6 +730,67 @@ textarea.input-readonly {
   border-top: 3px solid #ef4444 !important;
   border-top-left-radius: 14px !important;
   border-top-right-radius: 14px !important;
+}
+
+/* ── Kanban: overrides para dark mode ── */
+
+/* Columna: surface oscuro con borde sutil. En dark sacamos la franja superior
+   de color por estado (success/warning/danger) — es ruido visual sobre dark. */
+[data-theme="dark"] .m-kanban__column-body,
+[data-theme="dark"] .m-kanban__column-body:has(.crud-state-badge--success),
+[data-theme="dark"] .m-kanban__column-body:has(.crud-state-badge--warning),
+[data-theme="dark"] .m-kanban__column-body:has(.crud-state-badge--danger) {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 14px !important;
+}
+
+/* Etiqueta de la columna */
+[data-theme="dark"] .m-kanban__column-label {
+  color: var(--color-text) !important;
+}
+
+/* Badge de conteo */
+[data-theme="dark"] .m-kanban__column-count {
+  background: rgba(96, 165, 250, 0.18) !important;
+  color: var(--color-primary) !important;
+}
+
+/* Menú · · · */
+[data-theme="dark"] .m-kanban__column-menu {
+  color: var(--color-text-muted) !important;
+}
+
+/* Cards: surface-hover (un escalón más claro que la columna) */
+[data-theme="dark"] .m-kanban__card {
+  background: var(--color-surface-hover) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .m-kanban__card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme="dark"] .m-kanban__card strong {
+  color: var(--color-text) !important;
+}
+
+[data-theme="dark"] .m-kanban__card-meta {
+  color: var(--color-text-secondary) !important;
+}
+
+/* Botón "Añadir X" al pie */
+[data-theme="dark"] .m-kanban__column-add {
+  background: rgba(96, 165, 250, 0.06) !important;
+  border-color: rgba(96, 165, 250, 0.22) !important;
+  color: var(--color-text-secondary) !important;
+}
+
+[data-theme="dark"] .m-kanban__column-add:hover {
+  background: rgba(96, 165, 250, 0.14) !important;
+  color: var(--color-primary) !important;
 }
 
 /* ── Lista: badge de estado en celda (inyectado por useStatusColors) ── */

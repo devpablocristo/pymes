@@ -34,6 +34,9 @@ func (m *mockRepo) Update(ctx context.Context, in UpdateInput) (saledomain.Sale,
 func (m *mockRepo) Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
 	return m.voidFn(ctx, orgID, saleID)
 }
+func (m *mockRepo) UpdateStatus(ctx context.Context, in UpdateStatusInput) (saledomain.Sale, error) {
+	return saledomain.Sale{ID: in.ID, OrgID: in.OrgID, Status: in.Status}, nil
+}
 func (m *mockRepo) PatchSale(context.Context, uuid.UUID, uuid.UUID, SalePatchFields) (saledomain.Sale, error) {
 	return saledomain.Sale{}, nil
 }

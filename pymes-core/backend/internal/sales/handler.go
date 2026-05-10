@@ -20,6 +20,7 @@ type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in CreateSaleInput) (saledomain.Sale, error)
 	Update(ctx context.Context, in UpdateSaleInput) (saledomain.Sale, error)
+	UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (saledomain.Sale, error)
 	GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
 	Void(ctx context.Context, orgID, saleID uuid.UUID, actor string) (saledomain.Sale, error)
 }
@@ -35,6 +36,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.POST("/sales", rbac.RequirePermission("sales", "create"), h.Create)
 	auth.GET("/sales/:id", rbac.RequirePermission("sales", "read"), h.Get)
 	auth.PATCH("/sales/:id", rbac.RequirePermission("sales", "update"), h.Update)
+	auth.PATCH("/sales/:id/status", rbac.RequirePermission("sales", "update"), h.UpdateStatus)
 	auth.POST("/sales/:id/void", rbac.RequirePermission("sales", "void"), h.Void)
 }
 
@@ -252,6 +254,35 @@ func (h *Handler) Update(c *gin.Context) {
 		Notes:      req.Notes,
 		Actor:      a.Actor,
 	})
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, toSaleResponse(out))
+}
+
+func (h *Handler) UpdateStatus(c *gin.Context) {
+	a := handlers.GetAuthContext(c)
+	orgID, err := uuid.Parse(a.OrgID)
+	if err != nil {
+		handlers.WriteValidation(c, "invalid tenant")
+		return
+	}
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		handlers.WriteValidation(c, "invalid id")
+		return
+	}
+	var req dto.UpdateSaleStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handlers.WriteValidation(c, "invalid request body")
+		return
+	}
+	out, err := h.uc.UpdateStatus(c.Request.Context(), UpdateStatusInput{
+		OrgID:  orgID,
+		ID:     id,
+		Status: strings.TrimSpace(req.Status),
+	}, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

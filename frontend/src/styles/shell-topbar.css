@@ -49,6 +49,7 @@ main.app-shell-main {
   align-items: stretch !important;
   justify-content: flex-start !important;
   padding: 0 !important;
+  margin: 0 !important;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
@@ -56,6 +57,12 @@ main.app-shell-main {
   min-height: 0 !important;
   gap: 0 !important;
   flex-wrap: nowrap !important;
+  /* Forzar bounding box idéntico a la grilla hermana (.spike-grid-4 / .spike-kpi-grid):
+     ambos children directos de .page-stack deben tener el mismo ancho exacto. */
+  width: 100% !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
 }
 
 /* ── Topbar azul: solo contiene el título ── */
@@ -75,6 +82,23 @@ main.app-shell-main {
   align-items: center !important;
   justify-content: flex-start !important;
   flex-wrap: nowrap !important;
+}
+
+/* Topbar adaptado a dark: navy profundo en vez de azul brillante */
+[data-theme="dark"] .crud-page-shell__header-main {
+  background: linear-gradient(135deg, #0c2c4c 0%, #0f3a66 100%) !important;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid rgba(96, 165, 250, 0.18) !important;
+}
+
+/* Botones del topbar en dark: más translúcidos */
+[data-theme="dark"] .topbar-icon-btn {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #e2e8f0 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+[data-theme="dark"] .topbar-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.14) !important;
 }
 
 /* Ocultar pills y subtítulo de la zona azul — van en la barra blanca */
@@ -390,7 +414,84 @@ main.app-shell-main {
   width: 100% !important;
 }
 
-/* ── Barra antigua de tabs (wo-mod-orders__header-lead) ahora vacía → ocultar ── */
-.wo-mod-orders__header-lead {
-  display: none !important;
+/* ════════════════════════════════════════════════════════════════════
+   DARK MODE — overrides de hardcoded colors al esquema oscuro.
+   El topbar azul mantiene el accent (#0085db); ajustamos contraste
+   del borde y la sub-toolbar blanca + tabs/search/cards de productos.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Topbar azul: bordeado más cálido sobre dark + sombra más profunda */
+[data-theme="dark"] .crud-page-shell__header-main {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45) !important;
+  border-color: rgba(96, 165, 250, 0.28) !important;
+}
+
+/* Sub-toolbar: ya no es blanca brillante, usa surface oscuro */
+[data-theme="dark"] .crud-page-shell__header-actions {
+  background: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Tabs de vista: contenedor y items adaptados al dark */
+[data-theme="dark"] .crud-page-shell__header-actions .m-view-tabs {
+  background: var(--color-surface-hover) !important;
+}
+
+[data-theme="dark"] .crud-page-shell__header-actions .m-view-tabs__item {
+  color: var(--color-text-secondary) !important;
+}
+
+[data-theme="dark"] .crud-page-shell__header-actions .m-view-tabs__item--active {
+  background: var(--color-surface) !important;
+  color: var(--color-primary) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Search input dentro de la sub-toolbar */
+[data-theme="dark"] .crud-page-shell__header-actions .page-search__input,
+[data-theme="dark"] .crud-page-shell__header-actions .crud-resource-shell-header__search {
+  background: var(--color-bg) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
+}
+
+[data-theme="dark"] .crud-page-shell__header-actions .page-search__input::placeholder,
+[data-theme="dark"] .crud-page-shell__header-actions .crud-resource-shell-header__search::placeholder {
+  color: var(--color-text-muted) !important;
+}
+
+[data-theme="dark"] .crud-page-shell__header-actions .page-search__input:focus,
+[data-theme="dark"] .crud-page-shell__header-actions .crud-resource-shell-header__search:focus {
+  background: var(--color-surface-hover) !important;
+  border-color: var(--color-primary) !important;
+}
+
+/* Notification dot: borde acorde al fondo (sigue siendo el azul del topbar) */
+[data-theme="dark"] .topbar-notification-dot {
+  border-color: var(--color-primary) !important;
+}
+
+/* Cards de productos (galería): fondo surface, borde y texto adaptados */
+[data-theme="dark"] .products-crud-page > div[style*="grid-template-columns"] > button {
+  background: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35) !important;
+}
+
+[data-theme="dark"] .products-crud-page > div[style*="grid-template-columns"] > button:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme="dark"] .products-crud-page > div[style*="grid-template-columns"] > button > span:last-child > span:first-child {
+  color: var(--color-text) !important;
+}
+
+[data-theme="dark"] .products-crud-page > div[style*="grid-template-columns"] > button > span:last-child > span:nth-child(2) {
+  color: var(--color-text-muted) !important;
+}
+
+[data-theme="dark"] .products-crud-page > div[style*="grid-template-columns"] > button > span:last-child > span:last-child {
+  color: var(--color-primary) !important;
+  border-top-color: var(--color-border-subtle) !important;
 }

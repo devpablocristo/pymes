@@ -40,6 +40,25 @@ type DashItem = Record<string, any>;
 
 const schedulingClient = createSchedulingClient(apiRequest);
 
+// ─── Theme-aware label colors para ApexCharts ───
+// ApexCharts pinta texto SVG con `fill` desde la opción `colors` del eje;
+// en dark mode los hardcodes #8898aa / #5a6a85 / #2a3547 quedan ilegibles.
+// Esta helper devuelve los tokens del tema activo en el momento del render.
+// Light mode preserva exactamente los hardcodes previos y omite chart.foreColor
+// para no alterar el rendering existente.
+function getChartLabelColors(): {
+  axisMuted: string;        // antes #8898aa hardcoded (light)
+  axisSecondary: string;    // antes #5a6a85 hardcoded (light)
+  textStrong: string;       // antes #2a3547 hardcoded (light)
+  foreColor: string | undefined; // chart.foreColor: undefined en light, claro en dark
+} {
+  const isDark = typeof document !== 'undefined'
+    && document.documentElement.getAttribute('data-theme') === 'dark';
+  return isDark
+    ? { axisMuted: '#94a3b8', axisSecondary: '#cbd5e1', textStrong: '#e2e8f0', foreColor: '#94a3b8' }
+    : { axisMuted: '#8898aa', axisSecondary: '#5a6a85', textStrong: '#2a3547', foreColor: undefined };
+}
+
 // ─── ApexCharts hook ───
 
 function useApexChart(
@@ -242,10 +261,13 @@ function BalanceChart() {
   const periodLabel = data?.period || new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
   const chartRef = useApexChart(
-    () => ({
+    () => {
+      const c = getChartLabelColors();
+      return {
       chart: {
         type: 'bar', height: 220, toolbar: { show: false },
         fontFamily: 'Plus Jakarta Sans, sans-serif', animations: { enabled: false },
+        foreColor: c.foreColor,
       },
       series: [
         { name: 'Ingresos',  data: incomeSeries },
@@ -258,7 +280,7 @@ function BalanceChart() {
       grid: { borderColor: '#f0f5f9', strokeDashArray: 4, xaxis: { lines: { show: false } } },
       xaxis: {
         categories: months,
-        labels: { style: { colors: '#8898aa', fontSize: '11px', fontFamily: 'Plus Jakarta Sans' } },
+        labels: { style: { colors: c.axisMuted, fontSize: '11px', fontFamily: 'Plus Jakarta Sans' } },
         axisBorder: { show: false }, axisTicks: { show: false },
       },
       yaxis: (() => {
@@ -275,7 +297,7 @@ function BalanceChart() {
           max: 200,
           tickAmount: 4,
           labels: {
-            style: { colors: '#8898aa', fontSize: '11px', fontFamily: 'Plus Jakarta Sans' },
+            style: { colors: c.axisMuted, fontSize: '11px', fontFamily: 'Plus Jakarta Sans' },
             formatter: (v: number) => `$${Math.round(v / 200 * nicePeakK)}K`,
           },
         };
@@ -287,7 +309,8 @@ function BalanceChart() {
           return `$${real[opts.dataPointIndex] ?? v}K`;
         }},
       },
-    }),
+      };
+    },
     [income, expense],
   );
 
@@ -327,8 +350,13 @@ function QuotesPipeline() {
   const total    = accepted + sent + draft + rejected;
 
   const chartRef = useApexChart(
-    () => ({
-      chart: { type: 'donut', height: 180, fontFamily: 'Plus Jakarta Sans, sans-serif', animations: { enabled: false } },
+    () => {
+      const c = getChartLabelColors();
+      return {
+      chart: {
+        type: 'donut', height: 180, fontFamily: 'Plus Jakarta Sans, sans-serif', animations: { enabled: false },
+        foreColor: c.foreColor,
+      },
       series: [accepted, sent, draft, rejected],
       labels: ['Aceptados', 'Enviados', 'Borradores', 'Rechazados'],
       colors: ['#4bd08b', '#0085db', '#e7ecf0', '#fb977d'],
@@ -343,14 +371,15 @@ function QuotesPipeline() {
               show: true,
               total: {
                 show: true, label: 'Total',
-                fontFamily: 'Plus Jakarta Sans', color: '#2a3547',
+                fontFamily: 'Plus Jakarta Sans', color: c.textStrong,
                 formatter: () => String(total),
               },
             },
           },
         },
       },
-    }),
+      };
+    },
     [accepted, sent, draft, rejected],
   );
 
@@ -759,10 +788,13 @@ function ExpensesByCategory() {
   const amounts    = sorted.map(([, amt]) => Math.round(amt / 1000));
 
   const chartRef = useApexChart(
-    () => ({
+    () => {
+      const c = getChartLabelColors();
+      return {
       chart: {
         type: 'bar', height: 290, toolbar: { show: false },
         fontFamily: 'Plus Jakarta Sans, sans-serif', animations: { enabled: false },
+        foreColor: c.foreColor,
       },
       plotOptions: { bar: { horizontal: true, borderRadius: 6, borderRadiusApplication: 'end', barHeight: '72%' } },
       series: [{ name: 'Egresos', data: amounts }],
@@ -778,16 +810,17 @@ function ExpensesByCategory() {
       xaxis: {
         categories,
         labels: {
-          style: { colors: '#8898aa', fontSize: '11px', fontFamily: 'Plus Jakarta Sans' },
+          style: { colors: c.axisMuted, fontSize: '11px', fontFamily: 'Plus Jakarta Sans' },
           formatter: (v: number) => `$${v}K`,
         },
         axisBorder: { show: false }, axisTicks: { show: false },
       },
       yaxis: {
-        labels: { style: { colors: '#5a6a85', fontSize: '12px', fontFamily: 'Plus Jakarta Sans' } },
+        labels: { style: { colors: c.axisSecondary, fontSize: '12px', fontFamily: 'Plus Jakarta Sans' } },
       },
       tooltip: { y: { formatter: (v: number) => `$${v}K` } },
-    }),
+      };
+    },
     [JSON.stringify(amounts), JSON.stringify(categories)],
   );
 

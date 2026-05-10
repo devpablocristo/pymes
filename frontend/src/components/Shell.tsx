@@ -10,6 +10,7 @@ import { toCrudResourceSlug } from '../crud/crudResourceSlug';
 import { tenantLink, useTenantSlug } from '../lib/tenantSlug';
 import { clerkEnabled } from '../lib/auth';
 import logoUrl from '../assets/logo.svg';
+import logoDarkUrl from '../assets/logo-dark.svg';
 import isoUrl from '../assets/iso.svg';
 
 /* Componente nulo: usa useOrganization (solo seguro dentro de ClerkProvider)
@@ -256,7 +257,8 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const brandLogo = (
     <>
-      <img src={logoUrl} alt="Wukomo" className="brand-logo-full" style={{ height: '22px', display: 'block' }} />
+      <img src={logoUrl} alt="Wukomo" className="brand-logo-full brand-logo-full--light" style={{ height: '22px', display: 'block' }} />
+      <img src={logoDarkUrl} alt="Wukomo" className="brand-logo-full brand-logo-full--dark" style={{ height: '22px', display: 'block' }} />
       <img src={isoUrl} alt="W" className="brand-logo-iso" />
     </>
   );

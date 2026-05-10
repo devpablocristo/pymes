@@ -216,6 +216,11 @@ a.sidebar-link i.ti {
   display: none !important;
 }
 
+/* Logo: variante por tema */
+.brand-logo-full--dark { display: none !important; }
+[data-theme="dark"] .brand-logo-full--light { display: none !important; }
+[data-theme="dark"] .brand-logo-full--dark { display: block !important; }
+
 /* Colapsado: ajustar padding del brand para que el iso quepa con márgenes */
 .sidebar-collapsed .sidebar-brand {
   padding: 16px 8px 12px !important;
@@ -261,4 +266,89 @@ a.sidebar-link i.ti {
 
 .sidebar-collapsed .sidebar-section-label > * {
   display: none !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   DARK MODE — overrides de hardcoded colors al esquema oscuro.
+   El light mode no se toca: solo redefinimos lo que choca en dark.
+   ════════════════════════════════════════════════════════════════════ */
+
+[data-theme="dark"] .app-layout {
+  background: var(--color-bg) !important;
+}
+
+[data-theme="dark"] aside.sidebar {
+  background: var(--color-sidebar) !important;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.45) !important;
+  border: 1px solid var(--color-border) !important;
+}
+
+[data-theme="dark"] .sidebar-brand {
+  border-bottom-color: var(--color-border-subtle) !important;
+}
+
+[data-theme="dark"] .sidebar-brand small {
+  color: var(--color-text-muted) !important;
+}
+
+[data-theme="dark"] .sidebar-search-input {
+  background: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
+}
+
+[data-theme="dark"] .sidebar-search-input:focus {
+  background: var(--color-surface-hover) !important;
+  border-color: var(--color-primary) !important;
+}
+
+[data-theme="dark"] .sidebar-section-label {
+  color: var(--color-text-muted) !important;
+}
+
+[data-theme="dark"] a.sidebar-link {
+  color: var(--color-sidebar-text) !important;
+}
+
+[data-theme="dark"] a.sidebar-link:hover {
+  background: var(--color-sidebar-hover) !important;
+  color: var(--color-text) !important;
+}
+
+[data-theme="dark"] a.sidebar-link.active,
+[data-theme="dark"] a.sidebar-link[aria-current='page'] {
+  background: var(--color-sidebar-active) !important;
+  color: var(--color-sidebar-text-active) !important;
+}
+
+[data-theme="dark"] .sidebar-footer-controls,
+[data-theme="dark"] .shell-clerk-auth {
+  border-top-color: var(--color-border-subtle) !important;
+}
+
+[data-theme="dark"] .shell-org-switcher-trigger,
+[data-theme="dark"] .shell-branch-switcher-input,
+[data-theme="dark"] .language-selector-input {
+  background: var(--color-surface) !important;
+  color: var(--color-text-secondary) !important;
+  border-color: var(--color-border) !important;
+}
+
+[data-theme="dark"] .shell-branch-switcher-input:focus,
+[data-theme="dark"] .language-selector-input:focus {
+  background: var(--color-surface-hover) !important;
+  border-color: var(--color-primary) !important;
+}
+
+[data-theme="dark"] .shell-branch-switcher-label {
+  color: var(--color-text-muted) !important;
+}
+
+[data-theme="dark"] .sidebar-collapsed .sidebar-section-label {
+  background: rgba(96, 165, 250, 0.22) !important;
+}
+
+/* Scrollbar thumb más visible sobre fondo oscuro */
+[data-theme="dark"] aside.sidebar:hover nav.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.38) !important;
 }

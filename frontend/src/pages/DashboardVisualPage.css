@@ -6,6 +6,12 @@
   gap: 15px;
 }
 
+.page-stack.dash {
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+}
+
 .dash__empty-hint {
   color: #adb5bd;
   font-size: 13px;
@@ -39,7 +45,7 @@
 
 .spike-grid-4 {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 15px;
   align-items: stretch;
 }
@@ -50,7 +56,7 @@
 
 .spike-grid-3 {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 15px;
   align-items: stretch;
 }
@@ -61,7 +67,7 @@
 
 .spike-grid-2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 15px;
   align-items: stretch;
 }
@@ -114,7 +120,7 @@
 
 .spike-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 15px;
 }
 
@@ -200,6 +206,7 @@
   align-items: center;
   gap: 5px;
   margin-top: 2px;
+  white-space: nowrap;
 }
 
 .spike-kpi-trend-icon {
@@ -629,4 +636,150 @@
 
 .spike-services-list .spike-progress-fill {
   border-radius: 6px;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   DARK MODE — overrides de hardcoded colors al esquema oscuro.
+   Texto, bordes, fondos sutiles y badges adaptados a fondo dark.
+   El acento primario (#0085db) se cambia por var(--color-primary).
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Hint vacío y subtítulos */
+[data-theme="dark"] .dash__empty-hint,
+[data-theme="dark"] .spike-kpi-sub,
+[data-theme="dark"] .spike-cell-meta {
+  color: var(--color-text-muted) !important;
+}
+
+/* Labels y caption secundarios */
+[data-theme="dark"] .spike-kpi-label,
+[data-theme="dark"] .spike-section-sub,
+[data-theme="dark"] .spike-agenda-date,
+[data-theme="dark"] .spike-agenda-service,
+[data-theme="dark"] .spike-agenda-stat {
+  color: var(--color-text-muted) !important;
+}
+
+/* Valores e identificadores destacados (KPI value, section title, totals) */
+[data-theme="dark"] .spike-kpi-value,
+[data-theme="dark"] .spike-section-title,
+[data-theme="dark"] .spike-agenda-time,
+[data-theme="dark"] .spike-agenda-name,
+[data-theme="dark"] .spike-agenda-stat strong,
+[data-theme="dark"] .spike-avatar-name,
+[data-theme="dark"] .spike-cell-strong,
+[data-theme="dark"] .spike-donut-legend li strong {
+  color: var(--color-text) !important;
+}
+
+/* Texto secundario (legend, agenda label, donut, table cells) */
+[data-theme="dark"] .spike-legend-item,
+[data-theme="dark"] .spike-donut-legend li,
+[data-theme="dark"] .spike-agenda-label,
+[data-theme="dark"] .spike-table tbody td {
+  color: var(--color-text-secondary) !important;
+}
+
+/* Action links primarios y staff highlight */
+[data-theme="dark"] .spike-section-action,
+[data-theme="dark"] .spike-agenda-staff {
+  color: var(--color-primary) !important;
+}
+
+/* Borders de separación: agenda items, table, row items */
+[data-theme="dark"] .spike-agenda-item,
+[data-theme="dark"] .spike-agenda-footer,
+[data-theme="dark"] .spike-table thead th,
+[data-theme="dark"] .spike-table tbody td,
+[data-theme="dark"] .spike-row-item {
+  border-color: var(--color-border) !important;
+}
+
+/* Header table: el border-bottom-2 + text-muted */
+[data-theme="dark"] .spike-table thead th {
+  color: var(--color-text-muted) !important;
+}
+
+/* Hover row en tabla */
+[data-theme="dark"] .spike-table tbody tr:hover td {
+  background: var(--color-surface-hover) !important;
+}
+
+/* Progress bar background */
+[data-theme="dark"] .spike-progress-bg {
+  background: var(--color-surface-hover) !important;
+}
+
+/* Badges: invierten a tono oscuro con texto claro acento (los dot fills se mantienen) */
+[data-theme="dark"] .spike-badge-teal {
+  background: rgba(52, 211, 153, 0.15) !important;
+  color: #6ee7b7 !important;
+}
+
+[data-theme="dark"] .spike-badge-yellow {
+  background: rgba(251, 191, 36, 0.15) !important;
+  color: #fcd34d !important;
+}
+
+[data-theme="dark"] .spike-badge-red {
+  background: rgba(248, 113, 113, 0.15) !important;
+  color: #fca5a5 !important;
+}
+
+[data-theme="dark"] .spike-badge-gray {
+  background: var(--color-surface-hover) !important;
+  color: var(--color-text-muted) !important;
+}
+
+[data-theme="dark"] .spike-badge-blue {
+  background: var(--color-primary-subtle) !important;
+  color: var(--color-primary) !important;
+}
+
+/* Tooltip de ApexCharts: sombra más fuerte en dark */
+[data-theme="dark"] .spike-kpi-card .apexcharts-tooltip {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55) !important;
+}
+
+/* ────────────────────────────────────────────────────────────
+   Servicios más vendidos — labels inline-styled con #2a3547
+   (TSX usa style={{ color: '#2a3547' }} hardcoded en el span).
+   En dark, ese gris oscuro queda casi invisible sobre fondo dark.
+   ──────────────────────────────────────────────────────────── */
+[data-theme="dark"] .spike-services-list .spike-progress-label > span:first-child {
+  color: var(--color-text) !important;
+}
+
+/* ────────────────────────────────────────────────────────────
+   ApexCharts en dark — labels de ejes / leyendas / data labels.
+   ApexCharts pinta texto SVG con `fill`, no `color`.
+   Cubre x/y axis (Balance mensual, Egresos por categoría) y leyendas.
+   ──────────────────────────────────────────────────────────── */
+[data-theme="dark"] .apexcharts-xaxis-label,
+[data-theme="dark"] .apexcharts-yaxis-label,
+[data-theme="dark"] .apexcharts-xaxis text,
+[data-theme="dark"] .apexcharts-yaxis text,
+[data-theme="dark"] .apexcharts-text tspan,
+[data-theme="dark"] .apexcharts-legend-text {
+  fill: var(--color-text-secondary) !important;
+  color: var(--color-text-secondary) !important;
+}
+
+/* Texto central del donut (Total / count): debe usar el color principal */
+[data-theme="dark"] .apexcharts-datalabel-label,
+[data-theme="dark"] .apexcharts-datalabel-value,
+[data-theme="dark"] .apexcharts-datalabels text,
+[data-theme="dark"] .apexcharts-pie-label,
+[data-theme="dark"] .apexcharts-pie text {
+  fill: var(--color-text) !important;
+}
+
+/* Grid y axis lines del chart en dark: bordes apenas visibles */
+[data-theme="dark"] .apexcharts-gridline {
+  stroke: var(--color-border) !important;
+}
+
+[data-theme="dark"] .apexcharts-xaxis line,
+[data-theme="dark"] .apexcharts-yaxis line {
+  stroke: var(--color-border) !important;
 }

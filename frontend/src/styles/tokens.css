@@ -1,10 +1,8 @@
 /**
  * Design tokens — colores, tipo, espacio, sombras, tema oscuro.
  * Importado primero desde `styles.css`; no incluye reset ni componentes.
- *
- * Las fuentes (Plus Jakarta Sans + JetBrains Mono) las carga
- * `@fontsource/*` desde `main.tsx`; no usar @import a CDN.
  */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ── Design tokens ── */
 :root {
@@ -68,7 +66,7 @@
   --radius-btn: 30px;
   --radius-badge: 50px;
 
-  /* Sombras — escala de elevación z1→z24 con tinte azul para light */
+  /* Sombras — escala de elevación z1→z24 (inspirada en Spike/TQ) */
   --shadow-z1: 0px 2px 6px rgba(37, 83, 185, 0.1);
   --shadow-z4: 0 4px 12px rgba(37, 83, 185, 0.12);
   --shadow-z8: 0 8px 24px rgba(37, 83, 185, 0.12);
@@ -119,7 +117,7 @@
   /* Iconos junto a texto (buscador, estrella, etc.) */
   --text-icon: 1.125rem;
 
-  /* Pesos (Plus Jakarta Sans: 300–700 cargados via @fontsource) */
+  /* Pesos (DM Sans: 300–700 importados arriba) */
   --font-weight-light: 300;
   --font-weight-normal: 400;
   --font-weight-medium: 500;
@@ -167,7 +165,6 @@
   --color-sidebar-active: #1e293b;
   --color-sidebar-text: #64748b;
   --color-sidebar-text-active: #e2e8f0;
-  --color-sidebar-border: #1e293b;
 
   --color-text: #e2e8f0;
   --color-text-secondary: #94a3b8;

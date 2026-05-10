@@ -30,6 +30,7 @@ vi.mock('../lib/api', () => ({
   apiRequest: (...args: [string]) => apiMocks.apiRequest(...args),
   getSession: () => apiMocks.getSession(),
   downloadAPIFile: (...args: unknown[]) => apiMocks.downloadAPIFile(...args),
+  getNotificationsSummary: () => Promise.resolve({ unread_count: 0 }),
 }));
 
 function renderModulePage(initialPath: string) {

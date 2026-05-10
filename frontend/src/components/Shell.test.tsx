@@ -26,6 +26,10 @@ vi.mock('../lib/tenantProfile', async () => {
   };
 });
 
+vi.mock('../lib/auth', () => ({
+  clerkEnabled: false,
+}));
+
 vi.mock('./BranchSwitcher', () => ({
   BranchSwitcher: () => <div data-testid="branch-switcher" />,
 }));

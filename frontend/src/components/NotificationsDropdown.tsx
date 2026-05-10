@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { QueryClientContext, useQuery } from '@tanstack/react-query';
 import { IconBell, IconX } from '@tabler/icons-react';
 import { getNotificationsSummary } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
@@ -18,6 +18,19 @@ import './NotificationsDropdown.css';
  * para mantener consistencia con el resto del UI kit.
  */
 export function NotificationsDropdown() {
+  const queryClient = useContext(QueryClientContext);
+  if (!queryClient) {
+    return (
+      <button type="button" className="topbar-icon-btn" aria-label="Notificaciones">
+        <IconBell size={18} stroke={1.6} aria-hidden="true" />
+      </button>
+    );
+  }
+
+  return <NotificationsDropdownWithQuery />;
+}
+
+function NotificationsDropdownWithQuery() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 

@@ -22,6 +22,7 @@ vi.mock('../lib/api', () => ({
   getMe: () => apiMocks.getMe(),
   getBillingStatus: () => apiMocks.getBillingStatus(),
   createPortal: () => apiMocks.createPortal(),
+  getNotificationsSummary: () => Promise.resolve({ unread_count: 0 }),
 }));
 
 const sessionFixture: SessionResponse = {

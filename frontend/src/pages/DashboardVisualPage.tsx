@@ -23,7 +23,8 @@ import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { useI18n } from '../lib/i18n';
 import { apiRequest } from '../lib/api';
-import { useBranchSelection } from '../lib/useBranchSelection';
+import { useOptionalBranchSelection } from '../lib/useBranchSelection';
+import { readActiveBranchId } from '../lib/branchSelectionStorage';
 import type {
   SalesSummaryData,
   CashflowSummaryData,
@@ -434,7 +435,10 @@ function formatDuration(minutes: number): string {
 
 function AgendaHoy() {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const { selectedBranch, selectedBranchId, isLoading: branchLoading } = useBranchSelection();
+  const branchSelection = useOptionalBranchSelection();
+  const selectedBranch = branchSelection?.selectedBranch ?? null;
+  const selectedBranchId = branchSelection?.selectedBranchId ?? readActiveBranchId();
+  const branchLoading = branchSelection?.isLoading ?? false;
 
   const { data: stats } = useQuery<DashboardStats>({
     queryKey: ['scheduling-summary', 'dashboard', selectedBranchId ?? 'all', today],
@@ -752,7 +756,9 @@ function FrequentCustomers() {
 // ─── Egresos por categoría ───
 
 function ExpensesByCategory() {
-  const { selectedBranchId, isLoading: branchLoading } = useBranchSelection();
+  const branchSelection = useOptionalBranchSelection();
+  const selectedBranchId = branchSelection?.selectedBranchId ?? readActiveBranchId();
+  const branchLoading = branchSelection?.isLoading ?? false;
 
   const { data, isLoading } = useQuery({
     queryKey: ['expenses-by-category', selectedBranchId ?? 'all'],
@@ -991,6 +997,7 @@ export function DashboardVisualPage() {
         <div className="spike-col-stack">
           <TopServices />
           <FrequentCustomers />
+          <Debtors />
         </div>
       </div>
 

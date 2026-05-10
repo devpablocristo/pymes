@@ -4,12 +4,12 @@ DO $$
 DECLARE
     v_tenant uuid := '__SEED_TENANT_ID__';
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_tenant) THEN
+    IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_tenant) THEN
         RETURN;
     END IF;
 
     INSERT INTO restaurant.dining_areas (
-        id, tenant_id, name, sort_order, is_favorite, tags, metadata, updated_at
+        id, org_id, name, sort_order, is_favorite, tags, metadata, updated_at
     )
     SELECT
         CASE gs
@@ -37,7 +37,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO restaurant.dining_tables (
-        id, tenant_id, area_id, code, label, capacity, status, notes,
+        id, org_id, area_id, code, label, capacity, status, notes,
         is_favorite, tags, metadata, updated_at
     )
     SELECT
@@ -63,7 +63,7 @@ BEGIN
         jsonb_build_object('source', 'seed'),
         now()
     FROM generate_series(1, 10) AS gs
-    ON CONFLICT (tenant_id, code) DO UPDATE
+    ON CONFLICT (org_id, code) DO UPDATE
         SET area_id = EXCLUDED.area_id,
             label = EXCLUDED.label,
             capacity = EXCLUDED.capacity,
@@ -75,7 +75,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO restaurant.table_sessions (
-        id, tenant_id, table_id, guest_count, party_label, notes, opened_at, closed_at, updated_at
+        id, org_id, table_id, guest_count, party_label, notes, opened_at, closed_at, updated_at
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/session/' || gs::text),

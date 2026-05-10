@@ -16,7 +16,7 @@ type Address struct {
 
 type Customer struct {
 	ID         uuid.UUID
-	TenantID   uuid.UUID
+	OrgID   uuid.UUID
 	Type       string
 	Name       string
 	TaxID      string

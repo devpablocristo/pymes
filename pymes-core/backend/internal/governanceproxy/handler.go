@@ -13,14 +13,14 @@ import (
 )
 
 type governanceClient interface {
-	ListPoliciesForTenant(ctx context.Context, tenantID string) (int, []byte, error)
-	CreatePolicyForTenant(ctx context.Context, tenantID string, body any) (int, []byte, error)
-	UpdatePolicyForTenant(ctx context.Context, tenantID, id string, updates any) (int, []byte, error)
-	DeletePolicyForTenant(ctx context.Context, tenantID, id string) (int, error)
+	ListPoliciesForTenant(ctx context.Context, orgID string) (int, []byte, error)
+	CreatePolicyForTenant(ctx context.Context, orgID string, body any) (int, []byte, error)
+	UpdatePolicyForTenant(ctx context.Context, orgID, id string, updates any) (int, []byte, error)
+	DeletePolicyForTenant(ctx context.Context, orgID, id string) (int, error)
 	ListActionTypes(ctx context.Context) (int, []byte, error)
-	ListPendingApprovalsForTenant(ctx context.Context, tenantID string) (int, []byte, error)
-	ApproveForTenant(ctx context.Context, tenantID, id string, body any) (int, []byte, error)
-	RejectForTenant(ctx context.Context, tenantID, id string, body any) (int, []byte, error)
+	ListPendingApprovalsForTenant(ctx context.Context, orgID string) (int, []byte, error)
+	ApproveForTenant(ctx context.Context, orgID, id string, body any) (int, []byte, error)
+	RejectForTenant(ctx context.Context, orgID, id string, body any) (int, []byte, error)
 }
 
 // Handler proxies requests del frontend a Nexus Governance API.
@@ -57,11 +57,11 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 }
 
 func (h *Handler) listPolicies(c *gin.Context) {
-	tenantID, ok := tenantIDFromAuth(c)
+	orgID, ok := tenantIDFromAuth(c)
 	if !ok {
 		return
 	}
-	status, data, err := h.client.ListPoliciesForTenant(c.Request.Context(), tenantID)
+	status, data, err := h.client.ListPoliciesForTenant(c.Request.Context(), orgID)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: list policies failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -71,7 +71,7 @@ func (h *Handler) listPolicies(c *gin.Context) {
 }
 
 func (h *Handler) createPolicy(c *gin.Context) {
-	tenantID, ok := tenantIDFromAuth(c)
+	orgID, ok := tenantIDFromAuth(c)
 	if !ok {
 		return
 	}
@@ -97,7 +97,7 @@ func (h *Handler) createPolicy(c *gin.Context) {
 		"mode":        req.Mode,
 	}
 
-	status, data, err := h.client.CreatePolicyForTenant(c.Request.Context(), tenantID, governanceBody)
+	status, data, err := h.client.CreatePolicyForTenant(c.Request.Context(), orgID, governanceBody)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: create policy failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -107,7 +107,7 @@ func (h *Handler) createPolicy(c *gin.Context) {
 }
 
 func (h *Handler) updatePolicy(c *gin.Context) {
-	tenantID, ok := tenantIDFromAuth(c)
+	orgID, ok := tenantIDFromAuth(c)
 	if !ok {
 		return
 	}
@@ -138,7 +138,7 @@ func (h *Handler) updatePolicy(c *gin.Context) {
 		updates["expression"] = BuildCELExpression("", req.Condition)
 	}
 
-	status, data, err := h.client.UpdatePolicyForTenant(c.Request.Context(), tenantID, id, updates)
+	status, data, err := h.client.UpdatePolicyForTenant(c.Request.Context(), orgID, id, updates)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: update policy failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -148,7 +148,7 @@ func (h *Handler) updatePolicy(c *gin.Context) {
 }
 
 func (h *Handler) deletePolicy(c *gin.Context) {
-	tenantID, ok := tenantIDFromAuth(c)
+	orgID, ok := tenantIDFromAuth(c)
 	if !ok {
 		return
 	}
@@ -158,7 +158,7 @@ func (h *Handler) deletePolicy(c *gin.Context) {
 		return
 	}
 
-	status, err := h.client.DeletePolicyForTenant(c.Request.Context(), tenantID, id)
+	status, err := h.client.DeletePolicyForTenant(c.Request.Context(), orgID, id)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: delete policy failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -178,11 +178,11 @@ func (h *Handler) listActionTypes(c *gin.Context) {
 }
 
 func (h *Handler) listPendingApprovals(c *gin.Context) {
-	tenantID, ok := tenantIDFromAuth(c)
+	orgID, ok := tenantIDFromAuth(c)
 	if !ok {
 		return
 	}
-	status, data, err := h.client.ListPendingApprovalsForTenant(c.Request.Context(), tenantID)
+	status, data, err := h.client.ListPendingApprovalsForTenant(c.Request.Context(), orgID)
 	if err != nil {
 		// La bandeja de notificaciones usa approvals como señal opcional.
 		// Si Governance no está disponible en local o en entornos sin governance,
@@ -195,7 +195,7 @@ func (h *Handler) listPendingApprovals(c *gin.Context) {
 }
 
 func (h *Handler) approve(c *gin.Context) {
-	tenantID, ok := tenantIDFromAuth(c)
+	orgID, ok := tenantIDFromAuth(c)
 	if !ok {
 		return
 	}
@@ -212,7 +212,7 @@ func (h *Handler) approve(c *gin.Context) {
 
 	body := map[string]string{"decided_by": "owner", "note": req.Note}
 
-	status, data, err := h.client.ApproveForTenant(c.Request.Context(), tenantID, id, body)
+	status, data, err := h.client.ApproveForTenant(c.Request.Context(), orgID, id, body)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: approve failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -222,7 +222,7 @@ func (h *Handler) approve(c *gin.Context) {
 }
 
 func (h *Handler) reject(c *gin.Context) {
-	tenantID, ok := tenantIDFromAuth(c)
+	orgID, ok := tenantIDFromAuth(c)
 	if !ok {
 		return
 	}
@@ -239,7 +239,7 @@ func (h *Handler) reject(c *gin.Context) {
 
 	body := map[string]string{"decided_by": "owner", "note": req.Note}
 
-	status, data, err := h.client.RejectForTenant(c.Request.Context(), tenantID, id, body)
+	status, data, err := h.client.RejectForTenant(c.Request.Context(), orgID, id, body)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: reject failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -256,10 +256,10 @@ func (h *Handler) getConditionTemplates(c *gin.Context) {
 
 func tenantIDFromAuth(c *gin.Context) (string, bool) {
 	auth := handlers.GetAuthContext(c)
-	tenantID := strings.TrimSpace(auth.TenantID)
-	if tenantID == "" {
+	orgID := strings.TrimSpace(auth.OrgID)
+	if orgID == "" {
 		c.JSON(http.StatusForbidden, gin.H{"code": "tenant_required", "message": "tenant activo requerido"})
 		return "", false
 	}
-	return tenantID, true
+	return orgID, true
 }

@@ -17,14 +17,14 @@ import (
 )
 
 type usecasesPort interface {
-	List(ctx context.Context, tenantID uuid.UUID, activeOnly bool, limit int) ([]pricelistdomain.PriceList, error)
-	ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]pricelistdomain.PriceList, error)
+	List(ctx context.Context, orgID uuid.UUID, activeOnly bool, limit int) ([]pricelistdomain.PriceList, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]pricelistdomain.PriceList, error)
 	Create(ctx context.Context, in pricelistdomain.PriceList) (pricelistdomain.PriceList, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (pricelistdomain.PriceList, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (pricelistdomain.PriceList, error)
 	Update(ctx context.Context, in pricelistdomain.PriceList) (pricelistdomain.PriceList, error)
-	SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error
-	Restore(ctx context.Context, tenantID, id uuid.UUID) error
-	HardDelete(ctx context.Context, tenantID, id uuid.UUID) error
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type Handler struct{ uc usecasesPort }
@@ -47,7 +47,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) List(c *gin.Context) {
-	tenantID, ok := parseTenant(c)
+	orgID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -55,7 +55,7 @@ func (h *Handler) List(c *gin.Context) {
 	activeOnly := strings.ToLower(c.DefaultQuery("active", "true")) != "false"
 	archived := strings.EqualFold(strings.TrimSpace(c.Query("archived")), "true")
 	if archived {
-		items, err := h.uc.ListArchived(c.Request.Context(), tenantID, limit)
+		items, err := h.uc.ListArchived(c.Request.Context(), orgID, limit)
 		if err != nil {
 			httperrors.Respond(c, err)
 			return
@@ -63,7 +63,7 @@ func (h *Handler) List(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"items": items})
 		return
 	}
-	items, err := h.uc.List(c.Request.Context(), tenantID, activeOnly, limit)
+	items, err := h.uc.List(c.Request.Context(), orgID, activeOnly, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -72,12 +72,12 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) ListArchived(c *gin.Context) {
-	tenantID, ok := parseTenant(c)
+	orgID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.ListArchived(c.Request.Context(), tenantID, limit)
+	items, err := h.uc.ListArchived(c.Request.Context(), orgID, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -86,7 +86,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 }
 
 func (h *Handler) Create(c *gin.Context) {
-	tenantID, ok := parseTenant(c)
+	orgID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -95,7 +95,7 @@ func (h *Handler) Create(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	out, err := h.uc.Create(c.Request.Context(), requestToDomain(tenantID, req))
+	out, err := h.uc.Create(c.Request.Context(), requestToDomain(orgID, req))
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -104,11 +104,11 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	tenantID, id, ok := parseTenantAndID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -117,7 +117,7 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	tenantID, id, ok := parseTenantAndID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -126,7 +126,7 @@ func (h *Handler) Update(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	payload := requestToDomain(tenantID, req)
+	payload := requestToDomain(orgID, req)
 	payload.ID = id
 	out, err := h.uc.Update(c.Request.Context(), payload)
 	if err != nil {
@@ -138,11 +138,11 @@ func (h *Handler) Update(c *gin.Context) {
 
 // Delete realiza soft delete (archiva). Es la semántica canónica CRUD.
 func (h *Handler) Delete(c *gin.Context) {
-	tenantID, id, ok := parseTenantAndID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.SoftDelete(c.Request.Context(), tenantID, id); err != nil {
+	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -154,11 +154,11 @@ func (h *Handler) Archive(c *gin.Context) {
 }
 
 func (h *Handler) Restore(c *gin.Context) {
-	tenantID, id, ok := parseTenantAndID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.Restore(c.Request.Context(), tenantID, id); err != nil {
+	if err := h.uc.Restore(c.Request.Context(), orgID, id); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -166,18 +166,18 @@ func (h *Handler) Restore(c *gin.Context) {
 }
 
 func (h *Handler) HardDelete(c *gin.Context) {
-	tenantID, id, ok := parseTenantAndID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.HardDelete(c.Request.Context(), tenantID, id); err != nil {
+	if err := h.uc.HardDelete(c.Request.Context(), orgID, id); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
 }
 
-func requestToDomain(tenantID uuid.UUID, req dto.CreatePriceListRequest) pricelistdomain.PriceList {
+func requestToDomain(orgID uuid.UUID, req dto.CreatePriceListRequest) pricelistdomain.PriceList {
 	active := true
 	if req.IsActive != nil {
 		active = *req.IsActive
@@ -199,7 +199,7 @@ func requestToDomain(tenantID uuid.UUID, req dto.CreatePriceListRequest) priceli
 			}
 		}
 	}
-	return pricelistdomain.PriceList{TenantID: tenantID, Name: strings.TrimSpace(req.Name), Description: strings.TrimSpace(req.Description), IsDefault: req.IsDefault, Markup: req.Markup, IsActive: active, IsFavorite: isFavorite, Tags: req.Tags, Items: items}
+	return pricelistdomain.PriceList{OrgID: orgID, Name: strings.TrimSpace(req.Name), Description: strings.TrimSpace(req.Description), IsDefault: req.IsDefault, Markup: req.Markup, IsActive: active, IsFavorite: isFavorite, Tags: req.Tags, Items: items}
 }
 
 func parseTenant(c *gin.Context) (uuid.UUID, bool) {

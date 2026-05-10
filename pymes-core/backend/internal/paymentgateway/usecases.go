@@ -35,28 +35,28 @@ var (
 )
 
 type repositoryPort interface {
-	ResolveTenantID(ctx context.Context, ref string) (uuid.UUID, error)
-	GetPlanCode(ctx context.Context, tenantID uuid.UUID) string
-	GetBankInfo(ctx context.Context, tenantID uuid.UUID) (gatewaydomain.BankInfo, bool, error)
-	GetWhatsAppTransferTemplate(ctx context.Context, tenantID uuid.UUID) string
-	GetWhatsAppLinkTemplate(ctx context.Context, tenantID uuid.UUID) string
+	ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, error)
+	GetPlanCode(ctx context.Context, orgID uuid.UUID) string
+	GetBankInfo(ctx context.Context, orgID uuid.UUID) (gatewaydomain.BankInfo, bool, error)
+	GetWhatsAppTransferTemplate(ctx context.Context, orgID uuid.UUID) string
+	GetWhatsAppLinkTemplate(ctx context.Context, orgID uuid.UUID) string
 
-	GetConnection(ctx context.Context, tenantID uuid.UUID) (gatewaydomain.PaymentGatewayConnection, error)
+	GetConnection(ctx context.Context, orgID uuid.UUID) (gatewaydomain.PaymentGatewayConnection, error)
 	GetConnectionByExternalUserID(ctx context.Context, externalUserID string) (gatewaydomain.PaymentGatewayConnection, error)
 	GetServiceIDByName(ctx context.Context, name string) (uuid.UUID, error)
 	ListActiveConnections(ctx context.Context) ([]gatewaydomain.PaymentGatewayConnection, error)
 	SaveConnection(ctx context.Context, in gatewaydomain.PaymentGatewayConnection) error
-	Disconnect(ctx context.Context, tenantID uuid.UUID) error
+	Disconnect(ctx context.Context, orgID uuid.UUID) error
 
-	CountMonthlyPreferences(ctx context.Context, tenantID uuid.UUID, since time.Time) (int64, error)
+	CountMonthlyPreferences(ctx context.Context, orgID uuid.UUID, since time.Time) (int64, error)
 	SavePreference(ctx context.Context, in gatewaydomain.PaymentPreference) (gatewaydomain.PaymentPreference, error)
-	GetLatestPreference(ctx context.Context, tenantID uuid.UUID, refType string, refID uuid.UUID) (gatewaydomain.PaymentPreference, error)
+	GetLatestPreference(ctx context.Context, orgID uuid.UUID, refType string, refID uuid.UUID) (gatewaydomain.PaymentPreference, error)
 	GetPreferenceByExternalID(ctx context.Context, provider, externalID string) (gatewaydomain.PaymentPreference, error)
 
-	GetSaleSnapshot(ctx context.Context, tenantID, saleID uuid.UUID) (gatewaydomain.SaleSnapshot, error)
-	GetQuoteSnapshot(ctx context.Context, tenantID, quoteID uuid.UUID) (gatewaydomain.QuoteSnapshot, error)
+	GetSaleSnapshot(ctx context.Context, orgID, saleID uuid.UUID) (gatewaydomain.SaleSnapshot, error)
+	GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.UUID) (gatewaydomain.QuoteSnapshot, error)
 	ProcessApprovedSalePayment(ctx context.Context, in ProcessSalePaymentInput) error
-	MarkPreferenceApproved(ctx context.Context, tenantID uuid.UUID, refType string, refID uuid.UUID, payerID string, paidAt time.Time) error
+	MarkPreferenceApproved(ctx context.Context, orgID uuid.UUID, refType string, refID uuid.UUID, payerID string, paidAt time.Time) error
 	StoreWebhookEvent(ctx context.Context, in gatewaydomain.WebhookEvent) error
 	LockPendingWebhookEvents(ctx context.Context, limit int) ([]gatewaydomain.WebhookEvent, error)
 	MarkWebhookEventProcessed(ctx context.Context, id uuid.UUID) error

@@ -1,6 +1,6 @@
 -- 0001_restaurants.up.sql (vertical Restaurants — squashed)
 -- Schema isolado en `restaurant.*` con FK a orgs(id) en pymes-core.
--- Consolida: 0001..0004 actuales (post `0004_dining_archive` con archived_at).
+-- Consolida: 0001..0004 actuales (post `0004_dining_archive` con deleted_at).
 
 CREATE SCHEMA IF NOT EXISTS restaurant;
 
@@ -9,14 +9,17 @@ CREATE TABLE IF NOT EXISTS restaurant.dining_areas (
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
     name text NOT NULL,
     sort_order integer NOT NULL DEFAULT 0,
-    archived_at timestamptz,
+    is_favorite boolean NOT NULL DEFAULT false,
+    tags text[] NOT NULL DEFAULT '{}'::text[],
+    metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+    deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_dining_areas_org_sort
     ON restaurant.dining_areas(org_id, sort_order, id);
-CREATE INDEX IF NOT EXISTS idx_dining_areas_archived_at
-    ON restaurant.dining_areas(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_dining_areas_deleted_at
+    ON restaurant.dining_areas(org_id, deleted_at);
 
 CREATE TRIGGER trg_dining_areas_updated_at
     BEFORE UPDATE ON restaurant.dining_areas FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -33,7 +36,10 @@ CREATE TABLE IF NOT EXISTS restaurant.dining_tables (
         CONSTRAINT dining_tables_status_check
         CHECK (status IN ('available','occupied','reserved','cleaning')),
     notes text NOT NULL DEFAULT '',
-    archived_at timestamptz,
+    is_favorite boolean NOT NULL DEFAULT false,
+    tags text[] NOT NULL DEFAULT '{}'::text[],
+    metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+    deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -41,8 +47,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_dining_tables_org_code
     ON restaurant.dining_tables(org_id, code);
 CREATE INDEX IF NOT EXISTS idx_dining_tables_org_area
     ON restaurant.dining_tables(org_id, area_id);
-CREATE INDEX IF NOT EXISTS idx_dining_tables_archived_at
-    ON restaurant.dining_tables(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_dining_tables_deleted_at
+    ON restaurant.dining_tables(org_id, deleted_at);
 
 CREATE TRIGGER trg_dining_tables_updated_at
     BEFORE UPDATE ON restaurant.dining_tables FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -81,7 +87,7 @@ CREATE TABLE IF NOT EXISTS restaurant.reservations (
         CONSTRAINT reservations_status_check
         CHECK (status IN ('pending','confirmed','seated','completed','cancelled','no_show')),
     notes text NOT NULL DEFAULT '',
-    archived_at timestamptz,
+    deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -89,8 +95,8 @@ CREATE INDEX IF NOT EXISTS idx_reservations_org_status
     ON restaurant.reservations(org_id, status, reserved_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reservations_org_date
     ON restaurant.reservations(org_id, reserved_at DESC);
-CREATE INDEX IF NOT EXISTS idx_reservations_archived_at
-    ON restaurant.reservations(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_reservations_deleted_at
+    ON restaurant.reservations(org_id, deleted_at);
 
 CREATE TRIGGER trg_reservations_updated_at
     BEFORE UPDATE ON restaurant.reservations FOR EACH ROW EXECUTE FUNCTION set_updated_at();

@@ -17,20 +17,20 @@ const defaultConfirmationTTL = 15 * time.Minute
 
 type RepositoryPort interface {
 	CreateConfirmation(ctx context.Context, in Confirmation) (Confirmation, error)
-	GetConfirmation(ctx context.Context, tenantID uuid.UUID, id uuid.UUID) (Confirmation, error)
-	MarkConfirmationUsed(ctx context.Context, tenantID uuid.UUID, id uuid.UUID) error
-	GetIdempotencyRecord(ctx context.Context, tenantID uuid.UUID, actor, capabilityID, key string) (IdempotencyRecord, bool, error)
+	GetConfirmation(ctx context.Context, orgID uuid.UUID, id uuid.UUID) (Confirmation, error)
+	MarkConfirmationUsed(ctx context.Context, orgID uuid.UUID, id uuid.UUID) error
+	GetIdempotencyRecord(ctx context.Context, orgID uuid.UUID, actor, capabilityID, key string) (IdempotencyRecord, bool, error)
 	SaveIdempotencyRecord(ctx context.Context, in IdempotencyRecord) error
-	ListAgentEvents(ctx context.Context, tenantID uuid.UUID, limit int, capabilityID, requestID string) ([]AgentEvent, error)
+	ListAgentEvents(ctx context.Context, orgID uuid.UUID, limit int, capabilityID, requestID string) ([]AgentEvent, error)
 }
 
 type GovernanceClient interface {
-	SubmitRequestForTenant(ctx context.Context, tenantID, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
+	SubmitRequestForTenant(ctx context.Context, orgID, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
 	GetRequest(ctx context.Context, id string) (governanceclient.RequestSummary, int, error)
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type Usecases struct {
@@ -73,7 +73,7 @@ type ConfirmationOutput struct {
 }
 
 func (u *Usecases) CreateConfirmation(ctx context.Context, in CreateConfirmationInput) (ConfirmationOutput, error) {
-	tenantID, err := uuid.Parse(strings.TrimSpace(in.Auth.TenantID))
+	orgID, err := uuid.Parse(strings.TrimSpace(in.Auth.OrgID))
 	if err != nil {
 		return ConfirmationOutput{}, agentError(http.StatusBadRequest, "invalid_tenant", "tenant invalido")
 	}
@@ -96,7 +96,7 @@ func (u *Usecases) CreateConfirmation(ctx context.Context, in CreateConfirmation
 		return ConfirmationOutput{}, agentError(http.StatusBadRequest, "invalid_expiration", "expires_at debe estar en el futuro")
 	}
 	out, err := u.repo.CreateConfirmation(ctx, Confirmation{
-		TenantID:     tenantID,
+		OrgID:     orgID,
 		Actor:        strings.TrimSpace(in.Auth.Actor),
 		CapabilityID: capability.ID,
 		PayloadHash:  payloadHash,
@@ -108,7 +108,7 @@ func (u *Usecases) CreateConfirmation(ctx context.Context, in CreateConfirmation
 		return ConfirmationOutput{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, in.Auth.TenantID, in.Auth.Actor, "agent.confirmation.created", "agent_confirmation", out.ID.String(), map[string]any{
+		u.audit.Log(ctx, in.Auth.OrgID, in.Auth.Actor, "agent.confirmation.created", "agent_confirmation", out.ID.String(), map[string]any{
 			"capability_id": capability.ID,
 			"payload_hash":  payloadHash,
 			"risk_level":    capability.RiskLevel,
@@ -199,7 +199,7 @@ type ExecuteResult struct {
 }
 
 func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult, error) {
-	tenantID, err := uuid.Parse(strings.TrimSpace(in.Auth.TenantID))
+	orgID, err := uuid.Parse(strings.TrimSpace(in.Auth.OrgID))
 	if err != nil {
 		return ExecuteResult{}, agentError(http.StatusBadRequest, "invalid_tenant", "tenant invalido")
 	}
@@ -226,7 +226,7 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 		return ExecuteResult{}, agentError(http.StatusBadRequest, "idempotency_key_required", "Idempotency-Key requerido")
 	}
 	if idempotencyKey != "" {
-		existing, found, err := u.repo.GetIdempotencyRecord(ctx, tenantID, strings.TrimSpace(in.Auth.Actor), capability.ID, idempotencyKey)
+		existing, found, err := u.repo.GetIdempotencyRecord(ctx, orgID, strings.TrimSpace(in.Auth.Actor), capability.ID, idempotencyKey)
 		if err != nil {
 			return ExecuteResult{}, err
 		}
@@ -244,7 +244,7 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 	}
 
 	if capability.RequiresConfirmation {
-		if err := u.validateConfirmation(ctx, tenantID, strings.TrimSpace(in.Auth.Actor), capability, payloadHash, in.ConfirmationID); err != nil {
+		if err := u.validateConfirmation(ctx, orgID, strings.TrimSpace(in.Auth.Actor), capability, payloadHash, in.ConfirmationID); err != nil {
 			return ExecuteResult{}, err
 		}
 	}
@@ -257,7 +257,7 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 			return ExecuteResult{}, agentError(http.StatusServiceUnavailable, "review_unavailable", "Nexus Governance no esta configurado")
 		}
 		if reviewRequestID == "" {
-			resp, err := u.review.SubmitRequestForTenant(ctx, tenantID.String(), idempotencyKey, governanceclient.SubmitRequestBody{
+			resp, err := u.review.SubmitRequestForTenant(ctx, orgID.String(), idempotencyKey, governanceclient.SubmitRequestBody{
 				RequesterType:  requesterType(in.Auth.AuthMethod),
 				RequesterID:    strings.TrimSpace(in.Auth.Actor),
 				RequesterName:  strings.TrimSpace(in.Auth.Actor),
@@ -302,7 +302,7 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 						"confirmation": capability.RequiresConfirmation,
 					},
 				}
-				if err := u.saveIdempotency(ctx, tenantID, in.Auth.Actor, capability.ID, idempotencyKey, payloadHash, http.StatusAccepted, output); err != nil {
+				if err := u.saveIdempotency(ctx, orgID, in.Auth.Actor, capability.ID, idempotencyKey, payloadHash, http.StatusAccepted, output); err != nil {
 					return ExecuteResult{}, err
 				}
 				u.logExecution(ctx, in.Auth, capability, payloadHash, "agent.action.pending_review", reviewRequestID, idempotencyKey)
@@ -323,7 +323,7 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 		ExecutorStatus:  capability.ExecutorStatus,
 		Message:         "La capability esta registrada y gobernada, pero todavia no tiene executor de dominio conectado.",
 	}
-	if err := u.saveIdempotency(ctx, tenantID, in.Auth.Actor, capability.ID, idempotencyKey, payloadHash, http.StatusNotImplemented, output); err != nil {
+	if err := u.saveIdempotency(ctx, orgID, in.Auth.Actor, capability.ID, idempotencyKey, payloadHash, http.StatusNotImplemented, output); err != nil {
 		return ExecuteResult{}, err
 	}
 	u.logExecution(ctx, in.Auth, capability, payloadHash, "agent.action.executor_missing", reviewRequestID, idempotencyKey)
@@ -331,14 +331,14 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 }
 
 func (u *Usecases) ListEvents(ctx context.Context, auth ActorContext, limit int, capabilityID, requestID string) ([]AgentEvent, error) {
-	tenantID, err := uuid.Parse(strings.TrimSpace(auth.TenantID))
+	orgID, err := uuid.Parse(strings.TrimSpace(auth.OrgID))
 	if err != nil {
 		return nil, agentError(http.StatusBadRequest, "invalid_tenant", "tenant invalido")
 	}
-	return u.repo.ListAgentEvents(ctx, tenantID, limit, strings.TrimSpace(capabilityID), strings.TrimSpace(requestID))
+	return u.repo.ListAgentEvents(ctx, orgID, limit, strings.TrimSpace(capabilityID), strings.TrimSpace(requestID))
 }
 
-func (u *Usecases) validateConfirmation(ctx context.Context, tenantID uuid.UUID, actor string, capability Capability, payloadHash, rawID string) error {
+func (u *Usecases) validateConfirmation(ctx context.Context, orgID uuid.UUID, actor string, capability Capability, payloadHash, rawID string) error {
 	if strings.TrimSpace(rawID) == "" {
 		return agentError(http.StatusPreconditionRequired, "confirmation_required", "confirmation_id requerido")
 	}
@@ -346,7 +346,7 @@ func (u *Usecases) validateConfirmation(ctx context.Context, tenantID uuid.UUID,
 	if err != nil {
 		return agentError(http.StatusBadRequest, "invalid_confirmation", "confirmation_id invalido")
 	}
-	conf, err := u.repo.GetConfirmation(ctx, tenantID, id)
+	conf, err := u.repo.GetConfirmation(ctx, orgID, id)
 	if err != nil {
 		return agentError(http.StatusNotFound, "confirmation_not_found", "confirmacion no encontrada")
 	}
@@ -365,7 +365,7 @@ func (u *Usecases) validateConfirmation(ctx context.Context, tenantID uuid.UUID,
 	return nil
 }
 
-func (u *Usecases) saveIdempotency(ctx context.Context, tenantID uuid.UUID, actor, capabilityID, key, payloadHash string, status int, output ExecuteOutput) error {
+func (u *Usecases) saveIdempotency(ctx context.Context, orgID uuid.UUID, actor, capabilityID, key, payloadHash string, status int, output ExecuteOutput) error {
 	if strings.TrimSpace(key) == "" {
 		return nil
 	}
@@ -374,7 +374,7 @@ func (u *Usecases) saveIdempotency(ctx context.Context, tenantID uuid.UUID, acto
 		return err
 	}
 	return u.repo.SaveIdempotencyRecord(ctx, IdempotencyRecord{
-		TenantID:       tenantID,
+		OrgID:       orgID,
 		Actor:          strings.TrimSpace(actor),
 		CapabilityID:   capabilityID,
 		IdempotencyKey: strings.TrimSpace(key),
@@ -388,7 +388,7 @@ func (u *Usecases) logExecution(ctx context.Context, auth ActorContext, capabili
 	if u.audit == nil {
 		return
 	}
-	u.audit.Log(ctx, auth.TenantID, auth.Actor, action, "agent_capability", capability.ID, map[string]any{
+	u.audit.Log(ctx, auth.OrgID, auth.Actor, action, "agent_capability", capability.ID, map[string]any{
 		"capability_id":     capability.ID,
 		"payload_hash":      payloadHash,
 		"review_request_id": reviewRequestID,

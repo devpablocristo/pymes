@@ -19,11 +19,11 @@ import (
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.Exam, int64, error)
 	Create(ctx context.Context, in domain.Exam, actor string) (domain.Exam, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Exam, error)
-	Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (domain.Exam, error)
-	Archive(ctx context.Context, tenantID, id uuid.UUID, actor string) error
-	Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error
-	HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Exam, error)
+	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Exam, error)
+	Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 }
 
 type Handler struct {
@@ -47,13 +47,13 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	tenantID, ok := verticalgin.ParseAuthTenantID(c)
+	orgID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
 	limit := verticalgin.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	items, total, err := h.uc.List(c.Request.Context(), ListParams{
-		TenantID: tenantID,
+		OrgID: orgID,
 		Limit:    limit,
 		Search:   c.Query("search"),
 		Status:   c.Query("status"),
@@ -67,7 +67,7 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) Create(c *gin.Context) {
-	tenantID, ok := verticalgin.ParseAuthTenantID(c)
+	orgID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -81,7 +81,7 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 	out, err := h.uc.Create(c.Request.Context(), domain.Exam{
-		TenantID:        tenantID,
+		OrgID:        orgID,
 		PatientName:     req.PatientName,
 		PatientDocument: req.PatientDocument,
 		EmployerName:    req.EmployerName,
@@ -104,11 +104,11 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -117,7 +117,7 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -134,7 +134,7 @@ func (h *Handler) Update(c *gin.Context) {
 	if !ok {
 		return
 	}
-	out, err := h.uc.Update(c.Request.Context(), tenantID, id, UpdateInput{
+	out, err := h.uc.Update(c.Request.Context(), orgID, id, UpdateInput{
 		PatientName:     req.PatientName,
 		PatientDocument: req.PatientDocument,
 		EmployerName:    req.EmployerName,
@@ -158,11 +158,11 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Archive(c *gin.Context) {
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Archive(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.Archive(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -170,11 +170,11 @@ func (h *Handler) Archive(c *gin.Context) {
 }
 
 func (h *Handler) Restore(c *gin.Context) {
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Restore(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.Restore(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -182,11 +182,11 @@ func (h *Handler) Restore(c *gin.Context) {
 }
 
 func (h *Handler) HardDelete(c *gin.Context) {
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.HardDelete(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -227,7 +227,7 @@ func toResponses(items []domain.Exam) []dto.ExamResponse {
 func toResponse(item domain.Exam) dto.ExamResponse {
 	return dto.ExamResponse{
 		ID:              item.ID.String(),
-		TenantID:        item.TenantID.String(),
+		OrgID:        item.OrgID.String(),
 		PatientName:     item.PatientName,
 		PatientDocument: item.PatientDocument,
 		EmployerName:    item.EmployerName,

@@ -29,7 +29,7 @@ export function BranchProvider({ children }: PropsWithChildren) {
     retry: 1,
   });
 
-  const tenantId = tenantAccess?.tenantId ?? sessionQuery.data?.auth.tenant_id ?? null;
+  const tenantId = tenantAccess?.tenantId ?? sessionQuery.data?.auth.org_id ?? null;
 
   const branchesQuery = useQuery<Branch[]>({
     queryKey: tenantId ? tenantKey(tenantId, queryKeys.scheduling.branches) : queryKeys.scheduling.branches,

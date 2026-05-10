@@ -23,21 +23,21 @@ CREATE TABLE IF NOT EXISTS parties (
     is_favorite boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    archived_at timestamptz
+    deleted_at timestamptz
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_parties_org_tax_uniq
     ON parties(org_id, tax_id)
-    WHERE archived_at IS NULL AND tax_id IS NOT NULL AND tax_id != '';
+    WHERE deleted_at IS NULL AND tax_id IS NOT NULL AND tax_id != '';
 CREATE INDEX IF NOT EXISTS idx_parties_org
-    ON parties(org_id) WHERE archived_at IS NULL;
+    ON parties(org_id) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_parties_org_type
-    ON parties(org_id, party_type) WHERE archived_at IS NULL;
+    ON parties(org_id, party_type) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_parties_org_name
-    ON parties(org_id, display_name) WHERE archived_at IS NULL;
+    ON parties(org_id, display_name) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_parties_org_email
-    ON parties(org_id, email) WHERE archived_at IS NULL AND email IS NOT NULL;
+    ON parties(org_id, email) WHERE deleted_at IS NULL AND email IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_parties_tags
-    ON parties USING GIN(tags) WHERE archived_at IS NULL;
+    ON parties USING GIN(tags) WHERE deleted_at IS NULL;
 
 CREATE TRIGGER trg_parties_updated_at
     BEFORE UPDATE ON parties FOR EACH ROW EXECUTE FUNCTION set_updated_at();

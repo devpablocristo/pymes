@@ -16,15 +16,15 @@ import (
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]servicedomain.Service, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in servicedomain.Service) (servicedomain.Service, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (servicedomain.Service, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (servicedomain.Service, error)
 	Update(ctx context.Context, in servicedomain.Service) (servicedomain.Service, error)
-	Archive(ctx context.Context, tenantID, id uuid.UUID) error
-	Restore(ctx context.Context, tenantID, id uuid.UUID) error
-	Delete(ctx context.Context, tenantID, id uuid.UUID) error
+	Archive(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type Usecases struct {
@@ -57,7 +57,7 @@ func (u *Usecases) Create(ctx context.Context, in servicedomain.Service, actor s
 		return servicedomain.Service{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.TenantID.String(), actor, "service.created", "service", out.ID.String(), map[string]any{"name": out.Name, "code": out.Code})
+		u.audit.Log(ctx, out.OrgID.String(), actor, "service.created", "service", out.ID.String(), map[string]any{"name": out.Name, "code": out.Code})
 	}
 	return out, nil
 }
@@ -78,8 +78,8 @@ type UpdateInput struct {
 	Metadata               *map[string]any
 }
 
-func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (servicedomain.Service, error) {
-	current, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (servicedomain.Service, error) {
+	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return servicedomain.Service{}, fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
@@ -150,13 +150,13 @@ func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in Update
 		return servicedomain.Service{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.TenantID.String(), actor, "service.updated", "service", out.ID.String(), map[string]any{"name": out.Name, "code": out.Code})
+		u.audit.Log(ctx, out.OrgID.String(), actor, "service.updated", "service", out.ID.String(), map[string]any{"name": out.Name, "code": out.Code})
 	}
 	return out, nil
 }
 
-func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (servicedomain.Service, error) {
-	out, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (servicedomain.Service, error) {
+	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return servicedomain.Service{}, fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
@@ -166,41 +166,41 @@ func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (service
 	return out, nil
 }
 
-func (u *Usecases) Archive(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Archive(ctx, tenantID, id); err != nil {
+func (u *Usecases) Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Archive(ctx, orgID, id); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "service.archived", "service", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "service.archived", "service", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "service.restored", "service", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "service.restored", "service", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) Delete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Delete(ctx, tenantID, id); err != nil {
+func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Delete(ctx, orgID, id); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "service.deleted", "service", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "service.deleted", "service", id.String(), map[string]any{})
 	}
 	return nil
 }

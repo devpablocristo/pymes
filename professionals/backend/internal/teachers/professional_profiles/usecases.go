@@ -17,18 +17,18 @@ import (
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.ProfessionalProfile, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in domain.ProfessionalProfile) (domain.ProfessionalProfile, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.ProfessionalProfile, error)
-	GetBySlug(ctx context.Context, tenantID uuid.UUID, slug string) (domain.ProfessionalProfile, error)
-	SlugExists(ctx context.Context, tenantID uuid.UUID, slug string, excludeID *uuid.UUID) (bool, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.ProfessionalProfile, error)
+	GetBySlug(ctx context.Context, orgID uuid.UUID, slug string) (domain.ProfessionalProfile, error)
+	SlugExists(ctx context.Context, orgID uuid.UUID, slug string, excludeID *uuid.UUID) (bool, error)
 	Update(ctx context.Context, in domain.ProfessionalProfile) (domain.ProfessionalProfile, error)
-	ListPublic(ctx context.Context, tenantID uuid.UUID) ([]domain.ProfessionalProfile, error)
-	Archive(ctx context.Context, tenantID, id uuid.UUID) error
-	Restore(ctx context.Context, tenantID, id uuid.UUID) error
-	Delete(ctx context.Context, tenantID, id uuid.UUID) error
+	ListPublic(ctx context.Context, orgID uuid.UUID) ([]domain.ProfessionalProfile, error)
+	Archive(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type Usecases struct {
@@ -54,7 +54,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.ProfessionalProfile, ac
 	}
 	in.PublicSlug = strings.ToLower(strings.TrimSpace(in.PublicSlug))
 
-	exists, err := u.repo.SlugExists(ctx, in.TenantID, in.PublicSlug, nil)
+	exists, err := u.repo.SlugExists(ctx, in.OrgID, in.PublicSlug, nil)
 	if err != nil {
 		return domain.ProfessionalProfile{}, err
 	}
@@ -72,13 +72,13 @@ func (u *Usecases) Create(ctx context.Context, in domain.ProfessionalProfile, ac
 	}
 
 	if u.audit != nil {
-		u.audit.Log(ctx, out.TenantID.String(), actor, "professional_profile.created", "professional_profile", out.ID.String(), map[string]any{"slug": out.PublicSlug})
+		u.audit.Log(ctx, out.OrgID.String(), actor, "professional_profile.created", "professional_profile", out.ID.String(), map[string]any{"slug": out.PublicSlug})
 	}
 	return out, nil
 }
 
-func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.ProfessionalProfile, error) {
-	out, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.ProfessionalProfile, error) {
+	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.ProfessionalProfile{}, fmt.Errorf("professional profile not found: %w", httperrors.ErrNotFound)
@@ -88,8 +88,8 @@ func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.
 	return out, nil
 }
 
-func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (domain.ProfessionalProfile, error) {
-	current, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.ProfessionalProfile, error) {
+	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.ProfessionalProfile{}, fmt.Errorf("professional profile not found: %w", httperrors.ErrNotFound)
@@ -103,7 +103,7 @@ func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in Update
 	if in.PublicSlug != nil {
 		slug := strings.ToLower(strings.TrimSpace(*in.PublicSlug))
 		if slug != current.PublicSlug {
-			exists, err := u.repo.SlugExists(ctx, tenantID, slug, &id)
+			exists, err := u.repo.SlugExists(ctx, orgID, slug, &id)
 			if err != nil {
 				return domain.ProfessionalProfile{}, err
 			}
@@ -147,56 +147,56 @@ func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in Update
 	}
 
 	if u.audit != nil {
-		u.audit.Log(ctx, out.TenantID.String(), actor, "professional_profile.updated", "professional_profile", out.ID.String(), map[string]any{"slug": out.PublicSlug})
+		u.audit.Log(ctx, out.OrgID.String(), actor, "professional_profile.updated", "professional_profile", out.ID.String(), map[string]any{"slug": out.PublicSlug})
 	}
 	return out, nil
 }
 
-func (u *Usecases) Archive(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Archive(ctx, tenantID, id); err != nil {
+func (u *Usecases) Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Archive(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("professional profile not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "professional_profile.archived", "professional_profile", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "professional_profile.archived", "professional_profile", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("professional profile not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "professional_profile.restored", "professional_profile", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "professional_profile.restored", "professional_profile", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) Delete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Delete(ctx, tenantID, id); err != nil {
+func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Delete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("professional profile not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "professional_profile.deleted", "professional_profile", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "professional_profile.deleted", "professional_profile", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) ListPublic(ctx context.Context, tenantID uuid.UUID) ([]domain.ProfessionalProfile, error) {
-	return u.repo.ListPublic(ctx, tenantID)
+func (u *Usecases) ListPublic(ctx context.Context, orgID uuid.UUID) ([]domain.ProfessionalProfile, error) {
+	return u.repo.ListPublic(ctx, orgID)
 }
 
-func (u *Usecases) GetBySlug(ctx context.Context, tenantID uuid.UUID, slug string) (domain.ProfessionalProfile, error) {
-	out, err := u.repo.GetBySlug(ctx, tenantID, slug)
+func (u *Usecases) GetBySlug(ctx context.Context, orgID uuid.UUID, slug string) (domain.ProfessionalProfile, error) {
+	out, err := u.repo.GetBySlug(ctx, orgID, slug)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.ProfessionalProfile{}, fmt.Errorf("professional profile not found: %w", httperrors.ErrNotFound)

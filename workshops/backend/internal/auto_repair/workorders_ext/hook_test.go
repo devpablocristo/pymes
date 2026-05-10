@@ -17,9 +17,9 @@ type fakeVehicleLookup struct {
 	err     error
 }
 
-func (f *fakeVehicleLookup) GetByID(ctx context.Context, tenantID, id uuid.UUID) (vehiclesdomain.Vehicle, error) {
+func (f *fakeVehicleLookup) GetByID(ctx context.Context, orgID, id uuid.UUID) (vehiclesdomain.Vehicle, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	_ = id
 	if f.err != nil {
 		return vehiclesdomain.Vehicle{}, f.err
@@ -38,7 +38,7 @@ func TestHookBeforeCreateSyncsVehicleData(t *testing.T) {
 		},
 	})
 	wo := &workordersdomain.WorkOrder{
-		TenantID:  uuid.New(),
+		OrgID:  uuid.New(),
 		AssetID:   uuid.New(),
 		AssetType: "vehicle",
 	}
@@ -60,7 +60,7 @@ func TestHookBeforeCreateSyncsVehicleData(t *testing.T) {
 func TestHookBeforeCreateRejectsUnknownVehicle(t *testing.T) {
 	hook := New(&fakeVehicleLookup{err: httperrors.ErrNotFound})
 	wo := &workordersdomain.WorkOrder{
-		TenantID:  uuid.New(),
+		OrgID:  uuid.New(),
 		AssetID:   uuid.New(),
 		AssetType: "vehicle",
 	}

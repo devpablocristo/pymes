@@ -46,8 +46,8 @@ type SaaSConfig struct {
 type SaaSServices struct {
 	Mux            *http.ServeMux
 	AuthMiddleware func(http.Handler) http.Handler
-	// ResolveTenantRef mapea Clerk org_..., slug o UUID a tenant UUID interno.
-	ResolveTenantRef func(ctx context.Context, ref string) (uuid.UUID, bool, error)
+	// ResolveOrgRef mapea Clerk org_..., slug o UUID a tenant UUID interno.
+	ResolveOrgRef func(ctx context.Context, ref string) (uuid.UUID, bool, error)
 }
 
 // SetupSaaS initializes Pymes tenant access on the given GORM DB.
@@ -91,8 +91,8 @@ func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, er
 		return id, true, nil
 	}
 
-	resolveMembership := func(ctx context.Context, tenantID uuid.UUID, actor string) (string, bool, error) {
-		return store.FindActiveMembershipRoleByExternalUser(ctx, tenantID.String(), actor)
+	resolveMembership := func(ctx context.Context, orgID uuid.UUID, actor string) (string, bool, error) {
+		return store.FindActiveMembershipRoleByExternalUser(ctx, orgID.String(), actor)
 	}
 
 	authMW := newTenantAuthMiddleware(jwtVerifier, apiKeyVerifier)
@@ -116,7 +116,7 @@ func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, er
 	return &SaaSServices{
 		Mux:              mux,
 		AuthMiddleware:   authMW,
-		ResolveTenantRef: resolveTenantRef,
+		ResolveOrgRef: resolveTenantRef,
 	}, nil
 }
 
@@ -141,12 +141,12 @@ func (v *jwtPrincipalVerifier) Verify(ctx context.Context, credential string) (t
 	if actor == "" {
 		return tenantPrincipal{}, domainerr.Unauthorized("missing user claim")
 	}
-	rawTenant := firstTenantClaim(claims, valueOrDefault(v.cfg.JWTTenantClaim, "tenant_id"), "tenant_id", "o.id")
+	rawTenant := firstTenantClaim(claims, valueOrDefault(v.cfg.JWTTenantClaim, "org_id"), "org_id", "o.id")
 	if rawTenant == "" {
 		return tenantPrincipal{}, domainerr.Forbidden("tenant claim is required")
 	}
-	tenantID := rawTenant
-	if _, parseErr := uuid.Parse(tenantID); parseErr != nil {
+	orgID := rawTenant
+	if _, parseErr := uuid.Parse(orgID); parseErr != nil {
 		resolved, ok, resolveErr := v.store.ResolveTenantIDByExternalRef(ctx, rawTenant)
 		if resolveErr != nil {
 			return tenantPrincipal{}, resolveErr
@@ -154,9 +154,9 @@ func (v *jwtPrincipalVerifier) Verify(ctx context.Context, credential string) (t
 		if !ok {
 			return tenantPrincipal{}, domainerr.Forbidden("tenant is not registered in Pymes")
 		}
-		tenantID = resolved
+		orgID = resolved
 	}
-	role, ok, err := v.store.FindActiveMembershipRoleByExternalUser(ctx, tenantID, actor)
+	role, ok, err := v.store.FindActiveMembershipRoleByExternalUser(ctx, orgID, actor)
 	if err != nil {
 		return tenantPrincipal{}, err
 	}
@@ -164,7 +164,7 @@ func (v *jwtPrincipalVerifier) Verify(ctx context.Context, credential string) (t
 		return tenantPrincipal{}, domainerr.Forbidden("active tenant membership required")
 	}
 	return tenantPrincipal{
-		TenantID:   tenantID,
+		OrgID:   orgID,
 		Actor:      actor,
 		Role:       role,
 		Scopes:     scopesFromClaims(claims, valueOrDefault(v.cfg.JWTScopesClaim, "scopes")),
@@ -177,12 +177,12 @@ func (v *apiKeyPrincipalVerifier) Verify(ctx context.Context, credential string)
 	if err != nil {
 		return tenantPrincipal{}, err
 	}
-	actor := "api_key:" + principal.TenantID
+	actor := "api_key:" + principal.OrgID
 	if strings.TrimSpace(keyID) != "" {
 		actor = "api_key:" + strings.TrimSpace(keyID)
 	}
 	return tenantPrincipal{
-		TenantID:   principal.TenantID,
+		OrgID:   principal.OrgID,
 		Actor:      actor,
 		Role:       "service",
 		Scopes:     append([]string(nil), principal.Scopes...),

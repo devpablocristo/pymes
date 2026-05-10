@@ -7,7 +7,7 @@ import (
 )
 
 type TenantSettingsModel struct {
-	TenantID                uuid.UUID `gorm:"type:uuid;primaryKey"`
+	OrgID                uuid.UUID `gorm:"type:uuid;primaryKey"`
 	PlanCode                string    `gorm:"not null;default:starter"`
 	HardLimits              []byte    `gorm:"type:jsonb"`
 	StripeCustomerID        *string
@@ -65,7 +65,7 @@ func (TenantSettingsModel) TableName() string { return "tenant_settings" }
 
 type AdminActivityEventModel struct {
 	ID           uuid.UUID `gorm:"type:uuid;primaryKey"`
-	TenantID     uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID     uuid.UUID `gorm:"type:uuid;index;not null"`
 	Actor        string
 	Action       string
 	ResourceType string

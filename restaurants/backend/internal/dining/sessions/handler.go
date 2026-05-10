@@ -17,8 +17,8 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.TableSessionListItem, int64, error)
-	Open(ctx context.Context, tenantID, tableID uuid.UUID, guestCount int, partyLabel, notes, actor string) (domain.TableSession, error)
-	Close(ctx context.Context, tenantID, sessionID uuid.UUID, actor string) (domain.TableSession, error)
+	Open(ctx context.Context, orgID, tableID uuid.UUID, guestCount int, partyLabel, notes, actor string) (domain.TableSession, error)
+	Close(ctx context.Context, orgID, sessionID uuid.UUID, actor string) (domain.TableSession, error)
 }
 
 type Handler struct {
@@ -34,7 +34,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	tenantID, ok := verticalgin.ParseAuthTenantID(c)
+	orgID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -52,7 +52,7 @@ func (h *Handler) List(c *gin.Context) {
 		tableID = &parsed
 	}
 	items, total, err := h.uc.List(c.Request.Context(), ListParams{
-		TenantID: tenantID,
+		OrgID: orgID,
 		OpenOnly: openOnly,
 		TableID:  tableID,
 	})
@@ -69,7 +69,7 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Open(c *gin.Context) {
 	authCtx := auth.GetAuthContext(c)
-	tenantID, ok := verticalgin.ParseAuthTenantID(c)
+	orgID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -87,7 +87,7 @@ func (h *Handler) Open(c *gin.Context) {
 	if guestCount <= 0 {
 		guestCount = 1
 	}
-	out, err := h.uc.Open(c.Request.Context(), tenantID, tableUUID, guestCount, req.PartyLabel, req.Notes, authCtx.Actor)
+	out, err := h.uc.Open(c.Request.Context(), orgID, tableUUID, guestCount, req.PartyLabel, req.Notes, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -97,11 +97,11 @@ func (h *Handler) Open(c *gin.Context) {
 
 func (h *Handler) Close(c *gin.Context) {
 	authCtx := auth.GetAuthContext(c)
-	tenantID, sessionID, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, sessionID, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	out, err := h.uc.Close(c.Request.Context(), tenantID, sessionID, authCtx.Actor)
+	out, err := h.uc.Close(c.Request.Context(), orgID, sessionID, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -112,7 +112,7 @@ func (h *Handler) Close(c *gin.Context) {
 func toListItem(it domain.TableSessionListItem) dto.TableSessionItem {
 	return dto.TableSessionItem{
 		ID:         it.ID.String(),
-		TenantID:   it.TenantID.String(),
+		OrgID:   it.OrgID.String(),
 		TableID:    it.TableID.String(),
 		TableCode:  it.TableCode,
 		AreaName:   it.AreaName,
@@ -129,7 +129,7 @@ func toListItem(it domain.TableSessionListItem) dto.TableSessionItem {
 func toSessionItem(s domain.TableSession) dto.TableSessionItem {
 	return dto.TableSessionItem{
 		ID:         s.ID.String(),
-		TenantID:   s.TenantID.String(),
+		OrgID:   s.OrgID.String(),
 		TableID:    s.TableID.String(),
 		GuestCount: s.GuestCount,
 		PartyLabel: s.PartyLabel,

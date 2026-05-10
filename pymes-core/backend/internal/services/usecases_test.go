@@ -48,7 +48,7 @@ func TestCreateDefaultsCurrency(t *testing.T) {
 	uc := NewUsecases(repo, nil)
 
 	out, err := uc.Create(context.Background(), servicedomain.Service{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		Name:     "Servicio demo",
 	}, "tester")
 	if err != nil {
@@ -85,17 +85,17 @@ func TestUpdateRejectsArchivedServiceWithConflict(t *testing.T) {
 	t.Parallel()
 
 	archivedAt := time.Now().UTC()
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	svcID := uuid.New()
 	repo := &captureServiceRepo{existing: &servicedomain.Service{
 		ID:        svcID,
-		TenantID:  tenantID,
+		OrgID:  orgID,
 		Name:      "Servicio archivado",
 		DeletedAt: &archivedAt,
 	}}
 	uc := NewUsecases(repo, nil)
 
-	_, err := uc.Update(context.Background(), tenantID, svcID, UpdateInput{}, "tester")
+	_, err := uc.Update(context.Background(), orgID, svcID, UpdateInput{}, "tester")
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}

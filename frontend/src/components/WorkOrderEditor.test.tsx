@@ -25,7 +25,7 @@ vi.mock('@devpablocristo/core-browser', () => ({
 function buildWorkOrder(overrides?: Partial<AutoRepairWorkOrder>): AutoRepairWorkOrder {
   return {
     id: 'wo-1',
-    tenant_id: 'org-1',
+    org_id: 'org-1',
     number: 'OT-001',
     asset_type: 'vehicle',
     asset_id: 'veh-1',

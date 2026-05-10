@@ -162,6 +162,9 @@ Los **mappers** viven en el adapter que los necesita:
 - **No existen repositorios in-memory.**
 - Un solo archivo `repository.go` por módulo: interface + sentinel errors + implementación GORM. **Sin sufijos.**
 - Para tests: fakes/stubs dentro del `_test.go`, nunca como archivo separado.
+- **Identidad multi-tenant: tabla canónica `orgs`, columna FK `org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE`.** No usar `tenants` (no existe en el schema post-cutover) ni columnas `tenant_id`. Excepción: las tablas `tenant_settings` y `tenant_invitations` mantienen su nombre por convención `core/saas/go`, pero su FK también es `org_id`. Ver [`docs/DATABASE_INIT.md`](docs/DATABASE_INIT.md).
+- **Soft delete: `archived_at timestamptz NULL`**. Excepciones documentadas: `users.deleted_at` (semántica GDPR) y `sales.voided_at` (regulación contable).
+- **Migraciones nuevas**: numeración consecutiva en `pymes-core/backend/migrations/` (post-squash arrancamos desde 0018). Nunca modificar las 0001..0017 squashed. Toda migración nueva tiene su `.down.sql` reverso completo y `CREATE TABLE/INDEX IF NOT EXISTS`.
 
 ### 5.6 Naming por archivo
 
@@ -426,3 +429,6 @@ internal/customer_messaging/
 - NUNCA decir "listo" sin haber buildado/testeado
 - NUNCA duplicar funcionalidad de pymes-core en una vertical
 - NUNCA importar dominio interno entre verticales — solo HTTP
+- NUNCA crear tablas con prefijo `tenant_*` ni columnas `tenant_id`. Identidad canónica: `orgs` + columna `org_id`. Excepción única: las tablas saas `tenant_settings` y `tenant_invitations` mantienen su nombre histórico (su FK ya es `org_id`).
+- NUNCA hacer queries SQL raw que referencien las tablas legacy `tenants`, `tenant_memberships`, `tenant_api_keys`, `tenant_usage_counters` — fueron renombradas en el cutover (PR #13) a `orgs`, `org_members`, `org_api_keys`, `org_usage_counters`. Si encontrás una referencia residual: bug, reportarlo.
+- NUNCA llamar `saasmigrations.MigrateUp` en bootstrap. El schema saas está copiado y versionado en `pymes-core/backend/migrations/0001_saas_identity.up.sql`. Si `core/saas/go` evoluciona, hay que adoptar el cambio explícitamente en pymes-core con una migración nueva.

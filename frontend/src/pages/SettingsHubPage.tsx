@@ -125,7 +125,7 @@ export function SettingsHubPage() {
         <SettingsHubSectionContent
           section={section}
           isAccountAdmin={isAccountAdmin}
-          tenantId={sessionQuery.data?.auth.tenant_id}
+          tenantId={sessionQuery.data?.auth.org_id}
           membershipRole={sessionQuery.data?.membership?.role}
         />
       </SectionHubPage>

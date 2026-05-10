@@ -35,7 +35,7 @@ func userDTOFromRow(row pymesUserRow) tenantUserDTO {
 func memberDTOFromRow(row pymesTenantMembershipRow) tenantMemberDTO {
 	return tenantMemberDTO{
 		ID:       row.ID.String(),
-		TenantID: row.TenantID.String(),
+		OrgID: row.OrgID.String(),
 		UserID:   row.UserID.String(),
 		Role:     row.Role,
 		Status:   row.Status,
@@ -46,7 +46,7 @@ func memberDTOFromRow(row pymesTenantMembershipRow) tenantMemberDTO {
 
 func tenantBillingFromRow(row pymesTenantSettingsRow) saasbillingdomain.TenantBilling {
 	return saasbillingdomain.TenantBilling{
-		TenantID:           row.TenantID.String(),
+		TenantID:           row.OrgID.String(),
 		PlanCode:           saasbillingdomain.PlanCode(strings.TrimSpace(row.PlanCode)),
 		HardLimits:         parseHardLimits(row.HardLimitsJSON, row.HardLimits),
 		BillingStatus:      saasbillingdomain.BillingStatus(strings.TrimSpace(row.BillingStatus)),
@@ -60,7 +60,7 @@ func tenantBillingFromRow(row pymesTenantSettingsRow) saasbillingdomain.TenantBi
 
 func adminTenantSettingsFromRow(row pymesTenantSettingsRow) saasadmindomain.TenantSettings {
 	return saasadmindomain.TenantSettings{
-		TenantID:   row.TenantID.String(),
+		TenantID:   row.OrgID.String(),
 		PlanCode:   row.PlanCode,
 		Status:     saasadmindomain.TenantStatus(strings.TrimSpace(row.Status)),
 		DeletedAt:  row.DeletedAt,

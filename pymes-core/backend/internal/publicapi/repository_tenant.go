@@ -18,7 +18,7 @@ type tenantResolveBySlugRow struct {
 }
 
 type businessInfoRow struct {
-	TenantID          uuid.UUID
+	OrgID          uuid.UUID
 	Name              string
 	Slug              string
 	BusinessName      string
@@ -28,7 +28,7 @@ type businessInfoRow struct {
 	SchedulingEnabled bool
 }
 
-func (r *Repository) ResolveTenantID(ctx context.Context, ref string) (uuid.UUID, error) {
+func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, error) {
 	trimmed := strings.TrimSpace(ref)
 	if trimmed == "" {
 		return uuid.Nil, ErrTenantNotFound
@@ -37,7 +37,7 @@ func (r *Repository) ResolveTenantID(ctx context.Context, ref string) (uuid.UUID
 	if parsed, err := uuid.Parse(trimmed); err == nil {
 		var row tenantResolveByIDRow
 		err = r.db.WithContext(ctx).
-			Table("tenants").
+			Table("orgs").
 			Select("id").
 			Where("id = ?", parsed).
 			Take(&row).Error
@@ -48,7 +48,7 @@ func (r *Repository) ResolveTenantID(ctx context.Context, ref string) (uuid.UUID
 
 	var row tenantResolveBySlugRow
 	err := r.db.WithContext(ctx).
-		Table("tenants").
+		Table("orgs").
 		Select("id").
 		Where("slug = ?", trimmed).
 		Take(&row).Error
@@ -61,19 +61,13 @@ func (r *Repository) ResolveTenantID(ctx context.Context, ref string) (uuid.UUID
 	return row.ID, nil
 }
 
-// ResolveOrgID satisfies the current scheduling public module contract.
-// Pymes still resolves and stores this as a tenant id.
-func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, error) {
-	return r.ResolveTenantID(ctx, ref)
-}
-
-func (r *Repository) GetBusinessInfo(ctx context.Context, tenantID uuid.UUID) (BusinessInfo, error) {
+func (r *Repository) GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (BusinessInfo, error) {
 	var row businessInfoRow
 
 	err := r.db.WithContext(ctx).
-		Table("tenants o").
+		Table("orgs o").
 		Select(`
-			o.id as tenant_id,
+			o.id as org_id,
 			o.name,
 			o.slug,
 			COALESCE(ts.business_name, '') as business_name,
@@ -82,8 +76,8 @@ func (r *Repository) GetBusinessInfo(ctx context.Context, tenantID uuid.UUID) (B
 			COALESCE(ts.business_email, '') as business_email,
 			COALESCE(ts.scheduling_enabled, false) as scheduling_enabled
 		`).
-		Joins("LEFT JOIN tenant_settings ts ON ts.tenant_id = o.id").
-		Where("o.id = ?", tenantID).
+		Joins("LEFT JOIN tenant_settings ts ON ts.org_id = o.id").
+		Where("o.id = ?", orgID).
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -98,7 +92,7 @@ func (r *Repository) GetBusinessInfo(ctx context.Context, tenantID uuid.UUID) (B
 	}
 
 	return BusinessInfo{
-		TenantID:          row.TenantID,
+		OrgID:          row.OrgID,
 		Name:              row.Name,
 		Slug:              row.Slug,
 		BusinessName:      businessName,

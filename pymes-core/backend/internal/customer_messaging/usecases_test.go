@@ -34,19 +34,19 @@ type testRepo struct {
 	lastStatusTitle     string
 }
 
-func (r *testRepo) GetQuoteSnapshot(ctx context.Context, tenantID, quoteID uuid.UUID) (QuoteSnapshot, error) {
+func (r *testRepo) GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.UUID) (QuoteSnapshot, error) {
 	return QuoteSnapshot{}, nil
 }
 
-func (r *testRepo) GetSaleSnapshot(ctx context.Context, tenantID, saleID uuid.UUID) (SaleSnapshot, error) {
+func (r *testRepo) GetSaleSnapshot(ctx context.Context, orgID, saleID uuid.UUID) (SaleSnapshot, error) {
 	return SaleSnapshot{}, nil
 }
 
-func (r *testRepo) GetPartyPhone(ctx context.Context, tenantID, partyID uuid.UUID) (string, string, error) {
+func (r *testRepo) GetPartyPhone(ctx context.Context, orgID, partyID uuid.UUID) (string, string, error) {
 	return r.partyPhone, r.partyName, nil
 }
 
-func (r *testRepo) GetTemplates(ctx context.Context, tenantID uuid.UUID) (Templates, error) {
+func (r *testRepo) GetTemplates(ctx context.Context, orgID uuid.UUID) (Templates, error) {
 	return Templates{DefaultCountryCode: "54"}, nil
 }
 
@@ -57,7 +57,7 @@ func (r *testRepo) GetConnectionByPhoneNumberID(ctx context.Context, phoneNumber
 	return r.conn, nil
 }
 
-func (r *testRepo) GetConnection(ctx context.Context, tenantID uuid.UUID) (domain.Connection, error) {
+func (r *testRepo) GetConnection(ctx context.Context, orgID uuid.UUID) (domain.Connection, error) {
 	return r.domainConn, nil
 }
 
@@ -66,11 +66,11 @@ func (r *testRepo) SaveConnection(ctx context.Context, conn domain.Connection, e
 	return nil
 }
 
-func (r *testRepo) DisconnectConnection(ctx context.Context, tenantID uuid.UUID) error {
+func (r *testRepo) DisconnectConnection(ctx context.Context, orgID uuid.UUID) error {
 	return nil
 }
 
-func (r *testRepo) GetConnectionStats(ctx context.Context, tenantID uuid.UUID) (domain.ConnectionStats, error) {
+func (r *testRepo) GetConnectionStats(ctx context.Context, orgID uuid.UUID) (domain.ConnectionStats, error) {
 	return domain.ConnectionStats{}, nil
 }
 
@@ -96,23 +96,23 @@ func (r *testRepo) SaveTemplate(ctx context.Context, tpl domain.Template) error 
 	return nil
 }
 
-func (r *testRepo) GetTemplate(ctx context.Context, tenantID, templateID uuid.UUID) (domain.Template, error) {
+func (r *testRepo) GetTemplate(ctx context.Context, orgID, templateID uuid.UUID) (domain.Template, error) {
 	return domain.Template{}, nil
 }
 
-func (r *testRepo) GetTemplateByName(ctx context.Context, tenantID uuid.UUID, name, language string) (domain.Template, error) {
+func (r *testRepo) GetTemplateByName(ctx context.Context, orgID uuid.UUID, name, language string) (domain.Template, error) {
 	return domain.Template{}, nil
 }
 
-func (r *testRepo) ListTemplates(ctx context.Context, tenantID uuid.UUID) ([]domain.Template, error) {
+func (r *testRepo) ListTemplates(ctx context.Context, orgID uuid.UUID) ([]domain.Template, error) {
 	return r.templates, nil
 }
 
-func (r *testRepo) UpdateTemplateStatus(ctx context.Context, tenantID, templateID uuid.UUID, status domain.TemplateStatus, metaTemplateID, rejectionReason string) error {
+func (r *testRepo) UpdateTemplateStatus(ctx context.Context, orgID, templateID uuid.UUID, status domain.TemplateStatus, metaTemplateID, rejectionReason string) error {
 	return nil
 }
 
-func (r *testRepo) DeleteTemplate(ctx context.Context, tenantID, templateID uuid.UUID) error {
+func (r *testRepo) DeleteTemplate(ctx context.Context, orgID, templateID uuid.UUID) error {
 	return nil
 }
 
@@ -121,21 +121,21 @@ func (r *testRepo) SaveOptIn(ctx context.Context, optIn domain.OptIn) error {
 	return nil
 }
 
-func (r *testRepo) GetOptIn(ctx context.Context, tenantID, partyID uuid.UUID) (domain.OptIn, error) {
+func (r *testRepo) GetOptIn(ctx context.Context, orgID, partyID uuid.UUID) (domain.OptIn, error) {
 	return domain.OptIn{}, nil
 }
 
-func (r *testRepo) OptOut(ctx context.Context, tenantID, partyID uuid.UUID) error {
+func (r *testRepo) OptOut(ctx context.Context, orgID, partyID uuid.UUID) error {
 	return nil
 }
 
-func (r *testRepo) ListOptIns(ctx context.Context, tenantID uuid.UUID) ([]domain.OptIn, error) {
+func (r *testRepo) ListOptIns(ctx context.Context, orgID uuid.UUID) ([]domain.OptIn, error) {
 	return r.optIns, nil
 }
 
-func (r *testRepo) IsOptedIn(ctx context.Context, tenantID, partyID uuid.UUID) (bool, error) {
+func (r *testRepo) IsOptedIn(ctx context.Context, orgID, partyID uuid.UUID) (bool, error) {
 	for _, o := range r.optIns {
-		if o.TenantID == tenantID && o.PartyID == partyID && o.Status == domain.OptInStatusOptedIn {
+		if o.OrgID == orgID && o.PartyID == partyID && o.Status == domain.OptInStatusOptedIn {
 			return true, nil
 		}
 	}
@@ -249,9 +249,9 @@ func TestVerifyWebhook(t *testing.T) {
 
 func TestHandleInboundWebhook(t *testing.T) {
 	t.Parallel()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	repo := &testRepo{conn: Connection{
-		TenantID:      tenantID,
+		OrgID:      orgID,
 		PhoneNumberID: "123456789",
 		AccessToken:   "plain-token",
 		IsActive:      true,
@@ -281,8 +281,8 @@ func TestHandleInboundWebhook(t *testing.T) {
 	if result.Processed != 1 || result.Replied != 1 {
 		t.Fatalf("HandleInboundWebhook() = %+v, want processed=1 replied=1", result)
 	}
-	if aiClient.last.TenantID != tenantID {
-		t.Fatalf("ai tenant_id = %s, want %s", aiClient.last.TenantID, tenantID)
+	if aiClient.last.OrgID != orgID {
+		t.Fatalf("ai org_id = %s, want %s", aiClient.last.OrgID, orgID)
 	}
 	if metaClient.phoneNumberID != "123456789" {
 		t.Fatalf("meta phone_number_id = %q, want %q", metaClient.phoneNumberID, "123456789")
@@ -322,11 +322,11 @@ func TestValidateWebhookSignature(t *testing.T) {
 
 func TestSendText(t *testing.T) {
 	t.Parallel()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	partyID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	repo := &testRepo{
 		domainConn: domain.Connection{
-			TenantID:      tenantID,
+			OrgID:      orgID,
 			PhoneNumberID: "123456789",
 			AccessToken:   "plain-token",
 			IsActive:      true,
@@ -334,7 +334,7 @@ func TestSendText(t *testing.T) {
 		partyPhone: "+5491112345678",
 		partyName:  "Juan",
 		optIns: []domain.OptIn{{
-			TenantID: tenantID,
+			OrgID: orgID,
 			PartyID:  partyID,
 			Status:   domain.OptInStatusOptedIn,
 		}},
@@ -343,7 +343,7 @@ func TestSendText(t *testing.T) {
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, metaClient, nil, "", "")
 
 	msg, err := uc.SendText(context.Background(), domain.SendTextRequest{
-		TenantID: tenantID,
+		OrgID: orgID,
 		PartyID:  partyID,
 		Body:     "Hola Juan, tu pedido está listo",
 		Actor:    "admin",
@@ -364,11 +364,11 @@ func TestSendText(t *testing.T) {
 
 func TestSendTextRequiresOptIn(t *testing.T) {
 	t.Parallel()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	partyID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	repo := &testRepo{
 		domainConn: domain.Connection{
-			TenantID:      tenantID,
+			OrgID:      orgID,
 			PhoneNumberID: "123456789",
 			AccessToken:   "plain-token",
 			IsActive:      true,
@@ -381,7 +381,7 @@ func TestSendTextRequiresOptIn(t *testing.T) {
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, metaClient, nil, "", "")
 
 	_, err := uc.SendText(context.Background(), domain.SendTextRequest{
-		TenantID: tenantID,
+		OrgID: orgID,
 		PartyID:  partyID,
 		Body:     "Hola",
 		Actor:    "admin",
@@ -393,11 +393,11 @@ func TestSendTextRequiresOptIn(t *testing.T) {
 
 func TestConnect(t *testing.T) {
 	t.Parallel()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	repo := &testRepo{}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, nil, nil, "", "")
 
-	conn, err := uc.Connect(context.Background(), tenantID, "phone-123", "waba-456", "token-789", "+541112345678", "Mi Negocio")
+	conn, err := uc.Connect(context.Background(), orgID, "phone-123", "waba-456", "token-789", "+541112345678", "Mi Negocio")
 	if err != nil {
 		t.Fatalf("Connect() error = %v", err)
 	}
@@ -414,11 +414,11 @@ func TestConnect(t *testing.T) {
 
 func TestCreateTemplate(t *testing.T) {
 	t.Parallel()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	repo := &testRepo{}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, nil, nil, "", "")
 
-	tpl, err := uc.CreateTemplate(context.Background(), tenantID, domain.Template{
+	tpl, err := uc.CreateTemplate(context.Background(), orgID, domain.Template{
 		Name:     "order_ready",
 		Category: domain.CategoryUtility,
 		BodyText: "Hola {{1}}, tu pedido {{2}} está listo para retirar.",
@@ -442,12 +442,12 @@ func TestCreateTemplate(t *testing.T) {
 
 func TestRegisterOptIn(t *testing.T) {
 	t.Parallel()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	partyID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	repo := &testRepo{}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, nil, nil, "", "")
 
-	optIn, err := uc.RegisterOptIn(context.Background(), tenantID, partyID, "+5491112345678", domain.OptInSourceManual)
+	optIn, err := uc.RegisterOptIn(context.Background(), orgID, partyID, "+5491112345678", domain.OptInSourceManual)
 	if err != nil {
 		t.Fatalf("RegisterOptIn() error = %v", err)
 	}
@@ -497,7 +497,7 @@ func TestVerifyWebhook_TokenNotConfigured(t *testing.T) {
 
 func TestHandleInboundWebhook_InvalidJSON(t *testing.T) {
 	t.Parallel()
-	repo := &testRepo{conn: Connection{TenantID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
+	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", &testAIClient{}, &testMetaClient{}, nil, "", "")
 	_, err := uc.HandleInboundWebhook(context.Background(), []byte(`not-json`))
 	if err == nil {
@@ -507,7 +507,7 @@ func TestHandleInboundWebhook_InvalidJSON(t *testing.T) {
 
 func TestHandleInboundWebhook_NoMessages(t *testing.T) {
 	t.Parallel()
-	repo := &testRepo{conn: Connection{TenantID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
+	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", &testAIClient{}, &testMetaClient{}, nil, "", "")
 	result, err := uc.HandleInboundWebhook(context.Background(), []byte(`{"object":"whatsapp_business_account","entry":[]}`))
 	if err != nil {
@@ -520,7 +520,7 @@ func TestHandleInboundWebhook_NoMessages(t *testing.T) {
 
 func TestHandleInboundWebhook_ProcessesStatusUpdatesWithoutAIReply(t *testing.T) {
 	t.Parallel()
-	repo := &testRepo{conn: Connection{TenantID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
+	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, nil, nil, "", "")
 	payload := []byte(`{
 		"object":"whatsapp_business_account",
@@ -568,7 +568,7 @@ func TestHandleInboundWebhook_SkipsUnknownConnection(t *testing.T) {
 
 func TestHandleInboundWebhook_RequiresAI(t *testing.T) {
 	t.Parallel()
-	repo := &testRepo{conn: Connection{TenantID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
+	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, &testMetaClient{}, nil, "", "")
 	_, err := uc.HandleInboundWebhook(context.Background(), []byte(`{"object":"whatsapp_business_account","entry":[{"changes":[{"field":"messages","value":{"metadata":{"phone_number_id":"1"},"messages":[{"id":"m1","from":"5491100000000","type":"text","text":{"body":"Hola"}}]}}]}]}`))
 	if err == nil {
@@ -578,7 +578,7 @@ func TestHandleInboundWebhook_RequiresAI(t *testing.T) {
 
 func TestHandleInboundWebhook_RequiresMeta(t *testing.T) {
 	t.Parallel()
-	repo := &testRepo{conn: Connection{TenantID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
+	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", &testAIClient{}, nil, nil, "", "")
 	_, err := uc.HandleInboundWebhook(context.Background(), []byte(`{"object":"whatsapp_business_account","entry":[{"changes":[{"field":"messages","value":{"metadata":{"phone_number_id":"1"},"messages":[{"id":"m1","from":"5491100000000","type":"text","text":{"body":"Hola"}}]}}]}]}`))
 	if err == nil {
@@ -589,17 +589,17 @@ func TestHandleInboundWebhook_RequiresMeta(t *testing.T) {
 func TestConnect_Validation(t *testing.T) {
 	t.Parallel()
 	uc := NewUsecases(&testRepo{}, nil, "http://localhost:5173", nil, nil, nil, "", "")
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
-	_, err := uc.Connect(context.Background(), tenantID, "", "waba", "token", "", "")
+	_, err := uc.Connect(context.Background(), orgID, "", "waba", "token", "", "")
 	if err == nil {
 		t.Fatal("Connect() error = nil, want error when phone_number_id empty")
 	}
-	_, err = uc.Connect(context.Background(), tenantID, "phone", "", "token", "", "")
+	_, err = uc.Connect(context.Background(), orgID, "phone", "", "token", "", "")
 	if err == nil {
 		t.Fatal("Connect() error = nil, want error when waba_id empty")
 	}
-	_, err = uc.Connect(context.Background(), tenantID, "phone", "waba", "", "", "")
+	_, err = uc.Connect(context.Background(), orgID, "phone", "waba", "", "", "")
 	if err == nil {
 		t.Fatal("Connect() error = nil, want error when access_token empty")
 	}
@@ -609,8 +609,8 @@ func TestDisconnect(t *testing.T) {
 	t.Parallel()
 	repo := &testRepo{}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, nil, nil, "", "")
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
-	if err := uc.Disconnect(context.Background(), tenantID); err != nil {
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	if err := uc.Disconnect(context.Background(), orgID); err != nil {
 		t.Fatalf("Disconnect() error = %v", err)
 	}
 }

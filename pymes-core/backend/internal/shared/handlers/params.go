@@ -11,12 +11,12 @@ import (
 )
 
 func ParseAuthTenantID(c *gin.Context) (uuid.UUID, bool) {
-	tenantID, ok := sharedauth.ParseAuthTenantID(c)
+	orgID, ok := sharedauth.ParseAuthTenantID(c)
 	if !ok {
 		WriteValidation(c, "invalid tenant")
 		return uuid.Nil, false
 	}
-	return tenantID, true
+	return orgID, true
 }
 
 func ParseUUIDParam(c *gin.Context, param string, field string) (uuid.UUID, bool) {
@@ -30,7 +30,7 @@ func ParseUUIDParam(c *gin.Context, param string, field string) (uuid.UUID, bool
 }
 
 func ParseAuthTenantAndParamID(c *gin.Context, param string, field string) (uuid.UUID, uuid.UUID, bool) {
-	tenantID, ok := ParseAuthTenantID(c)
+	orgID, ok := ParseAuthTenantID(c)
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
@@ -38,11 +38,11 @@ func ParseAuthTenantAndParamID(c *gin.Context, param string, field string) (uuid
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
-	return tenantID, id, true
+	return orgID, id, true
 }
 
 func ParseEntityRef(c *gin.Context, entityParam string, idParam string) (uuid.UUID, string, uuid.UUID, bool) {
-	tenantID, ok := ParseAuthTenantID(c)
+	orgID, ok := ParseAuthTenantID(c)
 	if !ok {
 		return uuid.Nil, "", uuid.Nil, false
 	}
@@ -55,7 +55,7 @@ func ParseEntityRef(c *gin.Context, entityParam string, idParam string) (uuid.UU
 	if !ok {
 		return uuid.Nil, "", uuid.Nil, false
 	}
-	return tenantID, entity, id, true
+	return orgID, entity, id, true
 }
 
 func WriteValidation(c *gin.Context, message string) {

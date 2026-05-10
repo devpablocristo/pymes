@@ -101,7 +101,7 @@ export function TenantAccessBoundary({ children }: { children: ReactNode }) {
   });
 
   const sessionTenantSlug = normalizeSlug(sessionQuery.data?.tenant?.slug ?? null);
-  const sessionTenantId = sessionQuery.data?.tenant?.id ?? sessionQuery.data?.auth.tenant_id ?? '';
+  const sessionTenantId = sessionQuery.data?.tenant?.id ?? sessionQuery.data?.auth.org_id ?? '';
   const slugMatchesSession = Boolean(
     normalizedRequestedSlug && sessionTenantSlug && normalizedRequestedSlug === sessionTenantSlug,
   );

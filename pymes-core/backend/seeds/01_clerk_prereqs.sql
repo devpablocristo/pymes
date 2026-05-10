@@ -8,7 +8,7 @@ DECLARE
     v_owner uuid;
     v_user uuid;
 BEGIN
-    INSERT INTO tenants (id, external_id, name, slug, created_at, updated_at)
+    INSERT INTO orgs (id, external_id, name, slug, created_at, updated_at)
     VALUES (
         v_tenant,
         NULLIF('__SEED_TENANT_EXTERNAL_ID__', ''),
@@ -20,7 +20,7 @@ BEGIN
     ON CONFLICT (id) DO UPDATE
         SET name = EXCLUDED.name,
             slug = EXCLUDED.slug,
-            external_id = COALESCE(EXCLUDED.external_id, tenants.external_id),
+            external_id = COALESCE(EXCLUDED.external_id, orgs.external_id),
             updated_at = now();
 
     SELECT id INTO v_owner
@@ -58,28 +58,28 @@ BEGIN
          WHERE id = v_owner;
     END IF;
 
-    UPDATE tenant_memberships
+    UPDATE org_members
        SET status = 'removed',
            removed_at = COALESCE(removed_at, now()),
            updated_at = now()
-     WHERE tenant_id = v_tenant
+     WHERE org_id = v_tenant
        AND role = 'owner'
        AND status = 'active'
        AND user_id <> v_owner;
 
-    INSERT INTO tenant_memberships (tenant_id, user_id, role, status, removed_at, created_at, updated_at)
+    INSERT INTO org_members (org_id, user_id, role, status, removed_at, created_at, updated_at)
     VALUES (v_tenant, v_owner, 'owner', 'active', NULL, now(), now())
-    ON CONFLICT (tenant_id, user_id) WHERE status = 'active' DO UPDATE
+    ON CONFLICT (org_id, user_id) WHERE status = 'active' DO UPDATE
         SET role = 'owner',
             status = 'active',
             removed_at = NULL,
             updated_at = now();
 
-    INSERT INTO tenant_settings (tenant_id, plan_code)
+    INSERT INTO tenant_settings (org_id, plan_code)
     VALUES (v_tenant, 'starter')
-    ON CONFLICT (tenant_id) DO NOTHING;
+    ON CONFLICT (org_id) DO NOTHING;
 
-    INSERT INTO tenant_api_keys (id, tenant_id, name, api_key_hash, key_prefix, created_by)
+    INSERT INTO org_api_keys (id, org_id, name, api_key_hash, key_prefix, created_by)
     VALUES (
         '00000000-0000-0000-0000-000000000004',
         v_tenant,
@@ -89,11 +89,11 @@ BEGIN
         'seed'
     )
     ON CONFLICT (api_key_hash) DO UPDATE SET
-        tenant_id = EXCLUDED.tenant_id,
+        org_id = EXCLUDED.org_id,
         name = EXCLUDED.name,
         key_prefix = EXCLUDED.key_prefix;
 
-    INSERT INTO tenant_api_key_scopes (id, api_key_id, scope) VALUES
+    INSERT INTO org_api_key_scopes (id, api_key_id, scope) VALUES
         (gen_random_uuid(), '00000000-0000-0000-0000-000000000004', 'admin:console:read'),
         (gen_random_uuid(), '00000000-0000-0000-0000-000000000004', 'admin:console:write')
     ON CONFLICT (api_key_id, scope) DO NOTHING;

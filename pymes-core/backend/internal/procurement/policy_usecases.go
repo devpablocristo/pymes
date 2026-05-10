@@ -18,7 +18,7 @@ import (
 
 // PolicyCreateInput crea una política CEL por tenant.
 type PolicyCreateInput struct {
-	TenantID     uuid.UUID
+	OrgID     uuid.UUID
 	Actor        string
 	Name         string
 	Expression   string
@@ -32,7 +32,7 @@ type PolicyCreateInput struct {
 
 // PolicyUpdateInput actualiza una política existente.
 type PolicyUpdateInput struct {
-	TenantID     uuid.UUID
+	OrgID     uuid.UUID
 	ID           uuid.UUID
 	Actor        string
 	Name         string
@@ -47,8 +47,8 @@ type PolicyUpdateInput struct {
 
 // ListPoliciesForTenant lista las policies de procurement del tenant: proxy a
 // Nexus, sin almacenamiento local en Pymes.
-func (u *Usecases) ListPoliciesForTenant(ctx context.Context, tenantID uuid.UUID) ([]domain.ProcurementPolicy, error) {
-	st, raw, err := u.governance.ListPoliciesForTenant(ctx, tenantID.String())
+func (u *Usecases) ListPoliciesForTenant(ctx context.Context, orgID uuid.UUID) ([]domain.ProcurementPolicy, error) {
+	st, raw, err := u.governance.ListPoliciesForTenant(ctx, orgID.String())
 	if err != nil {
 		return nil, fmt.Errorf("nexus list policies: %w", err)
 	}
@@ -63,13 +63,13 @@ func (u *Usecases) ListPoliciesForTenant(ctx context.Context, tenantID uuid.UUID
 	}
 	out := make([]domain.ProcurementPolicy, 0, len(envelope.Data))
 	for _, p := range envelope.Data {
-		out = append(out, nexusPolicyToDomain(p, tenantID))
+		out = append(out, nexusPolicyToDomain(p, orgID))
 	}
 	return out, nil
 }
 
-func (u *Usecases) GetPolicy(ctx context.Context, tenantID, id uuid.UUID) (domain.ProcurementPolicy, error) {
-	st, raw, err := u.governance.GetPolicyForTenant(ctx, tenantID.String(), id.String())
+func (u *Usecases) GetPolicy(ctx context.Context, orgID, id uuid.UUID) (domain.ProcurementPolicy, error) {
+	st, raw, err := u.governance.GetPolicyForTenant(ctx, orgID.String(), id.String())
 	if err != nil {
 		return domain.ProcurementPolicy{}, fmt.Errorf("nexus get policy: %w", err)
 	}
@@ -83,12 +83,12 @@ func (u *Usecases) GetPolicy(ctx context.Context, tenantID, id uuid.UUID) (domai
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return domain.ProcurementPolicy{}, fmt.Errorf("decode policy: %w", err)
 	}
-	return nexusPolicyToDomain(p, tenantID), nil
+	return nexusPolicyToDomain(p, orgID), nil
 }
 
 func (u *Usecases) CreatePolicy(ctx context.Context, in PolicyCreateInput) (domain.ProcurementPolicy, error) {
-	if in.TenantID == uuid.Nil {
-		return domain.ProcurementPolicy{}, domainerr.Validation("tenant_id is required")
+	if in.OrgID == uuid.Nil {
+		return domain.ProcurementPolicy{}, domainerr.Validation("org_id is required")
 	}
 	actor := strings.TrimSpace(in.Actor)
 	if actor == "" {
@@ -100,7 +100,7 @@ func (u *Usecases) CreatePolicy(ctx context.Context, in PolicyCreateInput) (doma
 	}
 	body := nexusPolicyCreateBody(in, mode)
 
-	st, raw, err := u.governance.CreatePolicyForTenant(ctx, in.TenantID.String(), body)
+	st, raw, err := u.governance.CreatePolicyForTenant(ctx, in.OrgID.String(), body)
 	if err != nil {
 		return domain.ProcurementPolicy{}, fmt.Errorf("nexus create policy: %w", err)
 	}
@@ -111,9 +111,9 @@ func (u *Usecases) CreatePolicy(ctx context.Context, in PolicyCreateInput) (doma
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return domain.ProcurementPolicy{}, fmt.Errorf("decode created policy: %w", err)
 	}
-	out := nexusPolicyToDomain(p, in.TenantID)
-	u.logPolicyAudit(ctx, in.TenantID, actor, "procurement_policy.created", out.ID.String(), map[string]any{"name": out.Name})
-	u.emitWebhook(ctx, in.TenantID, "procurement_policy.created", map[string]any{
+	out := nexusPolicyToDomain(p, in.OrgID)
+	u.logPolicyAudit(ctx, in.OrgID, actor, "procurement_policy.created", out.ID.String(), map[string]any{"name": out.Name})
+	u.emitWebhook(ctx, in.OrgID, "procurement_policy.created", map[string]any{
 		"procurement_policy_id": out.ID.String(),
 		"name":                  out.Name,
 	})
@@ -131,7 +131,7 @@ func (u *Usecases) UpdatePolicy(ctx context.Context, in PolicyUpdateInput) (doma
 	}
 	body := nexusPolicyUpdateBody(in, mode)
 
-	st, raw, err := u.governance.UpdatePolicyForTenant(ctx, in.TenantID.String(), in.ID.String(), body)
+	st, raw, err := u.governance.UpdatePolicyForTenant(ctx, in.OrgID.String(), in.ID.String(), body)
 	if err != nil {
 		return domain.ProcurementPolicy{}, fmt.Errorf("nexus update policy: %w", err)
 	}
@@ -145,20 +145,20 @@ func (u *Usecases) UpdatePolicy(ctx context.Context, in PolicyUpdateInput) (doma
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return domain.ProcurementPolicy{}, fmt.Errorf("decode updated policy: %w", err)
 	}
-	out := nexusPolicyToDomain(p, in.TenantID)
-	u.logPolicyAudit(ctx, in.TenantID, actor, "procurement_policy.updated", out.ID.String(), map[string]any{"name": out.Name})
-	u.emitWebhook(ctx, in.TenantID, "procurement_policy.updated", map[string]any{
+	out := nexusPolicyToDomain(p, in.OrgID)
+	u.logPolicyAudit(ctx, in.OrgID, actor, "procurement_policy.updated", out.ID.String(), map[string]any{"name": out.Name})
+	u.emitWebhook(ctx, in.OrgID, "procurement_policy.updated", map[string]any{
 		"procurement_policy_id": out.ID.String(),
 		"name":                  out.Name,
 	})
 	return out, nil
 }
 
-func (u *Usecases) DeletePolicy(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+func (u *Usecases) DeletePolicy(ctx context.Context, orgID, id uuid.UUID, actor string) error {
 	if strings.TrimSpace(actor) == "" {
 		return domainerr.Validation("actor is required")
 	}
-	st, err := u.governance.DeletePolicyForTenant(ctx, tenantID.String(), id.String())
+	st, err := u.governance.DeletePolicyForTenant(ctx, orgID.String(), id.String())
 	if err != nil {
 		return fmt.Errorf("nexus delete policy: %w", err)
 	}
@@ -168,8 +168,8 @@ func (u *Usecases) DeletePolicy(ctx context.Context, tenantID, id uuid.UUID, act
 	if st >= 400 {
 		return fmt.Errorf("nexus delete policy: status %d", st)
 	}
-	u.logPolicyAudit(ctx, tenantID, actor, "procurement_policy.deleted", id.String(), nil)
-	u.emitWebhook(ctx, tenantID, "procurement_policy.deleted", map[string]any{"procurement_policy_id": id.String()})
+	u.logPolicyAudit(ctx, orgID, actor, "procurement_policy.deleted", id.String(), nil)
+	u.emitWebhook(ctx, orgID, "procurement_policy.deleted", map[string]any{"procurement_policy_id": id.String()})
 	return nil
 }
 
@@ -209,16 +209,16 @@ func normalizePolicyMode(raw string) string {
 	}
 }
 
-func (u *Usecases) logPolicyAudit(ctx context.Context, tenantID uuid.UUID, actor, action, resourceID string, payload map[string]any) {
+func (u *Usecases) logPolicyAudit(ctx context.Context, orgID uuid.UUID, actor, action, resourceID string, payload map[string]any) {
 	if u.audit == nil {
 		return
 	}
-	u.audit.Log(ctx, tenantID.String(), actor, action, "procurement_policy", resourceID, payload)
+	u.audit.Log(ctx, orgID.String(), actor, action, "procurement_policy", resourceID, payload)
 }
 
 // nexusPolicyToDomain mapea el shape público de Nexus a la representación
 // que la UI de Pymes consume. CreatedAt/UpdatedAt vienen como RFC3339.
-func nexusPolicyToDomain(p governanceclient.PolicyResponse, tenantID uuid.UUID) domain.ProcurementPolicy {
+func nexusPolicyToDomain(p governanceclient.PolicyResponse, orgID uuid.UUID) domain.ProcurementPolicy {
 	id, _ := uuid.Parse(p.ID)
 	created, _ := time.Parse(time.RFC3339, p.CreatedAt)
 	updated, _ := time.Parse(time.RFC3339, p.UpdatedAt)
@@ -232,7 +232,7 @@ func nexusPolicyToDomain(p governanceclient.PolicyResponse, tenantID uuid.UUID) 
 	}
 	return domain.ProcurementPolicy{
 		ID:           id,
-		TenantID:     tenantID,
+		OrgID:     orgID,
 		Name:         p.Name,
 		Expression:   p.Expression,
 		Effect:       p.Effect,

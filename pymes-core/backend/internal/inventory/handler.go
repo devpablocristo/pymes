@@ -18,10 +18,10 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListStockParams) ([]inventorydomain.StockLevel, int64, bool, *uuid.UUID, error)
-	GetByProduct(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID) (inventorydomain.StockLevel, error)
-	AdjustManual(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID, quantity float64, minQuantity *float64, notes, actor string) (inventorydomain.StockLevel, error)
+	GetByProduct(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID) (inventorydomain.StockLevel, error)
+	AdjustManual(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID, quantity float64, minQuantity *float64, notes, actor string) (inventorydomain.StockLevel, error)
 	ListMovements(ctx context.Context, p ListMovementParams) ([]inventorydomain.StockMovement, int64, bool, *uuid.UUID, error)
-	LowStock(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, limit int, after *uuid.UUID) ([]inventorydomain.StockLevel, int64, bool, *uuid.UUID, error)
+	LowStock(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, limit int, after *uuid.UUID) ([]inventorydomain.StockLevel, int64, bool, *uuid.UUID, error)
 }
 
 type Handler struct {
@@ -40,7 +40,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 
 func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -60,7 +60,7 @@ func (h *Handler) List(c *gin.Context) {
 		branchID = &id
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListStockParams{
-		TenantID: tenantID,
+		OrgID: orgID,
 		BranchID: branchID,
 		Limit:    limit,
 		After:    after,
@@ -84,7 +84,7 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Get(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -103,7 +103,7 @@ func (h *Handler) Get(c *gin.Context) {
 		}
 		branchID = &id
 	}
-	out, err := h.uc.GetByProduct(c.Request.Context(), tenantID, branchID, productID)
+	out, err := h.uc.GetByProduct(c.Request.Context(), orgID, branchID, productID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -113,7 +113,7 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Adjust(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -137,7 +137,7 @@ func (h *Handler) Adjust(c *gin.Context) {
 		}
 		branchID = &id
 	}
-	out, err := h.uc.AdjustManual(c.Request.Context(), tenantID, branchID, productID, req.Quantity, req.MinQuantity, req.Notes, a.Actor)
+	out, err := h.uc.AdjustManual(c.Request.Context(), orgID, branchID, productID, req.Quantity, req.MinQuantity, req.Notes, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -147,7 +147,7 @@ func (h *Handler) Adjust(c *gin.Context) {
 
 func (h *Handler) ListMovements(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -176,7 +176,7 @@ func (h *Handler) ListMovements(c *gin.Context) {
 		branchID = &id
 	}
 	items, total, hasMore, next, err := h.uc.ListMovements(c.Request.Context(), ListMovementParams{
-		TenantID:  tenantID,
+		OrgID:  orgID,
 		BranchID:  branchID,
 		Limit:     limit,
 		After:     after,
@@ -199,7 +199,7 @@ func (h *Handler) ListMovements(c *gin.Context) {
 
 func (h *Handler) LowStock(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -218,7 +218,7 @@ func (h *Handler) LowStock(c *gin.Context) {
 		}
 		branchID = &id
 	}
-	items, total, hasMore, next, err := h.uc.LowStock(c.Request.Context(), tenantID, branchID, limit, after)
+	items, total, hasMore, next, err := h.uc.LowStock(c.Request.Context(), orgID, branchID, limit, after)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -236,7 +236,7 @@ func (h *Handler) LowStock(c *gin.Context) {
 func toStockLevelItem(in inventorydomain.StockLevel) dto.StockLevelItem {
 	out := dto.StockLevelItem{
 		ProductID:   in.ProductID.String(),
-		TenantID:    in.TenantID.String(),
+		OrgID:    in.OrgID.String(),
 		ProductName: in.ProductName,
 		SKU:         in.SKU,
 		Quantity:    in.Quantity,
@@ -254,7 +254,7 @@ func toStockLevelItem(in inventorydomain.StockLevel) dto.StockLevelItem {
 func toStockMovementItem(in inventorydomain.StockMovement) dto.StockMovementItem {
 	out := dto.StockMovementItem{
 		ID:          in.ID.String(),
-		TenantID:    in.TenantID.String(),
+		OrgID:    in.OrgID.String(),
 		ProductID:   in.ProductID.String(),
 		ProductName: in.ProductName,
 		Type:        in.Type,

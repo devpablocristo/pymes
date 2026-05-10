@@ -21,7 +21,7 @@ type Repository struct{ db *gorm.DB }
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 type ListParams struct {
-	TenantID uuid.UUID
+	OrgID uuid.UUID
 	Limit    int
 	After    *uuid.UUID
 	Status   string
@@ -30,7 +30,7 @@ type ListParams struct {
 func (r *Repository) List(ctx context.Context, p ListParams) ([]invdomain.Invoice, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.InvoiceModel{}).
-		Where("tenant_id = ? AND deleted_at IS NULL", p.TenantID)
+		Where("org_id = ? AND deleted_at IS NULL", p.OrgID)
 	if s := strings.TrimSpace(p.Status); s != "" {
 		q = q.Where("status = ?", s)
 	}
@@ -61,11 +61,11 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]invdomain.Invoic
 	return out, total, hasMore, next, nil
 }
 
-func (r *Repository) ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]invdomain.Invoice, error) {
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]invdomain.Invoice, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	var rows []models.InvoiceModel
 	if err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND deleted_at IS NOT NULL", tenantID).
+		Where("org_id = ? AND deleted_at IS NOT NULL", orgID).
 		Order("deleted_at DESC").
 		Limit(limit).
 		Find(&rows).Error; err != nil {
@@ -74,10 +74,10 @@ func (r *Repository) ListArchived(ctx context.Context, tenantID uuid.UUID, limit
 	return r.hydrateWithItems(ctx, rows)
 }
 
-func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (invdomain.Invoice, error) {
+func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (invdomain.Invoice, error) {
 	var row models.InvoiceModel
 	if err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
 		Take(&row).Error; err != nil {
 		return invdomain.Invoice{}, err
 	}
@@ -97,7 +97,7 @@ func (r *Repository) Create(ctx context.Context, in invdomain.Invoice) (invdomai
 	}
 	row := models.InvoiceModel{
 		ID:              id,
-		TenantID:        in.TenantID,
+		OrgID:        in.OrgID,
 		Number:          number,
 		PartyID:         in.PartyID,
 		CustomerName:    strings.TrimSpace(in.CustomerName),
@@ -142,7 +142,7 @@ func (r *Repository) Create(ctx context.Context, in invdomain.Invoice) (invdomai
 	if err != nil {
 		return invdomain.Invoice{}, err
 	}
-	return r.GetByID(ctx, in.TenantID, id)
+	return r.GetByID(ctx, in.OrgID, id)
 }
 
 func (r *Repository) Update(ctx context.Context, in invdomain.Invoice) (invdomain.Invoice, error) {
@@ -161,7 +161,7 @@ func (r *Repository) Update(ctx context.Context, in invdomain.Invoice) (invdomai
 		"updated_at":       now,
 	}
 	res := r.db.WithContext(ctx).Model(&models.InvoiceModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", in.TenantID, in.ID).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		return invdomain.Invoice{}, res.Error
@@ -169,13 +169,13 @@ func (r *Repository) Update(ctx context.Context, in invdomain.Invoice) (invdomai
 	if res.RowsAffected == 0 {
 		return invdomain.Invoice{}, gorm.ErrRecordNotFound
 	}
-	return r.GetByID(ctx, in.TenantID, in.ID)
+	return r.GetByID(ctx, in.OrgID, in.ID)
 }
 
-func (r *Repository) SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	now := time.Now().UTC()
 	res := r.db.WithContext(ctx).Model(&models.InvoiceModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
 		Update("deleted_at", now)
 	if res.Error != nil {
 		return res.Error
@@ -186,9 +186,9 @@ func (r *Repository) SoftDelete(ctx context.Context, tenantID, id uuid.UUID) err
 	return nil
 }
 
-func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.InvoiceModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
 		Update("deleted_at", nil)
 	if res.Error != nil {
 		return res.Error
@@ -199,8 +199,8 @@ func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error 
 	return nil
 }
 
-func (r *Repository) HardDelete(ctx context.Context, tenantID, id uuid.UUID) error {
-	res := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Delete(&models.InvoiceModel{})
+func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Delete(&models.InvoiceModel{})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -254,7 +254,7 @@ func toDomain(row models.InvoiceModel, items []invdomain.InvoiceLineItem) invdom
 	}
 	return invdomain.Invoice{
 		ID:              row.ID,
-		TenantID:        row.TenantID,
+		OrgID:        row.OrgID,
 		Number:          row.Number,
 		PartyID:         row.PartyID,
 		CustomerName:    row.CustomerName,

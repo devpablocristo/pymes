@@ -21,7 +21,7 @@ export async function getMeWithTimeout(): Promise<MeProfileResponse> {
 export function profileTenantLabel(auth: SessionResponse['auth'], clerkTenantName: string | null | undefined): string {
   const clerk = clerkTenantName?.trim() || '';
   const apiName = typeof auth.tenant_name === 'string' ? auth.tenant_name.trim() : '';
-  const id = auth.tenant_id?.trim() || '';
+  const id = auth.org_id?.trim() || '';
   return clerk || apiName || id || '—';
 }
 

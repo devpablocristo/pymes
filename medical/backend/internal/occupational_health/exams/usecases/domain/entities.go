@@ -8,7 +8,7 @@ import (
 
 type Exam struct {
 	ID              uuid.UUID
-	TenantID        uuid.UUID
+	OrgID        uuid.UUID
 	PatientName     string
 	PatientDocument string
 	EmployerName    string

@@ -8,7 +8,7 @@ import (
 
 type Return struct {
 	ID           uuid.UUID    `json:"id"`
-	TenantID     uuid.UUID    `json:"tenant_id"`
+	OrgID     uuid.UUID    `json:"org_id"`
 	Number       string       `json:"number"`
 	SaleID       uuid.UUID    `json:"sale_id"`
 	PartyID      *uuid.UUID   `json:"party_id,omitempty"`
@@ -42,7 +42,7 @@ type ReturnItem struct {
 
 type CreditNote struct {
 	ID         uuid.UUID  `json:"id"`
-	TenantID   uuid.UUID  `json:"tenant_id"`
+	OrgID   uuid.UUID  `json:"org_id"`
 	Number     string     `json:"number"`
 	PartyID    uuid.UUID  `json:"party_id"`
 	ReturnID   uuid.UUID  `json:"return_id"`

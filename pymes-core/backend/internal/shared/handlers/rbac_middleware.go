@@ -9,7 +9,7 @@ import (
 )
 
 type PermissionChecker interface {
-	HasPermission(ctx context.Context, tenantID, actor, role string, scopes []string, authMethod, resource, action string) bool
+	HasPermission(ctx context.Context, orgID, actor, role string, scopes []string, authMethod, resource, action string) bool
 }
 
 type RBACMiddleware struct {
@@ -29,11 +29,11 @@ func (m *RBACMiddleware) RequirePermission(resource, action string) gin.HandlerF
 			return
 		}
 		authCtx := GetAuthContext(c)
-		if authCtx.TenantID == "" {
+		if authCtx.OrgID == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"code": "UNAUTHORIZED", "message": "unauthorized"})
 			return
 		}
-		if m.checker.HasPermission(c.Request.Context(), authCtx.TenantID, authCtx.Actor, authCtx.Role, authCtx.Scopes, authCtx.AuthMethod, resource, action) {
+		if m.checker.HasPermission(c.Request.Context(), authCtx.OrgID, authCtx.Actor, authCtx.Role, authCtx.Scopes, authCtx.AuthMethod, resource, action) {
 			c.Next()
 			return
 		}

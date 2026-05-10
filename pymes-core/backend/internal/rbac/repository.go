@@ -26,9 +26,9 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) ListRoles(ctx context.Context, tenantID uuid.UUID) ([]rbacdomain.Role, error) {
+func (r *Repository) ListRoles(ctx context.Context, orgID uuid.UUID) ([]rbacdomain.Role, error) {
 	var rows []models.RoleModel
-	if err := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID).Order("is_system DESC, name ASC").Find(&rows).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("org_id = ?", orgID).Order("is_system DESC, name ASC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]rbacdomain.Role, 0, len(rows))
@@ -42,9 +42,9 @@ func (r *Repository) ListRoles(ctx context.Context, tenantID uuid.UUID) ([]rbacd
 	return out, nil
 }
 
-func (r *Repository) GetRole(ctx context.Context, tenantID, roleID uuid.UUID) (rbacdomain.Role, error) {
+func (r *Repository) GetRole(ctx context.Context, orgID, roleID uuid.UUID) (rbacdomain.Role, error) {
 	var row models.RoleModel
-	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, roleID).First(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, roleID).First(&row).Error; err != nil {
 		return rbacdomain.Role{}, err
 	}
 	perms, err := r.loadRolePermissions(ctx, row.ID)
@@ -58,7 +58,7 @@ func (r *Repository) CreateRole(ctx context.Context, in rbacdomain.Role) (rbacdo
 	now := time.Now().UTC()
 	m := models.RoleModel{
 		ID:          uuid.New(),
-		TenantID:    in.TenantID,
+		OrgID:    in.OrgID,
 		Name:        strings.TrimSpace(in.Name),
 		Description: strings.TrimSpace(in.Description),
 		IsSystem:    in.IsSystem,
@@ -88,7 +88,7 @@ func (r *Repository) UpdateRole(ctx context.Context, in rbacdomain.Role) (rbacdo
 		updates["name"] = strings.TrimSpace(in.Name)
 	}
 	result := r.db.WithContext(ctx).Model(&models.RoleModel{}).
-		Where("tenant_id = ? AND id = ?", in.TenantID, in.ID).
+		Where("org_id = ? AND id = ?", in.OrgID, in.ID).
 		Updates(updates)
 	if result.Error != nil {
 		return rbacdomain.Role{}, result.Error
@@ -99,11 +99,11 @@ func (r *Repository) UpdateRole(ctx context.Context, in rbacdomain.Role) (rbacdo
 	if err := r.replaceRolePermissions(ctx, in.ID, in.Permissions); err != nil {
 		return rbacdomain.Role{}, err
 	}
-	return r.GetRole(ctx, in.TenantID, in.ID)
+	return r.GetRole(ctx, in.OrgID, in.ID)
 }
 
-func (r *Repository) DeleteRole(ctx context.Context, tenantID, roleID uuid.UUID) error {
-	result := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, roleID).Delete(&models.RoleModel{})
+func (r *Repository) DeleteRole(ctx context.Context, orgID, roleID uuid.UUID) error {
+	result := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, roleID).Delete(&models.RoleModel{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -113,8 +113,8 @@ func (r *Repository) DeleteRole(ctx context.Context, tenantID, roleID uuid.UUID)
 	return nil
 }
 
-func (r *Repository) AssignRole(ctx context.Context, tenantID, roleID, userID uuid.UUID, assignedBy string) error {
-	if ok, err := r.isTenantMember(ctx, tenantID, userID); err != nil {
+func (r *Repository) AssignRole(ctx context.Context, orgID, roleID, userID uuid.UUID, assignedBy string) error {
+	if ok, err := r.isTenantMember(ctx, orgID, userID); err != nil {
 		return err
 	} else if !ok {
 		return gorm.ErrRecordNotFound
@@ -122,11 +122,11 @@ func (r *Repository) AssignRole(ctx context.Context, tenantID, roleID, userID uu
 
 	now := time.Now().UTC()
 	var existing models.UserRoleModel
-	err := r.db.WithContext(ctx).Where("tenant_id = ? AND user_id = ?", tenantID, userID).First(&existing).Error
+	err := r.db.WithContext(ctx).Where("org_id = ? AND user_id = ?", orgID, userID).First(&existing).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return r.db.WithContext(ctx).Create(&models.UserRoleModel{
-				TenantID:   tenantID,
+				OrgID:   orgID,
 				UserID:     userID,
 				RoleID:     roleID,
 				AssignedBy: assignedBy,
@@ -137,12 +137,12 @@ func (r *Repository) AssignRole(ctx context.Context, tenantID, roleID, userID uu
 	}
 
 	return r.db.WithContext(ctx).Model(&models.UserRoleModel{}).
-		Where("tenant_id = ? AND user_id = ?", tenantID, userID).
+		Where("org_id = ? AND user_id = ?", orgID, userID).
 		Updates(map[string]any{"role_id": roleID, "assigned_by": assignedBy, "assigned_at": now}).Error
 }
 
-func (r *Repository) RemoveRole(ctx context.Context, tenantID, roleID, userID uuid.UUID) error {
-	result := r.db.WithContext(ctx).Where("tenant_id = ? AND role_id = ? AND user_id = ?", tenantID, roleID, userID).Delete(&models.UserRoleModel{})
+func (r *Repository) RemoveRole(ctx context.Context, orgID, roleID, userID uuid.UUID) error {
+	result := r.db.WithContext(ctx).Where("org_id = ? AND role_id = ? AND user_id = ?", orgID, roleID, userID).Delete(&models.UserRoleModel{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -152,16 +152,16 @@ func (r *Repository) RemoveRole(ctx context.Context, tenantID, roleID, userID uu
 	return nil
 }
 
-func (r *Repository) IsSystemRole(ctx context.Context, tenantID, roleID uuid.UUID) (bool, error) {
+func (r *Repository) IsSystemRole(ctx context.Context, orgID, roleID uuid.UUID) (bool, error) {
 	var row models.RoleModel
-	if err := r.db.WithContext(ctx).Select("is_system").Where("tenant_id = ? AND id = ?", tenantID, roleID).First(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Select("is_system").Where("org_id = ? AND id = ?", orgID, roleID).First(&row).Error; err != nil {
 		return false, err
 	}
 	return row.IsSystem, nil
 }
 
-func (r *Repository) GetUserPermissions(ctx context.Context, tenantID, userID uuid.UUID) (map[string]map[string]bool, error) {
-	if ok, err := r.isTenantAdmin(ctx, tenantID, userID); err != nil {
+func (r *Repository) GetUserPermissions(ctx context.Context, orgID, userID uuid.UUID) (map[string]map[string]bool, error) {
+	if ok, err := r.isTenantAdmin(ctx, orgID, userID); err != nil {
 		return nil, err
 	} else if ok {
 		return map[string]map[string]bool{"*": {"*": true}}, nil
@@ -171,7 +171,7 @@ func (r *Repository) GetUserPermissions(ctx context.Context, tenantID, userID uu
 	err := r.db.WithContext(ctx).Table("user_roles ur").
 		Select("rp.resource, rp.action").
 		Joins("JOIN role_permissions rp ON rp.role_id = ur.role_id").
-		Where("ur.tenant_id = ? AND ur.user_id = ?", tenantID, userID).
+		Where("ur.org_id = ? AND ur.user_id = ?", orgID, userID).
 		Find(&rows).Error
 	if err != nil {
 		return nil, err
@@ -179,24 +179,24 @@ func (r *Repository) GetUserPermissions(ctx context.Context, tenantID, userID uu
 	return rowsToPermissionMap(rows), nil
 }
 
-func (r *Repository) GetActorPermissions(ctx context.Context, tenantID uuid.UUID, actor string) (map[string]map[string]bool, error) {
-	userID, ok, err := r.findActorUserID(ctx, tenantID, actor)
+func (r *Repository) GetActorPermissions(ctx context.Context, orgID uuid.UUID, actor string) (map[string]map[string]bool, error) {
+	userID, ok, err := r.findActorUserID(ctx, orgID, actor)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return map[string]map[string]bool{}, nil
 	}
-	return r.GetUserPermissions(ctx, tenantID, userID)
+	return r.GetUserPermissions(ctx, orgID, userID)
 }
 
-func (r *Repository) findActorUserID(ctx context.Context, tenantID uuid.UUID, actor string) (uuid.UUID, bool, error) {
+func (r *Repository) findActorUserID(ctx context.Context, orgID uuid.UUID, actor string) (uuid.UUID, bool, error) {
 	actor = strings.TrimSpace(actor)
 	if actor == "" {
 		return uuid.Nil, false, nil
 	}
 	if id, err := uuid.Parse(actor); err == nil {
-		if ok, err := r.isTenantMember(ctx, tenantID, id); err != nil {
+		if ok, err := r.isTenantMember(ctx, orgID, id); err != nil {
 			return uuid.Nil, false, err
 		} else if ok {
 			return id, true, nil
@@ -209,7 +209,7 @@ func (r *Repository) findActorUserID(ctx context.Context, tenantID uuid.UUID, ac
 	var row userRow
 	err := r.db.WithContext(ctx).Table("users u").
 		Select("u.id").
-		Joins("JOIN tenant_memberships tm ON tm.user_id = u.id AND tm.tenant_id = ?", tenantID).
+		Joins("JOIN org_members tm ON tm.user_id = u.id AND tm.org_id = ?", orgID).
 		Where("u.external_id = ?", actor).
 		Limit(1).
 		Scan(&row).Error
@@ -222,26 +222,26 @@ func (r *Repository) findActorUserID(ctx context.Context, tenantID uuid.UUID, ac
 	return row.ID, true, nil
 }
 
-func (r *Repository) isTenantAdmin(ctx context.Context, tenantID, userID uuid.UUID) (bool, error) {
+func (r *Repository) isTenantAdmin(ctx context.Context, orgID, userID uuid.UUID) (bool, error) {
 	type row struct {
 		Role string `gorm:"column:role"`
 	}
 	var out row
-	err := r.db.WithContext(ctx).Table("tenant_memberships").Select("role").Where("tenant_id = ? AND user_id = ?", tenantID, userID).Limit(1).Scan(&out).Error
+	err := r.db.WithContext(ctx).Table("org_members").Select("role").Where("org_id = ? AND user_id = ?", orgID, userID).Limit(1).Scan(&out).Error
 	if err != nil {
 		return false, err
 	}
 	return strings.EqualFold(strings.TrimSpace(out.Role), "admin"), nil
 }
 
-func (r *Repository) isTenantMember(ctx context.Context, tenantID, userID uuid.UUID) (bool, error) {
+func (r *Repository) isTenantMember(ctx context.Context, orgID, userID uuid.UUID) (bool, error) {
 	type row struct {
 		ID uuid.UUID `gorm:"column:user_id"`
 	}
 	var out row
-	err := r.db.WithContext(ctx).Table("tenant_memberships").
+	err := r.db.WithContext(ctx).Table("org_members").
 		Select("user_id").
-		Where("tenant_id = ? AND user_id = ?", tenantID, userID).
+		Where("org_id = ? AND user_id = ?", orgID, userID).
 		Limit(1).
 		Scan(&out).Error
 	if err != nil {
@@ -293,7 +293,7 @@ func (r *Repository) replaceRolePermissions(ctx context.Context, roleID uuid.UUI
 func roleToDomain(in models.RoleModel, perms []rbacdomain.Permission) rbacdomain.Role {
 	return rbacdomain.Role{
 		ID:          in.ID,
-		TenantID:    in.TenantID,
+		OrgID:    in.OrgID,
 		Name:        in.Name,
 		Description: in.Description,
 		IsSystem:    in.IsSystem,

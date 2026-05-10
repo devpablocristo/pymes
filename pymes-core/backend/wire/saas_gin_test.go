@@ -22,7 +22,7 @@ func (scopedAPIKeyVerifier) Verify(ctx context.Context, token string) (tenantPri
 	_ = ctx
 	_ = token
 	return tenantPrincipal{
-		TenantID:   "00000000-0000-0000-0000-000000000001",
+		OrgID:   "00000000-0000-0000-0000-000000000001",
 		Actor:      "api_key:key-1",
 		Role:       "service",
 		Scopes:     []string{"admin:console:read", "admin:console:write"},
@@ -36,7 +36,7 @@ func (scopedJWTVerifier) Verify(ctx context.Context, token string) (tenantPrinci
 	_ = ctx
 	_ = token
 	return tenantPrincipal{
-		TenantID:   "00000000-0000-0000-0000-000000000001",
+		OrgID:   "00000000-0000-0000-0000-000000000001",
 		Actor:      "user-1",
 		Role:       "member",
 		Scopes:     []string{"admin:console:read"},
@@ -55,8 +55,8 @@ func testTenantResolver(_ context.Context, ref string) (uuid.UUID, bool, error) 
 	}
 }
 
-func testTenantMembershipResolver(_ context.Context, tenantID uuid.UUID, actor string) (string, bool, error) {
-	if actor == "user-1" && tenantID == uuid.MustParse("00000000-0000-0000-0000-000000000002") {
+func testTenantMembershipResolver(_ context.Context, orgID uuid.UUID, actor string) (string, bool, error) {
+	if actor == "user-1" && orgID == uuid.MustParse("00000000-0000-0000-0000-000000000002") {
 		return "owner", true, nil
 	}
 	return "", false, nil
@@ -89,8 +89,8 @@ func TestGinSaaSAuthMiddlewareCopiesPrincipalScopes(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &auth); err != nil {
 		t.Fatal(err)
 	}
-	if auth.TenantID != "00000000-0000-0000-0000-000000000001" {
-		t.Fatalf("unexpected tenant id %q", auth.TenantID)
+	if auth.OrgID != "00000000-0000-0000-0000-000000000001" {
+		t.Fatalf("unexpected tenant id %q", auth.OrgID)
 	}
 	if auth.AuthMethod != "api_key" {
 		t.Fatalf("unexpected auth method %q", auth.AuthMethod)

@@ -8,7 +8,7 @@ import (
 
 type ProcurementRequest struct {
 	ID             uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	TenantID       uuid.UUID  `gorm:"type:uuid;index;not null"`
+	OrgID       uuid.UUID  `gorm:"type:uuid;index;not null"`
 	RequesterActor string     `gorm:"not null"`
 	Title          string     `gorm:"not null"`
 	Description    string     `gorm:"not null;default:''"`

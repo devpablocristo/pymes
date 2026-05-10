@@ -16,8 +16,8 @@ import (
 )
 
 type usecasesPort interface {
-	ListByProfile(ctx context.Context, tenantID, profileID uuid.UUID) ([]domain.ServiceLink, error)
-	ReplaceForProfile(ctx context.Context, tenantID, profileID uuid.UUID, links []domain.ServiceLink, actor string) ([]domain.ServiceLink, error)
+	ListByProfile(ctx context.Context, orgID, profileID uuid.UUID) ([]domain.ServiceLink, error)
+	ReplaceForProfile(ctx context.Context, orgID, profileID uuid.UUID, links []domain.ServiceLink, actor string) ([]domain.ServiceLink, error)
 }
 
 type Handler struct {
@@ -32,11 +32,11 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	tenantID, profileID, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, profileID, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	items, err := h.uc.ListByProfile(c.Request.Context(), tenantID, profileID)
+	items, err := h.uc.ListByProfile(c.Request.Context(), orgID, profileID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -50,7 +50,7 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Replace(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	tenantID, profileID, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, profileID, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -86,7 +86,7 @@ func (h *Handler) Replace(c *gin.Context) {
 			Metadata:          meta,
 		})
 	}
-	items, err := h.uc.ReplaceForProfile(c.Request.Context(), tenantID, profileID, links, a.Actor)
+	items, err := h.uc.ReplaceForProfile(c.Request.Context(), orgID, profileID, links, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -101,7 +101,7 @@ func (h *Handler) Replace(c *gin.Context) {
 func toServiceLinkItem(in domain.ServiceLink) dto.ServiceLinkItem {
 	item := dto.ServiceLinkItem{
 		ID:                in.ID.String(),
-		TenantID:          in.TenantID.String(),
+		OrgID:          in.OrgID.String(),
 		ProfileID:         in.ProfileID.String(),
 		ServiceID:         in.ServiceID.String(),
 		PublicDescription: in.PublicDescription,

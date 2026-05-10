@@ -82,7 +82,7 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
   const [error, setError] = useState('');
   const loading = tenantQuery.isPending || auditQuery.isPending;
   const [saving, setSaving] = useState(false);
-  const sessionTenantId = sessionQuery.data?.auth.tenant_id ?? '';
+  const sessionTenantId = sessionQuery.data?.auth.org_id ?? '';
   const isConsoleAdmin = sessionQuery.data?.auth.product_role === 'admin';
   const [auditExportBusy, setAuditExportBusy] = useState(false);
 

@@ -15,7 +15,7 @@ import (
 )
 
 type ListParams struct {
-	TenantID uuid.UUID
+	OrgID uuid.UUID
 	Limit    int
 	After    *uuid.UUID
 	Search   string
@@ -33,15 +33,15 @@ type UpdateInput struct {
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.DiningArea, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in domain.DiningArea) (domain.DiningArea, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.DiningArea, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.DiningArea, error)
 	Update(ctx context.Context, in domain.DiningArea) (domain.DiningArea, error)
-	Archive(ctx context.Context, tenantID, id uuid.UUID) error
-	Restore(ctx context.Context, tenantID, id uuid.UUID) error
-	Delete(ctx context.Context, tenantID, id uuid.UUID) error
+	Archive(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type Usecases struct {
@@ -67,13 +67,13 @@ func (u *Usecases) Create(ctx context.Context, in domain.DiningArea, actor strin
 		return domain.DiningArea{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.TenantID.String(), actor, "restaurant.area.created", "dining_area", out.ID.String(), map[string]any{"name": out.Name})
+		u.audit.Log(ctx, out.OrgID.String(), actor, "restaurant.area.created", "dining_area", out.ID.String(), map[string]any{"name": out.Name})
 	}
 	return out, nil
 }
 
-func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.DiningArea, error) {
-	out, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.DiningArea, error) {
+	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.DiningArea{}, fmt.Errorf("dining area not found: %w", httperrors.ErrNotFound)
@@ -83,8 +83,8 @@ func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.
 	return out, nil
 }
 
-func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (domain.DiningArea, error) {
-	current, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.DiningArea, error) {
+	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.DiningArea{}, fmt.Errorf("dining area not found: %w", httperrors.ErrNotFound)
@@ -117,46 +117,46 @@ func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in Update
 		return domain.DiningArea{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.TenantID.String(), actor, "restaurant.area.updated", "dining_area", out.ID.String(), nil)
+		u.audit.Log(ctx, out.OrgID.String(), actor, "restaurant.area.updated", "dining_area", out.ID.String(), nil)
 	}
 	return out, nil
 }
 
-func (u *Usecases) Archive(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Archive(ctx, tenantID, id); err != nil {
+func (u *Usecases) Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Archive(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("dining area not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "restaurant.area.archived", "dining_area", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "restaurant.area.archived", "dining_area", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("dining area not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "restaurant.area.restored", "dining_area", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "restaurant.area.restored", "dining_area", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) Delete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Delete(ctx, tenantID, id); err != nil {
+func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Delete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("dining area not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "restaurant.area.deleted", "dining_area", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "restaurant.area.deleted", "dining_area", id.String(), map[string]any{})
 	}
 	return nil
 }

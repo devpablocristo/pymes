@@ -12,11 +12,11 @@ import (
 )
 
 func (h *Handler) ListTemplates(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
-	tpls, err := h.uc.ListTemplates(c.Request.Context(), tenantID)
+	tpls, err := h.uc.ListTemplates(c.Request.Context(), orgID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -29,7 +29,7 @@ func (h *Handler) ListTemplates(c *gin.Context) {
 }
 
 func (h *Handler) CreateTemplate(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -42,7 +42,7 @@ func (h *Handler) CreateTemplate(c *gin.Context) {
 	for _, b := range body.Buttons {
 		buttons = append(buttons, domain.TemplateButton{Type: b.Type, Text: b.Text, URL: b.URL, Phone: b.Phone, Payload: b.Payload})
 	}
-	tpl, err := h.uc.CreateTemplate(c.Request.Context(), tenantID, domain.Template{Name: body.Name, Language: body.Language, Category: domain.TemplateCategory(body.Category), HeaderType: body.HeaderType, HeaderText: body.HeaderText, BodyText: body.BodyText, FooterText: body.FooterText, Buttons: buttons})
+	tpl, err := h.uc.CreateTemplate(c.Request.Context(), orgID, domain.Template{Name: body.Name, Language: body.Language, Category: domain.TemplateCategory(body.Category), HeaderType: body.HeaderType, HeaderText: body.HeaderText, BodyText: body.BodyText, FooterText: body.FooterText, Buttons: buttons})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -51,11 +51,11 @@ func (h *Handler) CreateTemplate(c *gin.Context) {
 }
 
 func (h *Handler) GetTemplate(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	tpl, err := h.uc.GetTemplate(c.Request.Context(), tenantID, id)
+	tpl, err := h.uc.GetTemplate(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -64,11 +64,11 @@ func (h *Handler) GetTemplate(c *gin.Context) {
 }
 
 func (h *Handler) DeleteTemplate(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.DeleteTemplate(c.Request.Context(), tenantID, id); err != nil {
+	if err := h.uc.DeleteTemplate(c.Request.Context(), orgID, id); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}

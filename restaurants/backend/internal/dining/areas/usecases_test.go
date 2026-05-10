@@ -41,9 +41,9 @@ func (r *fakeRepo) Create(_ context.Context, in domain.DiningArea) (domain.Dinin
 	return in, nil
 }
 
-func (r *fakeRepo) GetByID(_ context.Context, tenantID, id uuid.UUID) (domain.DiningArea, error) {
+func (r *fakeRepo) GetByID(_ context.Context, orgID, id uuid.UUID) (domain.DiningArea, error) {
 	a, ok := r.areas[id]
-	if !ok || a.TenantID != tenantID {
+	if !ok || a.OrgID != orgID {
 		return domain.DiningArea{}, gorm.ErrRecordNotFound
 	}
 	return a, nil
@@ -54,9 +54,9 @@ func (r *fakeRepo) Update(_ context.Context, in domain.DiningArea) (domain.Dinin
 	return in, nil
 }
 
-func (r *fakeRepo) Archive(_ context.Context, tenantID, id uuid.UUID) error {
+func (r *fakeRepo) Archive(_ context.Context, orgID, id uuid.UUID) error {
 	a, ok := r.areas[id]
-	if !ok || a.TenantID != tenantID {
+	if !ok || a.OrgID != orgID {
 		return gorm.ErrRecordNotFound
 	}
 	if a.DeletedAt == nil {
@@ -67,9 +67,9 @@ func (r *fakeRepo) Archive(_ context.Context, tenantID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *fakeRepo) Restore(_ context.Context, tenantID, id uuid.UUID) error {
+func (r *fakeRepo) Restore(_ context.Context, orgID, id uuid.UUID) error {
 	a, ok := r.areas[id]
-	if !ok || a.TenantID != tenantID {
+	if !ok || a.OrgID != orgID {
 		return gorm.ErrRecordNotFound
 	}
 	a.DeletedAt = nil
@@ -77,9 +77,9 @@ func (r *fakeRepo) Restore(_ context.Context, tenantID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *fakeRepo) Delete(_ context.Context, tenantID, id uuid.UUID) error {
+func (r *fakeRepo) Delete(_ context.Context, orgID, id uuid.UUID) error {
 	a, ok := r.areas[id]
-	if !ok || a.TenantID != tenantID || a.DeletedAt == nil {
+	if !ok || a.OrgID != orgID || a.DeletedAt == nil {
 		return gorm.ErrRecordNotFound
 	}
 	delete(r.areas, id)
@@ -102,9 +102,9 @@ func TestCreateHappyPath(t *testing.T) {
 	audit := &fakeAudit{}
 	uc := NewUsecases(repo, audit)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	out, err := uc.Create(context.Background(), domain.DiningArea{
-		TenantID: tenantID,
+		OrgID: orgID,
 		Name:     "Terraza",
 	}, "user-1")
 
@@ -127,7 +127,7 @@ func TestCreateNameTooShort(t *testing.T) {
 	uc := NewUsecases(newFakeRepo(), nil)
 
 	_, err := uc.Create(context.Background(), domain.DiningArea{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		Name:     "A",
 	}, "user-1")
 
@@ -145,7 +145,7 @@ func TestCreateTrimsWhitespace(t *testing.T) {
 	uc := NewUsecases(repo, nil)
 
 	out, err := uc.Create(context.Background(), domain.DiningArea{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		Name:     "  Terraza  ",
 	}, "user-1")
 
@@ -162,11 +162,11 @@ func TestGetByIDHappyPath(t *testing.T) {
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, nil)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	id := uuid.New()
-	repo.areas[id] = domain.DiningArea{ID: id, TenantID: tenantID, Name: "Barra"}
+	repo.areas[id] = domain.DiningArea{ID: id, OrgID: orgID, Name: "Barra"}
 
-	out, err := uc.GetByID(context.Background(), tenantID, id)
+	out, err := uc.GetByID(context.Background(), orgID, id)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -194,13 +194,13 @@ func TestUpdateHappyPath(t *testing.T) {
 	audit := &fakeAudit{}
 	uc := NewUsecases(repo, audit)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	id := uuid.New()
-	repo.areas[id] = domain.DiningArea{ID: id, TenantID: tenantID, Name: "Barra", SortOrder: 1}
+	repo.areas[id] = domain.DiningArea{ID: id, OrgID: orgID, Name: "Barra", SortOrder: 1}
 
 	newName := "Terraza"
 	newSort := 5
-	out, err := uc.Update(context.Background(), tenantID, id, UpdateInput{
+	out, err := uc.Update(context.Background(), orgID, id, UpdateInput{
 		Name:      &newName,
 		SortOrder: &newSort,
 	}, "user-1")
@@ -238,12 +238,12 @@ func TestUpdateNameTooShort(t *testing.T) {
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, nil)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	id := uuid.New()
-	repo.areas[id] = domain.DiningArea{ID: id, TenantID: tenantID, Name: "Barra"}
+	repo.areas[id] = domain.DiningArea{ID: id, OrgID: orgID, Name: "Barra"}
 
 	short := "X"
-	_, err := uc.Update(context.Background(), tenantID, id, UpdateInput{Name: &short}, "user-1")
+	_, err := uc.Update(context.Background(), orgID, id, UpdateInput{Name: &short}, "user-1")
 	if err == nil {
 		t.Fatal("expected validation error")
 	}
@@ -257,11 +257,11 @@ func TestListReturnsItems(t *testing.T) {
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, nil)
 
-	tenantID := uuid.New()
-	repo.areas[uuid.New()] = domain.DiningArea{TenantID: tenantID, Name: "A"}
-	repo.areas[uuid.New()] = domain.DiningArea{TenantID: tenantID, Name: "B"}
+	orgID := uuid.New()
+	repo.areas[uuid.New()] = domain.DiningArea{OrgID: orgID, Name: "A"}
+	repo.areas[uuid.New()] = domain.DiningArea{OrgID: orgID, Name: "B"}
 
-	items, total, _, _, err := uc.List(context.Background(), ListParams{TenantID: tenantID})
+	items, total, _, _, err := uc.List(context.Background(), ListParams{OrgID: orgID})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -279,26 +279,26 @@ func TestArchiveRestoreAndDelete(t *testing.T) {
 	audit := &fakeAudit{}
 	uc := NewUsecases(repo, audit)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	id := uuid.New()
-	repo.areas[id] = domain.DiningArea{ID: id, TenantID: tenantID, Name: "Barra"}
+	repo.areas[id] = domain.DiningArea{ID: id, OrgID: orgID, Name: "Barra"}
 
-	if err := uc.Archive(context.Background(), tenantID, id, "user-1"); err != nil {
+	if err := uc.Archive(context.Background(), orgID, id, "user-1"); err != nil {
 		t.Fatalf("archive: %v", err)
 	}
 	if repo.areas[id].DeletedAt == nil {
 		t.Fatal("expected archived area to have DeletedAt")
 	}
-	if err := uc.Restore(context.Background(), tenantID, id, "user-1"); err != nil {
+	if err := uc.Restore(context.Background(), orgID, id, "user-1"); err != nil {
 		t.Fatalf("restore: %v", err)
 	}
 	if repo.areas[id].DeletedAt != nil {
 		t.Fatal("expected restored area to clear DeletedAt")
 	}
-	if err := uc.Archive(context.Background(), tenantID, id, "user-1"); err != nil {
+	if err := uc.Archive(context.Background(), orgID, id, "user-1"); err != nil {
 		t.Fatalf("archive before delete: %v", err)
 	}
-	if err := uc.Delete(context.Background(), tenantID, id, "user-1"); err != nil {
+	if err := uc.Delete(context.Background(), orgID, id, "user-1"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	if _, ok := repo.areas[id]; ok {

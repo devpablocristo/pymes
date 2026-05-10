@@ -17,13 +17,13 @@ import (
 )
 
 type usecasesPort interface {
-	RequestUpload(ctx context.Context, tenantID uuid.UUID, entityType string, entityID uuid.UUID, fileName, contentType string, sizeBytes int64) (attachmentdomain.UploadRequest, error)
+	RequestUpload(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, fileName, contentType string, sizeBytes int64) (attachmentdomain.UploadRequest, error)
 	SaveUpload(ctx context.Context, in attachmentdomain.Attachment) (attachmentdomain.Attachment, error)
 	UploadContent(ctx context.Context, storageKey string, body io.Reader) error
-	GetDownloadLink(ctx context.Context, tenantID, id uuid.UUID) (attachmentdomain.Attachment, attachmentdomain.DownloadLink, error)
-	OpenContent(ctx context.Context, tenantID, id uuid.UUID) (attachmentdomain.Attachment, *os.File, error)
-	Delete(ctx context.Context, tenantID, id uuid.UUID) error
-	ListByEntity(ctx context.Context, tenantID uuid.UUID, entityType string, entityID uuid.UUID, limit int) ([]attachmentdomain.Attachment, error)
+	GetDownloadLink(ctx context.Context, orgID, id uuid.UUID) (attachmentdomain.Attachment, attachmentdomain.DownloadLink, error)
+	OpenContent(ctx context.Context, orgID, id uuid.UUID) (attachmentdomain.Attachment, *os.File, error)
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
+	ListByEntity(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, limit int) ([]attachmentdomain.Attachment, error)
 }
 
 type requestUploadRequest struct {
@@ -58,7 +58,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup) {
 }
 
 func (h *Handler) RequestUpload(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -72,7 +72,7 @@ func (h *Handler) RequestUpload(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid entity_id")
 		return
 	}
-	out, err := h.uc.RequestUpload(c.Request.Context(), tenantID, req.EntityType, entityID, req.FileName, req.ContentType, req.SizeBytes)
+	out, err := h.uc.RequestUpload(c.Request.Context(), orgID, req.EntityType, entityID, req.FileName, req.ContentType, req.SizeBytes)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -94,7 +94,7 @@ func (h *Handler) UploadContent(c *gin.Context) {
 }
 
 func (h *Handler) ConfirmUpload(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -109,7 +109,7 @@ func (h *Handler) ConfirmUpload(c *gin.Context) {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	out, err := h.uc.SaveUpload(c.Request.Context(), attachmentdomain.Attachment{TenantID: tenantID, AttachableType: strings.TrimSpace(req.EntityType), AttachableID: entityID, FileName: strings.TrimSpace(req.FileName), ContentType: strings.TrimSpace(req.ContentType), SizeBytes: req.SizeBytes, StorageKey: strings.TrimSpace(req.StorageKey), UploadedBy: auth.Actor})
+	out, err := h.uc.SaveUpload(c.Request.Context(), attachmentdomain.Attachment{OrgID: orgID, AttachableType: strings.TrimSpace(req.EntityType), AttachableID: entityID, FileName: strings.TrimSpace(req.FileName), ContentType: strings.TrimSpace(req.ContentType), SizeBytes: req.SizeBytes, StorageKey: strings.TrimSpace(req.StorageKey), UploadedBy: auth.Actor})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -118,11 +118,11 @@ func (h *Handler) ConfirmUpload(c *gin.Context) {
 }
 
 func (h *Handler) GetURL(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	_, link, err := h.uc.GetDownloadLink(c.Request.Context(), tenantID, id)
+	_, link, err := h.uc.GetDownloadLink(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -131,11 +131,11 @@ func (h *Handler) GetURL(c *gin.Context) {
 }
 
 func (h *Handler) Download(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	item, file, err := h.uc.OpenContent(c.Request.Context(), tenantID, id)
+	item, file, err := h.uc.OpenContent(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -146,11 +146,11 @@ func (h *Handler) Download(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Delete(c.Request.Context(), tenantID, id); err != nil {
+	if err := h.uc.Delete(c.Request.Context(), orgID, id); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -158,7 +158,7 @@ func (h *Handler) Delete(c *gin.Context) {
 }
 
 func (h *Handler) ListByEntity(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -167,7 +167,7 @@ func (h *Handler) ListByEntity(c *gin.Context) {
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.ListByEntity(c.Request.Context(), tenantID, strings.TrimSpace(c.Param("entity")), entityID, limit)
+	items, err := h.uc.ListByEntity(c.Request.Context(), orgID, strings.TrimSpace(c.Param("entity")), entityID, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

@@ -15,14 +15,14 @@ import (
 )
 
 type usecasesPort interface {
-	ListRoles(ctx context.Context, tenantID string) ([]rbacdomain.Role, error)
-	GetRole(ctx context.Context, tenantID, roleID string) (rbacdomain.Role, error)
-	CreateRole(ctx context.Context, tenantID, actor, name, description string, perms []rbacdomain.Permission) (rbacdomain.Role, error)
-	UpdateRole(ctx context.Context, tenantID, roleID, actor string, description *string, permissions []rbacdomain.Permission) (rbacdomain.Role, error)
-	DeleteRole(ctx context.Context, tenantID, roleID, actor string) error
-	AssignRole(ctx context.Context, tenantID, roleID, userID, actor string) error
-	RemoveRole(ctx context.Context, tenantID, roleID, userID, actor string) error
-	EffectivePermissions(ctx context.Context, tenantID, userID string) (map[string][]string, error)
+	ListRoles(ctx context.Context, orgID string) ([]rbacdomain.Role, error)
+	GetRole(ctx context.Context, orgID, roleID string) (rbacdomain.Role, error)
+	CreateRole(ctx context.Context, orgID, actor, name, description string, perms []rbacdomain.Permission) (rbacdomain.Role, error)
+	UpdateRole(ctx context.Context, orgID, roleID, actor string, description *string, permissions []rbacdomain.Permission) (rbacdomain.Role, error)
+	DeleteRole(ctx context.Context, orgID, roleID, actor string) error
+	AssignRole(ctx context.Context, orgID, roleID, userID, actor string) error
+	RemoveRole(ctx context.Context, orgID, roleID, userID, actor string) error
+	EffectivePermissions(ctx context.Context, orgID, userID string) (map[string][]string, error)
 }
 
 type Handler struct {
@@ -49,7 +49,7 @@ func (h *Handler) ListRoles(c *gin.Context) {
 	if !ok {
 		return
 	}
-	roles, err := h.uc.ListRoles(c.Request.Context(), authCtx.TenantID)
+	roles, err := h.uc.ListRoles(c.Request.Context(), authCtx.OrgID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -71,7 +71,7 @@ func (h *Handler) CreateRole(c *gin.Context) {
 
 	out, err := h.uc.CreateRole(
 		c.Request.Context(),
-		authCtx.TenantID,
+		authCtx.OrgID,
 		authCtx.Actor,
 		req.Name,
 		req.Description,
@@ -89,7 +89,7 @@ func (h *Handler) GetRole(c *gin.Context) {
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetRole(c.Request.Context(), authCtx.TenantID, c.Param("id"))
+	out, err := h.uc.GetRole(c.Request.Context(), authCtx.OrgID, c.Param("id"))
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -111,7 +111,7 @@ func (h *Handler) UpdateRole(c *gin.Context) {
 	if req.Permissions != nil {
 		perms = toPermissions(req.Permissions)
 	}
-	updated, err := h.uc.UpdateRole(c.Request.Context(), authCtx.TenantID, c.Param("id"), authCtx.Actor, req.Description, perms)
+	updated, err := h.uc.UpdateRole(c.Request.Context(), authCtx.OrgID, c.Param("id"), authCtx.Actor, req.Description, perms)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -124,7 +124,7 @@ func (h *Handler) DeleteRole(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.uc.DeleteRole(c.Request.Context(), authCtx.TenantID, c.Param("id"), authCtx.Actor); err != nil {
+	if err := h.uc.DeleteRole(c.Request.Context(), authCtx.OrgID, c.Param("id"), authCtx.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -136,7 +136,7 @@ func (h *Handler) AssignRole(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.uc.AssignRole(c.Request.Context(), authCtx.TenantID, c.Param("id"), c.Param("user_id"), authCtx.Actor); err != nil {
+	if err := h.uc.AssignRole(c.Request.Context(), authCtx.OrgID, c.Param("id"), c.Param("user_id"), authCtx.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -148,7 +148,7 @@ func (h *Handler) RemoveRole(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.uc.RemoveRole(c.Request.Context(), authCtx.TenantID, c.Param("id"), c.Param("user_id"), authCtx.Actor); err != nil {
+	if err := h.uc.RemoveRole(c.Request.Context(), authCtx.OrgID, c.Param("id"), c.Param("user_id"), authCtx.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -160,7 +160,7 @@ func (h *Handler) UserPermissions(c *gin.Context) {
 	if !ok {
 		return
 	}
-	permissions, err := h.uc.EffectivePermissions(c.Request.Context(), authCtx.TenantID, c.Param("user_id"))
+	permissions, err := h.uc.EffectivePermissions(c.Request.Context(), authCtx.OrgID, c.Param("user_id"))
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

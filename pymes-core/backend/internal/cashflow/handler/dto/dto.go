@@ -2,7 +2,7 @@ package dto
 
 type CashMovementItem struct {
 	ID            string   `json:"id"`
-	TenantID      string   `json:"tenant_id"`
+	OrgID      string   `json:"org_id"`
 	BranchID      string   `json:"branch_id,omitempty"`
 	Type          string   `json:"type"`
 	Amount        float64  `json:"amount"`
@@ -49,7 +49,7 @@ type CreateCashMovementRequest struct {
 }
 
 type CashSummaryResponse struct {
-	TenantID     string  `json:"tenant_id"`
+	OrgID     string  `json:"org_id"`
 	PeriodStart  string  `json:"period_start"`
 	PeriodEnd    string  `json:"period_end"`
 	TotalIncome  float64 `json:"total_income"`

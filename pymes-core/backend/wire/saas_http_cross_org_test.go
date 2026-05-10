@@ -11,7 +11,7 @@ type crossOrgJWTVerifier struct{}
 
 func (crossOrgJWTVerifier) Verify(_ context.Context, _ string) (tenantPrincipal, error) {
 	return tenantPrincipal{
-		TenantID:   "org-a",
+		OrgID:   "org-a",
 		Actor:      "user-1",
 		Role:       "admin",
 		Scopes:     []string{"admin:console:write"},
@@ -24,7 +24,7 @@ func TestHandleListMembers_DeniesCrossOrgAccess(t *testing.T) {
 
 	mux := http.NewServeMux()
 	authMW := newTenantAuthMiddleware(crossOrgJWTVerifier{}, nil)
-	registerProtected(mux, authMW, "GET /tenants/{tenant_id}/members", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "GET /tenants/{org_id}/members", func(w http.ResponseWriter, r *http.Request) {
 		handleListMembers(w, r, nil)
 	})
 
@@ -44,7 +44,7 @@ func TestHandleListAPIKeys_DeniesAPIKeyCaller(t *testing.T) {
 
 	mux := http.NewServeMux()
 	authMW := newTenantAuthMiddleware(nil, sessionStubAPIKeyVerifier{})
-	registerProtected(mux, authMW, "GET /tenants/{tenant_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "GET /tenants/{org_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
 		handleListAPIKeys(w, r, nil)
 	})
 

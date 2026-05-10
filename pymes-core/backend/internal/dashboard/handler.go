@@ -40,7 +40,7 @@ func (h *Handler) WidgetData(c *gin.Context) {
 
 func readViewer(c *gin.Context) (dashboarddomain.Viewer, bool) {
 	authCtx := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(strings.TrimSpace(authCtx.TenantID))
+	orgID, err := uuid.Parse(strings.TrimSpace(authCtx.OrgID))
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return dashboarddomain.Viewer{}, false
@@ -55,7 +55,7 @@ func readViewer(c *gin.Context) (dashboarddomain.Viewer, bool) {
 		branchID = &id
 	}
 	return dashboarddomain.Viewer{
-		TenantID: tenantID,
+		OrgID: orgID,
 		BranchID: branchID,
 		Actor:    strings.TrimSpace(authCtx.Actor),
 		Role:     strings.TrimSpace(authCtx.Role),

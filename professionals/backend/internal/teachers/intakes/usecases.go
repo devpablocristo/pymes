@@ -14,22 +14,22 @@ import (
 )
 
 type ListParams struct {
-	TenantID uuid.UUID
+	OrgID uuid.UUID
 	Archived bool
 }
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.Intake, error)
 	Create(ctx context.Context, in domain.Intake) (domain.Intake, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Intake, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Intake, error)
 	Update(ctx context.Context, in domain.Intake) (domain.Intake, error)
-	Archive(ctx context.Context, tenantID, id uuid.UUID) error
-	Restore(ctx context.Context, tenantID, id uuid.UUID) error
-	Delete(ctx context.Context, tenantID, id uuid.UUID) error
+	Archive(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type Usecases struct {
@@ -65,13 +65,13 @@ func (u *Usecases) Create(ctx context.Context, in domain.Intake, actor string) (
 		return domain.Intake{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.TenantID.String(), actor, "intake.created", "intake", out.ID.String(), map[string]any{"status": out.Status})
+		u.audit.Log(ctx, out.OrgID.String(), actor, "intake.created", "intake", out.ID.String(), map[string]any{"status": out.Status})
 	}
 	return out, nil
 }
 
-func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Intake, error) {
-	out, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Intake, error) {
+	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Intake{}, fmt.Errorf("intake not found: %w", httperrors.ErrNotFound)
@@ -90,8 +90,8 @@ type UpdateInput struct {
 	Payload         *map[string]any
 }
 
-func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (domain.Intake, error) {
-	current, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Intake, error) {
+	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Intake{}, fmt.Errorf("intake not found: %w", httperrors.ErrNotFound)
@@ -133,7 +133,7 @@ func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in Update
 		return domain.Intake{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.TenantID.String(), actor, "intake.updated", "intake", out.ID.String(), map[string]any{"status": out.Status})
+		u.audit.Log(ctx, out.OrgID.String(), actor, "intake.updated", "intake", out.ID.String(), map[string]any{"status": out.Status})
 	}
 	return out, nil
 }
@@ -146,8 +146,8 @@ func normalizeServiceID(serviceID *uuid.UUID) *uuid.UUID {
 	return nil
 }
 
-func (u *Usecases) Submit(ctx context.Context, tenantID, id uuid.UUID, actor string) (domain.Intake, error) {
-	current, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) Submit(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.Intake, error) {
+	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Intake{}, fmt.Errorf("intake not found: %w", httperrors.ErrNotFound)
@@ -166,46 +166,46 @@ func (u *Usecases) Submit(ctx context.Context, tenantID, id uuid.UUID, actor str
 		return domain.Intake{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.TenantID.String(), actor, "intake.submitted", "intake", out.ID.String(), map[string]any{})
+		u.audit.Log(ctx, out.OrgID.String(), actor, "intake.submitted", "intake", out.ID.String(), map[string]any{})
 	}
 	return out, nil
 }
 
-func (u *Usecases) Archive(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Archive(ctx, tenantID, id); err != nil {
+func (u *Usecases) Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Archive(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("intake not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "intake.archived", "intake", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "intake.archived", "intake", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("intake not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "intake.restored", "intake", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "intake.restored", "intake", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) Delete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Delete(ctx, tenantID, id); err != nil {
+func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Delete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("intake not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "intake.deleted", "intake", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "intake.deleted", "intake", id.String(), map[string]any{})
 	}
 	return nil
 }

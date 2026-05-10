@@ -189,7 +189,7 @@ seed_tenant_slug_exists() {
     found="$(
       host_pymes_psql \
         -Atq -v ON_ERROR_STOP=1 \
-        -c "SELECT 1 FROM tenants WHERE slug = '$slug_sql' LIMIT 1;" \
+        -c "SELECT 1 FROM orgs WHERE slug = '$slug_sql' LIMIT 1;" \
         2>/dev/null || true
     )"
     found="$(printf '%s' "$found" | tr -d '[:space:]')"
@@ -198,7 +198,7 @@ seed_tenant_slug_exists() {
 
   found="$(
     dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 \
-      -c "SELECT 1 FROM tenants WHERE slug = '$slug_sql' LIMIT 1;" \
+      -c "SELECT 1 FROM orgs WHERE slug = '$slug_sql' LIMIT 1;" \
       2>/dev/null || true
   )"
   found="$(printf '%s' "$found" | tr -d '[:space:]')"
@@ -223,13 +223,17 @@ require_seed_tenant_selector() {
     return
   fi
 
-  PYMES_SEED_DEMO_TENANT_EXTERNAL_ID="org_local_demo"
+  # No usar prefijo "org_": el fallback de saas_store_tenant_access.go
+  # interpreta orgs.external_id como clerk_org_id cuando empieza con "org_",
+  # y eso hace que el frontend intente clerk.setActive() con un id falso →
+  # promesa que cuelga → onboarding atascado en spinner infinito.
+  PYMES_SEED_DEMO_TENANT_EXTERNAL_ID="demo_local_demo"
   export PYMES_SEED_DEMO_TENANT_EXTERNAL_ID
 }
 
 require_seed_tenant_external_id() {
   if [[ -z "${PYMES_SEED_DEMO_TENANT_EXTERNAL_ID:-}" ]]; then
-    PYMES_SEED_DEMO_TENANT_EXTERNAL_ID="org_local_demo"
+    PYMES_SEED_DEMO_TENANT_EXTERNAL_ID="demo_local_demo"
     export PYMES_SEED_DEMO_TENANT_EXTERNAL_ID
   fi
 }
@@ -241,7 +245,7 @@ resolve_target_tenant_uuid_by_slug() {
 
   tenant_uuid="$(
     dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 \
-      -c "SELECT cast(id as text) FROM tenants WHERE slug = '$slug_sql';"
+      -c "SELECT cast(id as text) FROM orgs WHERE slug = '$slug_sql';"
   )"
   tenant_uuid="$(printf '%s' "$tenant_uuid" | tr -d '[:space:]')"
   if [[ -n "$tenant_uuid" ]]; then
@@ -253,7 +257,7 @@ resolve_target_tenant_uuid_by_slug() {
     tenant_uuid="$(
       host_pymes_psql \
         -Atq -v ON_ERROR_STOP=1 \
-        -c "SELECT cast(id as text) FROM tenants WHERE slug = '$slug_sql';" \
+        -c "SELECT cast(id as text) FROM orgs WHERE slug = '$slug_sql';" \
         2>/dev/null || true
     )"
     tenant_uuid="$(printf '%s' "$tenant_uuid" | tr -d '[:space:]')"
@@ -300,7 +304,7 @@ resolve_target_tenant_uuid() {
   local tenant_uuid
   tenant_uuid="$(
     dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 \
-      -c "SELECT cast(id as text) FROM tenants WHERE external_id = '$external_id_sql';"
+      -c "SELECT cast(id as text) FROM orgs WHERE external_id = '$external_id_sql';"
   )"
   tenant_uuid="$(printf '%s' "$tenant_uuid" | tr -d '[:space:]')"
   if [[ -n "$tenant_uuid" ]]; then
@@ -312,7 +316,7 @@ resolve_target_tenant_uuid() {
     tenant_uuid="$(
       host_pymes_psql \
         -Atq -v ON_ERROR_STOP=1 \
-        -c "SELECT cast(id as text) FROM tenants WHERE external_id = '$external_id_sql';" \
+        -c "SELECT cast(id as text) FROM orgs WHERE external_id = '$external_id_sql';" \
         2>/dev/null || true
     )"
     tenant_uuid="$(printf '%s' "$tenant_uuid" | tr -d '[:space:]')"

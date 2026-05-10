@@ -18,10 +18,10 @@ type Repository struct {
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
-func (r *Repository) ListByProfile(ctx context.Context, tenantID, profileID uuid.UUID) ([]domain.ServiceLink, error) {
+func (r *Repository) ListByProfile(ctx context.Context, orgID, profileID uuid.UUID) ([]domain.ServiceLink, error) {
 	var rows []models.ServiceLinkModel
 	err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND profile_id = ?", tenantID, profileID).
+		Where("org_id = ? AND profile_id = ?", orgID, profileID).
 		Order("display_order ASC, created_at ASC").
 		Find(&rows).Error
 	if err != nil {
@@ -34,9 +34,9 @@ func (r *Repository) ListByProfile(ctx context.Context, tenantID, profileID uuid
 	return out, nil
 }
 
-func (r *Repository) ReplaceForProfile(ctx context.Context, tenantID, profileID uuid.UUID, links []domain.ServiceLink) ([]domain.ServiceLink, error) {
+func (r *Repository) ReplaceForProfile(ctx context.Context, orgID, profileID uuid.UUID, links []domain.ServiceLink) ([]domain.ServiceLink, error) {
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("tenant_id = ? AND profile_id = ?", tenantID, profileID).
+		if err := tx.Where("org_id = ? AND profile_id = ?", orgID, profileID).
 			Delete(&models.ServiceLinkModel{}).Error; err != nil {
 			return err
 		}
@@ -44,7 +44,7 @@ func (r *Repository) ReplaceForProfile(ctx context.Context, tenantID, profileID 
 			meta, _ := json.Marshal(link.Metadata)
 			row := models.ServiceLinkModel{
 				ID:                uuid.New(),
-				TenantID:          tenantID,
+				OrgID:          orgID,
 				ProfileID:         profileID,
 				ServiceID:         link.ServiceID,
 				PublicDescription: link.PublicDescription,
@@ -63,13 +63,13 @@ func (r *Repository) ReplaceForProfile(ctx context.Context, tenantID, profileID 
 	if err != nil {
 		return nil, err
 	}
-	return r.ListByProfile(ctx, tenantID, profileID)
+	return r.ListByProfile(ctx, orgID, profileID)
 }
 
-func (r *Repository) ListByTenant(ctx context.Context, tenantID uuid.UUID) ([]domain.ServiceLink, error) {
+func (r *Repository) ListByTenant(ctx context.Context, orgID uuid.UUID) ([]domain.ServiceLink, error) {
 	var rows []models.ServiceLinkModel
 	err := r.db.WithContext(ctx).
-		Where("tenant_id = ?", tenantID).
+		Where("org_id = ?", orgID).
 		Order("display_order ASC, created_at ASC").
 		Find(&rows).Error
 	if err != nil {
@@ -92,7 +92,7 @@ func toDomain(row models.ServiceLinkModel) domain.ServiceLink {
 	}
 	return domain.ServiceLink{
 		ID:                row.ID,
-		TenantID:          row.TenantID,
+		OrgID:          row.OrgID,
 		ProfileID:         row.ProfileID,
 		ServiceID:         row.ServiceID,
 		PublicDescription: row.PublicDescription,

@@ -50,7 +50,7 @@ func TestCreateDefaultsCurrency(t *testing.T) {
 	uc := NewUsecases(repo, nil, nil)
 
 	out, err := uc.Create(context.Background(), productdomain.Product{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		Name:     "Producto demo",
 		ImageURL: "  https://cdn.example.com/p.png  ",
 	}, "tester")
@@ -78,7 +78,7 @@ func TestCreateSyncsPrimaryFromImageURLs(t *testing.T) {
 	uc := NewUsecases(repo, nil, nil)
 
 	out, err := uc.Create(context.Background(), productdomain.Product{
-		TenantID:  uuid.New(),
+		OrgID:  uuid.New(),
 		Name:      "Multifoto",
 		ImageURLs: []string{"  https://a.example/x.png  ", "https://b.example/y.png"},
 	}, "tester")
@@ -101,7 +101,7 @@ func TestCreateAcceptsLargeDataURLImages(t *testing.T) {
 	dataURL := "data:image/png;base64," + string(make([]byte, 20_000))
 
 	out, err := uc.Create(context.Background(), productdomain.Product{
-		TenantID:  uuid.New(),
+		OrgID:  uuid.New(),
 		Name:      "Foto local",
 		ImageURLs: []string{dataURL},
 	}, "tester")
@@ -141,17 +141,17 @@ func TestUpdateRejectsArchivedProductWithConflict(t *testing.T) {
 	t.Parallel()
 
 	archivedAt := time.Now().UTC()
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	prodID := uuid.New()
 	repo := &captureProductRepo{existing: &productdomain.Product{
 		ID:        prodID,
-		TenantID:  tenantID,
+		OrgID:  orgID,
 		Name:      "Producto archivado",
 		DeletedAt: &archivedAt,
 	}}
 	uc := NewUsecases(repo, nil, nil)
 
-	_, err := uc.Update(context.Background(), tenantID, prodID, UpdateInput{}, "tester")
+	_, err := uc.Update(context.Background(), orgID, prodID, UpdateInput{}, "tester")
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -165,11 +165,11 @@ func TestUpdateRejectsArchivedProductWithConflict(t *testing.T) {
 func TestUpdatePreservesImageURLsWhenOnlyImageURLSent(t *testing.T) {
 	t.Parallel()
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	prodID := uuid.New()
 	existing := productdomain.Product{
 		ID:        prodID,
-		TenantID:  tenantID,
+		OrgID:  orgID,
 		Name:      "Galería intacta",
 		ImageURL:  "https://a.example/thumb-old.png",
 		ImageURLs: []string{"https://a.example/1.png", "https://a.example/2.png"},
@@ -178,7 +178,7 @@ func TestUpdatePreservesImageURLsWhenOnlyImageURLSent(t *testing.T) {
 	uc := NewUsecases(repo, nil, nil)
 
 	newPrimary := "https://a.example/thumb-new.png"
-	_, err := uc.Update(context.Background(), tenantID, prodID, UpdateInput{ImageURL: &newPrimary}, "tester")
+	_, err := uc.Update(context.Background(), orgID, prodID, UpdateInput{ImageURL: &newPrimary}, "tester")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -195,11 +195,11 @@ func TestUpdatePreservesImageURLsWhenOnlyImageURLSent(t *testing.T) {
 func TestUpdateWithEmptyImageURLsClearsGallery(t *testing.T) {
 	t.Parallel()
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	prodID := uuid.New()
 	existing := productdomain.Product{
 		ID:        prodID,
-		TenantID:  tenantID,
+		OrgID:  orgID,
 		Name:      "Limpiar galería",
 		ImageURL:  "https://a.example/1.png",
 		ImageURLs: []string{"https://a.example/1.png", "https://a.example/2.png"},
@@ -208,7 +208,7 @@ func TestUpdateWithEmptyImageURLsClearsGallery(t *testing.T) {
 	uc := NewUsecases(repo, nil, nil)
 
 	empty := []string{}
-	_, err := uc.Update(context.Background(), tenantID, prodID, UpdateInput{ImageURLs: &empty}, "tester")
+	_, err := uc.Update(context.Background(), orgID, prodID, UpdateInput{ImageURLs: &empty}, "tester")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

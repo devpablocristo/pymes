@@ -31,9 +31,9 @@ func (s *pymesSaaSStore) ListTenantsForUser(ctx context.Context, userExternalID 
 		Role       string
 	}
 	if err := s.db.WithContext(ctx).
-		Table("tenants AS t").
+		Table("orgs AS t").
 		Select("t.id, t.name, t.slug, t.external_id, t.clerk_org_id, tm.role").
-		Joins("JOIN tenant_memberships tm ON tm.tenant_id = t.id AND tm.status = 'active'").
+		Joins("JOIN org_members tm ON tm.org_id = t.id AND tm.status = 'active'").
 		Joins("JOIN users u ON u.id = tm.user_id AND u.deleted_at IS NULL").
 		Where("u.external_id = ?", strings.TrimSpace(userExternalID)).
 		Order("t.name ASC").
@@ -64,10 +64,10 @@ func (s *pymesSaaSStore) ListTenantsForUser(ctx context.Context, userExternalID 
 	return items, nil
 }
 
-func (s *pymesSaaSStore) UpdateTenantMemberRole(ctx context.Context, tenantID, userID, role string) (tenantMemberDTO, error) {
-	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
+func (s *pymesSaaSStore) UpdateTenantMemberRole(ctx context.Context, orgID, userID, role string) (tenantMemberDTO, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
-		return tenantMemberDTO{}, domainerr.Validation("invalid tenant_id")
+		return tenantMemberDTO{}, domainerr.Validation("invalid org_id")
 	}
 	userUUID, err := uuid.Parse(strings.TrimSpace(userID))
 	if err != nil {
@@ -76,7 +76,7 @@ func (s *pymesSaaSStore) UpdateTenantMemberRole(ctx context.Context, tenantID, u
 	role = normalizeInviteRole(role)
 	var row pymesTenantMembershipRow
 	if err := s.db.WithContext(ctx).
-		Where("tenant_id = ? AND user_id = ? AND status = 'active'", tenantUUID, userUUID).
+		Where("org_id = ? AND user_id = ? AND status = 'active'", tenantUUID, userUUID).
 		Preload("User").
 		Take(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -96,10 +96,10 @@ func (s *pymesSaaSStore) UpdateTenantMemberRole(ctx context.Context, tenantID, u
 	return memberDTOFromRow(row), nil
 }
 
-func (s *pymesSaaSStore) RemoveTenantMember(ctx context.Context, tenantID, userID string) error {
-	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
+func (s *pymesSaaSStore) RemoveTenantMember(ctx context.Context, orgID, userID string) error {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
-		return domainerr.Validation("invalid tenant_id")
+		return domainerr.Validation("invalid org_id")
 	}
 	userUUID, err := uuid.Parse(strings.TrimSpace(userID))
 	if err != nil {
@@ -108,7 +108,7 @@ func (s *pymesSaaSStore) RemoveTenantMember(ctx context.Context, tenantID, userI
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var row pymesTenantMembershipRow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("tenant_id = ? AND user_id = ? AND status = 'active'", tenantUUID, userUUID).
+			Where("org_id = ? AND user_id = ? AND status = 'active'", tenantUUID, userUUID).
 			Preload("User").
 			Take(&row).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -144,16 +144,16 @@ func (s *pymesSaaSStore) RemoveTenantMember(ctx context.Context, tenantID, userI
 	})
 }
 
-func (s *pymesSaaSStore) TransferTenantOwnership(ctx context.Context, tenantID, actorExternalID, nextOwnerUserID string) error {
-	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
+func (s *pymesSaaSStore) TransferTenantOwnership(ctx context.Context, orgID, actorExternalID, nextOwnerUserID string) error {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
-		return domainerr.Validation("invalid tenant_id")
+		return domainerr.Validation("invalid org_id")
 	}
 	nextOwnerUUID, err := uuid.Parse(strings.TrimSpace(nextOwnerUserID))
 	if err != nil {
 		return domainerr.Validation("invalid user_id")
 	}
-	actor, err := s.requireTenantOwner(ctx, tenantID, actorExternalID)
+	actor, err := s.requireTenantOwner(ctx, orgID, actorExternalID)
 	if err != nil {
 		return err
 	}
@@ -163,13 +163,13 @@ func (s *pymesSaaSStore) TransferTenantOwnership(ctx context.Context, tenantID, 
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var current pymesTenantMembershipRow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("tenant_id = ? AND user_id = ? AND role = 'owner' AND status = 'active'", tenantUUID, actor.ID).
+			Where("org_id = ? AND user_id = ? AND role = 'owner' AND status = 'active'", tenantUUID, actor.ID).
 			Take(&current).Error; err != nil {
 			return err
 		}
 		var next pymesTenantMembershipRow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("tenant_id = ? AND user_id = ? AND status = 'active'", tenantUUID, nextOwnerUUID).
+			Where("org_id = ? AND user_id = ? AND status = 'active'", tenantUUID, nextOwnerUUID).
 			Take(&next).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("next owner member not found")

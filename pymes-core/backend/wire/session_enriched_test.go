@@ -13,7 +13,7 @@ type sessionStubJWTVerifier struct{}
 func (sessionStubJWTVerifier) Verify(ctx context.Context, token string) (tenantPrincipal, error) {
 	_ = token
 	return tenantPrincipal{
-		TenantID:   "org-uuid",
+		OrgID:   "org-uuid",
 		Actor:      "user_xxx",
 		Role:       "viewer",
 		Scopes:     []string{},
@@ -26,7 +26,7 @@ type sessionStubAPIKeyVerifier struct{}
 func (sessionStubAPIKeyVerifier) Verify(ctx context.Context, token string) (tenantPrincipal, error) {
 	_ = token
 	return tenantPrincipal{
-		TenantID:   "org-uuid",
+		OrgID:   "org-uuid",
 		Actor:      "api_key:key-1",
 		Role:       "service",
 		Scopes:     []string{},
@@ -70,8 +70,8 @@ func TestHandleSessionEnriched_ProductRoleUser(t *testing.T) {
 	if auth["product_role"] != "user" {
 		t.Fatalf("product_role=%v", auth["product_role"])
 	}
-	if auth["tenant_id"] != "org-uuid" {
-		t.Fatalf("tenant_id=%v", auth["tenant_id"])
+	if auth["org_id"] != "org-uuid" {
+		t.Fatalf("org_id =%v", auth["org_id"])
 	}
 }
 

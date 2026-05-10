@@ -42,9 +42,9 @@ func (r *fakeRepo) Create(_ context.Context, in domain.DiningTable) (domain.Dini
 	return in, nil
 }
 
-func (r *fakeRepo) GetByID(_ context.Context, tenantID, id uuid.UUID) (domain.DiningTable, error) {
+func (r *fakeRepo) GetByID(_ context.Context, orgID, id uuid.UUID) (domain.DiningTable, error) {
 	t, ok := r.tables[id]
-	if !ok || t.TenantID != tenantID {
+	if !ok || t.OrgID != orgID {
 		return domain.DiningTable{}, gorm.ErrRecordNotFound
 	}
 	return t, nil
@@ -58,9 +58,9 @@ func (r *fakeRepo) Update(_ context.Context, in domain.DiningTable) (domain.Dini
 	return in, nil
 }
 
-func (r *fakeRepo) Archive(_ context.Context, tenantID, id uuid.UUID) error {
+func (r *fakeRepo) Archive(_ context.Context, orgID, id uuid.UUID) error {
 	table, ok := r.tables[id]
-	if !ok || table.TenantID != tenantID {
+	if !ok || table.OrgID != orgID {
 		return gorm.ErrRecordNotFound
 	}
 	if table.DeletedAt == nil {
@@ -71,9 +71,9 @@ func (r *fakeRepo) Archive(_ context.Context, tenantID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *fakeRepo) Restore(_ context.Context, tenantID, id uuid.UUID) error {
+func (r *fakeRepo) Restore(_ context.Context, orgID, id uuid.UUID) error {
 	table, ok := r.tables[id]
-	if !ok || table.TenantID != tenantID {
+	if !ok || table.OrgID != orgID {
 		return gorm.ErrRecordNotFound
 	}
 	table.DeletedAt = nil
@@ -81,9 +81,9 @@ func (r *fakeRepo) Restore(_ context.Context, tenantID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *fakeRepo) Delete(_ context.Context, tenantID, id uuid.UUID) error {
+func (r *fakeRepo) Delete(_ context.Context, orgID, id uuid.UUID) error {
 	table, ok := r.tables[id]
-	if !ok || table.TenantID != tenantID || table.DeletedAt == nil {
+	if !ok || table.OrgID != orgID || table.DeletedAt == nil {
 		return gorm.ErrRecordNotFound
 	}
 	delete(r.tables, id)
@@ -107,9 +107,9 @@ func (a *fakeAudit) Log(_ context.Context, _, _, _, _, _ string, _ map[string]an
 	a.calls++
 }
 
-func validTable(tenantID, areaID uuid.UUID) domain.DiningTable {
+func validTable(orgID, areaID uuid.UUID) domain.DiningTable {
 	return domain.DiningTable{
-		TenantID: tenantID,
+		OrgID: orgID,
 		AreaID:   areaID,
 		Code:     "M01",
 		Label:    "Mesa 1",
@@ -126,9 +126,9 @@ func TestCreateHappyPath(t *testing.T) {
 	audit := &fakeAudit{}
 	uc := NewUsecases(repo, &fakeAreaLookup{exists: true}, audit)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	areaID := uuid.New()
-	out, err := uc.Create(context.Background(), validTable(tenantID, areaID), "user-1")
+	out, err := uc.Create(context.Background(), validTable(orgID, areaID), "user-1")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -226,11 +226,11 @@ func TestGetByIDHappyPath(t *testing.T) {
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, &fakeAreaLookup{exists: true}, nil)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	id := uuid.New()
-	repo.tables[id] = domain.DiningTable{ID: id, TenantID: tenantID, Code: "M01", Capacity: 4, Status: "available"}
+	repo.tables[id] = domain.DiningTable{ID: id, OrgID: orgID, Code: "M01", Capacity: 4, Status: "available"}
 
-	out, err := uc.GetByID(context.Background(), tenantID, id)
+	out, err := uc.GetByID(context.Background(), orgID, id)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -255,14 +255,14 @@ func TestUpdateHappyPath(t *testing.T) {
 	audit := &fakeAudit{}
 	uc := NewUsecases(repo, &fakeAreaLookup{exists: true}, audit)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	areaID := uuid.New()
 	id := uuid.New()
-	repo.tables[id] = domain.DiningTable{ID: id, TenantID: tenantID, AreaID: areaID, Code: "M01", Label: "Mesa 1", Capacity: 4, Status: "available"}
+	repo.tables[id] = domain.DiningTable{ID: id, OrgID: orgID, AreaID: areaID, Code: "M01", Label: "Mesa 1", Capacity: 4, Status: "available"}
 
 	newLabel := "Mesa VIP"
 	newCap := 6
-	out, err := uc.Update(context.Background(), tenantID, id, UpdateInput{
+	out, err := uc.Update(context.Background(), orgID, id, UpdateInput{
 		Label:    &newLabel,
 		Capacity: &newCap,
 	}, "user-1")
@@ -300,13 +300,13 @@ func TestUpdateDuplicateCode(t *testing.T) {
 	}
 	uc := NewUsecases(repo, &fakeAreaLookup{exists: true}, nil)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	areaID := uuid.New()
 	id := uuid.New()
-	repo.tables[id] = domain.DiningTable{ID: id, TenantID: tenantID, AreaID: areaID, Code: "M01", Capacity: 4, Status: "available"}
+	repo.tables[id] = domain.DiningTable{ID: id, OrgID: orgID, AreaID: areaID, Code: "M01", Capacity: 4, Status: "available"}
 
 	newCode := "M02"
-	_, err := uc.Update(context.Background(), tenantID, id, UpdateInput{Code: &newCode}, "user-1")
+	_, err := uc.Update(context.Background(), orgID, id, UpdateInput{Code: &newCode}, "user-1")
 	if !errors.Is(err, httperrors.ErrConflict) {
 		t.Errorf("expected ErrConflict, got %v", err)
 	}
@@ -317,11 +317,11 @@ func TestListReturnsItems(t *testing.T) {
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, &fakeAreaLookup{exists: true}, nil)
 
-	tenantID := uuid.New()
-	repo.tables[uuid.New()] = domain.DiningTable{TenantID: tenantID, Code: "M01"}
-	repo.tables[uuid.New()] = domain.DiningTable{TenantID: tenantID, Code: "M02"}
+	orgID := uuid.New()
+	repo.tables[uuid.New()] = domain.DiningTable{OrgID: orgID, Code: "M01"}
+	repo.tables[uuid.New()] = domain.DiningTable{OrgID: orgID, Code: "M02"}
 
-	items, total, _, _, err := uc.List(context.Background(), ListParams{TenantID: tenantID})
+	items, total, _, _, err := uc.List(context.Background(), ListParams{OrgID: orgID})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -339,27 +339,27 @@ func TestArchiveRestoreAndDelete(t *testing.T) {
 	audit := &fakeAudit{}
 	uc := NewUsecases(repo, &fakeAreaLookup{exists: true}, audit)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	areaID := uuid.New()
 	id := uuid.New()
-	repo.tables[id] = domain.DiningTable{ID: id, TenantID: tenantID, AreaID: areaID, Code: "M01", Capacity: 4, Status: "available"}
+	repo.tables[id] = domain.DiningTable{ID: id, OrgID: orgID, AreaID: areaID, Code: "M01", Capacity: 4, Status: "available"}
 
-	if err := uc.Archive(context.Background(), tenantID, id, "user-1"); err != nil {
+	if err := uc.Archive(context.Background(), orgID, id, "user-1"); err != nil {
 		t.Fatalf("archive: %v", err)
 	}
 	if repo.tables[id].DeletedAt == nil {
 		t.Fatal("expected archived table to have DeletedAt")
 	}
-	if err := uc.Restore(context.Background(), tenantID, id, "user-1"); err != nil {
+	if err := uc.Restore(context.Background(), orgID, id, "user-1"); err != nil {
 		t.Fatalf("restore: %v", err)
 	}
 	if repo.tables[id].DeletedAt != nil {
 		t.Fatal("expected restored table to clear DeletedAt")
 	}
-	if err := uc.Archive(context.Background(), tenantID, id, "user-1"); err != nil {
+	if err := uc.Archive(context.Background(), orgID, id, "user-1"); err != nil {
 		t.Fatalf("archive before delete: %v", err)
 	}
-	if err := uc.Delete(context.Background(), tenantID, id, "user-1"); err != nil {
+	if err := uc.Delete(context.Background(), orgID, id, "user-1"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	if _, ok := repo.tables[id]; ok {

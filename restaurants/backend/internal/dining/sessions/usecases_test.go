@@ -33,13 +33,13 @@ func (r *fakeRepo) List(_ context.Context, _ ListParams) ([]domain.TableSessionL
 	return out, int64(len(out)), nil
 }
 
-func (r *fakeRepo) OpenSession(_ context.Context, tenantID, tableID uuid.UUID, guestCount int, partyLabel, notes string) (domain.TableSession, error) {
+func (r *fakeRepo) OpenSession(_ context.Context, orgID, tableID uuid.UUID, guestCount int, partyLabel, notes string) (domain.TableSession, error) {
 	if r.openErr != nil {
 		return domain.TableSession{}, r.openErr
 	}
 	s := domain.TableSession{
 		ID:         uuid.New(),
-		TenantID:   tenantID,
+		OrgID:   orgID,
 		TableID:    tableID,
 		GuestCount: guestCount,
 		PartyLabel: partyLabel,
@@ -50,12 +50,12 @@ func (r *fakeRepo) OpenSession(_ context.Context, tenantID, tableID uuid.UUID, g
 	return s, nil
 }
 
-func (r *fakeRepo) CloseSession(_ context.Context, tenantID, sessionID uuid.UUID) (domain.TableSession, error) {
+func (r *fakeRepo) CloseSession(_ context.Context, orgID, sessionID uuid.UUID) (domain.TableSession, error) {
 	if r.closeErr != nil {
 		return domain.TableSession{}, r.closeErr
 	}
 	s, ok := r.sessions[sessionID]
-	if !ok || s.TenantID != tenantID {
+	if !ok || s.OrgID != orgID {
 		return domain.TableSession{}, fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
 	}
 	now := time.Now()
@@ -80,9 +80,9 @@ func TestOpenHappyPath(t *testing.T) {
 	audit := &fakeAudit{}
 	uc := NewUsecases(repo, audit)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	tableID := uuid.New()
-	out, err := uc.Open(context.Background(), tenantID, tableID, 4, "Familia Garcia", "cumpleanos", "user-1")
+	out, err := uc.Open(context.Background(), orgID, tableID, 4, "Familia Garcia", "cumpleanos", "user-1")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -165,14 +165,14 @@ func TestCloseHappyPath(t *testing.T) {
 	audit := &fakeAudit{}
 	uc := NewUsecases(repo, audit)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	// abrir primero
-	opened, err := uc.Open(context.Background(), tenantID, uuid.New(), 3, "Test", "", "user-1")
+	opened, err := uc.Open(context.Background(), orgID, uuid.New(), 3, "Test", "", "user-1")
 	if err != nil {
 		t.Fatalf("setup: %v", err)
 	}
 
-	closed, err := uc.Close(context.Background(), tenantID, opened.ID, "user-1")
+	closed, err := uc.Close(context.Background(), orgID, opened.ID, "user-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -204,12 +204,12 @@ func TestListReturnsItems(t *testing.T) {
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, nil)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	// abrir dos sesiones
-	_, _ = uc.Open(context.Background(), tenantID, uuid.New(), 2, "A", "", "user-1")
-	_, _ = uc.Open(context.Background(), tenantID, uuid.New(), 3, "B", "", "user-1")
+	_, _ = uc.Open(context.Background(), orgID, uuid.New(), 2, "A", "", "user-1")
+	_, _ = uc.Open(context.Background(), orgID, uuid.New(), 3, "B", "", "user-1")
 
-	items, total, err := uc.List(context.Background(), ListParams{TenantID: tenantID})
+	items, total, err := uc.List(context.Background(), ListParams{OrgID: orgID})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

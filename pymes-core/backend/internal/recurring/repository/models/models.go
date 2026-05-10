@@ -9,7 +9,7 @@ import (
 
 type RecurringExpenseModel struct {
 	ID            uuid.UUID `gorm:"type:uuid;primaryKey"`
-	TenantID      uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID      uuid.UUID `gorm:"type:uuid;index;not null"`
 	Description   string
 	Amount        float64
 	Currency      string

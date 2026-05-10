@@ -432,15 +432,31 @@ Plan canónico: [`.claude/plans/tengo-un-bug-en-melodic-river.md`](../.claude/pl
 
 Resumen del cronograma:
 - **Fase A** (este documento): inventario congelado ✅
-- **Fase B**: scaffolding (scripts/migrations-validate.sh, scripts/migrations-snapshot.sh, dir _squashed/)
-- **Fase C**: snapshot del schema actual (pg_dump baseline)
-- **Fase D**: diseñar nuevas migraciones 0001..0017 de pymes-core
-- **Fase E**: convenciones SQL (trigger updated_at)
-- **Fase F**: squash de 4 verticales
-- **Fase G**: runner único + cleanup de bootstrap.go
-- **Fase H**: eliminar código muerto + seeds limpios
-- **Fase I**: tests de migración + CI
-- **Fase J**: validaciones post-cut (build + smoke + E2E)
-- **Fase K**: documentación final (DATABASE_INIT.md, actualizar CLAUDE.md)
+- **Fase B**: scaffolding (scripts/migrations-validate.sh, scripts/migrations-snapshot.sh, dir _squashed/) ✅ — PR #12
+- **Fase C**: snapshot del schema actual (pg_dump baseline) ✅ — PR #12
+- **Fase D**: diseñar nuevas migraciones 0001..0017 de pymes-core ✅ — PR #12
+- **Fase E**: convenciones SQL (trigger updated_at) ✅ — PR #12
+- **Fase F**: squash de 4 verticales ✅ — PR #12
+- **Fase G**: runner único + cleanup de bootstrap.go ✅ — PR #13
+- **Fase H**: cutover (archive legacy + promover squashed + refactor Go masivo `tenant_id→org_id`) ✅ — PR #13
+- **Fase I**: tests de migración + CI ✅ (parcial: go test -short verde en 6 backends; integration tests pendientes) — PR #13
+- **Fase J**: validaciones post-cut ✅ (build + smoke compose verde con 8 servicios respondiendo /healthz; E2E playwright pendiente) — PR #13
+- **Fase K**: documentación final ([`DATABASE_INIT.md`](DATABASE_INIT.md), CLAUDE.md actualizado) ✅ — PR #13
 
-Total: ~10 días dedicados.
+---
+
+## 11. Estado post-cutover (snapshot 2026-05-09)
+
+Tras el merge de PR #12 (squash design) + PR #13 (cutover + refactor Go), el schema vive así:
+
+| Métrica | Pre-squash | Post-squash | Cambio |
+|---|---|---|---|
+| Migraciones pymes-core en root | 78 | 17 | -61 |
+| Migraciones verticales en root | 39 | 6 (4 squashed + 2 medical no squasheadas) | -33 |
+| Tablas total en `public` | ~110 | 102 | -8 (tablas legacy eliminadas) |
+| Columnas con nombre `tenant_id` | ~115 | **0** | -100 % |
+| Tablas con nombre `tenant_*` | 8 | 2 (`tenant_settings`, `tenant_invitations`) | -75 % |
+| Drift cross-source | 5 tablas | **0** | resuelto |
+| `saasmigrations.MigrateUp` invocado en runtime | sí | no (schema copiado en pymes-core/0001) | regla 13 |
+
+Para el flujo operativo de DB virgen, comandos de debug y convenciones obligatorias, ver [`DATABASE_INIT.md`](DATABASE_INIT.md).

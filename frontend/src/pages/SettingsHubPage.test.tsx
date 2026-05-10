@@ -15,7 +15,7 @@ vi.mock('../lib/api', () => ({
 
 const sessionFixture: SessionResponse = {
   auth: {
-    tenant_id: 'tenant-medlab',
+    org_id: 'tenant-medlab',
     tenant_slug: 'medlab',
     tenant_name: 'MedLab',
     role: 'owner',

@@ -9,7 +9,7 @@ import type { TenantSettings } from '../lib/types';
 import { OnboardingPage } from './OnboardingPage';
 
 const apiMocks = vi.hoisted(() => ({
-  createTenant: vi.fn<() => Promise<{ tenant_id: string; clerk_org_id: string }>>(),
+  createTenant: vi.fn<() => Promise<{ org_id: string; clerk_org_id: string }>>(),
   updateTenantSettings: vi.fn<() => Promise<TenantSettings>>(),
   updateTenantSettingsWithSetupKey: vi.fn<() => Promise<TenantSettings>>(),
   listSchedulingBranches: vi.fn<() => Promise<{ items: Array<Record<string, unknown>> }>>(),
@@ -66,7 +66,7 @@ vi.mock('react-router-dom', async () => {
 
 function buildTenantSettings(overrides: Partial<TenantSettings> = {}): TenantSettings {
   return {
-    tenant_id: '00000000-0000-0000-0000-000000000001',
+    org_id: '00000000-0000-0000-0000-000000000001',
     plan_code: 'starter',
     hard_limits: {},
     billing_status: 'trialing',

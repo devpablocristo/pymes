@@ -31,7 +31,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Exam, int
 		deletedClause = "deleted_at IS NOT NULL"
 		base = base.Unscoped()
 	}
-	q := base.Where("tenant_id = ? AND "+deletedClause, p.TenantID)
+	q := base.Where("tenant_id = ? AND "+deletedClause, p.OrgID)
 	if status := strings.TrimSpace(p.Status); status != "" {
 		q = q.Where("status = ?", status)
 	}
@@ -58,7 +58,7 @@ func (r *Repository) Create(ctx context.Context, in domain.Exam) (domain.Exam, e
 	now := time.Now().UTC()
 	row := models.ExamModel{
 		ID:              uuid.New(),
-		TenantID:        in.TenantID,
+		OrgID:        in.OrgID,
 		PatientName:     in.PatientName,
 		PatientDocument: in.PatientDocument,
 		EmployerName:    in.EmployerName,
@@ -84,9 +84,9 @@ func (r *Repository) Create(ctx context.Context, in domain.Exam) (domain.Exam, e
 	return toDomain(row), nil
 }
 
-func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Exam, error) {
+func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Exam, error) {
 	var row models.ExamModel
-	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).Take(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).Take(&row).Error; err != nil {
 		return domain.Exam{}, err
 	}
 	return toDomain(row), nil
@@ -94,7 +94,7 @@ func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domai
 
 func (r *Repository) Update(ctx context.Context, in domain.Exam) (domain.Exam, error) {
 	res := r.db.WithContext(ctx).Model(&models.ExamModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", in.TenantID, in.ID).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
 		Updates(map[string]any{
 			"patient_name":     in.PatientName,
 			"patient_document": in.PatientDocument,
@@ -119,12 +119,12 @@ func (r *Repository) Update(ctx context.Context, in domain.Exam) (domain.Exam, e
 	if res.RowsAffected == 0 {
 		return domain.Exam{}, gorm.ErrRecordNotFound
 	}
-	return r.GetByID(ctx, in.TenantID, in.ID)
+	return r.GetByID(ctx, in.OrgID, in.ID)
 }
 
-func (r *Repository) Archive(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.ExamModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
 		Updates(map[string]any{"deleted_at": time.Now().UTC(), "updated_at": time.Now().UTC()})
 	if res.Error != nil {
 		return res.Error
@@ -135,9 +135,9 @@ func (r *Repository) Archive(ctx context.Context, tenantID, id uuid.UUID) error 
 	return nil
 }
 
-func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Unscoped().Model(&models.ExamModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
 		Updates(map[string]any{"deleted_at": nil, "updated_at": time.Now().UTC()})
 	if res.Error != nil {
 		return res.Error
@@ -148,9 +148,9 @@ func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error 
 	return nil
 }
 
-func (r *Repository) HardDelete(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Unscoped().
-		Where("tenant_id = ? AND id = ?", tenantID, id).
+		Where("tenant_id = ? AND id = ?", orgID, id).
 		Delete(&models.ExamModel{})
 	if res.Error != nil {
 		return res.Error
@@ -169,7 +169,7 @@ func toDomain(row models.ExamModel) domain.Exam {
 	}
 	return domain.Exam{
 		ID:              row.ID,
-		TenantID:        row.TenantID,
+		OrgID:        row.OrgID,
 		PatientName:     row.PatientName,
 		PatientDocument: row.PatientDocument,
 		EmployerName:    row.EmployerName,

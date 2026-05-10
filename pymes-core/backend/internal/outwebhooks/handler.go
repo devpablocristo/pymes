@@ -15,13 +15,13 @@ import (
 )
 
 type usecasesPort interface {
-	ListEndpoints(ctx context.Context, tenantID uuid.UUID) ([]webhookdomain.Endpoint, error)
+	ListEndpoints(ctx context.Context, orgID uuid.UUID) ([]webhookdomain.Endpoint, error)
 	CreateEndpoint(ctx context.Context, in webhookdomain.Endpoint) (webhookdomain.Endpoint, error)
-	GetEndpoint(ctx context.Context, tenantID, id uuid.UUID) (webhookdomain.Endpoint, error)
+	GetEndpoint(ctx context.Context, orgID, id uuid.UUID) (webhookdomain.Endpoint, error)
 	UpdateEndpoint(ctx context.Context, in webhookdomain.Endpoint) (webhookdomain.Endpoint, error)
-	DeleteEndpoint(ctx context.Context, tenantID, id uuid.UUID) error
-	ListDeliveries(ctx context.Context, tenantID, endpointID uuid.UUID, limit int) ([]webhookdomain.Delivery, error)
-	SendTest(ctx context.Context, tenantID, endpointID uuid.UUID, actor string) error
+	DeleteEndpoint(ctx context.Context, orgID, id uuid.UUID) error
+	ListDeliveries(ctx context.Context, orgID, endpointID uuid.UUID, limit int) ([]webhookdomain.Delivery, error)
+	SendTest(ctx context.Context, orgID, endpointID uuid.UUID, actor string) error
 	ReplayDelivery(ctx context.Context, deliveryID uuid.UUID) error
 }
 
@@ -41,11 +41,11 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) ListEndpoints(c *gin.Context) {
-	tenantID, ok := parseTenant(c)
+	orgID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
-	items, err := h.uc.ListEndpoints(c.Request.Context(), tenantID)
+	items, err := h.uc.ListEndpoints(c.Request.Context(), orgID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -54,7 +54,7 @@ func (h *Handler) ListEndpoints(c *gin.Context) {
 }
 
 func (h *Handler) CreateEndpoint(c *gin.Context) {
-	tenantID, ok := parseTenant(c)
+	orgID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -64,7 +64,7 @@ func (h *Handler) CreateEndpoint(c *gin.Context) {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	out, err := h.uc.CreateEndpoint(c.Request.Context(), webhookdomain.Endpoint{TenantID: tenantID, URL: req.URL, Secret: req.Secret, Events: req.Events, IsActive: req.IsActiveOrDefault(), CreatedBy: auth.Actor})
+	out, err := h.uc.CreateEndpoint(c.Request.Context(), webhookdomain.Endpoint{OrgID: orgID, URL: req.URL, Secret: req.Secret, Events: req.Events, IsActive: req.IsActiveOrDefault(), CreatedBy: auth.Actor})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -73,11 +73,11 @@ func (h *Handler) CreateEndpoint(c *gin.Context) {
 }
 
 func (h *Handler) GetEndpoint(c *gin.Context) {
-	tenantID, id, ok := parseTenantAndID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetEndpoint(c.Request.Context(), tenantID, id)
+	out, err := h.uc.GetEndpoint(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -86,7 +86,7 @@ func (h *Handler) GetEndpoint(c *gin.Context) {
 }
 
 func (h *Handler) UpdateEndpoint(c *gin.Context) {
-	tenantID, id, ok := parseTenantAndID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -95,7 +95,7 @@ func (h *Handler) UpdateEndpoint(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	current, err := h.uc.GetEndpoint(c.Request.Context(), tenantID, id)
+	current, err := h.uc.GetEndpoint(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -115,11 +115,11 @@ func (h *Handler) UpdateEndpoint(c *gin.Context) {
 }
 
 func (h *Handler) DeleteEndpoint(c *gin.Context) {
-	tenantID, id, ok := parseTenantAndID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.DeleteEndpoint(c.Request.Context(), tenantID, id); err != nil {
+	if err := h.uc.DeleteEndpoint(c.Request.Context(), orgID, id); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -127,12 +127,12 @@ func (h *Handler) DeleteEndpoint(c *gin.Context) {
 }
 
 func (h *Handler) ListDeliveries(c *gin.Context) {
-	tenantID, id, ok := parseTenantAndID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.ListDeliveries(c.Request.Context(), tenantID, id, limit)
+	items, err := h.uc.ListDeliveries(c.Request.Context(), orgID, id, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -141,12 +141,12 @@ func (h *Handler) ListDeliveries(c *gin.Context) {
 }
 
 func (h *Handler) TestEndpoint(c *gin.Context) {
-	tenantID, id, ok := parseTenantAndID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	if err := h.uc.SendTest(c.Request.Context(), tenantID, id, auth.Actor); err != nil {
+	if err := h.uc.SendTest(c.Request.Context(), orgID, id, auth.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -182,16 +182,16 @@ func (r endpointRequest) IsActiveOrDefault() bool {
 
 func parseTenant(c *gin.Context) (uuid.UUID, bool) {
 	auth := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(auth.TenantID)
+	orgID, err := uuid.Parse(auth.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return uuid.Nil, false
 	}
-	return tenantID, true
+	return orgID, true
 }
 
 func parseTenantAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
-	tenantID, ok := parseTenant(c)
+	orgID, ok := parseTenant(c)
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
@@ -200,5 +200,5 @@ func parseTenantAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 		handlers.WriteValidation(c, "invalid id")
 		return uuid.Nil, uuid.Nil, false
 	}
-	return tenantID, id, true
+	return orgID, id, true
 }

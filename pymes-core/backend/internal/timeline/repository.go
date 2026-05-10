@@ -17,11 +17,11 @@ type Repository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
-func (r *Repository) List(ctx context.Context, tenantID uuid.UUID, entityType string, entityID uuid.UUID, limit int) ([]timelinedomain.Entry, error) {
+func (r *Repository) List(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, limit int) ([]timelinedomain.Entry, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	var rows []models.TimelineEntryModel
 	if err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND entity_type = ? AND entity_id = ?", tenantID, entityType, entityID).
+		Where("org_id = ? AND entity_type = ? AND entity_id = ?", orgID, entityType, entityID).
 		Order("created_at DESC").
 		Limit(limit).
 		Find(&rows).Error; err != nil {
@@ -44,7 +44,7 @@ func (r *Repository) Create(ctx context.Context, in timelinedomain.Entry) (timel
 	payload, _ := json.Marshal(defaultMetadata(in.Metadata))
 	row := models.TimelineEntryModel{
 		ID:          in.ID,
-		TenantID:    in.TenantID,
+		OrgID:    in.OrgID,
 		EntityType:  in.EntityType,
 		EntityID:    in.EntityID,
 		EventType:   in.EventType,
@@ -67,7 +67,7 @@ func toDomain(row models.TimelineEntryModel) timelinedomain.Entry {
 	}
 	return timelinedomain.Entry{
 		ID:          row.ID,
-		TenantID:    row.TenantID,
+		OrgID:    row.OrgID,
 		EntityType:  row.EntityType,
 		EntityID:    row.EntityID,
 		EventType:   row.EventType,

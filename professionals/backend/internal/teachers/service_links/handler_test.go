@@ -24,13 +24,13 @@ func (s *stubServiceLinksUsecases) ListByProfile(_ context.Context, _, _ uuid.UU
 	return nil, nil
 }
 
-func (s *stubServiceLinksUsecases) ReplaceForProfile(_ context.Context, tenantID, profileID uuid.UUID, links []domain.ServiceLink, _ string) ([]domain.ServiceLink, error) {
+func (s *stubServiceLinksUsecases) ReplaceForProfile(_ context.Context, orgID, profileID uuid.UUID, links []domain.ServiceLink, _ string) ([]domain.ServiceLink, error) {
 	s.received = append([]domain.ServiceLink(nil), links...)
 	now := time.Date(2026, 4, 6, 12, 0, 0, 0, time.UTC)
 	out := make([]domain.ServiceLink, 0, len(links))
 	for i, link := range links {
 		link.ID = uuid.New()
-		link.TenantID = tenantID
+		link.OrgID = orgID
 		link.ProfileID = profileID
 		link.CreatedAt = now
 		link.UpdatedAt = now.Add(time.Minute * time.Duration(i))

@@ -9,7 +9,7 @@ import (
 
 type PriceListModel struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-	TenantID    uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID    uuid.UUID `gorm:"type:uuid;index;not null"`
 	Name        string
 	Description string
 	IsDefault   bool

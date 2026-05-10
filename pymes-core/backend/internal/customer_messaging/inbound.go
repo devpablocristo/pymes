@@ -21,7 +21,7 @@ import (
 )
 
 type Connection struct {
-	TenantID      uuid.UUID
+	OrgID      uuid.UUID
 	PhoneNumberID string
 	WABAID        string
 	AccessToken   string
@@ -46,7 +46,7 @@ type MetaClientPort interface {
 }
 
 type InboundMessage struct {
-	TenantID      uuid.UUID
+	OrgID      uuid.UUID
 	PhoneNumberID string
 	FromPhone     string
 	Text          string
@@ -191,21 +191,21 @@ func (u *Usecases) HandleInboundWebhook(ctx context.Context, payload []byte) (In
 			}
 			return result, err
 		}
-		tenantID := conn.TenantID
-		msg.TenantID = tenantID
+		orgID := conn.OrgID
+		msg.OrgID = orgID
 
 		var convID *uuid.UUID
 		var inboundPartyID *uuid.UUID
-		partyID, partyName, _ := u.repo.GetPartyByPhone(ctx, tenantID, msg.FromPhone)
+		partyID, partyName, _ := u.repo.GetPartyByPhone(ctx, orgID, msg.FromPhone)
 		if partyID != uuid.Nil {
-			conv, convErr := u.repo.GetOrCreateConversation(ctx, tenantID, partyID, msg.FromPhone, partyName)
+			conv, convErr := u.repo.GetOrCreateConversation(ctx, orgID, partyID, msg.FromPhone, partyName)
 			if convErr == nil {
 				convID = &conv.ID
 				inboundPartyID = &partyID
 				now := time.Now()
 				inboundMsg := domain.Message{
 					ID:             uuid.New(),
-					TenantID:       tenantID,
+					OrgID:       orgID,
 					PhoneNumberID:  msg.PhoneNumberID,
 					Direction:      domain.DirectionInbound,
 					WAMessageID:    msg.MessageID,
@@ -247,8 +247,8 @@ func (u *Usecases) HandleInboundWebhook(ctx context.Context, payload []byte) (In
 		}
 
 		if convID != nil {
-			domainConn := domain.Connection{TenantID: tenantID, PhoneNumberID: conn.PhoneNumberID}
-			outMsg := u.buildOutboundMessage(domainConn, tenantID, inboundPartyID, msg.FromPhone, domain.TypeText, reply.Reply, waReplyID)
+			domainConn := domain.Connection{OrgID: orgID, PhoneNumberID: conn.PhoneNumberID}
+			outMsg := u.buildOutboundMessage(domainConn, orgID, inboundPartyID, msg.FromPhone, domain.TypeText, reply.Reply, waReplyID)
 			outMsg.ConversationID = convID
 			outMsg.CreatedBy = "ai"
 			_ = u.repo.SaveMessage(ctx, outMsg)

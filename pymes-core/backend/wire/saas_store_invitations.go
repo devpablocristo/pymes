@@ -25,7 +25,7 @@ const tenantInviteTTL = 7 * 24 * time.Hour
 
 type tenantInvitationDTO struct {
 	ID                string     `json:"id"`
-	TenantID          string     `json:"tenant_id"`
+	OrgID          string     `json:"org_id"`
 	Email             string     `json:"email"`
 	Role              string     `json:"role"`
 	Status            string     `json:"status"`
@@ -40,7 +40,7 @@ type tenantInvitationDTO struct {
 }
 
 type tenantInvitationPreviewDTO struct {
-	TenantID   string    `json:"tenant_id"`
+	OrgID   string    `json:"org_id"`
 	TenantSlug string    `json:"tenant_slug"`
 	TenantName string    `json:"tenant_name"`
 	Email      string    `json:"email"`
@@ -49,14 +49,14 @@ type tenantInvitationPreviewDTO struct {
 	ExpiresAt  time.Time `json:"expires_at"`
 }
 
-func (s *pymesSaaSStore) ListTenantInvitations(ctx context.Context, tenantID string) ([]tenantInvitationDTO, error) {
-	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
+func (s *pymesSaaSStore) ListTenantInvitations(ctx context.Context, orgID string) ([]tenantInvitationDTO, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
-		return nil, domainerr.Validation("invalid tenant_id")
+		return nil, domainerr.Validation("invalid org_id")
 	}
 	var rows []pymesTenantInvitationRow
 	if err := s.db.WithContext(ctx).
-		Where("tenant_id = ? AND status = 'pending'", tenantUUID).
+		Where("org_id = ? AND status = 'pending'", tenantUUID).
 		Order("created_at DESC").
 		Find(&rows).Error; err != nil {
 		return nil, err
@@ -96,12 +96,12 @@ func (s *pymesSaaSStore) PreviewTenantInvitation(ctx context.Context, token stri
 	if !tenantInviteHasClerkInvitation(invite) {
 		return tenantInvitationPreviewDTO{}, domainerr.Conflict("invite was not sent by Clerk")
 	}
-	tenant, err := s.getTenantRow(ctx, invite.TenantID)
+	tenant, err := s.getTenantRow(ctx, invite.OrgID)
 	if err != nil {
 		return tenantInvitationPreviewDTO{}, err
 	}
 	return tenantInvitationPreviewDTO{
-		TenantID:   invite.TenantID.String(),
+		OrgID:   invite.OrgID.String(),
 		TenantSlug: tenantRowSlug(tenant),
 		TenantName: strings.TrimSpace(tenant.Name),
 		Email:      invite.EmailNormalized,
@@ -111,12 +111,12 @@ func (s *pymesSaaSStore) PreviewTenantInvitation(ctx context.Context, token stri
 	}, nil
 }
 
-func (s *pymesSaaSStore) CreateTenantInvitation(ctx context.Context, tenantID, actorExternalID, email, role string) (tenantInvitationDTO, error) {
-	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
+func (s *pymesSaaSStore) CreateTenantInvitation(ctx context.Context, orgID, actorExternalID, email, role string) (tenantInvitationDTO, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
-		return tenantInvitationDTO{}, domainerr.Validation("invalid tenant_id")
+		return tenantInvitationDTO{}, domainerr.Validation("invalid org_id")
 	}
-	actor, err := s.requireTenantOwner(ctx, tenantID, actorExternalID)
+	actor, err := s.requireTenantOwner(ctx, orgID, actorExternalID)
 	if err != nil {
 		return tenantInvitationDTO{}, err
 	}
@@ -145,7 +145,7 @@ func (s *pymesSaaSStore) CreateTenantInvitation(ctx context.Context, tenantID, a
 	expiresAt := now.Add(tenantInviteTTL)
 	row := pymesTenantInvitationRow{
 		ID:              uuid.New(),
-		TenantID:        tenantUUID,
+		OrgID:        tenantUUID,
 		EmailNormalized: email,
 		Role:            role,
 		Status:          "pending",
@@ -170,7 +170,7 @@ func (s *pymesSaaSStore) CreateTenantInvitation(ctx context.Context, tenantID, a
 		Role:           clerkRoleFromTenantRole(role),
 		RedirectURL:    redirectURL,
 		PublicMetadata: map[string]any{
-			"pymes_tenant_id":   row.TenantID.String(),
+			"pymes_tenant_id":   row.OrgID.String(),
 			"pymes_tenant_slug": tenantSlug,
 			"pymes_invite_id":   row.ID.String(),
 			"pymes_role":        role,
@@ -283,7 +283,7 @@ func (s *pymesSaaSStore) readInviteAcceptSnapshot(ctx context.Context, tokenHash
 				return domainerr.Conflict("invite already used")
 			}
 			var tenant pymesTenantRow
-			if err := tx.Where("id = ?", invite.TenantID).Take(&tenant).Error; err != nil {
+			if err := tx.Where("id = ?", invite.OrgID).Take(&tenant).Error; err != nil {
 				return err
 			}
 			snap.Tenant = tenant
@@ -310,7 +310,7 @@ func (s *pymesSaaSStore) readInviteAcceptSnapshot(ctx context.Context, tokenHash
 			return domainerr.Forbidden("invite_email_mismatch")
 		}
 		var tenant pymesTenantRow
-		if err := tx.Where("id = ?", invite.TenantID).Take(&tenant).Error; err != nil {
+		if err := tx.Where("id = ?", invite.OrgID).Take(&tenant).Error; err != nil {
 			return err
 		}
 		snap.Tenant = tenant
@@ -420,11 +420,11 @@ func (s *pymesSaaSStore) persistInviteAccept(ctx context.Context, snap inviteAcc
 		}
 		now := time.Now().UTC()
 		var existing pymesTenantMembershipRow
-		err = tx.Where("tenant_id = ? AND user_id = ?", invite.TenantID, localUser.ID).Take(&existing).Error
+		err = tx.Where("org_id = ? AND user_id = ?", invite.OrgID, localUser.ID).Take(&existing).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			existing = pymesTenantMembershipRow{
 				ID:        uuid.New(),
-				TenantID:  invite.TenantID,
+				OrgID:  invite.OrgID,
 				UserID:    localUser.ID,
 				Role:      normalizeInviteRole(invite.Role),
 				Status:    "active",
@@ -467,11 +467,11 @@ func (s *pymesSaaSStore) persistInviteAccept(ctx context.Context, snap inviteAcc
 	return accepted, snap.ClerkTenantID, nil
 }
 
-func (s *pymesSaaSStore) RevokeTenantInvitation(ctx context.Context, tenantID, inviteID, actorExternalID string) (tenantInvitationDTO, error) {
-	if _, err := s.requireTenantOwner(ctx, tenantID, actorExternalID); err != nil {
+func (s *pymesSaaSStore) RevokeTenantInvitation(ctx context.Context, orgID, inviteID, actorExternalID string) (tenantInvitationDTO, error) {
+	if _, err := s.requireTenantOwner(ctx, orgID, actorExternalID); err != nil {
 		return tenantInvitationDTO{}, err
 	}
-	row, tenant, err := s.loadTenantInviteForOwnerAction(ctx, tenantID, inviteID)
+	row, tenant, err := s.loadTenantInviteForOwnerAction(ctx, orgID, inviteID)
 	if err != nil {
 		return tenantInvitationDTO{}, err
 	}
@@ -502,12 +502,12 @@ func (s *pymesSaaSStore) RevokeTenantInvitation(ctx context.Context, tenantID, i
 	return tenantInvitationDTOFromRow(row), nil
 }
 
-func (s *pymesSaaSStore) ResendTenantInvitation(ctx context.Context, tenantID, inviteID, actorExternalID string) (tenantInvitationDTO, error) {
-	actor, err := s.requireTenantOwner(ctx, tenantID, actorExternalID)
+func (s *pymesSaaSStore) ResendTenantInvitation(ctx context.Context, orgID, inviteID, actorExternalID string) (tenantInvitationDTO, error) {
+	actor, err := s.requireTenantOwner(ctx, orgID, actorExternalID)
 	if err != nil {
 		return tenantInvitationDTO{}, err
 	}
-	row, tenant, err := s.loadTenantInviteForOwnerAction(ctx, tenantID, inviteID)
+	row, tenant, err := s.loadTenantInviteForOwnerAction(ctx, orgID, inviteID)
 	if err != nil {
 		return tenantInvitationDTO{}, err
 	}
@@ -533,7 +533,7 @@ func (s *pymesSaaSStore) ResendTenantInvitation(ctx context.Context, tenantID, i
 		Role:           clerkRoleFromTenantRole(row.Role),
 		RedirectURL:    redirectURL,
 		PublicMetadata: map[string]any{
-			"pymes_tenant_id":   row.TenantID.String(),
+			"pymes_tenant_id":   row.OrgID.String(),
 			"pymes_tenant_slug": tenantRowSlug(tenant),
 			"pymes_invite_id":   row.ID.String(),
 			"pymes_role":        row.Role,
@@ -571,9 +571,9 @@ func (s *pymesSaaSStore) ResendTenantInvitation(ctx context.Context, tenantID, i
 func (s *pymesSaaSStore) ensureNoActiveMembershipOrPendingInvite(ctx context.Context, tenantUUID uuid.UUID, email string) error {
 	var membershipCount int64
 	if err := s.db.WithContext(ctx).
-		Table("tenant_memberships AS om").
+		Table("org_members AS om").
 		Joins("JOIN users u ON u.id = om.user_id").
-		Where("om.tenant_id = ? AND om.status = 'active' AND lower(trim(u.email)) = ?", tenantUUID, email).
+		Where("om.org_id = ? AND om.status = 'active' AND lower(trim(u.email)) = ?", tenantUUID, email).
 		Count(&membershipCount).Error; err != nil {
 		return err
 	}
@@ -583,7 +583,7 @@ func (s *pymesSaaSStore) ensureNoActiveMembershipOrPendingInvite(ctx context.Con
 	var pendingRows []pymesTenantInvitationRow
 	if err := s.db.WithContext(ctx).
 		Model(&pymesTenantInvitationRow{}).
-		Where("tenant_id = ? AND email_normalized = ? AND status = 'pending'", tenantUUID, email).
+		Where("org_id = ? AND email_normalized = ? AND status = 'pending'", tenantUUID, email).
 		Find(&pendingRows).Error; err != nil {
 		return err
 	}
@@ -628,17 +628,17 @@ func tenantInviteHasClerkInvitation(row pymesTenantInvitationRow) bool {
 	return row.ClerkInvitationID != nil && strings.TrimSpace(*row.ClerkInvitationID) != ""
 }
 
-func (s *pymesSaaSStore) loadTenantInviteForOwnerAction(ctx context.Context, tenantID, inviteID string) (pymesTenantInvitationRow, pymesTenantRow, error) {
-	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
+func (s *pymesSaaSStore) loadTenantInviteForOwnerAction(ctx context.Context, orgID, inviteID string) (pymesTenantInvitationRow, pymesTenantRow, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
-		return pymesTenantInvitationRow{}, pymesTenantRow{}, domainerr.Validation("invalid tenant_id")
+		return pymesTenantInvitationRow{}, pymesTenantRow{}, domainerr.Validation("invalid org_id")
 	}
 	inviteUUID, err := uuid.Parse(strings.TrimSpace(inviteID))
 	if err != nil {
 		return pymesTenantInvitationRow{}, pymesTenantRow{}, domainerr.Validation("invalid invite_id")
 	}
 	var row pymesTenantInvitationRow
-	if err := s.db.WithContext(ctx).Where("id = ? AND tenant_id = ?", inviteUUID, tenantUUID).Take(&row).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("id = ? AND org_id = ?", inviteUUID, tenantUUID).Take(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return pymesTenantInvitationRow{}, pymesTenantRow{}, domainerr.NotFound("invite not found")
 		}
@@ -691,7 +691,7 @@ func tenantInvitationDTOFromRow(row pymesTenantInvitationRow) tenantInvitationDT
 	}
 	return tenantInvitationDTO{
 		ID:                row.ID.String(),
-		TenantID:          row.TenantID.String(),
+		OrgID:          row.OrgID.String(),
 		Email:             row.EmailNormalized,
 		Role:              row.Role,
 		Status:            row.Status,

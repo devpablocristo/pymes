@@ -20,7 +20,7 @@ func ParseUUIDParam(c *gin.Context, param string, field string) (uuid.UUID, bool
 }
 
 func ParseAuthTenantAndParamID(c *gin.Context, param string, field string) (uuid.UUID, uuid.UUID, bool) {
-	tenantID, ok := ParseAuthTenantID(c)
+	orgID, ok := ParseAuthTenantID(c)
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
@@ -28,7 +28,7 @@ func ParseAuthTenantAndParamID(c *gin.Context, param string, field string) (uuid
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
-	return tenantID, id, true
+	return orgID, id, true
 }
 
 func ParseRFC3339(raw string) (time.Time, error) {

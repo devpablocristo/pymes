@@ -68,7 +68,7 @@ type pymesTenantAPIKeyScopeRow struct {
 	Scope    string    `gorm:"column:scope"`
 }
 
-func (pymesTenantAPIKeyScopeRow) TableName() string { return "tenant_api_key_scopes" }
+func (pymesTenantAPIKeyScopeRow) TableName() string { return "org_api_key_scopes" }
 
 type pymesTenantSettingsRow struct {
 	OrgID              uuid.UUID  `gorm:"column:org_id"`
@@ -91,9 +91,10 @@ type pymesTenantSettingsRow struct {
 func (pymesTenantSettingsRow) TableName() string { return "tenant_settings" }
 
 type pymesUsageCounterRow struct {
-	CounterName string `gorm:"column:counter_name"`
-	Value       int64  `gorm:"column:value"`
-	Period      string `gorm:"column:period"`
+	OrgID       uuid.UUID `gorm:"column:org_id"`
+	CounterName string    `gorm:"column:counter"`
+	Value       int64     `gorm:"column:value"`
+	Period      time.Time `gorm:"column:period"`
 }
 
 func (pymesUsageCounterRow) TableName() string { return "org_usage_counters" }

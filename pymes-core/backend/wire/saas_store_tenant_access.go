@@ -31,7 +31,7 @@ func (s *pymesSaaSStore) ListTenantsForUser(ctx context.Context, userExternalID 
 		Role       string
 	}
 	if err := s.db.WithContext(ctx).
-		Table("tenants AS t").
+		Table("orgs AS t").
 		Select("t.id, t.name, t.slug, t.external_id, t.clerk_org_id, tm.role").
 		Joins("JOIN org_members tm ON tm.org_id = t.id AND tm.status = 'active'").
 		Joins("JOIN users u ON u.id = tm.user_id AND u.deleted_at IS NULL").

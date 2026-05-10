@@ -64,7 +64,7 @@ func (s *pymesSaaSStore) GetUsageSummary(ctx context.Context, orgID string) (saa
 	var rows []pymesUsageCounterRow
 	if err := s.db.WithContext(ctx).
 		Where("org_id = ?", tenantUUID).
-		Order("period DESC, counter_name ASC").
+		Order("period DESC, counter ASC").
 		Find(&rows).Error; err != nil {
 		return saasbillingdomain.UsageSummary{}, err
 	}
@@ -76,9 +76,9 @@ func (s *pymesSaaSStore) GetUsageSummary(ctx context.Context, orgID string) (saa
 		return summary, nil
 	}
 	period := rows[0].Period
-	summary.Period = period
+	summary.Period = period.Format("2006-01")
 	for _, row := range rows {
-		if row.Period != period {
+		if !row.Period.Equal(period) {
 			continue
 		}
 		switch row.CounterName {

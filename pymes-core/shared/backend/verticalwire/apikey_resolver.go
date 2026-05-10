@@ -27,7 +27,7 @@ type apiKeyScopeModel struct {
 	Scope string    `gorm:"not null"`
 }
 
-func (apiKeyScopeModel) TableName() string { return "tenant_api_key_scopes" }
+func (apiKeyScopeModel) TableName() string { return "org_api_key_scopes" }
 
 // NewAPIKeyResolver resuelve claves API contra las tablas compartidas con pymes-core.
 func NewAPIKeyResolver(db *gorm.DB) auth.APIKeyResolver {

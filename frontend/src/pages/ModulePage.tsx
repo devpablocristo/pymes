@@ -30,7 +30,7 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
 
   useEffect(() => {
     if (sessionQuery.data) {
-      setRuntime((current) => ({ ...current, tenantId: sessionQuery.data.auth.tenant_id }));
+      setRuntime((current) => ({ ...current, tenantId: sessionQuery.data.auth.org_id }));
     }
   }, [sessionQuery.data]);
 

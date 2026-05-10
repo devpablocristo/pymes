@@ -1,6 +1,6 @@
 /** Respuesta de GET/PATCH `/v1/admin/tenant-settings` (pymes-core admin). */
 export type TenantSettings = {
-  tenant_id: string;
+  org_id: string;
   plan_code: string;
   hard_limits: Record<string, unknown>;
   billing_status: string;
@@ -100,7 +100,7 @@ export type TenantSettingsUpdatePayload = {
 /** Entrada de GET `/v1/audit`. */
 export type AuditEntry = {
   id: string;
-  tenant_id: string;
+  org_id: string;
   actor?: string;
   actor_type?: string;
   action: string;
@@ -114,7 +114,7 @@ export type AuditEntry = {
 export type ProductRole = 'admin' | 'user';
 
 export type BootstrapAuthPayload = {
-  tenant_id: string;
+  org_id: string;
   /** Nombre legible desde `tenants.name` (GET /session); puede faltar si no hay fila o está vacío. */
   tenant_name?: string | null;
   /** Slug canónico validado por backend para rutas tenant-scoped. */
@@ -161,7 +161,7 @@ export type MeProfileUser = {
 };
 
 export type MeProfileResponse = {
-  tenant_id: string;
+  org_id: string;
   external_id: string;
   role: string;
   scopes?: string[];
@@ -169,7 +169,7 @@ export type MeProfileResponse = {
 };
 
 export type BillingStatus = {
-  tenant_id: string;
+  org_id: string;
   plan_code: string;
   status: string;
   hard_limits: Record<string, unknown>;

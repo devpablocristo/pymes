@@ -4,7 +4,7 @@ export type OccupationalExamType = 'pre_employment' | 'periodic' | 'return_to_wo
 
 export type OccupationalHealthExam = {
   id: string;
-  tenant_id: string;
+  org_id: string;
   patient_name: string;
   patient_document: string;
   employer_name: string;

@@ -238,7 +238,7 @@ export async function listTenants(): Promise<{ items: TenantSummary[] }> {
 export async function createTenant(payload: {
   name: string;
   slug?: string;
-}): Promise<{ tenant_id: string; clerk_org_id: string; slug?: string; raw_key?: string; key?: APIKeyItem }> {
+}): Promise<{ org_id: string; clerk_org_id: string; slug?: string; raw_key?: string; key?: APIKeyItem }> {
   return request('/v1/tenants', { method: 'POST', body: payload });
 }
 
@@ -314,7 +314,7 @@ export async function downloadAuditExportCsv(): Promise<string> {
 
 export type TenantMemberRow = {
   id: string;
-  tenant_id?: string;
+  org_id?: string;
   user_id: string;
   role?: string;
   status?: string;
@@ -332,7 +332,7 @@ export async function removeTenantMember(tenantId: string, userId: string): Prom
 
 export type TenantInvitation = {
   id: string;
-  tenant_id: string;
+  org_id: string;
   email: string;
   role: string;
   status: 'pending' | 'accepted' | 'revoked' | 'expired';
@@ -347,7 +347,7 @@ export type TenantInvitation = {
 };
 
 export type TenantInvitationPreview = {
-  tenant_id: string;
+  org_id: string;
   tenant_slug: string;
   tenant_name: string;
   email: string;
@@ -415,7 +415,7 @@ export async function getUserEffectivePermissions(userId: string): Promise<{ per
 
 export type SalePaymentRow = {
   id: string;
-  tenant_id?: string;
+  org_id?: string;
   reference_type?: string;
   reference_id?: string;
   method: string;

@@ -16,7 +16,7 @@ export type AttachmentRow = {
 
 export type AuditEntryRow = {
   id: string;
-  tenant_id?: string;
+  org_id?: string;
   actor?: string;
   actor_type?: string;
   actor_label?: string;

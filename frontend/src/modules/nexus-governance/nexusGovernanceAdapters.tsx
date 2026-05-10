@@ -14,7 +14,7 @@ import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListMo
 
 export type ProcurementRequest = {
   id: string;
-  tenant_id?: string;
+  org_id?: string;
   requester_actor?: string;
   title: string;
   description?: string;

@@ -38,7 +38,7 @@ function renderShellRoutes(path: string) {
     role: 'owner',
     session: {
       auth: {
-        tenant_id: '00000000-0000-0000-0000-000000000001',
+        org_id: '00000000-0000-0000-0000-000000000001',
         tenant_name: 'Bicimax',
         tenant_slug: 'bicimax',
         role: 'owner',
@@ -51,7 +51,7 @@ function renderShellRoutes(path: string) {
       membership: { role: 'owner' },
     },
     settings: {
-      tenant_id: '00000000-0000-0000-0000-000000000001',
+      org_id: '00000000-0000-0000-0000-000000000001',
       plan_code: 'starter',
       hard_limits: {},
       billing_status: 'trialing',

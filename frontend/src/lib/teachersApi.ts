@@ -27,7 +27,7 @@ function translateError(message: string): string {
 
 function mapIntake(item: {
   id: string;
-  tenant_id?: string;
+  org_id?: string;
   booking_id?: string;
   profile_id: string;
   customer_party_id?: string;
@@ -41,7 +41,7 @@ function mapIntake(item: {
 }): TeacherIntake {
   return {
     id: item.id,
-    tenant_id: item.tenant_id,
+    org_id: item.org_id,
     booking_id: item.booking_id,
     profile_id: item.profile_id,
     customer_party_id: item.customer_party_id,
@@ -177,7 +177,7 @@ export async function getTeacherIntakes(filters?: { archived?: boolean }): Promi
   const response = await teachersRequest<{
     items?: Array<{
       id: string;
-      tenant_id?: string;
+      org_id?: string;
       booking_id?: string;
       profile_id: string;
       customer_party_id?: string;
@@ -194,7 +194,7 @@ export async function getTeacherIntakes(filters?: { archived?: boolean }): Promi
 export async function getTeacherIntake(id: string): Promise<TeacherIntake> {
   const response = await teachersRequest<{
     id: string;
-    tenant_id?: string;
+    org_id?: string;
     booking_id?: string;
     profile_id: string;
     customer_party_id?: string;
@@ -215,7 +215,7 @@ export async function createTeacherIntake(data: {
 }): Promise<TeacherIntake> {
   const response = await teachersRequest<{
     id: string;
-    tenant_id?: string;
+    org_id?: string;
     booking_id?: string;
     profile_id: string;
     customer_party_id?: string;
@@ -248,7 +248,7 @@ export async function updateTeacherIntake(
   if (data.tags !== undefined) body.tags = data.tags;
   const response = await teachersRequest<{
     id: string;
-    tenant_id?: string;
+    org_id?: string;
     booking_id?: string;
     profile_id: string;
     customer_party_id?: string;

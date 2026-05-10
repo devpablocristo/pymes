@@ -1,6 +1,6 @@
 export type AutoRepairVehicle = {
   id: string;
-  tenant_id: string;
+  org_id: string;
   customer_id?: string;
   customer_name: string;
   license_plate: string;

@@ -38,7 +38,7 @@ const FULL_PROFILE: TenantProfile = {
 
 function makeSettings(overrides: Partial<TenantSettings> = {}): TenantSettings {
   return {
-    tenant_id: 'org_1',
+    org_id: 'org_1',
     plan_code: 'free',
     hard_limits: {},
     billing_status: 'active',

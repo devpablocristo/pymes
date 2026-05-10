@@ -43,7 +43,7 @@ type BackendLineItem = {
 
 type BackendInvoice = {
   id: string;
-  tenant_id: string;
+  org_id: string;
   number: string;
   party_id?: string;
   customer_name: string;

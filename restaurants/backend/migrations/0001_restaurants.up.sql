@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS restaurant.dining_areas (
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
     name text NOT NULL,
     sort_order integer NOT NULL DEFAULT 0,
+    is_favorite boolean NOT NULL DEFAULT false,
+    tags text[] NOT NULL DEFAULT '{}'::text[],
+    metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
     deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
@@ -33,6 +36,9 @@ CREATE TABLE IF NOT EXISTS restaurant.dining_tables (
         CONSTRAINT dining_tables_status_check
         CHECK (status IN ('available','occupied','reserved','cleaning')),
     notes text NOT NULL DEFAULT '',
+    is_favorite boolean NOT NULL DEFAULT false,
+    tags text[] NOT NULL DEFAULT '{}'::text[],
+    metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
     deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()

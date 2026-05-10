@@ -88,10 +88,11 @@ CREATE TRIGGER trg_bicycles_updated_at
 CREATE TABLE IF NOT EXISTS workshops.work_orders (
     id uuid PRIMARY KEY,
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    branch_id uuid,
     number text NOT NULL,
-    target_type text NOT NULL,
-    target_id uuid NOT NULL,
-    target_label text NOT NULL DEFAULT '',
+    asset_type text NOT NULL,
+    asset_id uuid NOT NULL,
+    asset_label text NOT NULL DEFAULT '',
     customer_id uuid,
     customer_name text NOT NULL DEFAULT '',
     booking_id uuid,
@@ -112,6 +113,8 @@ CREATE TABLE IF NOT EXISTS workshops.work_orders (
     ready_at timestamptz,
     delivered_at timestamptz,
     metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+    is_favorite boolean NOT NULL DEFAULT false,
+    tags text[] NOT NULL DEFAULT '{}'::text[],
     created_by text NOT NULL DEFAULT '',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -119,12 +122,16 @@ CREATE TABLE IF NOT EXISTS workshops.work_orders (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_work_orders_org_number_active
     ON workshops.work_orders(org_id, number) WHERE archived_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_work_orders_org_target
-    ON workshops.work_orders(org_id, target_type) WHERE archived_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_work_orders_org_asset
+    ON workshops.work_orders(org_id, asset_type) WHERE archived_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_work_orders_org_branch
+    ON workshops.work_orders(org_id, branch_id) WHERE archived_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_work_orders_org_status
     ON workshops.work_orders(org_id, status) WHERE archived_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_work_orders_org_deleted_at
+CREATE INDEX IF NOT EXISTS idx_work_orders_org_archived_at
     ON workshops.work_orders(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_work_orders_org_is_favorite
+    ON workshops.work_orders(org_id, is_favorite) WHERE is_favorite = true;
 
 CREATE TRIGGER trg_work_orders_updated_at
     BEFORE UPDATE ON workshops.work_orders FOR EACH ROW EXECUTE FUNCTION set_updated_at();

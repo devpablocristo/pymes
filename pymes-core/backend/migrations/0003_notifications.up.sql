@@ -39,20 +39,27 @@ CREATE INDEX IF NOT EXISTS idx_notification_log_org_created
 CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_log_dedup_key
     ON notification_log(dedup_key) WHERE dedup_key IS NOT NULL;
 
-CREATE TABLE IF NOT EXISTS in_app_notifications (
+-- pymes_in_app_notifications: namespace `pymes_` mantenido por TableName GORM
+-- (la lib core/notifications/go también define `Notification.TenantID` en su
+-- struct, pero la persistencia local usa este schema con user_id + kind +
+-- chat_context para contexto AI).
+CREATE TABLE IF NOT EXISTS pymes_in_app_notifications (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-    actor_id text NOT NULL DEFAULT '',
-    type text NOT NULL,
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title text NOT NULL,
-    body text NOT NULL DEFAULT '',
+    body text NOT NULL,
+    kind text NOT NULL,
+    entity_type text NOT NULL DEFAULT '',
+    entity_id text NOT NULL DEFAULT '',
+    chat_context jsonb NOT NULL DEFAULT '{}'::jsonb,
     read_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_inapp_notif_org_unread
-    ON in_app_notifications(org_id, read_at) WHERE read_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_inapp_notif_actor_created
-    ON in_app_notifications(actor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pymes_in_app_notif_user_created
+    ON pymes_in_app_notifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pymes_in_app_notif_org_unread
+    ON pymes_in_app_notifications(org_id, read_at) WHERE read_at IS NULL;
 
 CREATE TRIGGER trg_notification_preferences_updated_at
     BEFORE UPDATE ON notification_preferences

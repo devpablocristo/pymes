@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS payments (
     reference_id uuid NOT NULL,
     method text NOT NULL DEFAULT 'cash'
         CONSTRAINT payments_method_check
-        CHECK (method IN ('cash','card','transfer','check','other','credit_note')),
+        CHECK (method IN ('cash','card','transfer','check','other','credit_note','mercadopago')),
     amount numeric(15,2) NOT NULL,
     notes text NOT NULL DEFAULT '',
     is_favorite boolean NOT NULL DEFAULT false,

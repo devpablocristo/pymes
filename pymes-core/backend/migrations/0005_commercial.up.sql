@@ -13,6 +13,7 @@
 CREATE TABLE IF NOT EXISTS products (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    type text NOT NULL DEFAULT 'product',
     sku text,
     name text NOT NULL,
     description text NOT NULL DEFAULT '',

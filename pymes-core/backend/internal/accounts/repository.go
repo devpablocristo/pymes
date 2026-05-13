@@ -42,6 +42,60 @@ func (r *Repository) List(ctx context.Context, orgID uuid.UUID, accountType, ent
 	return out, nil
 }
 
+// Summary agrega saldos por tipo y currency dominante en una sola query.
+// Calcula totales de receivable/payable, count de no-zero, count total
+// y la currency más usada entre cuentas no-zero (fallback "ARS" si no hay).
+func (r *Repository) Summary(ctx context.Context, orgID uuid.UUID) (accountsdomain.Summary, error) {
+	type aggRow struct {
+		Type         string
+		Total        float64
+		NonZeroCount int
+		TotalCount   int
+	}
+	var rows []aggRow
+	err := r.db.WithContext(ctx).
+		Model(&models.AccountModel{}).
+		Select("type, COALESCE(SUM(balance), 0) AS total, " +
+			"COUNT(*) FILTER (WHERE balance != 0) AS non_zero_count, " +
+			"COUNT(*) AS total_count").
+		Where("org_id = ?", orgID).
+		Group("type").
+		Find(&rows).Error
+	if err != nil {
+		return accountsdomain.Summary{}, err
+	}
+	out := accountsdomain.Summary{OrgID: orgID, GeneratedAt: time.Now().UTC()}
+	for _, row := range rows {
+		out.AccountsTotalCount += row.TotalCount
+		switch row.Type {
+		case "receivable":
+			out.ReceivableTotal = row.Total
+			out.ReceivableNonZero = row.NonZeroCount
+		case "payable":
+			out.PayableTotal = row.Total
+			out.PayableNonZero = row.NonZeroCount
+		}
+	}
+	out.NetPosition = out.ReceivableTotal - out.PayableTotal
+
+	// Currency dominante entre cuentas no-zero (degradación silenciosa: "ARS"
+	// si no hay cuentas o la query falla).
+	var currency string
+	if err := r.db.WithContext(ctx).
+		Model(&models.AccountModel{}).
+		Select("currency").
+		Where("org_id = ? AND balance != 0", orgID).
+		Group("currency").
+		Order("COUNT(*) DESC").
+		Limit(1).
+		Scan(&currency).Error; err == nil && currency != "" {
+		out.Currency = currency
+	} else {
+		out.Currency = "ARS"
+	}
+	return out, nil
+}
+
 func (r *Repository) ListMovements(ctx context.Context, orgID, accountID uuid.UUID, limit int) ([]accountsdomain.Movement, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	var rows []models.MovementModel

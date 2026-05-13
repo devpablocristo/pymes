@@ -20,6 +20,7 @@ type usecasesPort interface {
 	Debtors(ctx context.Context, orgID uuid.UUID, limit int) ([]accountsdomain.Account, error)
 	Movements(ctx context.Context, orgID, accountID uuid.UUID, limit int) ([]accountsdomain.Movement, error)
 	CreateOrAdjust(ctx context.Context, in accountsdomain.Account, amount float64, description, actor string) (accountsdomain.Account, error)
+	Summary(ctx context.Context, orgID uuid.UUID) (accountsdomain.Summary, error)
 }
 
 type Handler struct{ uc usecasesPort }
@@ -28,9 +29,23 @@ func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
 	auth.GET("/accounts", rbac.RequirePermission("accounts", "read"), h.List)
+	auth.GET("/accounts/summary", rbac.RequirePermission("accounts", "read"), h.Summary)
 	auth.GET("/accounts/debtors", rbac.RequirePermission("accounts", "read"), h.Debtors)
 	auth.GET("/accounts/:id/movements", rbac.RequirePermission("accounts", "read"), h.Movements)
 	auth.POST("/accounts", rbac.RequirePermission("accounts", "create"), h.Create)
+}
+
+func (h *Handler) Summary(c *gin.Context) {
+	orgID, ok := parseTenant(c)
+	if !ok {
+		return
+	}
+	out, err := h.uc.Summary(c.Request.Context(), orgID)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out)
 }
 
 func (h *Handler) List(c *gin.Context) {

@@ -14,6 +14,7 @@ type RepositoryPort interface {
 	List(ctx context.Context, orgID uuid.UUID, accountType, entityType string, onlyNonZero bool, limit int) ([]accountsdomain.Account, error)
 	ListMovements(ctx context.Context, orgID, accountID uuid.UUID, limit int) ([]accountsdomain.Movement, error)
 	CreateOrAdjust(ctx context.Context, in accountsdomain.Account, amount float64, description, actor string) (accountsdomain.Account, error)
+	Summary(ctx context.Context, orgID uuid.UUID) (accountsdomain.Summary, error)
 }
 
 type Usecases struct{ repo RepositoryPort }
@@ -37,6 +38,13 @@ func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, accountType, entit
 
 func (u *Usecases) Debtors(ctx context.Context, orgID uuid.UUID, limit int) ([]accountsdomain.Account, error) {
 	return u.repo.List(ctx, orgID, "receivable", "customer", true, limit)
+}
+
+// Summary devuelve un resumen agregado de saldos por tipo y currency dominante
+// para un tenant. No requiere validación adicional — Repository.Summary delega
+// la query al motor sin parámetros adicionales.
+func (u *Usecases) Summary(ctx context.Context, orgID uuid.UUID) (accountsdomain.Summary, error) {
+	return u.repo.Summary(ctx, orgID)
 }
 
 func (u *Usecases) Movements(ctx context.Context, orgID, accountID uuid.UUID, limit int) ([]accountsdomain.Movement, error) {

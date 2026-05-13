@@ -33,3 +33,18 @@ type Movement struct {
 	CreatedBy     string     `json:"created_by,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
 }
+
+// Summary agrega saldos por tipo para un tenant. Útil para dashboards y para
+// que Companion (IA) consulte estado financiero agregado sin paginar la lista
+// completa de accounts.
+type Summary struct {
+	OrgID              uuid.UUID `json:"org_id"`
+	ReceivableTotal    float64   `json:"receivable_total"`
+	ReceivableNonZero  int       `json:"receivable_non_zero_count"`
+	PayableTotal       float64   `json:"payable_total"`
+	PayableNonZero     int       `json:"payable_non_zero_count"`
+	NetPosition        float64   `json:"net_position"`
+	AccountsTotalCount int       `json:"accounts_total_count"`
+	Currency           string    `json:"currency"`
+	GeneratedAt        time.Time `json:"generated_at"`
+}

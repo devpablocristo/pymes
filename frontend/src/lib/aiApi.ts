@@ -6,9 +6,13 @@ import type {
   PymesAssistantChatResponse,
 } from '../types/aiChat';
 
-function resolveAiBaseURLs(): string[] {
+// Companion reemplaza a pymes-ai como backend del chat. La base URL del
+// servicio Companion se inyecta vía `VITE_COMPANION_BASE_URL` en build.
+// Mantenemos `VITE_AI_API_URL` como fallback de compatibilidad mientras los
+// pipelines de deploy se actualizan.
+function resolveCompanionBaseURLs(): string[] {
   const env = import.meta.env as Record<string, string | undefined>;
-  const configured = env.VITE_AI_API_URL?.trim();
+  const configured = (env.VITE_COMPANION_BASE_URL ?? env.VITE_AI_API_URL)?.trim();
   const candidates: string[] = [];
   if (configured) {
     candidates.push(configured);
@@ -16,15 +20,16 @@ function resolveAiBaseURLs(): string[] {
   if (typeof window !== 'undefined') {
     const protocol = window.location.protocol || 'http:';
     const hostname = window.location.hostname || 'localhost';
-    candidates.push(`${protocol}//${hostname}:8200`);
+    // Default dev: companion-dev en GCP detrás del mismo proxy same-origin.
+    candidates.push(`${protocol}//${hostname}:18085`);
   }
   return [...new Set(candidates)];
 }
 
-const aiBaseURLs = resolveAiBaseURLs();
+const companionBaseURLs = resolveCompanionBaseURLs();
 
-function aiOptions(options: TenantAwareRequestOptions = {}): TenantAwareRequestOptions {
-  return { ...options, baseURLs: aiBaseURLs };
+function companionOptions(options: TenantAwareRequestOptions = {}): TenantAwareRequestOptions {
+  return { ...options, baseURLs: companionBaseURLs };
 }
 
 export type {
@@ -44,24 +49,29 @@ export type {
   PymesRoutingSource,
 } from '../types/aiChat';
 
-/** Asistente Pymes — un solo chat interno con router LLM y sub-agentes especializados. */
+/** Asistente Pymes — chat interno contra Companion (POST /v1/chat). */
 export async function pymesAssistantChat(payload: CommercialChatRequest): Promise<PymesAssistantChatResponse> {
-  return apiRequest('/v1/chat', aiOptions({ method: 'POST', body: payload }));
+  return apiRequest('/v1/chat', companionOptions({ method: 'POST', body: payload }));
 }
 
-// ── Conversaciones persistidas ──
+// ── Conversaciones persistidas (Companion agent_conversations) ──
 
 export type ConversationSummary = {
   id: string;
-  title: string;
+  title?: string;
   created_at: string;
   updated_at: string;
   message_count: number;
+  product_surface?: string;
 };
 
 export type ConversationMessage = {
   role: string;
   content: string;
+  /** Timestamp en formato ISO. `timestamp` es el campo canónico (Companion).
+   *  `ts` es el alias legacy heredado de pymes-ai; lo aceptamos como sinónimo
+   *  hasta que todos los consumidores migren a `timestamp`. */
+  timestamp?: string | null;
   ts?: string | null;
   tool_calls?: string[];
   blocks?: PymesAssistantChatBlock[];
@@ -69,20 +79,20 @@ export type ConversationMessage = {
 
 export type ConversationDetail = {
   id: string;
-  title: string;
+  title?: string;
   messages: ConversationMessage[];
   created_at: string;
   updated_at: string;
 };
 
-/** Lista conversaciones del usuario autenticado. */
+/** Lista conversaciones del usuario autenticado (Companion GET /v1/chat/conversations). */
 export async function listConversations(limit = 50): Promise<{ items: ConversationSummary[] }> {
-  return apiRequest(`/v1/chat/conversations?limit=${limit}`, aiOptions());
+  return apiRequest(`/v1/chat/conversations?limit=${limit}`, companionOptions());
 }
 
-/** Carga una conversación con su historial de mensajes. */
+/** Carga una conversación con su historial de mensajes (Companion GET /v1/chat/conversations/{id}). */
 export async function getConversation(conversationId: string): Promise<ConversationDetail> {
-  return apiRequest(`/v1/chat/conversations/${conversationId}`, aiOptions());
+  return apiRequest(`/v1/chat/conversations/${conversationId}`, companionOptions());
 }
 
 export async function createInsightNotifications(payload?: {
@@ -92,5 +102,5 @@ export async function createInsightNotifications(payload?: {
   top_limit?: number;
   preferred_language?: 'es' | 'en';
 }): Promise<InsightNotificationsResponse> {
-  return apiRequest('/v1/notifications', aiOptions({ method: 'POST', body: payload ?? {} }));
+  return apiRequest('/v1/notifications', companionOptions({ method: 'POST', body: payload ?? {} }));
 }

@@ -11,21 +11,21 @@
       {
         "source": "/v1/chat",
         "run": {
-          "serviceId": "pymes-ai",
+          "serviceId": "companion-dev",
           "region": "us-central1"
         }
       },
       {
         "source": "/v1/chat/**",
         "run": {
-          "serviceId": "pymes-ai",
+          "serviceId": "companion-dev",
           "region": "us-central1"
         }
       },
       {
         "source": "/v1/notifications",
         "run": {
-          "serviceId": "pymes-ai",
+          "serviceId": "companion-dev",
           "region": "us-central1"
         }
       },

@@ -297,7 +297,7 @@ Los nombres de servicio NO llevan prefijo `pymes-`. El `COMPOSE_PROJECT_NAME` ya
 | Backend vertical | `prof-backend`, `work-backend`, `beauty-backend`, `restaurants-backend` | `pymes-prof-backend-1` |
 | DB | `postgres` | `pymes-postgres-1` |
 | Frontend | `frontend` | `pymes-frontend-1` |
-| AI | `ai` | `pymes-ai-1` |
+| AI / Chat | (sibling repo) `companion` | servido por Companion local en `:18085` |
 
 ### Reglas Docker
 

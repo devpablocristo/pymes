@@ -176,7 +176,7 @@ jobs:
       - name: Build
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL_DEV }}
-          VITE_AI_API_URL: ${{ secrets.VITE_AI_API_URL_DEV }}
+          VITE_COMPANION_BASE_URL: ${{ secrets.VITE_COMPANION_BASE_URL_DEV }}
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_DEV }}
           VITE_API_KEY: ${{ secrets.VITE_API_KEY_DEV }}
           VITE_API_ACTOR: ${{ secrets.VITE_API_ACTOR_DEV }}
@@ -212,10 +212,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build production backend image
         run: docker build -f pymes-core/backend/Dockerfile.prod -t pymes-core-prod-ci ..
-      - name: Build production AI image
-        run: docker build -f ai/Dockerfile.prod -t pymes-ai-prod-ci .
-      - name: Smoke AI production image imports
-        run: docker run --rm -e GEMINI_API_KEY=ci-placeholder-not-used pymes-ai-prod-ci python -c "import src.main"
+      # pymes-ai image builds eliminados: el chat lo sirve Companion (sibling
+      # repo, su propio CI/deploy). Ver modular-swinging-hummingbird Fase 4.
 
   vertical-docker-prod-builds:
     runs-on: ubuntu-latest

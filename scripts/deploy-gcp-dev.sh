@@ -27,10 +27,8 @@ CLERK_JWKS_URL_VALUE="${CLERK_JWKS_URL_VALUE:-${JWKS_URL:-}}"
 FRONTEND_CLERK_PUBLISHABLE_KEY="${FRONTEND_CLERK_PUBLISHABLE_KEY:-${VITE_CLERK_PUBLISHABLE_KEY:-}}"
 GOVERNANCE_URL_EFFECTIVE="${GOVERNANCE_URL:-}"
 GOVERNANCE_API_KEY_EFFECTIVE="${GOVERNANCE_API_KEY:-}"
-AI_LLM_PROVIDER_VALUE="${AI_LLM_PROVIDER_VALUE:-${LLM_PROVIDER:-gemini}}"
-AI_GEMINI_MODEL_VALUE="${AI_GEMINI_MODEL_VALUE:-${GEMINI_MODEL:-gemini-2.5-flash}}"
-AI_GEMINI_VERTEX_PROJECT_VALUE="${AI_GEMINI_VERTEX_PROJECT_VALUE:-${GEMINI_VERTEX_PROJECT:-}}"
-AI_GEMINI_VERTEX_LOCATION_VALUE="${AI_GEMINI_VERTEX_LOCATION_VALUE:-${GEMINI_VERTEX_LOCATION:-global}}"
+# AI_*_VALUE vars eliminadas: pymes-ai decomisionado (Fase 4
+# modular-swinging-hummingbird). Companion gestiona su propio deploy de LLM.
 FIREBASE_TOOLS_VERSION="${FIREBASE_TOOLS_VERSION:-13}"
 
 log() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
@@ -118,9 +116,11 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:$SA" --role="roles/aiplatform.user" >/dev/null
 
 # ── 5. Build + push imágenes ──
+# Nota: pymes-ai fue decomisionado (modular-swinging-hummingbird Fase 4). El
+# chat lo sirve Companion (repo hermano); este script ya no construye ni
+# deploya el servicio pymes-ai.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/pymes/pymes-core:dev"
-AI_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/pymes/pymes-ai:dev"
 
 # Backend: necesita parent dir con core/ hermano
 log "staging backend context"
@@ -163,8 +163,6 @@ gcloud run deploy pymes-core --image="$BACKEND_IMAGE" --region="$REGION" \
   --project="$PROJECT_ID"
 
 BACKEND_URL=$(gcloud run services describe pymes-core --region="$REGION" --project="$PROJECT_ID" --format="value(status.url)")
-AI_VERTEX_PROJECT_EFFECTIVE="${AI_GEMINI_VERTEX_PROJECT_VALUE:-$PROJECT_ID}"
-AI_VERTEX_LOCATION_EFFECTIVE="${AI_GEMINI_VERTEX_LOCATION_VALUE:-$REGION}"
 
 CLERK_ENABLED=false
 
@@ -177,44 +175,8 @@ if [[ "$CLERK_ENABLED" != true ]]; then
   exit 1
 fi
 
-# AI
-log "staging ai context"
-AI_CTX="$(mktemp -d)"
-trap 'rm -rf "$BACKEND_CTX" "$AI_CTX"' EXIT
-rsync -a --exclude '.git/' --exclude '.venv/' --exclude '.pytest_cache/' --exclude '.ruff_cache/' \
-      --exclude '__pycache__/' --exclude 'node_modules/' --exclude 'dist/' \
-      "$REPO_ROOT/ai/" "$AI_CTX/ai/"
-
-log "building ai image"
-( cd "$AI_CTX" && gcloud builds submit . \
-    --config ai/cloudbuild.yaml \
-    --substitutions="_IMAGE=${AI_IMAGE}" \
-    --project="$PROJECT_ID" )
-
-log "deploy ai (Cloud Run)"
-AI_ENV_VARS="AI_ENVIRONMENT=development,BACKEND_URL=${BACKEND_URL},LLM_PROVIDER=${AI_LLM_PROVIDER_VALUE},GEMINI_MODEL=${AI_GEMINI_MODEL_VALUE},GEMINI_VERTEX_PROJECT=${AI_VERTEX_PROJECT_EFFECTIVE},GEMINI_VERTEX_LOCATION=${AI_VERTEX_LOCATION_EFFECTIVE},AUTH_ALLOW_API_KEY=true"
-if [[ -n "$CLERK_JWKS_URL_VALUE" ]]; then
-  AI_ENV_VARS="${AI_ENV_VARS},JWKS_URL=${CLERK_JWKS_URL_VALUE}"
-fi
-if [[ -n "$CLERK_JWT_ISSUER_VALUE" ]]; then
-  AI_ENV_VARS="${AI_ENV_VARS},JWT_ISSUER=${CLERK_JWT_ISSUER_VALUE}"
-fi
-if [[ -n "$GOVERNANCE_URL_EFFECTIVE" ]]; then
-  AI_ENV_VARS="${AI_ENV_VARS},GOVERNANCE_URL=${GOVERNANCE_URL_EFFECTIVE}"
-fi
-AI_SECRET_VARS="DATABASE_URL=DATABASE_URL:latest"
-if gcloud secrets describe GOVERNANCE_API_KEY --project="$PROJECT_ID" >/dev/null 2>&1; then
-  AI_SECRET_VARS="${AI_SECRET_VARS},GOVERNANCE_API_KEY=GOVERNANCE_API_KEY:latest"
-fi
-gcloud run deploy pymes-ai --image="$AI_IMAGE" --region="$REGION" \
-  --platform=managed --allow-unauthenticated \
-  --add-cloudsql-instances="$CONN" \
-  --set-env-vars="$AI_ENV_VARS" \
-  --set-secrets="$AI_SECRET_VARS" \
-  --min-instances=0 --max-instances=5 --memory=512Mi --cpu=1 --timeout=300 \
-  --project="$PROJECT_ID"
-
-AI_URL=$(gcloud run services describe pymes-ai --region="$REGION" --project="$PROJECT_ID" --format="value(status.url)")
+# AI: pymes-ai decomisionado. El chat ahora lo sirve Companion (sibling
+# repo); su deploy se gestiona desde companion/.github/workflows.
 
 # Frontend en Firebase Hosting
 log "asegurando proyecto Firebase"
@@ -224,7 +186,7 @@ log "building frontend static bundle"
 (
   cd "$REPO_ROOT/frontend"
   export VITE_API_URL="/"
-  export VITE_AI_API_URL="/"
+  export VITE_COMPANION_BASE_URL="/"
   export VITE_CLERK_PUBLISHABLE_KEY="$FRONTEND_CLERK_PUBLISHABLE_KEY"
   npm ci
   npm run build
@@ -240,13 +202,12 @@ FRONT_URL="https://${PROJECT_ID}.web.app"
 
 # Actualizar backend con FRONTEND_URL real (CORS)
 gcloud run services update pymes-core --region="$REGION" --project="$PROJECT_ID" \
-  --update-env-vars="FRONTEND_URL=${FRONT_URL},AI_SERVICE_URL=${AI_URL}" >/dev/null
+  --update-env-vars="FRONTEND_URL=${FRONT_URL}" >/dev/null
 
 log "LISTO"
 echo "PROJECT_ID : $PROJECT_ID"
 echo "BACKEND    : $BACKEND_URL"
 echo "FRONTEND   : $FRONT_URL"
-echo "AI         : $AI_URL"
 echo "DB         : $CONN (db-f1-micro, ~US\$9/mes)"
 echo
 echo "Para seeds con Cloud SQL Proxy:"

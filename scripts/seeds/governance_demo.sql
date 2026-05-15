@@ -67,13 +67,13 @@ INSERT INTO policies (name, action_type, expression, effect, mode, enabled) VALU
 DELETE FROM delegations
 WHERE owner_id = 'pymes-platform'
   AND owner_type = 'service'
-  AND agent_id = 'pymes-ai'
+  AND agent_id = 'companion'
   AND agent_type = 'service';
 
 INSERT INTO delegations (
   owner_id, owner_type, agent_id, agent_type,
   allowed_action_types, allowed_resources, purpose, max_risk_class, enabled
 ) VALUES (
-  'pymes-platform', 'service', 'pymes-ai', 'service',
-  '[]'::jsonb, '[]'::jsonb, 'Pymes AI Service - atencion al cliente y operaciones gobernadas', 'high', true
+  'pymes-platform', 'service', 'companion', 'service',
+  '[]'::jsonb, '[]'::jsonb, 'Companion agent - atencion al cliente y operaciones gobernadas', 'high', true
 );

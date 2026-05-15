@@ -105,7 +105,11 @@ func LoadFromEnv() Config {
 		SchedulerSecret:                  envconfig.Get("SCHEDULER_SECRET", ""),
 		ExchangeRateProvider:             envconfig.Get("EXCHANGE_RATE_PROVIDER", "manual"),
 		InternalServiceToken:             strings.TrimSpace(envconfig.Get("INTERNAL_SERVICE_TOKEN", localInternalServiceToken)),
-		AIServiceURL:                     envconfig.Get("AI_SERVICE_URL", "http://ai:8000"),
+		// AI_SERVICE_URL apuntaba a pymes-ai (decomisionado, modular-swinging-hummingbird Fase 4).
+		// Default vacío → AIClient.ProcessWhatsApp devuelve "ai service url not configured".
+		// TODO: cuando Companion exponga /v1/internal/customer-messaging/inbound (equivalente
+		// del endpoint que tenía pymes-ai), repointear AI_SERVICE_URL al base URL de Companion.
+		AIServiceURL: envconfig.Get("AI_SERVICE_URL", ""),
 		GovernanceCallbackToken:          envconfig.Get("GOVERNANCE_CALLBACK_TOKEN", ""),
 		GovernanceSyncInterval:           envconfig.Duration("GOVERNANCE_SYNC_INTERVAL_SECONDS", 30*time.Second),
 		WhatsAppWebhookVerifyToken:       envconfig.Get("WHATSAPP_WEBHOOK_VERIFY_TOKEN", ""),

@@ -9,7 +9,7 @@ steps:
       - --build-arg
       - VITE_API_URL=${_VITE_API_URL}
       - --build-arg
-      - VITE_AI_API_URL=${_VITE_AI_API_URL}
+      - VITE_COMPANION_BASE_URL=${_VITE_COMPANION_BASE_URL}
       - --build-arg
       - VITE_CLERK_PUBLISHABLE_KEY=${_VITE_CLERK_PUBLISHABLE_KEY}
       - --build-arg
@@ -30,7 +30,7 @@ options:
 substitutions:
   _IMAGE: ''
   _VITE_API_URL: ''
-  _VITE_AI_API_URL: ''
+  _VITE_COMPANION_BASE_URL: ''
   _VITE_CLERK_PUBLISHABLE_KEY: ''
   _VITE_API_KEY: ''
 

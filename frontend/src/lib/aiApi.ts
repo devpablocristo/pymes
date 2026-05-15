@@ -8,11 +8,9 @@ import type {
 
 // Companion reemplaza a pymes-ai como backend del chat. La base URL del
 // servicio Companion se inyecta vía `VITE_COMPANION_BASE_URL` en build.
-// Mantenemos `VITE_AI_API_URL` como fallback de compatibilidad mientras los
-// pipelines de deploy se actualizan.
 function resolveCompanionBaseURLs(): string[] {
   const env = import.meta.env as Record<string, string | undefined>;
-  const configured = (env.VITE_COMPANION_BASE_URL ?? env.VITE_AI_API_URL)?.trim();
+  const configured = env.VITE_COMPANION_BASE_URL?.trim();
   const candidates: string[] = [];
   if (configured) {
     candidates.push(configured);

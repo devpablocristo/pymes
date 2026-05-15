@@ -102,7 +102,10 @@ services:
       VITE_BEAUTY_API_URL: http://localhost:8383
       VITE_RESTAURANTS_API_URL: http://localhost:8484
       VITE_MEDICAL_API_URL: http://localhost:8585
-      VITE_AI_API_URL: ${VITE_AI_API_URL:-http://localhost:8200}
+      # Chat ahora servido por Companion. Default local apunta al docker-compose
+      # de companion (sibling repo) en su puerto 18085. Override con
+      # VITE_COMPANION_BASE_URL en .env si el setup difiere.
+      VITE_COMPANION_BASE_URL: ${VITE_COMPANION_BASE_URL:-http://host.docker.internal:18085}
       # Clerk: definir en .env junto al resto (pk_test_...). Vacío = modo consola con API key.
       VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
       VITE_API_KEY: ${VITE_API_KEY:-psk_local_admin}
@@ -112,46 +115,9 @@ services:
     depends_on:
       - cp-backend
 
-  ai:
-    restart: unless-stopped
-    build:
-      context: ..
-      dockerfile: pymes/ai/Dockerfile.dev
-    ports:
-      - "8200:8000"
-    volumes:
-      - ./ai/src:/workspace/pymes/ai/src
-      - ./ai/tests:/workspace/pymes/ai/tests
-      - ./ai/pyproject.toml:/workspace/pymes/ai/pyproject.toml
-      # ADC local para Vertex AI. No se versionan credenciales; se monta read-only desde el host.
-      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      AI_ENVIRONMENT: development
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/pymes
-      BACKEND_URL: http://host.docker.internal:8100
-      PROFESSIONALS_BACKEND_URL: http://host.docker.internal:8181
-      WORKSHOPS_BACKEND_URL: http://host.docker.internal:8282
-      BEAUTY_BACKEND_URL: http://host.docker.internal:8383
-      RESTAURANTS_BACKEND_URL: http://host.docker.internal:8484
-      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
-      LLM_PROVIDER: gemini
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
-      GEMINI_VERTEX_PROJECT: ${GEMINI_VERTEX_PROJECT:-}
-      GEMINI_VERTEX_LOCATION: ${GEMINI_VERTEX_LOCATION:-global}
-      GOVERNANCE_URL: ${GOVERNANCE_URL:-http://host.docker.internal:18084}
-      PYTHONPATH: /workspace/pymes/ai
-    depends_on:
-      cp-backend:
-        condition: service_started
-      work-backend:
-        condition: service_started
+  # ── Chat AI servido por Companion (sibling repo). Para levantar el chat
+  # localmente: docker compose -f ../companion/docker-compose.yml up companion.
+  # El servicio pymes-ai fue decomisionado (modular-swinging-hummingbird Fase 4).
 
   # ── Professionals Vertical ──
 

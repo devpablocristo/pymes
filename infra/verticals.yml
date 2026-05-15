@@ -11,9 +11,8 @@ platform:
       - "**/.*"
       - "**/node_modules/**"
     static_rewrites:
-      # Chat + insights ahora atendidos por Companion (sucesor de pymes-ai).
-      # Cuando pymes-ai se decomisione del todo (Fase 4 plan
-      # modular-swinging-hummingbird), borrar AI_SERVICE_NAME del workflow.
+      # Chat + insights atendidos por Companion (sucesor de pymes-ai, ya
+      # decomisionado por completo).
       - source: /v1/chat
         service: companion-dev
       - source: /v1/chat/**

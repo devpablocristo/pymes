@@ -158,16 +158,6 @@ jobs:
           fi
           echo "IMAGE_DIGEST=$digest" >> "$GITHUB_ENV"
 
-      - name: Resolve existing AI URL
-        run: |
-          set -euo pipefail
-          ai_service="${{ vars.CLOUD_RUN_SERVICE_AI_DEV || 'pymes-ai' }}"
-          ai_url="$(gcloud run services describe "$ai_service" \
-            --project="$GCP_PROJECT_ID" \
-            --region="$GCP_REGION" \
-            --format='value(status.url)' 2>/dev/null || true)"
-          echo "AI_SERVICE_URL_EXISTING=${ai_url}" >> "$GITHUB_ENV"
-
       - name: Resolve existing service URL
         run: |
           set -euo pipefail
@@ -213,9 +203,9 @@ jobs:
           if [[ -n "${GOVERNANCE_URL}" ]]; then
             env_vars="${env_vars},GOVERNANCE_URL=${GOVERNANCE_URL}"
           fi
-          if [[ -n "${AI_SERVICE_URL_EXISTING:-}" ]]; then
-            env_vars="${env_vars},AI_SERVICE_URL=${AI_SERVICE_URL_EXISTING}"
-          fi
+          # AI_SERVICE_URL: pymes-ai decomisionado (Fase 4
+          # modular-swinging-hummingbird). Cuando Companion exponga el endpoint
+          # /v1/internal/customer-messaging/inbound, reactivar la inyección.
           gcloud run deploy "$SERVICE_NAME" \
             --project="$GCP_PROJECT_ID" \
             --region="$GCP_REGION" \

@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
 
-	gormdb "github.com/devpablocristo/core/databases/postgres/go"
+	gormdb "github.com/devpablocristo/platform/databases/postgres/go"
 )
 
 // NewDB abre una conexión GORM a PostgreSQL con configuración por defecto.

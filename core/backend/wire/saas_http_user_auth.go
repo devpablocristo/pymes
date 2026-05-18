@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	authn "github.com/devpablocristo/core/authn/go"
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	authn "github.com/devpablocristo/platform/authn/go"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 )
 
 type clerkAuthenticatedUser struct {

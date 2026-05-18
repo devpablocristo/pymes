@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	schedulinghttp "github.com/devpablocristo/modules/scheduling/go/httpgin"
+	schedulinghttp "github.com/devpablocristo/platform/features/scheduling/go/httpgin"
 	"github.com/devpablocristo/pymes/core/backend/internal/shared/handlers"
 )
 

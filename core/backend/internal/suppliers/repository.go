@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/http/go/pagination"
+	"github.com/devpablocristo/platform/http/go/pagination"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 
-	utils "github.com/devpablocristo/core/validate/go/stringutil"
+	utils "github.com/devpablocristo/platform/validate/go/stringutil"
 	supplierdomain "github.com/devpablocristo/pymes/core/backend/internal/suppliers/usecases/domain"
 )
 

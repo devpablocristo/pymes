@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	purchasesdomain "github.com/devpablocristo/pymes/core/backend/internal/purchases/usecases/domain"
 )
 

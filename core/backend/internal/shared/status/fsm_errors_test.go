@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devpablocristo/core/concurrency/go/fsm"
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/concurrency/go/fsm"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 
 	"github.com/devpablocristo/pymes/core/backend/internal/shared/status"
 )

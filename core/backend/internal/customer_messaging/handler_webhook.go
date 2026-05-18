@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"

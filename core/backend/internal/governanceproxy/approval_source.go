@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/devpablocristo/core/governance/go/governanceclient"
+	"github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
 	governancedto "github.com/devpablocristo/pymes/core/backend/internal/governanceproxy/handler/dto"
 	"github.com/devpablocristo/pymes/core/backend/internal/inappnotifications"
 )

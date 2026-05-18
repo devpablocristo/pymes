@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/devpablocristo/core/config/go/envconfig"
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	saasbilling "github.com/devpablocristo/core/saas/go/billing"
+	"github.com/devpablocristo/platform/config/go/envconfig"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	saasbilling "github.com/devpablocristo/platform/kernels/saas/go/billing"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"

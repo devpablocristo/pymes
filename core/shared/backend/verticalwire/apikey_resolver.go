@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	utils "github.com/devpablocristo/core/security/go/hashutil"
+	utils "github.com/devpablocristo/platform/security/go/hashutil"
 	"github.com/devpablocristo/pymes/core/shared/backend/auth"
 )
 

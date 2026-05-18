@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
+	archive "github.com/devpablocristo/platform/features/crud/archive/go/archive"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/sessions/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 )

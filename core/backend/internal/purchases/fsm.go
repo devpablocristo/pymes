@@ -1,6 +1,6 @@
 package purchases
 
-import "github.com/devpablocristo/core/concurrency/go/fsm"
+import "github.com/devpablocristo/platform/concurrency/go/fsm"
 
 // purchaseStateMachine declara el grafo canónico de transiciones de status para
 // Purchase. Decisión arquitectónica firme (Sección 6.1 del plan): `voided`

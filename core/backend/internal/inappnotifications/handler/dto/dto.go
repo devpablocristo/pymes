@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	coredomain "github.com/devpablocristo/core/notifications/go/inbox/usecases/domain"
+	coredomain "github.com/devpablocristo/platform/notifications/go/inbox/usecases/domain"
 )
 
 // InAppNotificationResponse DTO de salida.

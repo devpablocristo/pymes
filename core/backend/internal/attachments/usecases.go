@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	attachmentdomain "github.com/devpablocristo/pymes/core/backend/internal/attachments/usecases/domain"
 )
 

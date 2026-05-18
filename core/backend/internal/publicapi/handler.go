@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/http/go/pagination"
+	"github.com/devpablocristo/platform/http/go/pagination"
 	"github.com/devpablocristo/pymes/core/backend/internal/shared/handlers"
 	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 )

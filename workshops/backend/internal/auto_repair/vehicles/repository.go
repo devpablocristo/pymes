@@ -11,8 +11,8 @@ import (
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/http/go/pagination"
-	utils "github.com/devpablocristo/core/validate/go/stringutil"
+	"github.com/devpablocristo/platform/http/go/pagination"
+	utils "github.com/devpablocristo/platform/validate/go/stringutil"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles/usecases/domain"
 	assetmodels "github.com/devpablocristo/pymes/workshops/backend/internal/customerassets/repository/models"
 )

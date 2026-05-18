@@ -3,7 +3,7 @@ package authz
 import (
 	"strings"
 
-	coreauthz "github.com/devpablocristo/core/authz/go"
+	coreauthz "github.com/devpablocristo/platform/authz/go"
 )
 
 // Roles privilegiados alineados con core/saas/go/tenant.NormalizeRole (owner, admin, secops, viewer).

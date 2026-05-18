@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
+	crudpaths "github.com/devpablocristo/platform/features/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 

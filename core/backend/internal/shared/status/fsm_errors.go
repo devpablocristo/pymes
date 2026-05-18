@@ -11,8 +11,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/devpablocristo/core/concurrency/go/fsm"
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/concurrency/go/fsm"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 )
 
 // MapFSMError envuelve los sentinels de fsm en domainerr.Conflict para que

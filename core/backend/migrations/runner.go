@@ -5,7 +5,7 @@ import (
 	"embed"
 	"fmt"
 
-	schedulingmigrations "github.com/devpablocristo/modules/scheduling/go/migrations"
+	schedulingmigrations "github.com/devpablocristo/platform/features/scheduling/go/migrations"
 	"github.com/golang-migrate/migrate/v4"
 	pg "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source"

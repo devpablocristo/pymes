@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	coredomain "github.com/devpablocristo/core/notifications/go/inbox/usecases/domain"
+	coredomain "github.com/devpablocristo/platform/notifications/go/inbox/usecases/domain"
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/pymes/core/backend/internal/inappnotifications"

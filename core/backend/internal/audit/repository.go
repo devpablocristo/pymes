@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/security/go/hashutil"
+	"github.com/devpablocristo/platform/security/go/hashutil"
 	"github.com/devpablocristo/pymes/core/backend/internal/audit/repository/models"
 	"github.com/devpablocristo/pymes/core/backend/internal/audit/usecases/domain"
 )

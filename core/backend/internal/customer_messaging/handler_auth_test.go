@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	types "github.com/devpablocristo/core/security/go/contextkeys"
+	types "github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/devpablocristo/pymes/core/backend/internal/customer_messaging/domain"
 	"github.com/devpablocristo/pymes/core/backend/internal/shared/handlers"
 )

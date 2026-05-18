@@ -9,9 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	authn "github.com/devpablocristo/core/authn/go"
-	ginmw "github.com/devpablocristo/core/http/gin/go"
-	ctxkeys "github.com/devpablocristo/core/security/go/contextkeys"
+	authn "github.com/devpablocristo/platform/authn/go"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
+	ctxkeys "github.com/devpablocristo/platform/security/go/contextkeys"
 )
 
 // AuthMiddleware re-exporta el tipo de core.

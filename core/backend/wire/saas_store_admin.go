@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	corepostgres "github.com/devpablocristo/core/databases/postgres/go"
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	corepostgres "github.com/devpablocristo/platform/databases/postgres/go"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/http/go/pagination"
+	"github.com/devpablocristo/platform/http/go/pagination"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 

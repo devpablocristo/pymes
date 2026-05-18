@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/devpablocristo/core/governance/go/governanceclient"
+	"github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
 )
 
 func TestClientSubmitRequestForTenantScopesNexusRequest(t *testing.T) {

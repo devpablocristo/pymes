@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/governance/go/governanceclient"
+	"github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
 	"github.com/google/uuid"
 )
 

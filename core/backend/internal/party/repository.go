@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/http/go/pagination"
+	"github.com/devpablocristo/platform/http/go/pagination"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 
-	utils "github.com/devpablocristo/core/validate/go/stringutil"
+	utils "github.com/devpablocristo/platform/validate/go/stringutil"
 	"github.com/devpablocristo/pymes/core/backend/internal/party/repository/models"
 	partydomain "github.com/devpablocristo/pymes/core/backend/internal/party/usecases/domain"
 )

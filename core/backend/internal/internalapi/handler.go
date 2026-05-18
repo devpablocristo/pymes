@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/http/go/pagination"
-	coredomain "github.com/devpablocristo/core/notifications/go/inbox/usecases/domain"
+	"github.com/devpablocristo/platform/http/go/pagination"
+	coredomain "github.com/devpablocristo/platform/notifications/go/inbox/usecases/domain"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 

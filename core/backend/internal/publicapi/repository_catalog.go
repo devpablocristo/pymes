@@ -6,10 +6,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/devpablocristo/core/http/go/pagination"
+	"github.com/devpablocristo/platform/http/go/pagination"
 	"github.com/google/uuid"
 
-	schedulingdomain "github.com/devpablocristo/modules/scheduling/go/domain"
+	schedulingdomain "github.com/devpablocristo/platform/features/scheduling/go/domain"
 )
 
 // ListPublicServices mantiene el shape compacto usado por el adapter externo schedulingpublichttp.

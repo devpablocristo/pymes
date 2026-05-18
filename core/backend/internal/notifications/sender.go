@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
-	corenotifications "github.com/devpablocristo/core/notifications/go"
+	corenotifications "github.com/devpablocristo/platform/notifications/go"
 	"github.com/rs/zerolog"
 )
 

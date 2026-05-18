@@ -4,11 +4,11 @@
 package httperrors
 
 import (
-	corepostgres "github.com/devpablocristo/core/databases/postgres/go"
+	corepostgres "github.com/devpablocristo/platform/databases/postgres/go"
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 )
 
 // Sentinel errors — domainerr.Error, soportan errors.Is por Kind.

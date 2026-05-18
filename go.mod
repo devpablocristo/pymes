@@ -4,28 +4,29 @@ go 1.26.1
 
 require (
 	github.com/MicahParks/keyfunc/v3 v3.8.0
-	github.com/devpablocristo/core/authn/go v0.2.1
-	github.com/devpablocristo/core/authz/go v0.1.0
-	github.com/devpablocristo/core/calendar/ics/go v0.1.0
-	github.com/devpablocristo/core/calendar/sync/google/go v0.1.0
-	github.com/devpablocristo/core/concurrency/go v0.2.0
-	github.com/devpablocristo/core/config/go v0.1.0
-	github.com/devpablocristo/core/databases/postgres/go v0.1.1
-	github.com/devpablocristo/core/errors/go v0.1.0
-	github.com/devpablocristo/core/governance/go v0.4.1
-	github.com/devpablocristo/core/http/gin/go v0.1.1
-	github.com/devpablocristo/core/http/go v0.1.1
-	github.com/devpablocristo/core/notifications/go v0.3.0
-	github.com/devpablocristo/core/saas/go v0.1.1-0.20260328151810-084828e80b26
-	github.com/devpablocristo/core/security/go v0.1.0
-	github.com/devpablocristo/core/validate/go v0.1.1
-	github.com/devpablocristo/modules/crud/archive/go v0.1.0
-	github.com/devpablocristo/modules/crud/paths/go v0.1.0
-	github.com/devpablocristo/modules/scheduling/go v0.5.0
+	github.com/devpablocristo/platform/authn/go v0.1.0
+	github.com/devpablocristo/platform/authz/go v0.1.0
+	github.com/devpablocristo/platform/calendar/ics/go v0.1.0
+	github.com/devpablocristo/platform/concurrency/go v0.1.0
+	github.com/devpablocristo/platform/config/go v0.1.0
+	github.com/devpablocristo/platform/databases/postgres/go v0.1.0
+	github.com/devpablocristo/platform/errors/go v0.1.0
+	github.com/devpablocristo/platform/features/crud/archive/go v0.1.0
+	github.com/devpablocristo/platform/features/crud/paths/go v0.1.0
+	github.com/devpablocristo/platform/features/scheduling/go v0.1.0
+	github.com/devpablocristo/platform/http/gin/go v0.1.0
+	github.com/devpablocristo/platform/http/go v0.1.0
+	github.com/devpablocristo/platform/kernels/governance/go v0.1.0
+	github.com/devpablocristo/platform/kernels/saas/go v0.1.0
+	github.com/devpablocristo/platform/notifications/go v0.1.1
+	github.com/devpablocristo/platform/sdks/google-calendar/go v0.1.0
+	github.com/devpablocristo/platform/security/go v0.1.0
+	github.com/devpablocristo/platform/validate/go v0.1.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
+	github.com/jackc/pgx/v5 v5.8.0
 	github.com/lib/pq v1.11.2
 	github.com/rs/zerolog v1.34.0
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
@@ -66,7 +67,7 @@ require (
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
-	github.com/devpablocristo/core/scheduling/go v0.1.0 // indirect
+	github.com/devpablocristo/platform/jobs/go v0.1.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
@@ -77,7 +78,6 @@ require (
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/pgx/v5 v5.8.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect

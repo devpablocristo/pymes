@@ -1,6 +1,6 @@
 package invoices
 
-import "github.com/devpablocristo/core/concurrency/go/fsm"
+import "github.com/devpablocristo/platform/concurrency/go/fsm"
 
 // invoiceStateMachine declara el grafo canónico de transiciones de status para
 // Invoice.

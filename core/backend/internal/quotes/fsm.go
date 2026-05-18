@@ -1,6 +1,6 @@
 package quotes
 
-import "github.com/devpablocristo/core/concurrency/go/fsm"
+import "github.com/devpablocristo/platform/concurrency/go/fsm"
 
 // quoteStateMachine declara el grafo canónico de transiciones de status para
 // Quote. Es la única fuente de verdad del backend.

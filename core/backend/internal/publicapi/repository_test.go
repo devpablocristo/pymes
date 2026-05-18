@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	schedulingdomain "github.com/devpablocristo/modules/scheduling/go/domain"
+	schedulingdomain "github.com/devpablocristo/platform/features/scheduling/go/domain"
 )
 
 type fakeScheduling struct {

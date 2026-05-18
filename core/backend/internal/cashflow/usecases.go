@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	archive "github.com/devpablocristo/platform/features/crud/archive/go/archive"
 	cashdomain "github.com/devpablocristo/pymes/core/backend/internal/cashflow/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 )

@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/devpablocristo/core/http/go/httpclient"
+	"github.com/devpablocristo/platform/http/go/httpclient"
 )
 
 type Client struct {

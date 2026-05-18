@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/http/go/pagination"
+	"github.com/devpablocristo/platform/http/go/pagination"
 	"github.com/google/uuid"
 
-	schedulingdomain "github.com/devpablocristo/modules/scheduling/go/domain"
-	schedulingpublic "github.com/devpablocristo/modules/scheduling/go/publicapi"
+	schedulingdomain "github.com/devpablocristo/platform/features/scheduling/go/domain"
+	schedulingpublic "github.com/devpablocristo/platform/features/scheduling/go/publicapi"
 )
 
 type schedulingSelection struct {

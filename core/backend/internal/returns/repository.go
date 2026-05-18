@@ -12,9 +12,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	"github.com/devpablocristo/core/http/go/pagination"
-	utils "github.com/devpablocristo/core/validate/go/stringutil"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/http/go/pagination"
+	utils "github.com/devpablocristo/platform/validate/go/stringutil"
 	returnmodels "github.com/devpablocristo/pymes/core/backend/internal/returns/repository/models"
 	returndomain "github.com/devpablocristo/pymes/core/backend/internal/returns/usecases/domain"
 )

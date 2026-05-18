@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/http/go/pagination"
+	"github.com/devpablocristo/platform/http/go/pagination"
 	"github.com/devpablocristo/pymes/core/backend/internal/procurement/repository/models"
 	"github.com/devpablocristo/pymes/core/backend/internal/procurement/usecases/domain"
 )

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/http/go/pagination"
-	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
+	"github.com/devpablocristo/platform/http/go/pagination"
+	crudpaths "github.com/devpablocristo/platform/features/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 

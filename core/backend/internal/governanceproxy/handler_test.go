@@ -10,7 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	ctxkeys "github.com/devpablocristo/core/security/go/contextkeys"
+	ctxkeys "github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/devpablocristo/pymes/core/backend/internal/governanceproxy/handler/dto"
 )
 

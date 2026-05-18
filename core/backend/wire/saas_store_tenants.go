@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	saasadmindomain "github.com/devpablocristo/core/saas/go/admin/usecases/domain"
-	saasbillingdomain "github.com/devpablocristo/core/saas/go/billing/usecases/domain"
+	saasadmindomain "github.com/devpablocristo/platform/kernels/saas/go/admin/usecases/domain"
+	saasbillingdomain "github.com/devpablocristo/platform/kernels/saas/go/billing/usecases/domain"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )

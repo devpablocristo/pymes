@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/devpablocristo/pymes/beauty/backend/internal/salon/orchestration"
 	"github.com/devpablocristo/pymes/beauty/backend/internal/salon/public"
 	"github.com/devpablocristo/pymes/beauty/backend/internal/shared/config"

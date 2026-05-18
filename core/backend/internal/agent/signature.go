@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	coreapikey "github.com/devpablocristo/core/security/go/apikey"
+	coreapikey "github.com/devpablocristo/platform/security/go/apikey"
 )
 
 const signatureWindow = 5 * time.Minute

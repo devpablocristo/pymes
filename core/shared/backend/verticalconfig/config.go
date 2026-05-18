@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/devpablocristo/core/config/go/envconfig"
+	"github.com/devpablocristo/platform/config/go/envconfig"
 )
 
 const localInternalServiceToken = "local-internal-token"

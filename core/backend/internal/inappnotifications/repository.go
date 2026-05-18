@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	coredomain "github.com/devpablocristo/core/notifications/go/inbox/usecases/domain"
+	coredomain "github.com/devpablocristo/platform/notifications/go/inbox/usecases/domain"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 

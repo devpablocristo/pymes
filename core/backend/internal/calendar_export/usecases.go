@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
-	ics "github.com/devpablocristo/core/calendar/ics/go"
-	schedulingdomain "github.com/devpablocristo/modules/scheduling/go/domain"
+	ics "github.com/devpablocristo/platform/calendar/ics/go"
+	schedulingdomain "github.com/devpablocristo/platform/features/scheduling/go/domain"
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/pymes/core/backend/internal/calendar_export/usecases/domain"

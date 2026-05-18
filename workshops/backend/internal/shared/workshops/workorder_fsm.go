@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/devpablocristo/core/concurrency/go/fsm"
+	"github.com/devpablocristo/platform/concurrency/go/fsm"
 
 	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 )

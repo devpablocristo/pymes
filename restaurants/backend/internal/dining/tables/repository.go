@@ -11,8 +11,8 @@ import (
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/http/go/pagination"
-	utils "github.com/devpablocristo/core/validate/go/stringutil"
+	"github.com/devpablocristo/platform/http/go/pagination"
+	utils "github.com/devpablocristo/platform/validate/go/stringutil"
 	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/restaurants/backend/internal/dining/tables/repository/models"
 	domain "github.com/devpablocristo/pymes/restaurants/backend/internal/dining/tables/usecases/domain"

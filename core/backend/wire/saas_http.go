@@ -9,10 +9,10 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	"github.com/devpablocristo/core/http/go/httperr"
-	saasbilling "github.com/devpablocristo/core/saas/go/billing"
-	billingdomain "github.com/devpablocristo/core/saas/go/billing/usecases/domain"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/http/go/httperr"
+	saasbilling "github.com/devpablocristo/platform/kernels/saas/go/billing"
+	billingdomain "github.com/devpablocristo/platform/kernels/saas/go/billing/usecases/domain"
 
 	"github.com/devpablocristo/pymes/core/backend/internal/shared/authz"
 )

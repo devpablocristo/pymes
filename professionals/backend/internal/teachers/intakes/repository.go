@@ -10,7 +10,7 @@ import (
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 
-	utils "github.com/devpablocristo/core/validate/go/stringutil"
+	utils "github.com/devpablocristo/platform/validate/go/stringutil"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes/repository/models"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes/usecases/domain"
 )

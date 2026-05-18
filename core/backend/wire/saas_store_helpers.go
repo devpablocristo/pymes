@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	saasadmindomain "github.com/devpablocristo/core/saas/go/admin/usecases/domain"
-	saasbillingdomain "github.com/devpablocristo/core/saas/go/billing/usecases/domain"
-	utils "github.com/devpablocristo/core/security/go/hashutil"
+	saasadmindomain "github.com/devpablocristo/platform/kernels/saas/go/admin/usecases/domain"
+	saasbillingdomain "github.com/devpablocristo/platform/kernels/saas/go/billing/usecases/domain"
+	utils "github.com/devpablocristo/platform/security/go/hashutil"
 )
 
 func userDTOFromRow(row pymesUserRow) tenantUserDTO {

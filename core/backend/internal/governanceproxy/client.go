@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/governance/go/governanceclient"
-	"github.com/devpablocristo/core/http/go/httpclient"
+	"github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
+	"github.com/devpablocristo/platform/http/go/httpclient"
 )
 
 // Client wraps core/governance/go. Product code only passes tenant IDs; this

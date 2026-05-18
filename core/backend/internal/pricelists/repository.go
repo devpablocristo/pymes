@@ -8,8 +8,8 @@ import (
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/http/go/pagination"
-	utils "github.com/devpablocristo/core/validate/go/stringutil"
+	"github.com/devpablocristo/platform/http/go/pagination"
+	utils "github.com/devpablocristo/platform/validate/go/stringutil"
 	"github.com/devpablocristo/pymes/core/backend/internal/pricelists/repository/models"
 	pricelistdomain "github.com/devpablocristo/pymes/core/backend/internal/pricelists/usecases/domain"
 )

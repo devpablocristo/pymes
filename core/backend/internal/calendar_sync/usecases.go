@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	googleoauth "github.com/devpablocristo/core/calendar/sync/google/go"
+	googleoauth "github.com/devpablocristo/platform/sdks/google-calendar/go"
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/pymes/core/backend/internal/calendar_sync/usecases/domain"

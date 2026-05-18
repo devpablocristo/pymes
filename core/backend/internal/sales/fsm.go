@@ -1,6 +1,6 @@
 package sales
 
-import "github.com/devpablocristo/core/concurrency/go/fsm"
+import "github.com/devpablocristo/platform/concurrency/go/fsm"
 
 // saleStateMachine declara el grafo canónico de transiciones de status para
 // Sale. Es la única fuente de verdad del backend para la validación que se

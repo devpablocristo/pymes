@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	utils "github.com/devpablocristo/core/validate/go/stringutil"
-	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
+	utils "github.com/devpablocristo/platform/validate/go/stringutil"
+	archive "github.com/devpablocristo/platform/features/crud/archive/go/archive"
 	quotedomain "github.com/devpablocristo/pymes/core/backend/internal/quotes/usecases/domain"
 	"github.com/devpablocristo/pymes/core/backend/internal/sales"
 	salesdomain "github.com/devpablocristo/pymes/core/backend/internal/sales/usecases/domain"

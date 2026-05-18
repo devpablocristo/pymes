@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	corecandidates "github.com/devpablocristo/core/notifications/go/candidates"
-	candidatesdomain "github.com/devpablocristo/core/notifications/go/candidates/usecases/domain"
+	corecandidates "github.com/devpablocristo/platform/notifications/go/candidates"
+	candidatesdomain "github.com/devpablocristo/platform/notifications/go/candidates/usecases/domain"
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/pymes/core/backend/internal/inappnotifications"

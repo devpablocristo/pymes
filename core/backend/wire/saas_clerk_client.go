@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 )
 
 const clerkBackendAPIBaseURL = "https://api.clerk.com/v1"

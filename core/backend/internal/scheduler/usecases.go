@@ -11,10 +11,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/concurrency/go/resilience"
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	"github.com/devpablocristo/core/http/go/httpclient"
-	schedulingdomain "github.com/devpablocristo/modules/scheduling/go/domain"
+	"github.com/devpablocristo/platform/concurrency/go/resilience"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/http/go/httpclient"
+	schedulingdomain "github.com/devpablocristo/platform/features/scheduling/go/domain"
 	schedulerdomain "github.com/devpablocristo/pymes/core/backend/internal/scheduler/usecases/domain"
 )
 

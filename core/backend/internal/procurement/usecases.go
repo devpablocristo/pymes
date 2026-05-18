@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	"github.com/devpablocristo/core/governance/go/governanceclient"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
 
 	"github.com/devpablocristo/pymes/core/backend/internal/procurement/usecases/domain"
 	"github.com/devpablocristo/pymes/core/backend/internal/purchases"

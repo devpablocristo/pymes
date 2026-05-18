@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	ctxkeys "github.com/devpablocristo/core/security/go/contextkeys"
+	ctxkeys "github.com/devpablocristo/platform/security/go/contextkeys"
 	admindomain "github.com/devpablocristo/pymes/core/backend/internal/admin/usecases/domain"
 )
 

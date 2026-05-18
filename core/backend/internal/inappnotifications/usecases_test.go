@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	coredomain "github.com/devpablocristo/core/notifications/go/inbox/usecases/domain"
+	coredomain "github.com/devpablocristo/platform/notifications/go/inbox/usecases/domain"
 	"github.com/google/uuid"
 
 	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"

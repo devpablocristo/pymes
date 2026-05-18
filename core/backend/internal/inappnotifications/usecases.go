@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	coreinbox "github.com/devpablocristo/core/notifications/go/inbox"
-	coredomain "github.com/devpablocristo/core/notifications/go/inbox/usecases/domain"
+	coreinbox "github.com/devpablocristo/platform/notifications/go/inbox"
+	coredomain "github.com/devpablocristo/platform/notifications/go/inbox/usecases/domain"
 	"github.com/google/uuid"
 
 	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"

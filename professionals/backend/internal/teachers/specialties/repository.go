@@ -11,8 +11,8 @@ import (
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/http/go/pagination"
-	utils "github.com/devpablocristo/core/validate/go/stringutil"
+	"github.com/devpablocristo/platform/http/go/pagination"
+	utils "github.com/devpablocristo/platform/validate/go/stringutil"
 	profmodels "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/repository/models"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties/repository/models"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties/usecases/domain"

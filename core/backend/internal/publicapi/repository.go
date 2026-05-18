@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	schedulingdomain "github.com/devpablocristo/modules/scheduling/go/domain"
-	schedulingpublic "github.com/devpablocristo/modules/scheduling/go/publicapi"
+	schedulingdomain "github.com/devpablocristo/platform/features/scheduling/go/domain"
+	schedulingpublic "github.com/devpablocristo/platform/features/scheduling/go/publicapi"
 )
 
 var (

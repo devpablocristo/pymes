@@ -13,14 +13,14 @@ import (
 	"net/netip"
 	"net/url"
 
-	"github.com/devpablocristo/core/http/go/httpclient"
+	"github.com/devpablocristo/platform/http/go/httpclient"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	webhookmodels "github.com/devpablocristo/pymes/core/backend/internal/outwebhooks/repository/models"
 	webhookdomain "github.com/devpablocristo/pymes/core/backend/internal/outwebhooks/usecases/domain"
 )

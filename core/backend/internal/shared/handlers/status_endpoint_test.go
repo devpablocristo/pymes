@@ -12,8 +12,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	types "github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	types "github.com/devpablocristo/platform/security/go/contextkeys"
 )
 
 // fakeSale es el dominio de prueba. RegisterStatusEndpoint es genérico, así que

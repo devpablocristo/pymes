@@ -5,8 +5,8 @@ import (
 
 	"github.com/google/uuid"
 
-	schedulingdomain "github.com/devpablocristo/modules/scheduling/go/domain"
-	schedulingpublic "github.com/devpablocristo/modules/scheduling/go/publicapi"
+	schedulingdomain "github.com/devpablocristo/platform/features/scheduling/go/domain"
+	schedulingpublic "github.com/devpablocristo/platform/features/scheduling/go/publicapi"
 )
 
 func (r *Repository) ListPublicQueues(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) ([]schedulingpublic.QueueSummary, error) {

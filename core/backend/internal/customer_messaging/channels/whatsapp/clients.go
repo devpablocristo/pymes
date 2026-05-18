@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/http/go/httpclient"
+	"github.com/devpablocristo/platform/http/go/httpclient"
 	cm "github.com/devpablocristo/pymes/core/backend/internal/customer_messaging"
 )
 

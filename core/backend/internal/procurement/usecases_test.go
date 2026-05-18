@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/devpablocristo/core/governance/go/governanceclient"
+	"github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/pymes/core/backend/internal/procurement/usecases/domain"

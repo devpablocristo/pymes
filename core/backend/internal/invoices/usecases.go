@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	archive "github.com/devpablocristo/platform/features/crud/archive/go/archive"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 

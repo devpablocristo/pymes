@@ -3,7 +3,7 @@ package audit
 import (
 	"context"
 	"encoding/json"
-	"github.com/devpablocristo/core/security/go/hashutil"
+	"github.com/devpablocristo/platform/security/go/hashutil"
 	"github.com/devpablocristo/pymes/core/backend/internal/audit/usecases/domain"
 	"github.com/google/uuid"
 	"strings"

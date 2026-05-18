@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	authn "github.com/devpablocristo/core/authn/go"
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	authn "github.com/devpablocristo/platform/authn/go"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	sharedauth "github.com/devpablocristo/pymes/core/shared/backend/auth"
 	"github.com/google/uuid"
 )

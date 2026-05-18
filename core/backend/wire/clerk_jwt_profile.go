@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	saasjwks "github.com/devpablocristo/core/authn/go/jwks"
+	saasjwks "github.com/devpablocristo/platform/authn/go/jwks"
 )
 
 // normalizeIssuerURL alinea issuers OIDC/Clerk (barra final opcional).

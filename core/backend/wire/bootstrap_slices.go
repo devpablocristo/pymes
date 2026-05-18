@@ -4,12 +4,12 @@ import (
 	"context"
 	"time"
 
-	coreworker "github.com/devpablocristo/core/concurrency/go/worker"
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	coreworker "github.com/devpablocristo/platform/concurrency/go/worker"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 
-	schedulinghttp "github.com/devpablocristo/modules/scheduling/go/httpgin"
+	schedulinghttp "github.com/devpablocristo/platform/features/scheduling/go/httpgin"
 	"github.com/devpablocristo/pymes/core/backend/internal/governanceproxy"
 	"github.com/devpablocristo/pymes/core/backend/internal/inappnotifications"
 	"github.com/devpablocristo/pymes/core/backend/internal/shared/handlers"

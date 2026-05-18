@@ -1,13 +1,13 @@
 import type { CrudFormValues, CrudPageConfig } from '../components/CrudPage';
-import { confirmAction } from '@devpablocristo/core-browser';
-import type { CSVColumn } from '@devpablocristo/modules-crud-ui/csv';
+import { confirmAction } from '@devpablocristo/platform-browser';
+import type { CSVColumn } from '@devpablocristo/platform-crud-ui/csv';
 import {
   mergeCsvToolbarConfig,
   type CrudCsvServerExportPort,
   type CrudCsvServerImportPort,
   type CrudCsvToolbarUiPort,
   type CsvToolbarMergeMode,
-} from '@devpablocristo/modules-crud-ui';
+} from '@devpablocristo/platform-crud-ui';
 import { apiRequest, downloadAPIFile } from '../lib/api';
 
 export type CSVToolbarOptions = {

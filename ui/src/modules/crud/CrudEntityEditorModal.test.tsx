@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CrudEntityEditorModal } from './CrudEntityEditorModal';
 
-vi.mock('@devpablocristo/core-browser', () => ({
+vi.mock('@devpablocristo/platform-browser', () => ({
   confirmAction: vi.fn(async () => true),
 }));
 

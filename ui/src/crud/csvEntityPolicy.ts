@@ -6,7 +6,7 @@
  * usa modo cliente (export desde filas cargadas; import solo si hay alta vía API).
  */
 import type { CrudPageConfig } from '../components/CrudPage';
-import type { CSVColumn } from '@devpablocristo/modules-crud-ui/csv';
+import type { CSVColumn } from '@devpablocristo/platform-crud-ui/csv';
 import type { CSVToolbarOptions } from './csvToolbar';
 
 /** Debe coincidir con `supportsImport` / export en `core/internal/dataio`. */

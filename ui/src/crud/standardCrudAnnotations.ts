@@ -1,4 +1,4 @@
-import type { CrudColumn, CrudFormField } from '@devpablocristo/modules-crud-ui';
+import type { CrudColumn, CrudFormField } from '@devpablocristo/platform-crud-ui';
 import type { CrudEditorModalFieldConfig, CrudPageConfig } from '../components/CrudPage';
 import { extractCrudRecordImageUrls, formatCrudRecordImageUrlsToForm } from '../modules/crud/crudLinkedEntityImageUrls';
 import { formatPartyTagList, parsePartyTagCsv } from '../modules/parties';

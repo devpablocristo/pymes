@@ -1,4 +1,4 @@
-import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
+import type { CrudFieldValue } from '@devpablocristo/platform-crud-ui';
 import type { ReactNode } from 'react';
 import {
   CrudEntityEditorModal,

@@ -4,7 +4,7 @@ import {
   CRUD_UI_PREFERENCES_FEATURE_KEYS,
   createCrudUiPreferencesApi,
   type CrudUiResourceOverride,
-} from '@devpablocristo/modules-crud-ui';
+} from '@devpablocristo/platform-crud-ui';
 
 export type CrudUiPreferencesResource = { resourceId: string; label: string };
 export type CrudUiPreferenceFeatureKey = readonly [keyof CrudFeatureFlags, string];

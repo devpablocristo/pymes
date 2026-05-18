@@ -1,5 +1,5 @@
-import { useSearch } from '@devpablocristo/modules-search';
-import { IconEdit, IconTrash } from '@devpablocristo/modules-ui-data-display/icons';
+import { useSearch } from '@devpablocristo/platform-search';
+import { IconEdit, IconTrash } from '@devpablocristo/platform-ui-data-display/icons';
 import type { CSSProperties, ChangeEvent } from 'react';
 import { useCallback, useState } from 'react';
 import { BranchSwitcher } from '../components/BranchSwitcher';

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
-import { useSearch } from '@devpablocristo/modules-search';
+import { useSearch } from '@devpablocristo/platform-search';
 import { listWatchers, updateWatcher, type WatcherResponse } from '../lib/governanceApi';
 import { queryKeys } from '../lib/queryKeys';
 import './WatcherConfigPage.css';

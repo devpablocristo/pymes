@@ -1,4 +1,4 @@
-import { resolveClerkBrowserConfig } from '@devpablocristo/core-authn/providers/clerk';
+import { resolveClerkBrowserConfig } from '@devpablocristo/platform-authn/providers/clerk';
 
 const clerkConfig = resolveClerkBrowserConfig();
 

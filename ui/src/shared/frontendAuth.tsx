@@ -1,8 +1,8 @@
 import { useEffect, useState, type PropsWithChildren } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { SignIn, SignUp, useAuth } from '@clerk/react';
-import { registerTokenProvider } from '@devpablocristo/core-authn/http/fetch';
-import { createClerkTokenProvider } from '@devpablocristo/core-authn/providers/clerk';
+import { registerTokenProvider } from '@devpablocristo/platform-authn/http/fetch';
+import { createClerkTokenProvider } from '@devpablocristo/platform-authn/providers/clerk';
 import { clerkEnabled } from '../lib/auth';
 import { useI18n } from '../lib/i18n';
 

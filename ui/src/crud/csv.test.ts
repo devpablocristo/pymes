@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCSV, normalizeCSVFieldValue, parseCSV } from '@devpablocristo/modules-crud-ui/csv';
+import { buildCSV, normalizeCSVFieldValue, parseCSV } from '@devpablocristo/platform-crud-ui/csv';
 import type { CrudPageConfig } from '../components/CrudPage';
 import { withCSVToolbar } from './csvToolbar';
 

@@ -1,5 +1,5 @@
 import { type CrudColumn, type CrudFieldValue, type CrudFormField, type CrudFormValues, type CrudPageConfig } from '../../components/CrudPage';
-import type { CrudToolbarAction } from '@devpablocristo/modules-crud-ui';
+import type { CrudToolbarAction } from '@devpablocristo/platform-crud-ui';
 import { buildStandardCrudViewModes, formatCrudLinkedEntityImageUrlsToForm, parseCrudLinkedEntityImageUrlList } from '../../modules/crud';
 import {
   asBoolean,

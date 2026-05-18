@@ -7,7 +7,7 @@ import {
   type CrudPageConfig as ModulesCrudPageConfig,
   type CrudViewModeConfig as ModulesCrudViewModeConfig,
   type CrudViewModeId as ModulesCrudViewModeId,
-} from '@devpablocristo/modules-crud-ui';
+} from '@devpablocristo/platform-crud-ui';
 import { apiRequest } from '../lib/api';
 import { buildPymesCrudStrings } from '../lib/crudModuleStrings';
 import { useI18n } from '../lib/i18n';
@@ -195,7 +195,7 @@ export type {
   CrudListHeaderSlotContext,
   CrudRowAction,
   CrudToolbarAction,
-} from '@devpablocristo/modules-crud-ui';
+} from '@devpablocristo/platform-crud-ui';
 
 export type CrudPageConfig<T extends { id: string }> = Omit<ModulesCrudPageConfig<T>, 'featureFlags'> & {
   featureFlags?: CrudFeatureFlags;
@@ -215,7 +215,7 @@ export type CrudPageConfig<T extends { id: string }> = Omit<ModulesCrudPageConfi
 export type CrudResourceConfigMap = Record<string, CrudPageConfig<any>>;
 
 /**
- * CRUD de consola Pymes: motor en `@devpablocristo/modules-crud-ui`, textos vía i18n y API vía `apiRequest`.
+ * CRUD de consola Pymes: motor en `@devpablocristo/platform-crud-ui`, textos vía i18n y API vía `apiRequest`.
  */
 export function CrudPage<T extends { id: string }>(props: CrudPageConfig<T>) {
   const { localizeText, sentenceCase, language } = useI18n();

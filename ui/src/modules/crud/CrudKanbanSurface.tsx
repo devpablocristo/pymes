@@ -1,7 +1,7 @@
 import {
   StatusKanbanBoard,
   type StatusKanbanBoardProps,
-} from '@devpablocristo/modules-kanban-board';
+} from '@devpablocristo/platform-kanban-board';
 import type { ReactNode } from 'react';
 
 type Props<T extends { id: string }> = StatusKanbanBoardProps<T> & {

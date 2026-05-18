@@ -4,8 +4,8 @@ import {
   PageShellFrame,
   type AppShellNavItem,
   type AppShellNavSection,
-} from '@devpablocristo/modules-ui-page-shell';
-import '@devpablocristo/modules-ui-page-shell/styles.css';
+} from '@devpablocristo/platform-ui-page-shell';
+import '@devpablocristo/platform-ui-page-shell/styles.css';
 import { useI18n } from '../lib/i18n';
 import { NotificationBadge } from '../components/NotificationBadge';
 

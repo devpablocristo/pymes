@@ -8,7 +8,7 @@ const mockStorage = vi.hoisted(() => ({
   setString: vi.fn(),
 }));
 
-vi.mock('@devpablocristo/core-browser/storage', () => ({
+vi.mock('@devpablocristo/platform-browser/storage', () => ({
   createBrowserStorageNamespace: () => mockStorage,
 }));
 

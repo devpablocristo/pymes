@@ -7,7 +7,7 @@ import {
   type DashboardStats,
   type DayAgendaItem,
   type SchedulingClient,
-} from '@devpablocristo/modules-scheduling';
+} from '@devpablocristo/platform-scheduling';
 import { useBranchSelection } from '../../lib/useBranchSelection';
 
 const summaryKeys = {

@@ -1,1 +1,1 @@
-export { formatAuthAPIUserMessage as formatClerkAPIUserMessage } from '@devpablocristo/core-authn/errors';
+export { formatAuthAPIUserMessage as formatClerkAPIUserMessage } from '@devpablocristo/platform-authn/errors';

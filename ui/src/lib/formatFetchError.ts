@@ -1,5 +1,5 @@
 // Re-export agnostic helpers from core
-export { formatFetchErrorForUser, stripHttpErrorPrefix } from '@devpablocristo/core-http/errors';
+export { formatFetchErrorForUser, stripHttpErrorPrefix } from '@devpablocristo/platform-http/errors';
 
 export type BillingPageErrorKind = 'stripe_unconfigured' | 'error';
 

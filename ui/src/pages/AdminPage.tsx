@@ -2,7 +2,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
-import { useSearch } from '@devpablocristo/modules-search';
+import { useSearch } from '@devpablocristo/platform-search';
 import {
   downloadAuditExportCsv,
   getAuditEntries,

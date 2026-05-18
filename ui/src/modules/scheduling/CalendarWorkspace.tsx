@@ -1,5 +1,5 @@
-import { SchedulingCalendar, createSchedulingClient } from '@devpablocristo/modules-scheduling/next';
-import '@devpablocristo/modules-scheduling/styles.next.css';
+import { SchedulingCalendar, createSchedulingClient } from '@devpablocristo/platform-scheduling/next';
+import '@devpablocristo/platform-scheduling/styles.next.css';
 import '../../styles/calendar-workspace.css';
 import { PageLayout } from '../../components/PageLayout';
 import { usePageSearch } from '../../components/PageSearch';

@@ -1,4 +1,4 @@
-import { createThemeManager } from '@devpablocristo/core-browser/theme';
+import { createThemeManager } from '@devpablocristo/platform-browser/theme';
 
 const themeManager = createThemeManager({
   namespace: 'pymes-ui',

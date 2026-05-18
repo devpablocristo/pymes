@@ -1,4 +1,4 @@
-import { parseListItemsFromResponse } from '@devpablocristo/core-browser/crud';
+import { parseListItemsFromResponse } from '@devpablocristo/platform-browser/crud';
 import type { CrudFieldValue, CrudFormValues, CrudPageConfig } from '../../components/CrudPage';
 import { apiRequest } from '../../lib/api';
 import { buildStandardCrudViewModes, renderCrudActiveBadge } from '../crud';

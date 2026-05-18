@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- provider + re-exports desde core */
-import { createI18nProvider, mergeMessages } from '@devpablocristo/core-browser/i18n';
+import { createI18nProvider, mergeMessages } from '@devpablocristo/platform-browser/i18n';
 import { vocab } from '../vocabulary';
 import { apiKeysMessages } from './messages/apiKeys';
 import { aiMessages } from './messages/ai';
@@ -39,5 +39,5 @@ const i18n = createI18nProvider({
 
 export const LanguageProvider = i18n.Provider;
 export const useI18n = i18n.useI18n;
-export { toSentenceCase } from '@devpablocristo/core-browser/i18n';
-export type { LanguageCode } from '@devpablocristo/core-browser/i18n';
+export { toSentenceCase } from '@devpablocristo/platform-browser/i18n';
+export type { LanguageCode } from '@devpablocristo/platform-browser/i18n';

@@ -26,7 +26,7 @@ vi.mock('../components/PageSearch', () => ({
   usePageSearch: () => pageSearchMocks.usePageSearch(),
 }));
 
-vi.mock('@devpablocristo/modules-search', () => ({
+vi.mock('@devpablocristo/platform-search', () => ({
   useSearch: <T,>(items: T[], textFn: (item: T) => string, query: string) => {
     if (!query.trim()) return items;
     const normalized = query.trim().toLowerCase();

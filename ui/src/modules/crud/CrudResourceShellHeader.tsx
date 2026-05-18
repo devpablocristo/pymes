@@ -1,10 +1,10 @@
-import { CrudPageShell } from '@devpablocristo/core-browser/crud';
+import { CrudPageShell } from '@devpablocristo/platform-browser/crud';
 import {
   CrudShellHeaderActionsColumn,
   interpolate,
   type CrudStrings,
   type CrudToolbarAction,
-} from '@devpablocristo/modules-crud-ui';
+} from '@devpablocristo/platform-crud-ui';
 import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { NavLink, matchPath, useLocation, useNavigate } from 'react-router-dom';

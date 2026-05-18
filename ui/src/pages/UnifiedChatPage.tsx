@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearch } from '@devpablocristo/modules-search';
+import { useSearch } from '@devpablocristo/platform-search';
 import { pymesAssistantChat, listConversations, getConversation } from '../lib/aiApi';
 import { humanRoutedLabel } from '../lib/aiLabels';
 import { useI18n } from '../lib/i18n';

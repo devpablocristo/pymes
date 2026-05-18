@@ -17,7 +17,7 @@ export * from './CrudTableSurface';
 export * from './CrudToolbarActionButtons';
 export * from './CrudViewModeSwitch';
 export * from './CrudValueFilterSelector';
-export * from '@devpablocristo/modules-crud-ui/entity-fields';
+export * from '@devpablocristo/platform-crud-ui/entity-fields';
 export * from './buildStandardCrudViewModes';
 export * from './crudLinkedEntityImageUrls';
 export * from './crudContextEntityParams';

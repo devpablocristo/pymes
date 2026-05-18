@@ -23,16 +23,16 @@ export default defineConfig({
             if (id.includes('@tanstack/react-query')) {
               return 'vendor-query';
             }
-            if (id.includes('@devpablocristo/modules-kanban-board') || id.includes('@dnd-kit/')) {
+            if (id.includes('@devpablocristo/platform-kanban-board') || id.includes('@dnd-kit/')) {
               return 'vendor-kanban';
             }
-            if (id.includes('@devpablocristo/modules-crud-ui')) {
+            if (id.includes('@devpablocristo/platform-crud-ui')) {
               return 'vendor-crud';
             }
-            if (id.includes('@devpablocristo/core-authn')) {
+            if (id.includes('@devpablocristo/platform-authn')) {
               return 'vendor-authn';
             }
-            if (id.includes('@devpablocristo/core-browser') || id.includes('@devpablocristo/core-http')) {
+            if (id.includes('@devpablocristo/platform-browser') || id.includes('@devpablocristo/platform-http')) {
               return 'vendor-core';
             }
             return undefined;

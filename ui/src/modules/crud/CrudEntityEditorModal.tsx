@@ -1,7 +1,7 @@
-import { confirmAction } from '@devpablocristo/core-browser';
+import { confirmAction } from '@devpablocristo/platform-browser';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
+import type { CrudFieldValue } from '@devpablocristo/platform-crud-ui';
 import { parseCrudLinkedEntityImageUrlList } from './crudLinkedEntityImageUrls';
 import {
   areCrudFieldValuesEqual,

@@ -1,4 +1,4 @@
-import { crudItemPath, type CrudFieldValue } from '@devpablocristo/modules-crud-ui';
+import { crudItemPath, type CrudFieldValue } from '@devpablocristo/platform-crud-ui';
 import { createElement, isValidElement } from 'react';
 import type {
   CrudColumn,

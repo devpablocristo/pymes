@@ -1,4 +1,4 @@
-import type { StringMachine } from '@devpablocristo/core-fsm';
+import type { StringMachine } from '@devpablocristo/platform-fsm';
 import type {
   CrudPageConfig,
   CrudStateMachineConfig,
@@ -77,7 +77,7 @@ export function buildFullyConnectedStatusStateMachine<T extends { id: string; st
 
 // buildStatusStateMachineFromFSM construye un CrudStateMachineConfig cuyas
 // `transitions` son derivadas directamente de un `StringMachine` de
-// `@devpablocristo/core-fsm`. El FSM TS espeja al FSM Go del backend, por lo
+// `@devpablocristo/platform-fsm`. El FSM TS espeja al FSM Go del backend, por lo
 // que el frontend bloquea pre-server exactamente las mismas transiciones que
 // el backend rechazaría con 409.
 //

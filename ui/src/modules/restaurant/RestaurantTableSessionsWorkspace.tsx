@@ -1,7 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { PageLayout } from '../../components/PageLayout';
 import { usePageSearch } from '../../components/PageSearch';
-import { useSearch } from '@devpablocristo/modules-search';
+import { useSearch } from '@devpablocristo/platform-search';
 import {
   closeRestaurantTableSession,
   getRestaurantDiningTables,

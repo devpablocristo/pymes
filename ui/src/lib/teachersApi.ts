@@ -1,4 +1,4 @@
-import { registerTokenProvider } from '@devpablocristo/core-authn/http/fetch';
+import { registerTokenProvider } from '@devpablocristo/platform-authn/http/fetch';
 import type {
   TeacherIntake,
   TeacherProfile,

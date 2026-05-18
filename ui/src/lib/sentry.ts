@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/react';
-import { createSentryReporter, registerErrorReporter, captureError } from '@devpablocristo/core-browser/observability';
+import { createSentryReporter, registerErrorReporter, captureError } from '@devpablocristo/platform-browser/observability';
 
 const dsn = import.meta.env.VITE_SENTRY_DSN as string | undefined;
 

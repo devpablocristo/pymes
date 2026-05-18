@@ -51,7 +51,7 @@ vi.mock('../components/PageSearch', () => ({
   usePageSearch: () => pageSearchMocks.usePageSearch(),
 }));
 
-vi.mock('@devpablocristo/modules-search', () => ({
+vi.mock('@devpablocristo/platform-search', () => ({
   useSearch: <T,>(items: T[]) => items,
 }));
 
@@ -81,7 +81,7 @@ vi.mock('../components/PageLayout', () => ({
   ),
 }));
 
-vi.mock('@devpablocristo/modules-ui-notification-feed', () => ({
+vi.mock('@devpablocristo/platform-notification-feed', () => ({
   NotificationFeed: ({
     items,
     summary,

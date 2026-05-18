@@ -1,14 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePageSearch } from '../components/PageSearch';
-import { useSearch } from '@devpablocristo/modules-search';
+import { useSearch } from '@devpablocristo/platform-search';
 import { useNavigate } from 'react-router-dom';
 import {
   NotificationFeed,
   type NotificationFeedItem,
   type NotificationFeedTone,
-} from '@devpablocristo/modules-ui-notification-feed';
-import '@devpablocristo/modules-ui-notification-feed/styles.css';
+} from '@devpablocristo/platform-notification-feed';
+import '@devpablocristo/platform-notification-feed/styles.css';
 import { listInAppNotifications, markInAppNotificationRead, type InAppNotificationItem } from '../lib/api';
 import { labelForApprovalAction } from '../lib/approvalActionLabels';
 import { humanInsightScopeLabel, humanRoutedLabel } from '../lib/aiLabels';

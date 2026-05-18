@@ -2,7 +2,7 @@ import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { openCrudFormDialog } from './crudActionDialogLauncher';
 
-vi.mock('@devpablocristo/core-browser', () => ({
+vi.mock('@devpablocristo/platform-browser', () => ({
   confirmAction: vi.fn(async () => true),
 }));
 

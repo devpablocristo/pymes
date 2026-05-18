@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { useState, type ReactNode } from 'react';
-import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
+import type { CrudFieldValue } from '@devpablocristo/platform-crud-ui';
 import { CrudActionDialog, type CrudActionDialogField } from './CrudActionDialog';
 import type { CrudEntityEditorModalBlock, CrudEntityEditorModalSection, CrudEntityEditorModalStat } from './CrudEntityEditorModal';
 

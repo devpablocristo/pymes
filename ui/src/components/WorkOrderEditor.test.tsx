@@ -18,7 +18,7 @@ vi.mock('../lib/workOrdersApi', () => ({
   restoreWorkOrder: (...args: unknown[]) => apiMocks.restoreWorkOrder(...args),
 }));
 
-vi.mock('@devpablocristo/core-browser', () => ({
+vi.mock('@devpablocristo/platform-browser', () => ({
   confirmAction: (options: unknown) => apiMocks.confirmAction(options),
 }));
 

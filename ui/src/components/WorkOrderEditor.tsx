@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { confirmAction } from '@devpablocristo/core-browser';
-import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
+import { confirmAction } from '@devpablocristo/platform-browser';
+import type { CrudFieldValue } from '@devpablocristo/platform-crud-ui';
 import {
   archiveWorkOrder,
   getWorkOrder,

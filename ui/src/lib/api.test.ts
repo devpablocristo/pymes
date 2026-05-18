@@ -13,7 +13,7 @@ const fetchMocks = vi.hoisted(() => ({
   requestResponse: vi.fn(),
 }));
 
-vi.mock('@devpablocristo/core-authn/http/fetch', () => ({
+vi.mock('@devpablocristo/platform-authn/http/fetch', () => ({
   request: (...args: unknown[]) => fetchMocks.request(...args),
   requestResponse: (...args: unknown[]) => fetchMocks.requestResponse(...args),
 }));

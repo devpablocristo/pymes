@@ -1,4 +1,4 @@
-import { mergeRecordsPreferOverride } from '@devpablocristo/core-browser';
+import { mergeRecordsPreferOverride } from '@devpablocristo/platform-browser';
 import { crudModuleCatalog } from '../crud/crudModuleCatalog';
 import type { ModuleDefinition, ModuleField, ModuleRuntimeContext, ValueResolver } from './moduleCatalog.types';
 

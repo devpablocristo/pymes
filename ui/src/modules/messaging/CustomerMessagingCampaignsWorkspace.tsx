@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { confirmAction } from '@devpablocristo/core-browser';
-import { useSearch } from '@devpablocristo/modules-search';
-import { DataTable, type DataTableColumn } from '@devpablocristo/modules-ui-data-display';
+import { confirmAction } from '@devpablocristo/platform-browser';
+import { useSearch } from '@devpablocristo/platform-search';
+import { DataTable, type DataTableColumn } from '@devpablocristo/platform-ui-data-display';
 import { PageLayout } from '../../components/PageLayout';
 import { usePageSearch } from '../../components/PageSearch';
 import { formatDate } from '../../crud/resourceConfigs.shared';

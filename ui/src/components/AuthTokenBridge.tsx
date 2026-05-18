@@ -1,5 +1,5 @@
 import { SharedAuthTokenBridge, type TokenProviderRegistrar } from '../shared/frontendAuth';
-import { registerTokenProvider } from '@devpablocristo/core-authn/http/fetch';
+import { registerTokenProvider } from '@devpablocristo/platform-authn/http/fetch';
 import { registerTeachersTokenProvider } from '../lib/teachersApi';
 
 // Referencia estable: un array nuevo en cada render disparaba useEffect en ClerkAuthTokenBridge

@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
-import { useSearch } from '@devpablocristo/modules-search';
+import { useSearch } from '@devpablocristo/platform-search';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n } from '../lib/i18n';
 import { getNotificationPreferences, updateNotificationPreference } from '../lib/api';

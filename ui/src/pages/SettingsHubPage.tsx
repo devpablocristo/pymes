@@ -3,11 +3,11 @@
  * El trabajo operativo del negocio vive en el menú lateral / módulos, no acá.
  */
 import { useQuery } from '@tanstack/react-query';
-import { useSearch } from '@devpablocristo/modules-search';
+import { useSearch } from '@devpablocristo/platform-search';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { SectionHubPage } from '@devpablocristo/modules-ui-section-hub';
-import '@devpablocristo/modules-ui-section-hub/styles.css';
+import { SectionHubPage } from '@devpablocristo/platform-ui-section-hub';
+import '@devpablocristo/platform-ui-section-hub/styles.css';
 import { HeaderMenu } from '../components/HeaderMenu';
 import { cleanHeaderMenuLabel } from '../components/headerMenuLabels';
 import { usePageSearch } from '../components/PageSearch';

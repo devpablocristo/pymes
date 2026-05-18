@@ -2,7 +2,7 @@ import {
   request as coreRequest,
   requestResponse as coreRequestResponse,
   type RequestOptions,
-} from '@devpablocristo/core-authn/http/fetch';
+} from '@devpablocristo/platform-authn/http/fetch';
 import type {
   APIKeyItem,
   BillingStatus,

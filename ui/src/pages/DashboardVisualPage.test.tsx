@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck — vitest mocks use dynamic types that tsc cannot verify
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { HttpError } from '@devpablocristo/core-authn/http/fetch';
+import { HttpError } from '@devpablocristo/platform-authn/http/fetch';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -54,7 +54,7 @@ vi.mock('../components/PageLayout', () => ({
   ),
 }));
 
-vi.mock('@devpablocristo/modules-scheduling', () => ({
+vi.mock('@devpablocristo/platform-scheduling', () => ({
   createSchedulingClient: (...args: unknown[]) => schedulingMocks.createSchedulingClient(...args),
 }));
 

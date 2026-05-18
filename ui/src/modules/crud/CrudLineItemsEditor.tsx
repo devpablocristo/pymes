@@ -1,5 +1,5 @@
 import { useId, useMemo } from 'react';
-import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
+import type { CrudFieldValue } from '@devpablocristo/platform-crud-ui';
 import { asString, parseJSONArray } from '../../crud/resourceConfigs.shared';
 import './CrudLineItemsEditor.css';
 

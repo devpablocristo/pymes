@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { Branch } from '@devpablocristo/modules-scheduling/next';
+import type { Branch } from '@devpablocristo/platform-scheduling/next';
 
 export type BranchContextValue = {
   tenantId: string | null;

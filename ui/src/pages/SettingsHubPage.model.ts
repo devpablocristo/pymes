@@ -11,8 +11,8 @@ import {
   IconSettings,
   IconTrash,
   IconUsers,
-} from '@devpablocristo/modules-ui-data-display/icons';
-import { parseSectionHubSelection, type SectionHubSection } from '@devpablocristo/modules-ui-section-hub';
+} from '@devpablocristo/platform-ui-data-display/icons';
+import { parseSectionHubSelection, type SectionHubSection } from '@devpablocristo/platform-ui-section-hub';
 
 export type SettingsSection =
   | null

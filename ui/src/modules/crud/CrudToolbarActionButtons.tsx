@@ -1,4 +1,4 @@
-import type { CrudHelpers, CrudToolbarAction } from '@devpablocristo/modules-crud-ui';
+import type { CrudHelpers, CrudToolbarAction } from '@devpablocristo/platform-crud-ui';
 import { crudButtonClass } from './crudButtonClass';
 
 export function CrudToolbarActionButtons<T extends { id: string }>({

@@ -1,4 +1,4 @@
-import type { KanbanColumnDef, SuppressCardOpen } from '@devpablocristo/modules-kanban-board';
+import type { KanbanColumnDef, SuppressCardOpen } from '@devpablocristo/platform-kanban-board';
 import { useCallback, useEffect, useMemo, useState, type RefObject, type ReactNode } from 'react';
 import type { CrudStateMachineConfig } from '../../components/CrudPage';
 import { CrudKanbanSurface } from './CrudKanbanSurface';

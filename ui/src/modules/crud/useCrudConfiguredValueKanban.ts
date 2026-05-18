@@ -1,4 +1,4 @@
-import { crudItemPath } from '@devpablocristo/modules-crud-ui';
+import { crudItemPath } from '@devpablocristo/platform-crud-ui';
 import { useCallback, useMemo } from 'react';
 import type { CrudPageConfig } from '../../components/CrudPage';
 import { apiRequest } from '../../lib/api';

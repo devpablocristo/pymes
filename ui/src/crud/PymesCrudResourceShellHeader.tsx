@@ -1,4 +1,4 @@
-import type { CrudStrings } from '@devpablocristo/modules-crud-ui';
+import type { CrudStrings } from '@devpablocristo/platform-crud-ui';
 import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { CrudResourceShellHeader, type CrudResourceShellHeaderConfigLike } from '../modules/crud';

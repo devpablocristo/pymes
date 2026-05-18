@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { ClerkProvider } from '@clerk/react';
 import { esMX } from '@clerk/localizations';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ConfirmDialogProvider } from '@devpablocristo/core-browser';
+import { ConfirmDialogProvider } from '@devpablocristo/platform-browser';
 import { BrowserRouter } from 'react-router-dom';
 import { clerkEnabled, clerkPublishableKey } from './lib/auth';
 import { clerkAppearance } from './lib/clerkAppearance';
@@ -25,7 +25,7 @@ import '@fontsource/plus-jakarta-sans/700.css';
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/500.css';
 
-import '@devpablocristo/modules-ui-modal/styles.css';
+import '@devpablocristo/platform-ui-modal/styles.css';
 import './styles.css';
 
 initSentry();

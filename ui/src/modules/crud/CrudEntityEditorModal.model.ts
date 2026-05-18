@@ -1,5 +1,5 @@
 import { createElement, type ReactNode } from 'react';
-import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
+import type { CrudFieldValue } from '@devpablocristo/platform-crud-ui';
 import { StandardCrudImageUrlsEditor } from '../../crud/standardCrudMedia';
 
 export type CrudEntityEditorModalField = {

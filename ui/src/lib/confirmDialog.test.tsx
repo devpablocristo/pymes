@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { ConfirmDialogProvider, confirmAction } from '@devpablocristo/core-browser';
+import { ConfirmDialogProvider, confirmAction } from '@devpablocristo/platform-browser';
 import { describe, expect, it } from 'vitest';
 
 function ConfirmDialogFixture() {

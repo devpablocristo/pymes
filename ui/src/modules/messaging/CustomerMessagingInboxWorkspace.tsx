@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
-import { useSearch } from '@devpablocristo/modules-search';
+import { useSearch } from '@devpablocristo/platform-search';
 import {
   ConversationInbox,
   type ConversationInboxItem,
-} from '@devpablocristo/modules-ui-conversation-inbox';
-import '@devpablocristo/modules-ui-notification-feed/styles.css';
-import '@devpablocristo/modules-ui-conversation-inbox/styles.css';
+} from '@devpablocristo/platform-conversation-inbox';
+import '@devpablocristo/platform-notification-feed/styles.css';
+import '@devpablocristo/platform-conversation-inbox/styles.css';
 import { PageLayout } from '../../components/PageLayout';
 import { usePageSearch } from '../../components/PageSearch';
 import { formatFetchErrorForUser } from '../../lib/formatFetchError';

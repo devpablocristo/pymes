@@ -10,8 +10,8 @@ import {
   type DayAgendaItem,
   type Service,
   type Resource,
-} from '@devpablocristo/modules-scheduling';
-import { HttpError } from '@devpablocristo/core-authn/http/fetch';
+} from '@devpablocristo/platform-scheduling';
+import { HttpError } from '@devpablocristo/platform-authn/http/fetch';
 import { useDashboardDataEndpoint } from '../dashboard/hooks/useDashboardDataEndpoint';
 import { HOME_DASHBOARD_CONTEXT } from '../dashboard/types';
 import {

@@ -22,7 +22,7 @@ vi.mock('../lib/api', () => ({
   downloadAuditExportCsv: () => apiMocks.downloadAuditExportCsv(),
 }));
 
-vi.mock('@devpablocristo/modules-search', () => ({
+vi.mock('@devpablocristo/platform-search', () => ({
   useSearch: <T,>(items: T[]) => items,
 }));
 

@@ -1,5 +1,5 @@
-import { CrudPageShell } from '@devpablocristo/core-browser/crud';
-import { CrudShellHeaderActionsColumn } from '@devpablocristo/modules-crud-ui';
+import { CrudPageShell } from '@devpablocristo/platform-browser/crud';
+import { CrudShellHeaderActionsColumn } from '@devpablocristo/platform-crud-ui';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePageSearchShellControl } from './PageSearch';

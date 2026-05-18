@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Branch } from '@devpablocristo/modules-scheduling/next';
+import type { Branch } from '@devpablocristo/platform-scheduling/next';
 import { LanguageProvider } from '../lib/i18n';
 import { BranchContext, type BranchContextValue } from '../lib/branchSelectionContext';
 

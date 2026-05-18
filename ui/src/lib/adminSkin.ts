@@ -1,4 +1,4 @@
-import { createBrowserStorageNamespace } from '@devpablocristo/core-browser/storage';
+import { createBrowserStorageNamespace } from '@devpablocristo/platform-browser/storage';
 
 export type AdminSkinId = 'classic' | 'modern';
 

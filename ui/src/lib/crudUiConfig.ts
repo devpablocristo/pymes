@@ -1,6 +1,6 @@
 import type { CrudPageConfig } from '../components/CrudPage';
 import { crudModuleCatalog } from '../crud/crudModuleCatalog';
-import { createCrudUiPreferencesApi, type CrudUiResourceOverride } from '@devpablocristo/modules-crud-ui';
+import { createCrudUiPreferencesApi, type CrudUiResourceOverride } from '@devpablocristo/platform-crud-ui';
 
 export const CRUD_UI_STORAGE_KEY = 'pymes.crud-ui-config.v1';
 export const CRUD_UI_CHANGE_EVENT = 'pymes:crud-ui-config-changed';

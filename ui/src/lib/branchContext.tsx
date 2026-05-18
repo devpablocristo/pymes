@@ -5,7 +5,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { createSchedulingClient, type Branch } from '@devpablocristo/modules-scheduling/next';
+import { createSchedulingClient, type Branch } from '@devpablocristo/platform-scheduling/next';
 import { apiRequest, getSession } from './api';
 import {
   readStoredBranchId,

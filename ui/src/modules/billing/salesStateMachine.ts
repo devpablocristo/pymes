@@ -1,4 +1,4 @@
-import { Builder, type StringMachine } from '@devpablocristo/core-fsm';
+import { Builder, type StringMachine } from '@devpablocristo/platform-fsm';
 
 /**
  * FSM canónico de transiciones de status para Sale (frontend).

@@ -1,4 +1,4 @@
-import { Builder, type StringMachine } from '@devpablocristo/core-fsm';
+import { Builder, type StringMachine } from '@devpablocristo/platform-fsm';
 
 export type CrudKanbanTransitionModel<Status extends string = string, ColumnId extends string = string> = {
   canonicalizeStatus: (raw: string) => Status;

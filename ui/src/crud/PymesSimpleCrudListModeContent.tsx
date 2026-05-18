@@ -1,4 +1,4 @@
-import { parsePaginatedResponse } from '@devpablocristo/core-browser/crud';
+import { parsePaginatedResponse } from '@devpablocristo/platform-browser/crud';
 import { useCallback, useMemo } from 'react';
 import './PymesSimpleCrudListModeContent.css';
 import { apiRequest } from '../lib/api';

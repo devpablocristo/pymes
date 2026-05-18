@@ -1,4 +1,4 @@
-import { createBrowserStorageNamespace } from '@devpablocristo/core-browser/storage';
+import { createBrowserStorageNamespace } from '@devpablocristo/platform-browser/storage';
 import type { TenantSettings } from './types';
 
 export type TeamSize = 'solo' | 'small' | 'medium' | 'large';

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { mergeCanonicalCrudDefaults } from '@devpablocristo/modules-crud-ui/surface';
+import { mergeCanonicalCrudDefaults } from '@devpablocristo/platform-crud-ui/surface';
 import { CrudPage, type CrudPageConfig, type CrudResourceConfigMap, type CrudViewModeConfig } from '../components/CrudPage';
 import { buildStandardCrudViewModes } from '../modules/crud/buildStandardCrudViewModes';
 import { applyCrudUiOverride } from '../lib/crudUiConfig';

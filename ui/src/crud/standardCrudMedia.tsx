@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
+import type { CrudFieldValue } from '@devpablocristo/platform-crud-ui';
 import { asCrudString } from '../lib/formPresets';
 import { CrudEntityMediaCarousel } from '../modules/crud/CrudEntityMediaCarousel';
 import { parseCrudLinkedEntityImageUrlList } from '../modules/crud/crudLinkedEntityImageUrls';

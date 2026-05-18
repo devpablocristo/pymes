@@ -160,9 +160,12 @@ export function invoiceCreateBodyFromCrud(values: Record<string, CrudFieldValue 
   };
 }
 
+// invoiceUpdateBodyFromCrud arma el body del PATCH genérico /v1/invoices/:id.
+// IMPORTANTE: NO incluye `status`. El cambio de status va SIEMPRE por
+// PATCH /v1/invoices/:id/status (ver `updateInvoiceStatus`). El backend
+// rechaza con 400 cualquier body de Update genérico que traiga `status`.
 export function invoiceUpdateBodyFromCrud(values: Record<string, CrudFieldValue | undefined>): Record<string, unknown> {
   const body: Record<string, unknown> = {};
-  if (values.status !== undefined) body.status = parseInvoiceStatus(values.status);
   const discount = asOptionalNumber(values.discount);
   if (discount !== undefined) body.discount_percent = discount;
   const tax = asOptionalNumber(values.tax);
@@ -188,7 +191,7 @@ export async function updateInvoiceFromCrudValues(
 }
 
 export async function updateInvoiceStatus(id: string, status: InvoiceStatus): Promise<void> {
-  await apiRequest(`/v1/invoices/${id}`, { method: 'PATCH', body: { status } });
+  await apiRequest(`/v1/invoices/${id}/status`, { method: 'PATCH', body: { status } });
 }
 
 export async function archiveInvoiceById(id: string): Promise<void> {

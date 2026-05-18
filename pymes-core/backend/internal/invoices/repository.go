@@ -172,6 +172,24 @@ func (r *Repository) Update(ctx context.Context, in invdomain.Invoice) (invdomai
 	return r.GetByID(ctx, in.OrgID, in.ID)
 }
 
+// UpdateStatus actualiza solo la columna status. La validación de transición
+// vive en el usecase (vía invoiceStateMachine + status.MapFSMError).
+func (r *Repository) UpdateStatus(ctx context.Context, orgID, id uuid.UUID, status string) (invdomain.Invoice, error) {
+	res := r.db.WithContext(ctx).Model(&models.InvoiceModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Updates(map[string]any{
+			"status":     status,
+			"updated_at": time.Now().UTC(),
+		})
+	if res.Error != nil {
+		return invdomain.Invoice{}, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return invdomain.Invoice{}, gorm.ErrRecordNotFound
+	}
+	return r.GetByID(ctx, orgID, id)
+}
+
 func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	now := time.Now().UTC()
 	res := r.db.WithContext(ctx).Model(&models.InvoiceModel{}).

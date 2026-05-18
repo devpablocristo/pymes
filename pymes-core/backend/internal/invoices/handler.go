@@ -2,10 +2,13 @@ package invoices
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/core/http/go/pagination"
 	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
@@ -23,6 +26,7 @@ type usecasesPort interface {
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (invdomain.Invoice, error)
 	Create(ctx context.Context, in CreateInput) (invdomain.Invoice, error)
 	Update(ctx context.Context, in UpdateInput) (invdomain.Invoice, error)
+	UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (invdomain.Invoice, error)
 	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
 	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
@@ -41,6 +45,13 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.POST(base, rbac.RequirePermission("invoices", "create"), h.Create)
 	auth.GET(item, rbac.RequirePermission("invoices", "read"), h.Get)
 	auth.PATCH(item, rbac.RequirePermission("invoices", "update"), h.Update)
+	handlers.RegisterStatusEndpoint(
+		auth, rbac, "invoices", "update", base,
+		func(ctx context.Context, orgID, id uuid.UUID, next, actor string) (invdomain.Invoice, error) {
+			return h.uc.UpdateStatus(ctx, UpdateStatusInput{OrgID: orgID, ID: id, Status: next}, actor)
+		},
+		func(i invdomain.Invoice) any { return toInvoiceResponse(i) },
+	)
 	auth.DELETE(item, rbac.RequirePermission("invoices", "delete"), h.Delete)
 	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("invoices", "update"), h.Archive)
 	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("invoices", "update"), h.Restore)
@@ -176,15 +187,32 @@ func (h *Handler) Update(c *gin.Context) {
 	if !ok {
 		return
 	}
+	// Detección explícita de "status" en el body. Gin ignora silenciosamente
+	// campos JSON desconocidos (sacar Status del DTO no devuelve 400 solo por
+	// presencia del campo). El cambio de status SIEMPRE va por
+	// PATCH /v1/invoices/:id/status. Si llega acá, es un cliente desactualizado.
+	bodyBytes, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		handlers.WriteValidation(c, "invalid request body")
+		return
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
+		handlers.WriteValidation(c, "invalid request body")
+		return
+	}
+	if _, hasStatus := raw["status"]; hasStatus {
+		httperrors.Respond(c, domainerr.Validation("use PATCH /invoices/:id/status to change status"))
+		return
+	}
 	var req dto.UpdateInvoiceRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := json.Unmarshal(bodyBytes, &req); err != nil {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), UpdateInput{
-		OrgID:        orgID,
+		OrgID:           orgID,
 		ID:              id,
-		Status:          req.Status,
 		DiscountPercent: req.DiscountPercent,
 		TaxPercent:      req.TaxPercent,
 		Notes:           req.Notes,

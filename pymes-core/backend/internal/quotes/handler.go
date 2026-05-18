@@ -52,7 +52,13 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.POST(quotesBasePath, rbac.RequirePermission("quotes", "create"), h.Create)
 	auth.GET(quotesItemPath, rbac.RequirePermission("quotes", "read"), h.Get)
 	auth.PATCH(quotesItemPath, rbac.RequirePermission("quotes", "update"), h.Update)
-	auth.PATCH(quotesItemPath+"/status", rbac.RequirePermission("quotes", "update"), h.UpdateStatus)
+	handlers.RegisterStatusEndpoint(
+		auth, rbac, "quotes", "update", quotesBasePath,
+		func(ctx context.Context, orgID, id uuid.UUID, next, actor string) (quotedomain.Quote, error) {
+			return h.uc.UpdateStatus(ctx, UpdateStatusInput{OrgID: orgID, ID: id, Status: next}, actor)
+		},
+		func(q quotedomain.Quote) any { return toQuoteResponse(q) },
+	)
 	auth.DELETE(quotesItemPath, rbac.RequirePermission("quotes", "delete"), h.Delete)
 	auth.POST(quotesItemPath+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("quotes", "update"), h.Archive)
 	auth.POST(quotesItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("quotes", "delete"), h.Restore)
@@ -305,35 +311,6 @@ func (h *Handler) Update(c *gin.Context) {
 		ValidUntil:   validUntil,
 		Actor:        a.Actor,
 	})
-	if err != nil {
-		httperrors.Respond(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, toQuoteResponse(out))
-}
-
-func (h *Handler) UpdateStatus(c *gin.Context) {
-	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
-	if err != nil {
-		handlers.WriteValidation(c, "invalid tenant")
-		return
-	}
-	quoteID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		handlers.WriteValidation(c, "invalid id")
-		return
-	}
-	var req dto.UpdateQuoteStatusRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		handlers.WriteValidation(c, "invalid request body")
-		return
-	}
-	out, err := h.uc.UpdateStatus(c.Request.Context(), UpdateStatusInput{
-		OrgID:  orgID,
-		ID:     quoteID,
-		Status: strings.TrimSpace(req.Status),
-	}, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

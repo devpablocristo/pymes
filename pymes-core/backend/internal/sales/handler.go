@@ -36,7 +36,13 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.POST("/sales", rbac.RequirePermission("sales", "create"), h.Create)
 	auth.GET("/sales/:id", rbac.RequirePermission("sales", "read"), h.Get)
 	auth.PATCH("/sales/:id", rbac.RequirePermission("sales", "update"), h.Update)
-	auth.PATCH("/sales/:id/status", rbac.RequirePermission("sales", "update"), h.UpdateStatus)
+	handlers.RegisterStatusEndpoint(
+		auth, rbac, "sales", "update", "/sales",
+		func(ctx context.Context, orgID, id uuid.UUID, next, actor string) (saledomain.Sale, error) {
+			return h.uc.UpdateStatus(ctx, UpdateStatusInput{OrgID: orgID, ID: id, Status: next}, actor)
+		},
+		func(s saledomain.Sale) any { return toSaleResponse(s) },
+	)
 	auth.POST("/sales/:id/void", rbac.RequirePermission("sales", "void"), h.Void)
 }
 
@@ -254,35 +260,6 @@ func (h *Handler) Update(c *gin.Context) {
 		Notes:      req.Notes,
 		Actor:      a.Actor,
 	})
-	if err != nil {
-		httperrors.Respond(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, toSaleResponse(out))
-}
-
-func (h *Handler) UpdateStatus(c *gin.Context) {
-	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
-	if err != nil {
-		handlers.WriteValidation(c, "invalid tenant")
-		return
-	}
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		handlers.WriteValidation(c, "invalid id")
-		return
-	}
-	var req dto.UpdateSaleStatusRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		handlers.WriteValidation(c, "invalid request body")
-		return
-	}
-	out, err := h.uc.UpdateStatus(c.Request.Context(), UpdateStatusInput{
-		OrgID:  orgID,
-		ID:     id,
-		Status: strings.TrimSpace(req.Status),
-	}, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

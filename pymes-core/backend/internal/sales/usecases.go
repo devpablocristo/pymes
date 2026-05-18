@@ -11,6 +11,7 @@ import (
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inventory"
 	saledomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/sales/usecases/domain"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/status"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
@@ -360,17 +361,35 @@ func (u *Usecases) PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in Sa
 }
 
 func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (saledomain.Sale, error) {
-	status := strings.TrimSpace(strings.ToLower(in.Status))
-	if status == "" {
+	next := strings.TrimSpace(strings.ToLower(in.Status))
+	if next == "" {
 		return saledomain.Sale{}, fmt.Errorf("status is required: %w", httperrors.ErrBadInput)
 	}
-	if !isValidSaleStatus(status) {
-		return saledomain.Sale{}, fmt.Errorf("invalid status: %w", httperrors.ErrBadInput)
+
+	// Leemos el estado actual para validar transición. Si la entidad no existe,
+	// devolvemos NotFound antes de tocar el FSM.
+	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return saledomain.Sale{}, fmt.Errorf("sale not found: %w", httperrors.ErrNotFound)
+		}
+		return saledomain.Sale{}, err
 	}
+
+	// Same-status es idempotente: no toca DB ni emite side effects.
+	if current.Status == next {
+		return current, nil
+	}
+
+	// Validación de transición vía FSM canónico (ver fsm.go).
+	if err := saleStateMachine.Validate(current.Status, next); err != nil {
+		return saledomain.Sale{}, status.MapFSMError(current.Status, next, err)
+	}
+
 	out, err := u.repo.UpdateStatus(ctx, UpdateStatusInput{
 		OrgID:  in.OrgID,
 		ID:     in.ID,
-		Status: status,
+		Status: next,
 	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -441,15 +460,6 @@ func (u *Usecases) Void(ctx context.Context, orgID, saleID uuid.UUID, actor stri
 		_ = u.webhooks.Enqueue(ctx, orgID, "sale.voided", map[string]any{"sale_id": saleID.String(), "customer_id": nullableUUID(current.CustomerID), "total": current.Total})
 	}
 	return out, nil
-}
-
-func isValidSaleStatus(v string) bool {
-	switch strings.TrimSpace(strings.ToLower(v)) {
-	case "draft", "completed", "paid", "pending", "voided":
-		return true
-	default:
-		return false
-	}
 }
 
 func isValidPaymentMethod(v string) bool {

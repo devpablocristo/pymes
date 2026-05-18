@@ -1,3 +1,4 @@
+import type { StringMachine } from '@devpablocristo/core-fsm';
 import type {
   CrudPageConfig,
   CrudStateMachineConfig,
@@ -70,6 +71,40 @@ export function buildFullyConnectedStatusStateMachine<T extends { id: string; st
     transitions: states.map((state) => ({
       from: state.value,
       to: states.filter((candidate) => candidate.value !== state.value).map((candidate) => candidate.value),
+    })),
+  };
+}
+
+// buildStatusStateMachineFromFSM construye un CrudStateMachineConfig cuyas
+// `transitions` son derivadas directamente de un `StringMachine` de
+// `@devpablocristo/core-fsm`. El FSM TS espeja al FSM Go del backend, por lo
+// que el frontend bloquea pre-server exactamente las mismas transiciones que
+// el backend rechazaría con 409.
+//
+// Uso típico (por dominio):
+//
+//   import { salesStateMachine } from './salesStateMachine';
+//   const config = buildStatusStateMachineFromFSM<Sale>(
+//     [{ value: 'draft', label: 'Borrador', badgeVariant: 'neutral' }, ...],
+//     salesStateMachine,
+//   );
+export function buildStatusStateMachineFromFSM<T extends { id: string; status: string }>(
+  states: Array<{
+    value: string;
+    label: string;
+    badgeVariant?: NonNullable<
+      NonNullable<CrudPageConfig<T>['stateMachine']>['states'][number]['badgeVariant']
+    >;
+  }>,
+  fsm: StringMachine,
+): CrudStateMachineConfig<T> {
+  return {
+    ...buildSimpleStatusStateMachine(states),
+    transitions: states.map((from) => ({
+      from: from.value,
+      to: states
+        .filter((to) => to.value !== from.value && fsm.canTransition(from.value, to.value))
+        .map((to) => to.value),
     })),
   };
 }

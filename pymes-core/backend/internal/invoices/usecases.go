@@ -13,6 +13,7 @@ import (
 	"gorm.io/gorm"
 
 	invdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/invoices/usecases/domain"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/status"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
@@ -34,6 +35,7 @@ type RepositoryPort interface {
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (invdomain.Invoice, error)
 	Create(ctx context.Context, in invdomain.Invoice) (invdomain.Invoice, error)
 	Update(ctx context.Context, in invdomain.Invoice) (invdomain.Invoice, error)
+	UpdateStatus(ctx context.Context, orgID, id uuid.UUID, status string) (invdomain.Invoice, error)
 	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
 	Restore(ctx context.Context, orgID, id uuid.UUID) error
 	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
@@ -171,10 +173,14 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (invdomain.Invoic
 	return out, nil
 }
 
+// UpdateInput soporta los campos editables del PATCH genérico de invoices.
+// El campo Status fue eliminado intencionalmente: el cambio de status va
+// SIEMPRE por PATCH /v1/invoices/:id/status (con FSM). El handler debe
+// rechazar explícitamente bodies que traigan "status" antes de bindear este
+// DTO (Gin ignora silenciosamente campos JSON desconocidos, no devuelve 400).
 type UpdateInput struct {
-	OrgID        uuid.UUID
+	OrgID           uuid.UUID
 	ID              uuid.UUID
-	Status          *string
 	DiscountPercent *float64
 	TaxPercent      *float64
 	Notes           *string
@@ -183,6 +189,55 @@ type UpdateInput struct {
 	IssuedDate      *string
 	DueDate         *string
 	Actor           string
+}
+
+// UpdateStatusInput cambia el status de una factura validando contra el FSM.
+type UpdateStatusInput struct {
+	OrgID  uuid.UUID
+	ID     uuid.UUID
+	Status string
+}
+
+// UpdateStatus aplica un cambio de status validando con invoiceStateMachine
+// (ver fsm.go). Side effects:
+//   - audit `invoice.status_updated`
+//   - same-status idempotente (no DB, no audit)
+func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (invdomain.Invoice, error) {
+	next := strings.TrimSpace(strings.ToLower(in.Status))
+	if next == "" {
+		return invdomain.Invoice{}, domainerr.Validation("status is required")
+	}
+
+	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return invdomain.Invoice{}, domainerr.NotFoundf("invoice", in.ID.String())
+		}
+		return invdomain.Invoice{}, err
+	}
+	if err := archive.IfArchived(current.ArchivedAt, "invoice"); err != nil {
+		return invdomain.Invoice{}, err
+	}
+
+	if string(current.Status) == next {
+		return current, nil
+	}
+
+	if err := invoiceStateMachine.Validate(string(current.Status), next); err != nil {
+		return invdomain.Invoice{}, status.MapFSMError(string(current.Status), next, err)
+	}
+
+	out, err := u.repo.UpdateStatus(ctx, in.OrgID, in.ID, next)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return invdomain.Invoice{}, domainerr.NotFoundf("invoice", in.ID.String())
+		}
+		return invdomain.Invoice{}, fmt.Errorf("update invoice status: %w", err)
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, in.OrgID.String(), actor, "invoice.status_updated", "invoice", out.ID.String(), map[string]any{"status": string(out.Status)})
+	}
+	return out, nil
 }
 
 func (u *Usecases) Update(ctx context.Context, in UpdateInput) (invdomain.Invoice, error) {
@@ -195,13 +250,6 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput) (invdomain.Invoic
 	}
 	if err := archive.IfArchived(current.ArchivedAt, "invoice"); err != nil {
 		return invdomain.Invoice{}, err
-	}
-	if in.Status != nil {
-		s := normalizeStatus(*in.Status)
-		if !isValidStatus(s) {
-			return invdomain.Invoice{}, fmt.Errorf("invalid status: %w", httperrors.ErrBadInput)
-		}
-		current.Status = invdomain.InvoiceStatus(s)
 	}
 	if in.DiscountPercent != nil {
 		current.DiscountPercent = *in.DiscountPercent

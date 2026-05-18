@@ -23,8 +23,11 @@ type CreateInvoiceRequest struct {
 	Items           []LineItemRequest `json:"items"`
 }
 
+// UpdateInvoiceRequest soporta los campos editables del PATCH genérico de
+// invoices. NO incluye Status: el cambio de status va por
+// PATCH /v1/invoices/:id/status (ver UpdateInvoiceStatusRequest). El handler
+// detecta explícitamente bodies que traigan "status" y devuelve 400.
 type UpdateInvoiceRequest struct {
-	Status          *string   `json:"status"`
 	DiscountPercent *float64  `json:"discount_percent"`
 	TaxPercent      *float64  `json:"tax_percent"`
 	Notes           *string   `json:"notes"`
@@ -32,6 +35,11 @@ type UpdateInvoiceRequest struct {
 	Tags            *[]string `json:"tags"`
 	IssuedDate      *string   `json:"issued_date"`
 	DueDate         *string   `json:"due_date"`
+}
+
+// UpdateInvoiceStatusRequest es el body de PATCH /v1/invoices/:id/status.
+type UpdateInvoiceStatusRequest struct {
+	Status string `json:"status" binding:"required"`
 }
 
 type LineItemResponse struct {

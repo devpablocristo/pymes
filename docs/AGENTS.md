@@ -14,6 +14,16 @@ Los agentes no deben llamar endpoints sueltos para acciones de negocio. Deben de
 
 Cada capability declara `resource`, `action`, schemas, riesgo, canales permitidos, RBAC, auditoria y `nexus_action_type`.
 
+Capabilities publicadas para Companion automations:
+
+- `pymes.get_work_orders`
+- `pymes.get_appointments`
+- `pymes.get_low_stock`
+- `pymes.get_customers`
+- `pymes.get_revenue_comparison`
+- `pymes.send_whatsapp_text`
+- `pymes.send_whatsapp_template`
+
 ## Riesgo
 
 - `read`: lectura sin efectos.
@@ -27,4 +37,3 @@ Las capabilities `high` y `critical` no deben ejecutarse sin confirmacion o Revi
 ## Estado actual
 
 El gateway de capabilities ya valida contrato, RBAC, confirmaciones, idempotencia, firma externa y Nexus Review. Los executors de dominio estan marcados como `contract_only` hasta conectarlos uno por uno; esto evita bypasses mientras se completa la ejecucion real.
-

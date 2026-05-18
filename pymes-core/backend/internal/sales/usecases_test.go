@@ -17,6 +17,8 @@ type mockRepo struct {
 	createFn            func(ctx context.Context, in CreateInput) (saledomain.Sale, error)
 	getByIDFn           func(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
 	voidFn              func(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
+	updateStatusFn      func(ctx context.Context, in UpdateStatusInput) (saledomain.Sale, error)
+	updateStatusCalled  int
 }
 
 func (m *mockRepo) List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error) {
@@ -35,6 +37,10 @@ func (m *mockRepo) Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomai
 	return m.voidFn(ctx, orgID, saleID)
 }
 func (m *mockRepo) UpdateStatus(ctx context.Context, in UpdateStatusInput) (saledomain.Sale, error) {
+	m.updateStatusCalled++
+	if m.updateStatusFn != nil {
+		return m.updateStatusFn(ctx, in)
+	}
 	return saledomain.Sale{ID: in.ID, OrgID: in.OrgID, Status: in.Status}, nil
 }
 func (m *mockRepo) PatchSale(context.Context, uuid.UUID, uuid.UUID, SalePatchFields) (saledomain.Sale, error) {

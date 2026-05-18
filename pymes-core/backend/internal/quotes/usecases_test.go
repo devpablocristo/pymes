@@ -20,6 +20,7 @@ type mockQuoteRepo struct {
 	createFn            func(ctx context.Context, in CreateInput) (quotedomain.Quote, error)
 	getByIDFn           func(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error)
 	setStatusFn         func(ctx context.Context, orgID, quoteID uuid.UUID, status string) (quotedomain.Quote, error)
+	setStatusCalled     int
 }
 
 func (m *mockQuoteRepo) List(ctx context.Context, p ListParams) ([]quotedomain.Quote, int64, bool, *uuid.UUID, error) {
@@ -54,8 +55,9 @@ func (m *mockQuoteRepo) HardDelete(ctx context.Context, orgID, quoteID uuid.UUID
 	return nil
 }
 func (m *mockQuoteRepo) SetStatus(ctx context.Context, orgID, quoteID uuid.UUID, status string) (quotedomain.Quote, error) {
+	m.setStatusCalled++
 	if m.setStatusFn == nil {
-		return quotedomain.Quote{}, nil
+		return quotedomain.Quote{ID: quoteID, OrgID: orgID, Status: status}, nil
 	}
 	return m.setStatusFn(ctx, orgID, quoteID, status)
 }

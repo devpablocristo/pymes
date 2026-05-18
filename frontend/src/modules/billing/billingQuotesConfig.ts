@@ -2,7 +2,8 @@ import type { CrudPageConfig } from '../../components/CrudPage';
 import { asOptionalString, asString } from '../../crud/resourceConfigs.shared';
 import { apiRequest, downloadAPIFile } from '../../lib/api';
 import { readActiveBranchId } from '../../lib/branchSelectionStorage';
-import { buildFullyConnectedStatusStateMachine, formatCrudLocalizedMoney } from '../crud';
+import { buildStatusStateMachineFromFSM, formatCrudLocalizedMoney } from '../crud';
+import { quotesStateMachine } from './quotesStateMachine';
 import {
   buildCommercialLineItemsBlock,
   buildCrudNameField,
@@ -19,12 +20,18 @@ import { parseCommercialPricedLineItems, type QuoteRecord } from './billingDocum
 export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
   renderList: NonNullable<CrudPageConfig<TRecord>['viewModes']>[number]['render'];
 }): CrudPageConfig<TRecord> {
-  const stateMachine = buildFullyConnectedStatusStateMachine<TRecord>([
-    { value: 'draft', label: 'Borrador', badgeVariant: 'default' },
-    { value: 'sent', label: 'Enviado', badgeVariant: 'info' },
-    { value: 'accepted', label: 'Aceptado', badgeVariant: 'success' },
-    { value: 'rejected', label: 'Rechazado', badgeVariant: 'danger' },
-  ]);
+  // Las `transitions` se derivan automáticamente del quotesStateMachine
+  // (espejo del backend en pymes-core/backend/internal/quotes/fsm.go).
+  const stateMachine = buildStatusStateMachineFromFSM<TRecord>(
+    [
+      { value: 'draft', label: 'Borrador', badgeVariant: 'default' },
+      { value: 'sent', label: 'Enviado', badgeVariant: 'info' },
+      { value: 'accepted', label: 'Aceptado', badgeVariant: 'success' },
+      { value: 'rejected', label: 'Rechazado', badgeVariant: 'danger' },
+      { value: 'expired', label: 'Vencido', badgeVariant: 'warning' },
+    ],
+    quotesStateMachine,
+  );
   const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer_name' | 'status' | 'notes' | 'tags'>({
     resourceId: 'quotes',
     renderList: opts.renderList,

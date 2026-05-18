@@ -12,6 +12,7 @@ import (
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	purchasesdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/purchases/usecases/domain"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/status"
 )
 
 type RepositoryPort interface {
@@ -179,6 +180,11 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 }
 
 func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (purchasesdomain.Purchase, error) {
+	next := strings.TrimSpace(strings.ToLower(in.Status))
+	if next == "" {
+		return purchasesdomain.Purchase{}, domainerr.Validation("status is required")
+	}
+
 	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -189,17 +195,21 @@ func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor
 	if err := archive.IfArchived(current.DeletedAt, "purchase"); err != nil {
 		return purchasesdomain.Purchase{}, err
 	}
-	nextStatus, err := normalizePurchaseStatus(in.Status, "")
-	if err != nil {
-		return purchasesdomain.Purchase{}, err
+
+	// Same-status idempotente: no DB, no audit.
+	if current.Status == next {
+		return current, nil
 	}
-	if !canTransitionPurchaseStatus(current.Status, nextStatus) {
-		return purchasesdomain.Purchase{}, domainerr.BusinessRule("purchase status transition is not allowed")
+
+	// Validación de transición vía FSM canónico (ver fsm.go).
+	if err := purchaseStateMachine.Validate(current.Status, next); err != nil {
+		return purchasesdomain.Purchase{}, status.MapFSMError(current.Status, next, err)
 	}
+
 	out, err := u.repo.UpdateStatus(ctx, UpdateStatusInput{
-		ID:       in.ID,
-		OrgID: in.OrgID,
-		Status:   nextStatus,
+		ID:     in.ID,
+		OrgID:  in.OrgID,
+		Status: next,
 	})
 	if err != nil {
 		return purchasesdomain.Purchase{}, err
@@ -308,29 +318,6 @@ func normalizePurchaseStatus(raw, defaultValue string) (string, error) {
 		return status, nil
 	default:
 		return "", domainerr.Validation("invalid status")
-	}
-}
-
-func canTransitionPurchaseStatus(from, to string) bool {
-	fromStatus, err := normalizePurchaseStatus(from, "")
-	if err != nil {
-		return false
-	}
-	toStatus, err := normalizePurchaseStatus(to, "")
-	if err != nil {
-		return false
-	}
-	switch fromStatus {
-	case "draft":
-		return toStatus == "draft" || toStatus == "partial" || toStatus == "received" || toStatus == "voided"
-	case "partial":
-		return toStatus == "draft" || toStatus == "partial" || toStatus == "received" || toStatus == "voided"
-	case "received":
-		return toStatus == "draft" || toStatus == "partial" || toStatus == "received" || toStatus == "voided"
-	case "voided":
-		return toStatus == "draft" || toStatus == "partial" || toStatus == "received" || toStatus == "voided"
-	default:
-		return false
 	}
 }
 

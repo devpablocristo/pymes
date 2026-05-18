@@ -73,6 +73,8 @@ describe('billingHelpers', () => {
 
     expect(config.basePath).toBe('/v1/quotes');
     expect(config.labelPluralCap).toBe('Presupuestos');
+    // Espejo del FSM Go (quotes/fsm.go). Incluye `expired` (terminal),
+    // ausente en la versión anterior con buildFullyConnected.
     expect(config.stateMachine).toMatchObject({
       field: 'status',
       states: [
@@ -80,12 +82,14 @@ describe('billingHelpers', () => {
         { value: 'sent', label: 'Enviado', columnId: 'sent', badgeVariant: 'info' },
         { value: 'accepted', label: 'Aceptado', columnId: 'accepted', badgeVariant: 'success' },
         { value: 'rejected', label: 'Rechazado', columnId: 'rejected', badgeVariant: 'danger' },
+        { value: 'expired', label: 'Vencido', columnId: 'expired', badgeVariant: 'warning' },
       ],
       columns: [
         { id: 'draft', label: 'Borrador', defaultState: 'draft' },
         { id: 'sent', label: 'Enviado', defaultState: 'sent' },
         { id: 'accepted', label: 'Aceptado', defaultState: 'accepted' },
         { id: 'rejected', label: 'Rechazado', defaultState: 'rejected' },
+        { id: 'expired', label: 'Vencido', defaultState: 'expired' },
       ],
     });
     expect(config.editorModal).toMatchObject({
@@ -214,23 +218,23 @@ describe('billingHelpers', () => {
 
     expect(config.basePath).toBe('/v1/sales');
     expect(config.labelPluralCap).toBe('Ventas');
+    // Order y set espejo del FSM Go (sales/fsm.go). `cancelled` se eliminó:
+    // no estaba en el FSM canónico ni en el CHECK constraint de la DB.
     expect(config.stateMachine).toMatchObject({
       field: 'status',
       states: [
         { value: 'draft', label: 'Borrador', columnId: 'draft', badgeVariant: 'default' },
+        { value: 'pending', label: 'Pendiente', columnId: 'pending', badgeVariant: 'warning' },
         { value: 'completed', label: 'Completada', columnId: 'completed', badgeVariant: 'success' },
         { value: 'paid', label: 'Pagada', columnId: 'paid', badgeVariant: 'success' },
-        { value: 'pending', label: 'Pendiente', columnId: 'pending', badgeVariant: 'warning' },
         { value: 'voided', label: 'Anulada', columnId: 'voided', badgeVariant: 'danger' },
-        { value: 'cancelled', label: 'Cancelada', columnId: 'cancelled', badgeVariant: 'danger' },
       ],
       columns: [
         { id: 'draft', label: 'Borrador', defaultState: 'draft' },
+        { id: 'pending', label: 'Pendiente', defaultState: 'pending' },
         { id: 'completed', label: 'Completada', defaultState: 'completed' },
         { id: 'paid', label: 'Pagada', defaultState: 'paid' },
-        { id: 'pending', label: 'Pendiente', defaultState: 'pending' },
         { id: 'voided', label: 'Anulada', defaultState: 'voided' },
-        { id: 'cancelled', label: 'Cancelada', defaultState: 'cancelled' },
       ],
     });
     expect(config.editorModal).toMatchObject({

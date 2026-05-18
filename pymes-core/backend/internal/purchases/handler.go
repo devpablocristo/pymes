@@ -38,7 +38,13 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.POST("/purchases", rbac.RequirePermission("purchases", "create"), h.Create)
 	auth.GET("/purchases/:id", rbac.RequirePermission("purchases", "read"), h.Get)
 	auth.PATCH("/purchases/:id", rbac.RequirePermission("purchases", "update"), h.Update)
-	auth.PATCH("/purchases/:id/status", rbac.RequirePermission("purchases", "update"), h.UpdateStatus)
+	handlers.RegisterStatusEndpoint(
+		auth, rbac, "purchases", "update", "/purchases",
+		func(ctx context.Context, orgID, id uuid.UUID, next, actor string) (purchasesdomain.Purchase, error) {
+			return h.uc.UpdateStatus(ctx, UpdateStatusInput{OrgID: orgID, ID: id, Status: next}, actor)
+		},
+		func(p purchasesdomain.Purchase) any { return p },
+	)
 	auth.DELETE("/purchases/:id", rbac.RequirePermission("purchases", "delete"), h.Delete)
 	auth.POST("/purchases/:id/"+crudpaths.SegmentArchive, rbac.RequirePermission("purchases", "update"), h.Archive)
 	auth.POST("/purchases/:id/"+crudpaths.SegmentRestore, rbac.RequirePermission("purchases", "delete"), h.Restore)
@@ -146,29 +152,6 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), UpdateInput{ID: id, OrgID: orgID, BranchID: payload.BranchID, SupplierID: payload.SupplierID, SupplierName: payload.SupplierName, Status: payload.Status, PaymentStatus: payload.PaymentStatus, IsFavorite: payload.IsFavorite, Tags: payload.Tags, Notes: payload.Notes, Items: payload.Items}, authCtx.Actor)
-	if err != nil {
-		httperrors.Respond(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, out)
-}
-
-func (h *Handler) UpdateStatus(c *gin.Context) {
-	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parseTenantAndID(c)
-	if !ok {
-		return
-	}
-	var req dto.UpdatePurchaseStatusRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		handlers.WriteValidation(c, "invalid request body")
-		return
-	}
-	out, err := h.uc.UpdateStatus(c.Request.Context(), UpdateStatusInput{
-		ID:       id,
-		OrgID: orgID,
-		Status:   strings.TrimSpace(req.Status),
-	}, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

@@ -40,6 +40,11 @@ func coreCapabilities() []Capability {
 		readCapability("products.search", "products", "read", "Buscar productos del catalogo.", readChannels),
 		readCapability("services.search", "services", "read", "Buscar servicios publicados por el tenant.", readChannels),
 		readCapability("inventory.read_stock", "inventory", "read", "Consultar stock y stock bajo.", readChannels),
+		readCapability("pymes.get_work_orders", "work_orders", "read", "Consultar ordenes de trabajo demoradas para automations IA.", readChannels),
+		readCapability("pymes.get_appointments", "appointments", "read", "Consultar turnos no confirmados para automations IA.", readChannels),
+		readCapability("pymes.get_low_stock", "inventory", "read", "Consultar items con stock bajo para automations IA.", readChannels),
+		readCapability("pymes.get_customers", "customers", "read", "Consultar clientes inactivos para automations IA.", readChannels),
+		readCapability("pymes.get_revenue_comparison", "dashboard", "read", "Consultar comparacion de facturacion mensual para automations IA.", readChannels),
 		writeCapability("quotes.create", "quotes", "create", "Crear presupuesto comercial.", RiskMedium, "quote.create", writeChannels),
 		writeCapability("sales.create", "sales", "create", "Crear una venta y sus efectos operativos asociados.", RiskHigh, "sale.create", writeChannels),
 		writeCapability("payments.generate_link", "payments", "create", "Generar link de pago para una venta.", RiskHigh, "payment_link.generate", writeChannels),
@@ -47,6 +52,8 @@ func coreCapabilities() []Capability {
 		writeCapability("procurement.submit_request", "procurement_requests", "submit", "Enviar solicitud de compra a aprobacion.", RiskHigh, "procurement.submit", writeChannels),
 		writeCapability("scheduling.book", "scheduling", "create", "Reservar turno o agenda operativa.", RiskMedium, "scheduling.book", writeChannels),
 		writeCapability("cashflow.create_movement", "cashflow", "create", "Registrar movimiento de caja.", RiskHigh, "cashflow.movement", writeChannels),
+		writeCapability("pymes.send_whatsapp_text", "whatsapp", "notify", "Enviar mensaje WhatsApp de texto desde automation IA.", RiskMedium, "notification.send", writeChannels),
+		writeCapability("pymes.send_whatsapp_template", "whatsapp", "notify", "Enviar template WhatsApp desde automation IA.", RiskMedium, "notification.send", writeChannels),
 	}
 }
 

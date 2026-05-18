@@ -10,7 +10,8 @@ import {
   updateInvoiceFromCrudValues,
   updateInvoiceStatus,
 } from '../../lib/invoicesApi';
-import { buildFullyConnectedStatusStateMachine, formatCrudLocalizedMoney } from '../crud';
+import { buildStatusStateMachineFromFSM, formatCrudLocalizedMoney } from '../crud';
+import { invoicesStateMachine } from './invoicesStateMachine';
 import {
   buildInternalFavoriteField,
   buildInternalTagsField,
@@ -45,11 +46,16 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
   | 'toFormValues'
   | 'isValid'
 > {
-  const stateMachine = buildFullyConnectedStatusStateMachine<TRecord>([
-    { value: 'paid', label: INVOICE_STATUS_LABELS.paid, badgeVariant: 'success' },
-    { value: 'pending', label: INVOICE_STATUS_LABELS.pending, badgeVariant: 'warning' },
-    { value: 'overdue', label: INVOICE_STATUS_LABELS.overdue, badgeVariant: 'danger' },
-  ]);
+  // Las `transitions` se derivan automáticamente del invoicesStateMachine
+  // (espejo del backend en pymes-core/backend/internal/invoices/fsm.go).
+  const stateMachine = buildStatusStateMachineFromFSM<TRecord>(
+    [
+      { value: 'paid', label: INVOICE_STATUS_LABELS.paid, badgeVariant: 'success' },
+      { value: 'pending', label: INVOICE_STATUS_LABELS.pending, badgeVariant: 'warning' },
+      { value: 'overdue', label: INVOICE_STATUS_LABELS.overdue, badgeVariant: 'danger' },
+    ],
+    invoicesStateMachine,
+  );
   const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer' | 'status' | 'tags'>({
     resourceId: 'invoices',
     renderList: opts.renderList,
@@ -139,11 +145,16 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
 }
 
 export function createInvoicesShellConfig<TRecord extends InvoiceRecord>(): CrudResourceShellHeaderConfigLike<TRecord> {
-  const stateMachine = buildFullyConnectedStatusStateMachine<TRecord>([
-    { value: 'paid', label: INVOICE_STATUS_LABELS.paid, badgeVariant: 'success' },
-    { value: 'pending', label: INVOICE_STATUS_LABELS.pending, badgeVariant: 'warning' },
-    { value: 'overdue', label: INVOICE_STATUS_LABELS.overdue, badgeVariant: 'danger' },
-  ]);
+  // Las `transitions` se derivan automáticamente del invoicesStateMachine
+  // (espejo del backend en pymes-core/backend/internal/invoices/fsm.go).
+  const stateMachine = buildStatusStateMachineFromFSM<TRecord>(
+    [
+      { value: 'paid', label: INVOICE_STATUS_LABELS.paid, badgeVariant: 'success' },
+      { value: 'pending', label: INVOICE_STATUS_LABELS.pending, badgeVariant: 'warning' },
+      { value: 'overdue', label: INVOICE_STATUS_LABELS.overdue, badgeVariant: 'danger' },
+    ],
+    invoicesStateMachine,
+  );
   const shellConfig = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer' | 'status' | 'tags'>({
     resourceId: 'invoices',
     renderList: () => createElement(Fragment),

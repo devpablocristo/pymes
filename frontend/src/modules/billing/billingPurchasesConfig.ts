@@ -2,7 +2,8 @@ import type { CrudPageConfig } from '../../components/CrudPage';
 import { asOptionalString, asString, formatDate } from '../../crud/resourceConfigs.shared';
 import { apiRequest } from '../../lib/api';
 import { readActiveBranchId } from '../../lib/branchSelectionStorage';
-import { buildCrudSelectFieldOptionsFromStateMachine, buildFullyConnectedStatusStateMachine, formatCrudLocalizedMoney, hasReadableCrudValue } from '../crud';
+import { buildCrudSelectFieldOptionsFromStateMachine, buildStatusStateMachineFromFSM, formatCrudLocalizedMoney, hasReadableCrudValue } from '../crud';
+import { purchasesStateMachine } from './purchasesStateMachine';
 import {
   buildCommercialLineItemsBlock,
   buildCrudNameField,
@@ -22,12 +23,18 @@ import { parseCommercialCostLineItems, type PurchaseRecord } from './billingDocu
 export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: {
   renderList: NonNullable<CrudPageConfig<TRecord>['viewModes']>[number]['render'];
 }): CrudPageConfig<TRecord> {
-  const stateMachine = buildFullyConnectedStatusStateMachine<TRecord>([
-    { value: 'draft', label: 'Borrador', badgeVariant: 'default' },
-    { value: 'partial', label: 'Parcial', badgeVariant: 'warning' },
-    { value: 'received', label: 'Recibida', badgeVariant: 'info' },
-    { value: 'voided', label: 'Anulada', badgeVariant: 'danger' },
-  ]);
+  // Las `transitions` se derivan automáticamente del purchasesStateMachine
+  // (espejo del backend en pymes-core/backend/internal/purchases/fsm.go).
+  // voided NO es terminal — permite revivir compras anuladas.
+  const stateMachine = buildStatusStateMachineFromFSM<TRecord>(
+    [
+      { value: 'draft', label: 'Borrador', badgeVariant: 'default' },
+      { value: 'partial', label: 'Parcial', badgeVariant: 'warning' },
+      { value: 'received', label: 'Recibida', badgeVariant: 'info' },
+      { value: 'voided', label: 'Anulada', badgeVariant: 'danger' },
+    ],
+    purchasesStateMachine,
+  );
 
   const base = createCommercialDocumentCrudConfig<
     TRecord,

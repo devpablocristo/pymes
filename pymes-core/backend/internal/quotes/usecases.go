@@ -15,6 +15,7 @@ import (
 	quotedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/quotes/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/sales"
 	salesdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/sales/usecases/domain"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/status"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
@@ -140,29 +141,35 @@ type UpdateStatusInput struct {
 	Status string
 }
 
-// validQuoteStatuses refleja el CHECK constraint quotes_status_check (migración 0007).
-var validQuoteStatuses = map[string]struct{}{
-	"draft":    {},
-	"sent":     {},
-	"accepted": {},
-	"rejected": {},
-	"expired":  {},
-}
-
-func isValidQuoteStatus(s string) bool {
-	_, ok := validQuoteStatuses[s]
-	return ok
-}
-
 func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (quotedomain.Quote, error) {
-	status := strings.TrimSpace(strings.ToLower(in.Status))
-	if status == "" {
+	next := strings.TrimSpace(strings.ToLower(in.Status))
+	if next == "" {
 		return quotedomain.Quote{}, fmt.Errorf("status is required: %w", httperrors.ErrBadInput)
 	}
-	if !isValidQuoteStatus(status) {
-		return quotedomain.Quote{}, fmt.Errorf("invalid status: %w", httperrors.ErrBadInput)
+
+	// Leer estado actual para validar transición vía FSM.
+	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return quotedomain.Quote{}, fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
+		}
+		return quotedomain.Quote{}, err
 	}
-	out, err := u.repo.SetStatus(ctx, in.OrgID, in.ID, status)
+	if err := archive.IfArchived(current.ArchivedAt, "quote"); err != nil {
+		return quotedomain.Quote{}, err
+	}
+
+	// Same-status idempotente: no DB, no audit.
+	if current.Status == next {
+		return current, nil
+	}
+
+	// Validación de transición vía FSM canónico (ver fsm.go).
+	if err := quoteStateMachine.Validate(current.Status, next); err != nil {
+		return quotedomain.Quote{}, status.MapFSMError(current.Status, next, err)
+	}
+
+	out, err := u.repo.SetStatus(ctx, in.OrgID, in.ID, next)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return quotedomain.Quote{}, fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
@@ -395,58 +402,20 @@ func (u *Usecases) HardDelete(ctx context.Context, orgID, quoteID uuid.UUID, act
 	return nil
 }
 
+// Send / Accept / Reject delegan en UpdateStatus para pasar por el FSM canónico
+// (ver fsm.go) y centralizar audit + side effects. La validación de transición
+// vive en el FSM, no en checks ad-hoc por método.
+
 func (u *Usecases) Send(ctx context.Context, orgID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error) {
-	current, err := u.GetByID(ctx, orgID, quoteID)
-	if err != nil {
-		return quotedomain.Quote{}, err
-	}
-	if current.Status != "draft" {
-		return quotedomain.Quote{}, fmt.Errorf("only draft quotes can be sent: %w", httperrors.ErrNotDraft)
-	}
-	out, err := u.repo.SetStatus(ctx, orgID, quoteID, "sent")
-	if err != nil {
-		return quotedomain.Quote{}, err
-	}
-	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "quote.sent", "quote", quoteID.String(), map[string]any{})
-	}
-	return out, nil
+	return u.UpdateStatus(ctx, UpdateStatusInput{OrgID: orgID, ID: quoteID, Status: "sent"}, actor)
 }
 
 func (u *Usecases) Accept(ctx context.Context, orgID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error) {
-	current, err := u.GetByID(ctx, orgID, quoteID)
-	if err != nil {
-		return quotedomain.Quote{}, err
-	}
-	if current.Status == "rejected" || current.Status == "expired" {
-		return quotedomain.Quote{}, fmt.Errorf("quote cannot be accepted from current status: %w", httperrors.ErrConflict)
-	}
-	out, err := u.repo.SetStatus(ctx, orgID, quoteID, "accepted")
-	if err != nil {
-		return quotedomain.Quote{}, err
-	}
-	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "quote.accepted", "quote", quoteID.String(), map[string]any{})
-	}
-	return out, nil
+	return u.UpdateStatus(ctx, UpdateStatusInput{OrgID: orgID, ID: quoteID, Status: "accepted"}, actor)
 }
 
 func (u *Usecases) Reject(ctx context.Context, orgID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error) {
-	current, err := u.GetByID(ctx, orgID, quoteID)
-	if err != nil {
-		return quotedomain.Quote{}, err
-	}
-	if current.Status == "accepted" {
-		return quotedomain.Quote{}, fmt.Errorf("accepted quote cannot be rejected: %w", httperrors.ErrConflict)
-	}
-	out, err := u.repo.SetStatus(ctx, orgID, quoteID, "rejected")
-	if err != nil {
-		return quotedomain.Quote{}, err
-	}
-	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "quote.rejected", "quote", quoteID.String(), map[string]any{})
-	}
-	return out, nil
+	return u.UpdateStatus(ctx, UpdateStatusInput{OrgID: orgID, ID: quoteID, Status: "rejected"}, actor)
 }
 
 func (u *Usecases) ToSale(ctx context.Context, orgID, quoteID uuid.UUID, paymentMethod, notes, actor string) (salesdomain.Sale, error) {

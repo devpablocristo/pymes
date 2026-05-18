@@ -3,7 +3,8 @@ import { asOptionalString, asString } from '../../crud/resourceConfigs.shared';
 import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../../lib/api';
 import { readActiveBranchId } from '../../lib/branchSelectionStorage';
 import { paymentMethodOptions } from '../../lib/formPresets';
-import { buildFullyConnectedStatusStateMachine, formatCrudLocalizedMoney, openCrudFormDialog, openCrudTextDialog } from '../crud';
+import { buildStatusStateMachineFromFSM, formatCrudLocalizedMoney, openCrudFormDialog, openCrudTextDialog } from '../crud';
+import { salesStateMachine } from './salesStateMachine';
 import {
   buildCommercialLineItemsBlock,
   buildCrudNameField,
@@ -22,14 +23,21 @@ import { parseCommercialPricedLineItems, type SaleRecord } from './billingDocume
 export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
   renderList: NonNullable<CrudPageConfig<TRecord>['viewModes']>[number]['render'];
 }): CrudPageConfig<TRecord> {
-  const stateMachine = buildFullyConnectedStatusStateMachine<TRecord>([
-    { value: 'draft', label: 'Borrador', badgeVariant: 'default' },
-    { value: 'completed', label: 'Completada', badgeVariant: 'success' },
-    { value: 'paid', label: 'Pagada', badgeVariant: 'success' },
-    { value: 'pending', label: 'Pendiente', badgeVariant: 'warning' },
-    { value: 'voided', label: 'Anulada', badgeVariant: 'danger' },
-    { value: 'cancelled', label: 'Cancelada', badgeVariant: 'danger' },
-  ]);
+  // Las `transitions` se derivan automáticamente del salesStateMachine
+  // (espejo del backend en pymes-core/backend/internal/sales/fsm.go).
+  // Nota: `cancelled` NO está en el FSM canónico; lo dejamos solo como
+  // estado visual para datos legacy. El FSM no permitirá transiciones
+  // hacia/desde `cancelled` — el kanban lo bloqueará pre-server.
+  const stateMachine = buildStatusStateMachineFromFSM<TRecord>(
+    [
+      { value: 'draft', label: 'Borrador', badgeVariant: 'default' },
+      { value: 'pending', label: 'Pendiente', badgeVariant: 'warning' },
+      { value: 'completed', label: 'Completada', badgeVariant: 'success' },
+      { value: 'paid', label: 'Pagada', badgeVariant: 'success' },
+      { value: 'voided', label: 'Anulada', badgeVariant: 'danger' },
+    ],
+    salesStateMachine,
+  );
   const base = createCommercialDocumentCrudConfig<
     TRecord,
     'number' | 'customer_name' | 'status' | 'payment_method' | 'notes' | 'tags'

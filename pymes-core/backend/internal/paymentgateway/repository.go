@@ -21,7 +21,7 @@ var (
 	ErrGatewayNotConnected = errors.New("payment gateway not connected")
 )
 
-type orgSlugRow struct {
+type tenantSlugRow struct {
 	ID uuid.UUID
 }
 
@@ -82,7 +82,7 @@ func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, e
 			return id, nil
 		}
 	}
-	var row orgSlugRow
+	var row tenantSlugRow
 	err := r.db.WithContext(ctx).Table("orgs").Select("id").Where("slug = ?", trimmed).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -212,7 +212,7 @@ func (r *Repository) ListActiveConnections(ctx context.Context) ([]gatewaydomain
 func (r *Repository) SaveConnection(ctx context.Context, in gatewaydomain.PaymentGatewayConnection) error {
 	now := time.Now().UTC()
 	row := models.PaymentGatewayConnectionModel{
-		OrgID:                 in.OrgID,
+		OrgID:              in.OrgID,
 		Provider:              coalesce(in.Provider, "mercadopago"),
 		ExternalUserID:        strings.TrimSpace(in.ExternalUserID),
 		AccessTokenEncrypted:  strings.TrimSpace(in.AccessToken),
@@ -257,7 +257,7 @@ func (r *Repository) CountMonthlyPreferences(ctx context.Context, orgID uuid.UUI
 func (r *Repository) SavePreference(ctx context.Context, in gatewaydomain.PaymentPreference) (gatewaydomain.PaymentPreference, error) {
 	row := models.PaymentPreferenceModel{
 		ID:              uuid.New(),
-		OrgID:           in.OrgID,
+		OrgID:        in.OrgID,
 		Provider:        coalesce(in.Provider, "mercadopago"),
 		ExternalID:      strings.TrimSpace(in.ExternalID),
 		ReferenceType:   strings.TrimSpace(in.ReferenceType),
@@ -349,7 +349,7 @@ func (r *Repository) GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.U
 }
 
 type ProcessSalePaymentInput struct {
-	OrgID         uuid.UUID
+	OrgID      uuid.UUID
 	SaleID        uuid.UUID
 	Amount        float64
 	ExternalPayID string
@@ -569,7 +569,7 @@ func (r *Repository) MarkWebhookEventError(ctx context.Context, id uuid.UUID, er
 
 func toConnectionDomain(in models.PaymentGatewayConnectionModel) gatewaydomain.PaymentGatewayConnection {
 	return gatewaydomain.PaymentGatewayConnection{
-		OrgID:          in.OrgID,
+		OrgID:       in.OrgID,
 		Provider:       in.Provider,
 		ExternalUserID: in.ExternalUserID,
 		AccessToken:    in.AccessTokenEncrypted,
@@ -584,7 +584,7 @@ func toConnectionDomain(in models.PaymentGatewayConnectionModel) gatewaydomain.P
 func toPreferenceDomain(in models.PaymentPreferenceModel) gatewaydomain.PaymentPreference {
 	return gatewaydomain.PaymentPreference{
 		ID:              in.ID,
-		OrgID:           in.OrgID,
+		OrgID:        in.OrgID,
 		Provider:        in.Provider,
 		ExternalID:      in.ExternalID,
 		ReferenceType:   in.ReferenceType,

@@ -130,7 +130,7 @@ func (r *Repository) HasLogByDedupKey(key string) bool {
 func (r *Repository) CreateLog(entry domain.Log) {
 	m := models.NotificationLogModel{
 		ID:                entry.ID,
-		OrgID:             entry.OrgID,
+		OrgID:          entry.OrgID,
 		UserID:            entry.UserID,
 		NotificationType:  entry.NotificationType,
 		Channel:           entry.Channel,

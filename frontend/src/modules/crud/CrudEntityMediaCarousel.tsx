@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type MouseEvent } from 'react';
 import { isDisplayableCrudImageSrc } from './crudLinkedEntityImageUrls';
 import './CrudEntityMediaCarousel.css';
 
@@ -10,6 +10,10 @@ export type CrudEntityMediaCarouselProps = {
   urls: string[];
   variant?: 'read' | 'edit';
   ariaLabel?: string;
+  /** Tarjetas de galería: proporción fija, sin franja de miniaturas. */
+  compact?: boolean;
+  /** Evita que clics en flechas/miniaturas burbujeen a un contenedor padre (p. ej. tarjeta botón). */
+  containInteractiveEvents?: boolean;
   /** En edición: quitar una URL del listado (p. ej. sincronizar con el campo del formulario). */
   onRequestRemoveAt?: (index: number) => void;
 };
@@ -18,6 +22,8 @@ export function CrudEntityMediaCarousel({
   urls,
   variant = 'read',
   ariaLabel = 'Imágenes',
+  compact = false,
+  containInteractiveEvents = false,
   onRequestRemoveAt,
 }: CrudEntityMediaCarouselProps) {
   const safeUrls = useMemo(() => urls.filter(Boolean), [urls]);
@@ -45,8 +51,19 @@ export function CrudEntityMediaCarousel({
       </span>
     );
 
+  const bubbleGuard = (event: MouseEvent) => {
+    if (containInteractiveEvents) event.stopPropagation();
+  };
+
   return (
-    <section className={cx('crud-entity-media-carousel', `crud-entity-media-carousel--${variant}`)} aria-label={ariaLabel}>
+    <section
+      className={cx(
+        'crud-entity-media-carousel',
+        `crud-entity-media-carousel--${variant}`,
+        compact && 'crud-entity-media-carousel--compact',
+      )}
+      aria-label={ariaLabel}
+    >
       <div className="crud-entity-media-carousel__hero">
         {renderHeroSlide(activeUrl)}
         {safeUrls.length > 1 ? (
@@ -54,7 +71,10 @@ export function CrudEntityMediaCarousel({
             <button
               type="button"
               className="crud-entity-media-carousel__nav crud-entity-media-carousel__nav--prev"
-              onClick={() => setIndex((current) => (current - 1 + safeUrls.length) % safeUrls.length)}
+              onClick={(event) => {
+                bubbleGuard(event);
+                setIndex((current) => (current - 1 + safeUrls.length) % safeUrls.length);
+              }}
               aria-label="Imagen anterior"
             >
               ‹
@@ -62,7 +82,10 @@ export function CrudEntityMediaCarousel({
             <button
               type="button"
               className="crud-entity-media-carousel__nav crud-entity-media-carousel__nav--next"
-              onClick={() => setIndex((current) => (current + 1) % safeUrls.length)}
+              onClick={(event) => {
+                bubbleGuard(event);
+                setIndex((current) => (current + 1) % safeUrls.length);
+              }}
               aria-label="Imagen siguiente"
             >
               ›
@@ -84,7 +107,10 @@ export function CrudEntityMediaCarousel({
                   thumbIndex === activeIndex && 'crud-entity-media-carousel__thumb--active',
                 )}
                 aria-selected={thumbIndex === activeIndex}
-                onClick={() => setIndex(thumbIndex)}
+                onClick={(event) => {
+                  bubbleGuard(event);
+                  setIndex(thumbIndex);
+                }}
               >
                 {renderThumbSlide(url)}
               </button>

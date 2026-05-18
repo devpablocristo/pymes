@@ -17,8 +17,9 @@ type CreateSaleRequest struct {
 	QuoteID       *string           `json:"quote_id"`
 	PaymentMethod string            `json:"payment_method"`
 	Items         []SaleItemPayload `json:"items" binding:"required"`
-	Notes         string            `json:"notes"`
+	IsFavorite    *bool             `json:"is_favorite"`
 	Tags          []string          `json:"tags,omitempty"`
+	Notes         string            `json:"notes"`
 	Metadata      map[string]any    `json:"metadata,omitempty"`
 }
 
@@ -30,6 +31,16 @@ type PatchSaleRequest struct {
 	PaymentMethod *string         `json:"payment_method"`
 	CustomerName  *string         `json:"customer_name"`
 	BranchID      *string         `json:"branch_id"`
+}
+
+type UpdateSaleRequest struct {
+	IsFavorite *bool     `json:"is_favorite"`
+	Tags       *[]string `json:"tags"`
+	Notes      *string   `json:"notes"`
+}
+
+type UpdateSaleStatusRequest struct {
+	Status string `json:"status" binding:"required"`
 }
 
 type SaleItemResponse struct {
@@ -48,7 +59,7 @@ type SaleItemResponse struct {
 
 type SaleResponse struct {
 	ID            string             `json:"id"`
-	OrgID         string             `json:"org_id"`
+	OrgID      string             `json:"org_id"`
 	BranchID      string             `json:"branch_id,omitempty"`
 	Number        string             `json:"number"`
 	CustomerID    string             `json:"customer_id,omitempty"`
@@ -61,10 +72,11 @@ type SaleResponse struct {
 	TaxTotal      float64            `json:"tax_total"`
 	Total         float64            `json:"total"`
 	Currency      string             `json:"currency"`
+	IsFavorite    bool               `json:"is_favorite"`
+	Tags          []string           `json:"tags,omitempty"`
 	Notes         string             `json:"notes"`
 	CreatedBy     string             `json:"created_by"`
 	CreatedAt     string             `json:"created_at"`
-	Tags          []string           `json:"tags,omitempty"`
 	Metadata      map[string]any     `json:"metadata,omitempty"`
 }
 

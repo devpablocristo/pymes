@@ -3,7 +3,7 @@
 
 DO $$
 DECLARE
-    v_org uuid := '__SEED_ORG_ID__';
+    v_tenant uuid := '__SEED_TENANT_ID__';
 
     r_admin uuid;
     r_seller uuid;
@@ -15,26 +15,26 @@ DECLARE
     pl_wholesale uuid;
     pl_vip uuid;
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_tenant) THEN
         RETURN;
     END IF;
 
-    r_admin := uuid_generate_v5(v_org, 'pymes-seed/v1/role/admin');
-    r_seller := uuid_generate_v5(v_org, 'pymes-seed/v1/role/vendedor');
-    r_cashier := uuid_generate_v5(v_org, 'pymes-seed/v1/role/cajero');
-    r_accountant := uuid_generate_v5(v_org, 'pymes-seed/v1/role/contador');
-    r_warehouse := uuid_generate_v5(v_org, 'pymes-seed/v1/role/almacenero');
-    pl_default := uuid_generate_v5(v_org, 'pymes-seed/v1/price-list/default');
-    pl_wholesale := uuid_generate_v5(v_org, 'pymes-seed/v1/price-list/wholesale');
-    pl_vip := uuid_generate_v5(v_org, 'pymes-seed/v1/price-list/vip');
+    r_admin := uuid_generate_v5(v_tenant, 'pymes-seed/v1/role/admin');
+    r_seller := uuid_generate_v5(v_tenant, 'pymes-seed/v1/role/vendedor');
+    r_cashier := uuid_generate_v5(v_tenant, 'pymes-seed/v1/role/cajero');
+    r_accountant := uuid_generate_v5(v_tenant, 'pymes-seed/v1/role/contador');
+    r_warehouse := uuid_generate_v5(v_tenant, 'pymes-seed/v1/role/almacenero');
+    pl_default := uuid_generate_v5(v_tenant, 'pymes-seed/v1/price-list/default');
+    pl_wholesale := uuid_generate_v5(v_tenant, 'pymes-seed/v1/price-list/wholesale');
+    pl_vip := uuid_generate_v5(v_tenant, 'pymes-seed/v1/price-list/vip');
 
     INSERT INTO roles (id, org_id, name, description, is_system)
     VALUES
-        (r_admin, v_org, 'admin', 'Full access', true),
-        (r_seller, v_org, 'seller', 'Sales and commercial management', true),
-        (r_cashier, v_org, 'cashier', 'Payments and cash register', true),
-        (r_accountant, v_org, 'accountant', 'Reports and accounting', true),
-        (r_warehouse, v_org, 'warehouse', 'Inventory and products', true)
+        (r_admin, v_tenant, 'admin', 'Full access', true),
+        (r_seller, v_tenant, 'seller', 'Sales and commercial management', true),
+        (r_cashier, v_tenant, 'cashier', 'Payments and cash register', true),
+        (r_accountant, v_tenant, 'accountant', 'Reports and accounting', true),
+        (r_warehouse, v_tenant, 'warehouse', 'Inventory and products', true)
     ON CONFLICT (id) DO NOTHING;
 
     INSERT INTO role_permissions (id, role_id, resource, action)
@@ -111,21 +111,23 @@ BEGIN
     -- tanto con Clerk (admins vienen de webhooks/onboarding) como con cualquier
     -- otro provisionamiento manual.
     INSERT INTO user_roles (user_id, org_id, role_id, assigned_by)
-    SELECT om.user_id, v_org, r_admin, 'seed'
+    SELECT DISTINCT om.user_id, v_tenant, r_admin, 'seed'
     FROM org_members om
-    WHERE om.org_id = v_org AND om.role IN ('admin', 'owner')
+    WHERE om.org_id = v_tenant
+      AND om.status = 'active'
+      AND om.role IN ('admin', 'owner')
     ON CONFLICT (user_id, org_id) DO UPDATE
         SET role_id = EXCLUDED.role_id,
             assigned_by = EXCLUDED.assigned_by,
             assigned_at = now();
 
     INSERT INTO price_lists (id, org_id, name, description, is_default, markup, is_active)
-    VALUES (pl_default, v_org, 'Retail', 'Default local price list', true, 0, true)
+    VALUES (pl_default, v_tenant, 'Retail', 'Default local price list', true, 0, true)
     ON CONFLICT (id) DO NOTHING;
 
     INSERT INTO price_lists (id, org_id, name, description, is_default, markup, is_active)
     VALUES
-        (pl_wholesale, v_org, 'Mayorista', 'Lista demo mayorista', false, -5, true),
-        (pl_vip, v_org, 'VIP', 'Lista demo clientes VIP', false, -10, true)
+        (pl_wholesale, v_tenant, 'Mayorista', 'Lista demo mayorista', false, -5, true),
+        (pl_vip, v_tenant, 'VIP', 'Lista demo clientes VIP', false, -10, true)
     ON CONFLICT (id) DO NOTHING;
 END $$;

@@ -8,7 +8,7 @@ import (
 
 type Session struct {
 	ID              uuid.UUID
-	OrgID           uuid.UUID
+	OrgID        uuid.UUID
 	BookingID       uuid.UUID
 	ProfileID       uuid.UUID
 	CustomerPartyID *uuid.UUID
@@ -20,11 +20,12 @@ type Session struct {
 	Metadata        map[string]any
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	DeletedAt       *time.Time
 }
 
 type SessionNote struct {
 	ID        uuid.UUID
-	OrgID     uuid.UUID
+	OrgID  uuid.UUID
 	SessionID uuid.UUID
 	NoteType  string
 	Title     string

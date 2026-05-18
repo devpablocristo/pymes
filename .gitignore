@@ -33,6 +33,7 @@ pnpm-debug.log*
 .deps/
 frontend/.deps/
 .firebase/
+**/e2e-real/.auth/
 
 # pymes-app (Expo)
 pymes-app/.expo/
@@ -47,3 +48,7 @@ pymes-app/android/app/build/
 !**/migrations/**/*.sql
 !**/seeds/*.sql
 *_productos.csv
+
+# Trabajo externo del diseñador (fork visual sobre main vieja). Source of
+# truth visual parcial — ver plan UI migration. NO debe commitearse al repo.
+wooko.com/

@@ -38,12 +38,28 @@ func (s *stubSessionsUsecases) GetByID(_ context.Context, _, _ uuid.UUID) (domai
 	return domain.Session{}, nil
 }
 
+func (s *stubSessionsUsecases) Update(_ context.Context, _, _ uuid.UUID, _ UpdateInput, _ string) (domain.Session, error) {
+	return domain.Session{}, nil
+}
+
 func (s *stubSessionsUsecases) Complete(_ context.Context, _, _ uuid.UUID, _ string) (domain.Session, error) {
 	return domain.Session{}, nil
 }
 
 func (s *stubSessionsUsecases) CreateNote(_ context.Context, _, _ uuid.UUID, _, _, _, _ string) (domain.SessionNote, error) {
 	return domain.SessionNote{}, nil
+}
+
+func (s *stubSessionsUsecases) Archive(_ context.Context, _, _ uuid.UUID, _ string) error {
+	return nil
+}
+
+func (s *stubSessionsUsecases) Restore(_ context.Context, _, _ uuid.UUID, _ string) error {
+	return nil
+}
+
+func (s *stubSessionsUsecases) Delete(_ context.Context, _, _ uuid.UUID, _ string) error {
+	return nil
 }
 
 func TestCreateUsesServiceIDContract(t *testing.T) {
@@ -88,7 +104,7 @@ func TestCreateUsesServiceIDContract(t *testing.T) {
 
 func testVerticalAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Set(ctxkeys.CtxKeyOrgID, "00000000-0000-0000-0000-000000000001")
+		c.Set(ctxkeys.CtxKeyTenantID, "00000000-0000-0000-0000-000000000001")
 		c.Set(ctxkeys.CtxKeyActor, "tester")
 		c.Next()
 	}

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CrudPageConfig } from '../components/CrudPage';
@@ -30,7 +30,7 @@ describe('inventory configured section shell', () => {
     loadLazyCrudPageConfigMock.mockResolvedValue(buildInventoryConfig());
   });
 
-  it('keeps only the view tabs in the section band even on configure route', async () => {
+  it('hides the parent view tabs on configure route', async () => {
     render(
       <MemoryRouter
         initialEntries={['/modules/inventory/configure']}
@@ -65,9 +65,6 @@ describe('inventory configured section shell', () => {
     );
 
     expect(await screen.findByText('configure-screen')).toBeInTheDocument();
-    const tabs = await screen.findByRole('navigation', { name: 'Vistas de inventario' });
-    expect(await within(tabs).findByRole('link', { name: 'Lista' })).toBeInTheDocument();
-    expect(within(tabs).getByRole('link', { name: 'Galería' })).toBeInTheDocument();
-    expect(within(tabs).getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Vistas de inventario' })).not.toBeInTheDocument();
   });
 });

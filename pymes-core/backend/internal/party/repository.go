@@ -24,7 +24,7 @@ type Repository struct {
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 type ListParams struct {
-	OrgID     uuid.UUID
+	OrgID  uuid.UUID
 	Limit     int
 	After     *uuid.UUID
 	Search    string
@@ -91,7 +91,7 @@ func (r *Repository) Create(ctx context.Context, in partydomain.Party) (partydom
 		meta, _ := json.Marshal(defaultMap(in.Metadata))
 		row := models.PartyModel{
 			ID:          uuid.New(),
-			OrgID:       in.OrgID,
+			OrgID:    in.OrgID,
 			PartyType:   strings.TrimSpace(in.PartyType),
 			DisplayName: strings.TrimSpace(in.DisplayName),
 			Email:       strings.TrimSpace(in.Email),
@@ -99,6 +99,7 @@ func (r *Repository) Create(ctx context.Context, in partydomain.Party) (partydom
 			Address:     addr,
 			TaxID:       strings.TrimSpace(in.TaxID),
 			Notes:       strings.TrimSpace(in.Notes),
+			IsFavorite:  in.IsFavorite,
 			Tags:        pq.StringArray(utils.NormalizeTags(in.Tags)),
 			Metadata:    meta,
 			CreatedAt:   time.Now().UTC(),
@@ -147,6 +148,7 @@ func (r *Repository) Update(ctx context.Context, in partydomain.Party) (partydom
 				"address":      addr,
 				"tax_id":       strings.TrimSpace(in.TaxID),
 				"notes":        strings.TrimSpace(in.Notes),
+				"is_favorite":  in.IsFavorite,
 				"tags":         pq.StringArray(utils.NormalizeTags(in.Tags)),
 				"metadata":     meta,
 				"updated_at":   time.Now().UTC(),
@@ -233,7 +235,7 @@ func (r *Repository) CreateRelationship(ctx context.Context, in partydomain.Part
 	meta, _ := json.Marshal(defaultMap(in.Metadata))
 	row := models.PartyRelationshipModel{
 		ID:               uuid.New(),
-		OrgID:            in.OrgID,
+		OrgID:         in.OrgID,
 		FromPartyID:      in.FromPartyID,
 		ToPartyID:        in.ToPartyID,
 		RelationshipType: strings.TrimSpace(in.RelationshipType),
@@ -287,7 +289,7 @@ func hydrateWithTx(ctx context.Context, tx *gorm.DB, rows []models.PartyModel) (
 	if err != nil {
 		return nil, err
 	}
-	orgs, err := loadOrganizations(ctx, tx, ids)
+	tenants, err := loadOrganizations(ctx, tx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +299,7 @@ func hydrateWithTx(ctx context.Context, tx *gorm.DB, rows []models.PartyModel) (
 	}
 	out := make([]partydomain.Party, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, toDomain(row, roles[row.ID], persons[row.ID], orgs[row.ID], agents[row.ID]))
+		out = append(out, toDomain(row, roles[row.ID], persons[row.ID], tenants[row.ID], agents[row.ID]))
 	}
 	return out, nil
 }
@@ -316,7 +318,7 @@ func loadRoles(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, ids []uuid.UUI
 		out[row.PartyID] = append(out[row.PartyID], partydomain.PartyRole{
 			ID:          row.ID,
 			PartyID:     row.PartyID,
-			OrgID:       row.OrgID,
+			OrgID:    row.OrgID,
 			Role:        row.Role,
 			IsActive:    row.IsActive,
 			PriceListID: row.PriceListID,
@@ -419,7 +421,7 @@ func createRoleWithTx(ctx context.Context, tx *gorm.DB, orgID, partyID uuid.UUID
 	row := models.PartyRoleModel{
 		ID:          uuid.New(),
 		PartyID:     partyID,
-		OrgID:       orgID,
+		OrgID:    orgID,
 		Role:        strings.TrimSpace(in.Role),
 		IsActive:    true,
 		PriceListID: in.PriceListID,
@@ -443,7 +445,7 @@ func relationshipRowsToDomain(rows []models.PartyRelationshipModel) []partydomai
 		}
 		out = append(out, partydomain.PartyRelationship{
 			ID:               row.ID,
-			OrgID:            row.OrgID,
+			OrgID:         row.OrgID,
 			FromPartyID:      row.FromPartyID,
 			ToPartyID:        row.ToPartyID,
 			RelationshipType: row.RelationshipType,
@@ -468,7 +470,7 @@ func toDomain(row models.PartyModel, roles []partydomain.PartyRole, person *part
 	}
 	return partydomain.Party{
 		ID:           row.ID,
-		OrgID:        row.OrgID,
+		OrgID:     row.OrgID,
 		PartyType:    row.PartyType,
 		DisplayName:  row.DisplayName,
 		Email:        row.Email,
@@ -476,6 +478,7 @@ func toDomain(row models.PartyModel, roles []partydomain.PartyRole, person *part
 		Address:      addr,
 		TaxID:        row.TaxID,
 		Notes:        row.Notes,
+		IsFavorite:   row.IsFavorite,
 		Tags:         append([]string(nil), row.Tags...),
 		Metadata:     meta,
 		CreatedAt:    row.CreatedAt,

@@ -20,12 +20,13 @@ type Config struct {
 	JWKSURL                          string
 	JWTIssuer                        string
 	JWTAudience                      string
-	JWTOrgClaim                      string
+	JWTTenantClaim                   string
 	JWTRoleClaim                     string
 	JWTScopesClaim                   string
 	JWTActorClaim                    string
 	AuthEnableJWT                    bool
 	AuthAllowAPIKey                  bool
+	ClerkSecretKey                   string
 	ClerkWebhookSecret               string
 	StripeSecretKey                  string
 	StripeWebhookSecret              string
@@ -48,8 +49,8 @@ type Config struct {
 	ExchangeRateProvider             string
 	InternalServiceToken             string
 	AIServiceURL                     string
-	ReviewCallbackToken              string
-	ReviewSyncInterval               time.Duration
+	GovernanceCallbackToken          string
+	GovernanceSyncInterval           time.Duration
 	WhatsAppWebhookVerifyToken       string
 	WhatsAppAppSecret                string
 	WhatsAppGraphAPIBaseURL          string
@@ -76,17 +77,18 @@ func LoadFromEnv() Config {
 		JWKSURL:                          envconfig.Get("JWKS_URL", ""),
 		JWTIssuer:                        envconfig.Get("JWT_ISSUER", ""),
 		JWTAudience:                      envconfig.Get("JWT_AUDIENCE", ""),
-		JWTOrgClaim:                      envconfig.Get("JWT_ORG_CLAIM", ""),
+		JWTTenantClaim:                   envconfig.Get("JWT_TENANT_CLAIM", ""),
 		JWTRoleClaim:                     envconfig.Get("JWT_ROLE_CLAIM", ""),
 		JWTScopesClaim:                   envconfig.Get("JWT_SCOPES_CLAIM", ""),
 		JWTActorClaim:                    envconfig.Get("JWT_ACTOR_CLAIM", ""),
 		AuthEnableJWT:                    envconfig.Bool("AUTH_ENABLE_JWT", true),
 		AuthAllowAPIKey:                  envconfig.Bool("AUTH_ALLOW_API_KEY", true),
+		ClerkSecretKey:                   envconfig.Get("CLERK_SECRET_KEY", ""),
 		ClerkWebhookSecret:               envconfig.Get("CLERK_WEBHOOK_SECRET", ""),
 		StripeSecretKey:                  envconfig.Get("STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret:              envconfig.Get("STRIPE_WEBHOOK_SECRET", ""),
 		NotificationBackend:              envconfig.Get("NOTIFICATION_BACKEND", "noop"),
-		FrontendURL:                      envconfig.Get("FRONTEND_URL", "http://localhost:5173"),
+		FrontendURL:                      envconfig.Get("FRONTEND_URL", "http://localhost:5180"),
 		PublicBaseURL:                    envconfig.Get("PUBLIC_BASE_URL", "http://localhost:8080"),
 		AWSRegion:                        envconfig.Get("AWS_REGION", "us-east-1"),
 		AWSSesFromEmail:                  envconfig.Get("AWS_SES_FROM_EMAIL", ""),
@@ -103,9 +105,13 @@ func LoadFromEnv() Config {
 		SchedulerSecret:                  envconfig.Get("SCHEDULER_SECRET", ""),
 		ExchangeRateProvider:             envconfig.Get("EXCHANGE_RATE_PROVIDER", "manual"),
 		InternalServiceToken:             strings.TrimSpace(envconfig.Get("INTERNAL_SERVICE_TOKEN", localInternalServiceToken)),
-		AIServiceURL:                     envconfig.Get("AI_SERVICE_URL", "http://ai:8000"),
-		ReviewCallbackToken:              strings.TrimSpace(envconfig.Get("REVIEW_CALLBACK_TOKEN", "")),
-		ReviewSyncInterval:               envconfig.Duration("REVIEW_SYNC_INTERVAL_SECONDS", 30*time.Second),
+		// AI_SERVICE_URL apuntaba a pymes-ai (decomisionado, modular-swinging-hummingbird Fase 4).
+		// Default vacío → AIClient.ProcessWhatsApp devuelve "ai service url not configured".
+		// TODO: cuando Companion exponga /v1/internal/customer-messaging/inbound (equivalente
+		// del endpoint que tenía pymes-ai), repointear AI_SERVICE_URL al base URL de Companion.
+		AIServiceURL: envconfig.Get("AI_SERVICE_URL", ""),
+		GovernanceCallbackToken:          envconfig.Get("GOVERNANCE_CALLBACK_TOKEN", ""),
+		GovernanceSyncInterval:           envconfig.Duration("GOVERNANCE_SYNC_INTERVAL_SECONDS", 30*time.Second),
 		WhatsAppWebhookVerifyToken:       envconfig.Get("WHATSAPP_WEBHOOK_VERIFY_TOKEN", ""),
 		WhatsAppAppSecret:                envconfig.Get("WHATSAPP_APP_SECRET", ""),
 		WhatsAppGraphAPIBaseURL:          envconfig.Get("WHATSAPP_GRAPH_API_BASE_URL", "https://graph.facebook.com/v23.0"),

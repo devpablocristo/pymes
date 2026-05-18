@@ -34,7 +34,7 @@ func (h *Handler) List(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -50,25 +50,25 @@ func (h *Handler) Upsert(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	var req dto.CreateExchangeRateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	rateDate := time.Now().UTC()
 	if strings.TrimSpace(req.RateDate) != "" {
 		parsed, err := time.Parse("2006-01-02", strings.TrimSpace(req.RateDate))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid rate_date"})
+			handlers.WriteValidation(c, "invalid rate_date")
 			return
 		}
 		rateDate = parsed.UTC()
 	}
 	out, err := h.uc.Upsert(c.Request.Context(), currencydomain.ExchangeRate{
-		OrgID:        orgID,
+		OrgID:     orgID,
 		FromCurrency: strings.ToUpper(strings.TrimSpace(req.FromCurrency)),
 		ToCurrency:   strings.ToUpper(strings.TrimSpace(req.ToCurrency)),
 		RateType:     strings.ToLower(strings.TrimSpace(req.RateType)),

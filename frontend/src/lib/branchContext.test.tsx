@@ -19,7 +19,7 @@ vi.mock('./api', () => ({
 function buildBranch(id: string, name: string, active = true): Branch {
   return {
     id,
-    org_id: 'org-1',
+    org_id: 'tenant-1',
     code: id,
     name,
     timezone: 'America/Argentina/Tucuman',
@@ -51,9 +51,8 @@ describe('BranchProvider', () => {
     apiMocks.getSession.mockReset();
     apiMocks.getSession.mockResolvedValue({
       auth: {
-        org_id: 'org-1',
-        org_name: 'Org Demo',
-        tenant_id: 'org-1',
+        org_id: 'tenant-1',
+        tenant_name: 'Tenant Demo',
         role: 'admin',
         product_role: 'admin',
         scopes: [],
@@ -63,8 +62,8 @@ describe('BranchProvider', () => {
     });
   });
 
-  it('rehydrates the stored branch selection for the current org', async () => {
-    window.localStorage.setItem('pymes-ui:branch-selection:org-1', 'branch-b');
+  it('rehydrates the stored branch selection for the current tenant', async () => {
+    window.localStorage.setItem('pymes-ui:branch-selection:tenant-1', 'branch-b');
     apiMocks.apiRequest.mockResolvedValue({
       items: [buildBranch('branch-a', 'Casa Central'), buildBranch('branch-b', 'Sucursal Norte')],
     });
@@ -119,6 +118,6 @@ describe('BranchProvider', () => {
     await waitFor(() => {
       expect(screen.getByTestId('selected-branch')).toHaveTextContent('branch-b');
     });
-    expect(window.localStorage.getItem('pymes-ui:branch-selection:org-1')).toBe('branch-b');
+    expect(window.localStorage.getItem('pymes-ui:branch-selection:tenant-1')).toBe('branch-b');
   });
 });

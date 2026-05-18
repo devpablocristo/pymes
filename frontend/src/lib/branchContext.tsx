@@ -13,25 +13,28 @@ import {
   writeStoredBranchId,
 } from './branchSelectionStorage';
 import { BranchContext, type BranchContextValue } from './branchSelectionContext';
-import { queryKeys } from './queryKeys';
+import { queryKeys, tenantKey } from './queryKeys';
+import { useOptionalTenantAccess } from './tenantAccessContext';
 
 const schedulingClient = createSchedulingClient(apiRequest);
 const EMPTY_BRANCHES: Branch[] = [];
 
 export function BranchProvider({ children }: PropsWithChildren) {
+  const tenantAccess = useOptionalTenantAccess();
   const sessionQuery = useQuery({
-    queryKey: queryKeys.session.current,
-    queryFn: getSession,
+    queryKey: tenantAccess ? tenantKey(tenantAccess.tenantId, queryKeys.session.current) : queryKeys.session.current,
+    queryFn: () => getSession(),
+    enabled: !tenantAccess,
     staleTime: 60_000,
     retry: 1,
   });
 
-  const orgId = sessionQuery.data?.auth.org_id ?? null;
+  const tenantId = tenantAccess?.tenantId ?? sessionQuery.data?.auth.org_id ?? null;
 
   const branchesQuery = useQuery<Branch[]>({
-    queryKey: queryKeys.scheduling.branches,
+    queryKey: tenantId ? tenantKey(tenantId, queryKeys.scheduling.branches) : queryKeys.scheduling.branches,
     queryFn: () => schedulingClient.listBranches(),
-    enabled: Boolean(orgId),
+    enabled: Boolean(tenantId),
     staleTime: 60_000,
     retry: 1,
   });
@@ -46,15 +49,15 @@ export function BranchProvider({ children }: PropsWithChildren) {
   const [selectionHydrated, setSelectionHydrated] = useState(false);
 
   useEffect(() => {
-    if (!orgId) {
+    if (!tenantId) {
       setStoredBranchId(null);
       setSelectionHydrated(false);
       writeActiveBranchId(null);
       return;
     }
-    setStoredBranchId(readStoredBranchId(orgId));
+    setStoredBranchId(readStoredBranchId(tenantId));
     setSelectionHydrated(true);
-  }, [orgId]);
+  }, [tenantId]);
 
   const selectedBranchId = useMemo(() => {
     if (!selectionHydrated) {
@@ -70,11 +73,11 @@ export function BranchProvider({ children }: PropsWithChildren) {
   }, [availableBranches, selectionHydrated, storedBranchId]);
 
   useEffect(() => {
-    if (!orgId || !selectionHydrated) {
+    if (!tenantId || !selectionHydrated) {
       return;
     }
-    writeStoredBranchId(orgId, selectedBranchId);
-  }, [orgId, selectedBranchId, selectionHydrated]);
+    writeStoredBranchId(tenantId, selectedBranchId);
+  }, [tenantId, selectedBranchId, selectionHydrated]);
 
   useEffect(() => {
     if (!selectionHydrated) {
@@ -90,16 +93,16 @@ export function BranchProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<BranchContextValue>(
     () => ({
-      orgId,
+      tenantId,
       branches,
       availableBranches,
       selectedBranchId,
       selectedBranch,
       isLoading:
-        sessionQuery.isLoading ||
+        (!tenantAccess && sessionQuery.isLoading) ||
         branchesQuery.isLoading ||
-        (Boolean(orgId) && !selectionHydrated),
-      isError: sessionQuery.isError || branchesQuery.isError,
+        (Boolean(tenantId) && !selectionHydrated),
+      isError: (!tenantAccess && sessionQuery.isError) || branchesQuery.isError,
       error: (sessionQuery.error as Error | null) ?? (branchesQuery.error as Error | null) ?? null,
       setSelectedBranchId: setStoredBranchId,
     }),
@@ -109,7 +112,8 @@ export function BranchProvider({ children }: PropsWithChildren) {
       branchesQuery.error,
       branchesQuery.isError,
       branchesQuery.isLoading,
-      orgId,
+      tenantAccess,
+      tenantId,
       selectedBranch,
       selectedBranchId,
       selectionHydrated,

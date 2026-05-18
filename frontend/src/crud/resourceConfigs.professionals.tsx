@@ -10,7 +10,6 @@ const professionalsConfig = createProfessionalsCrudConfig();
 
 export const { ConfiguredCrudPage, hasCrudResource, getCrudPageConfig } = defineCrudDomain({
   professionals: professionalsConfig,
-  teachers: professionalsConfig,
   specialties: createSpecialtiesCrudConfig(),
   intakes: createIntakesCrudConfig(),
   sessions: createSessionsCrudConfig(),

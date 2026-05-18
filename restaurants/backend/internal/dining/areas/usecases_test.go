@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -15,7 +16,7 @@ import (
 // --- fakes ---
 
 type fakeRepo struct {
-	areas   map[uuid.UUID]domain.DiningArea
+	areas    map[uuid.UUID]domain.DiningArea
 	createFn func(ctx context.Context, in domain.DiningArea) (domain.DiningArea, error)
 }
 
@@ -53,6 +54,38 @@ func (r *fakeRepo) Update(_ context.Context, in domain.DiningArea) (domain.Dinin
 	return in, nil
 }
 
+func (r *fakeRepo) Archive(_ context.Context, orgID, id uuid.UUID) error {
+	a, ok := r.areas[id]
+	if !ok || a.OrgID != orgID {
+		return gorm.ErrRecordNotFound
+	}
+	if a.DeletedAt == nil {
+		now := time.Now().UTC()
+		a.DeletedAt = &now
+		r.areas[id] = a
+	}
+	return nil
+}
+
+func (r *fakeRepo) Restore(_ context.Context, orgID, id uuid.UUID) error {
+	a, ok := r.areas[id]
+	if !ok || a.OrgID != orgID {
+		return gorm.ErrRecordNotFound
+	}
+	a.DeletedAt = nil
+	r.areas[id] = a
+	return nil
+}
+
+func (r *fakeRepo) Delete(_ context.Context, orgID, id uuid.UUID) error {
+	a, ok := r.areas[id]
+	if !ok || a.OrgID != orgID || a.DeletedAt == nil {
+		return gorm.ErrRecordNotFound
+	}
+	delete(r.areas, id)
+	return nil
+}
+
 type fakeAudit struct {
 	calls int
 }
@@ -72,7 +105,7 @@ func TestCreateHappyPath(t *testing.T) {
 	orgID := uuid.New()
 	out, err := uc.Create(context.Background(), domain.DiningArea{
 		OrgID: orgID,
-		Name:  "Terraza",
+		Name:     "Terraza",
 	}, "user-1")
 
 	if err != nil {
@@ -95,7 +128,7 @@ func TestCreateNameTooShort(t *testing.T) {
 
 	_, err := uc.Create(context.Background(), domain.DiningArea{
 		OrgID: uuid.New(),
-		Name:  "A",
+		Name:     "A",
 	}, "user-1")
 
 	if err == nil {
@@ -113,7 +146,7 @@ func TestCreateTrimsWhitespace(t *testing.T) {
 
 	out, err := uc.Create(context.Background(), domain.DiningArea{
 		OrgID: uuid.New(),
-		Name:  "  Terraza  ",
+		Name:     "  Terraza  ",
 	}, "user-1")
 
 	if err != nil {
@@ -237,5 +270,41 @@ func TestListReturnsItems(t *testing.T) {
 	}
 	if len(items) != 2 {
 		t.Errorf("expected 2 items, got %d", len(items))
+	}
+}
+
+func TestArchiveRestoreAndDelete(t *testing.T) {
+	t.Parallel()
+	repo := newFakeRepo()
+	audit := &fakeAudit{}
+	uc := NewUsecases(repo, audit)
+
+	orgID := uuid.New()
+	id := uuid.New()
+	repo.areas[id] = domain.DiningArea{ID: id, OrgID: orgID, Name: "Barra"}
+
+	if err := uc.Archive(context.Background(), orgID, id, "user-1"); err != nil {
+		t.Fatalf("archive: %v", err)
+	}
+	if repo.areas[id].DeletedAt == nil {
+		t.Fatal("expected archived area to have DeletedAt")
+	}
+	if err := uc.Restore(context.Background(), orgID, id, "user-1"); err != nil {
+		t.Fatalf("restore: %v", err)
+	}
+	if repo.areas[id].DeletedAt != nil {
+		t.Fatal("expected restored area to clear DeletedAt")
+	}
+	if err := uc.Archive(context.Background(), orgID, id, "user-1"); err != nil {
+		t.Fatalf("archive before delete: %v", err)
+	}
+	if err := uc.Delete(context.Background(), orgID, id, "user-1"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if _, ok := repo.areas[id]; ok {
+		t.Fatal("expected hard deleted area to be removed")
+	}
+	if audit.calls != 4 {
+		t.Errorf("expected 4 audit calls, got %d", audit.calls)
 	}
 }

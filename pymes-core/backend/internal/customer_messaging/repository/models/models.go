@@ -8,7 +8,7 @@ import (
 )
 
 type WhatsAppConnection struct {
-	OrgID              uuid.UUID  `gorm:"column:org_id;primaryKey"`
+	OrgID           uuid.UUID  `gorm:"column:org_id;primaryKey"`
 	PhoneNumberID      string     `gorm:"column:phone_number_id"`
 	WABAID             string     `gorm:"column:waba_id"`
 	AccessTokenEncrypt string     `gorm:"column:access_token_encrypted"`
@@ -26,7 +26,7 @@ func (WhatsAppConnection) TableName() string { return "whatsapp_connections" }
 
 type WhatsAppMessage struct {
 	ID               uuid.UUID      `gorm:"column:id;primaryKey"`
-	OrgID            uuid.UUID      `gorm:"column:org_id"`
+	OrgID         uuid.UUID      `gorm:"column:org_id"`
 	PhoneNumberID    string         `gorm:"column:phone_number_id"`
 	Direction        string         `gorm:"column:direction"`
 	WAMessageID      string         `gorm:"column:wa_message_id"`
@@ -55,7 +55,7 @@ func (WhatsAppMessage) TableName() string { return "whatsapp_messages" }
 
 type WhatsAppConversation struct {
 	ID                 uuid.UUID  `gorm:"column:id;primaryKey"`
-	OrgID              uuid.UUID  `gorm:"column:org_id"`
+	OrgID           uuid.UUID  `gorm:"column:org_id"`
 	PartyID            uuid.UUID  `gorm:"column:party_id"`
 	Phone              string     `gorm:"column:phone"`
 	PartyName          string     `gorm:"column:party_name"`
@@ -72,7 +72,7 @@ func (WhatsAppConversation) TableName() string { return "whatsapp_conversations"
 
 type WhatsAppTemplate struct {
 	ID              uuid.UUID      `gorm:"column:id;primaryKey"`
-	OrgID           uuid.UUID      `gorm:"column:org_id"`
+	OrgID        uuid.UUID      `gorm:"column:org_id"`
 	MetaTemplateID  string         `gorm:"column:meta_template_id"`
 	Name            string         `gorm:"column:name"`
 	Language        string         `gorm:"column:language"`
@@ -93,7 +93,7 @@ func (WhatsAppTemplate) TableName() string { return "whatsapp_templates" }
 
 type WhatsAppOptIn struct {
 	ID         uuid.UUID  `gorm:"column:id;primaryKey"`
-	OrgID      uuid.UUID  `gorm:"column:org_id"`
+	OrgID   uuid.UUID  `gorm:"column:org_id"`
 	PartyID    uuid.UUID  `gorm:"column:party_id"`
 	Phone      string     `gorm:"column:phone"`
 	Status     string     `gorm:"column:status"`
@@ -107,7 +107,7 @@ func (WhatsAppOptIn) TableName() string { return "whatsapp_opt_ins" }
 
 type WhatsAppCampaign struct {
 	ID               uuid.UUID      `gorm:"column:id;primaryKey"`
-	OrgID            uuid.UUID      `gorm:"column:org_id"`
+	OrgID         uuid.UUID      `gorm:"column:org_id"`
 	Name             string         `gorm:"column:name"`
 	TemplateName     string         `gorm:"column:template_name"`
 	TemplateLanguage string         `gorm:"column:template_language"`
@@ -132,7 +132,7 @@ func (WhatsAppCampaign) TableName() string { return "whatsapp_campaigns" }
 type WhatsAppCampaignRecipient struct {
 	ID           uuid.UUID  `gorm:"column:id;primaryKey"`
 	CampaignID   uuid.UUID  `gorm:"column:campaign_id"`
-	OrgID        uuid.UUID  `gorm:"column:org_id"`
+	OrgID     uuid.UUID  `gorm:"column:org_id"`
 	PartyID      uuid.UUID  `gorm:"column:party_id"`
 	Phone        string     `gorm:"column:phone"`
 	PartyName    string     `gorm:"column:party_name"`

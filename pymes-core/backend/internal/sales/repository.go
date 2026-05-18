@@ -105,7 +105,7 @@ type CreateItemInput struct {
 }
 
 type CreateInput struct {
-	OrgID         uuid.UUID
+	OrgID      uuid.UUID
 	BranchID      *uuid.UUID
 	CustomerID    *uuid.UUID
 	CustomerName  string
@@ -115,11 +115,20 @@ type CreateInput struct {
 	TaxTotal      float64
 	Total         float64
 	Currency      string
+	IsFavorite    bool
+	Tags          []string
 	Notes         string
 	CreatedBy     string
-	Tags          []string
 	Metadata      map[string]any
 	Items         []CreateItemInput
+}
+
+type UpdateInput struct {
+	OrgID   uuid.UUID
+	ID         uuid.UUID
+	IsFavorite *bool
+	Tags       *[]string
+	Notes      *string
 }
 
 func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sale, error) {
@@ -134,7 +143,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sal
 
 		saleRow := models.SaleModel{
 			ID:            uuid.New(),
-			OrgID:         in.OrgID,
+			OrgID:      in.OrgID,
 			BranchID:      in.BranchID,
 			Number:        number,
 			CustomerID:    in.CustomerID,
@@ -146,10 +155,11 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sal
 			TaxTotal:      in.TaxTotal,
 			Total:         in.Total,
 			Currency:      coalesce(in.Currency, tenant.Currency),
+			IsFavorite:    in.IsFavorite,
+			Tags:          pq.StringArray(utils.NormalizeTags(in.Tags)),
 			Notes:         strings.TrimSpace(in.Notes),
 			CreatedBy:     strings.TrimSpace(in.CreatedBy),
 			CreatedAt:     time.Now().UTC(),
-			Tags:          pq.StringArray(utils.NormalizeTags(in.Tags)),
 			Metadata:      metadataToJSONBytesSales(in.Metadata),
 		}
 		if err := tx.Create(&saleRow).Error; err != nil {
@@ -197,7 +207,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sal
 }
 
 type ListParams struct {
-	OrgID         uuid.UUID
+	OrgID      uuid.UUID
 	BranchID      *uuid.UUID
 	Limit         int
 	After         *uuid.UUID
@@ -273,6 +283,48 @@ func (r *Repository) GetByID(ctx context.Context, orgID, saleID uuid.UUID) (sale
 	return saleToDomain(saleRow, itemRows), nil
 }
 
+func (r *Repository) Update(ctx context.Context, in UpdateInput) (saledomain.Sale, error) {
+	updates := map[string]any{}
+	if in.IsFavorite != nil {
+		updates["is_favorite"] = *in.IsFavorite
+	}
+	if in.Tags != nil {
+		updates["tags"] = pq.StringArray(utils.NormalizeTags(*in.Tags))
+	}
+	if in.Notes != nil {
+		updates["notes"] = strings.TrimSpace(*in.Notes)
+	}
+	if len(updates) == 0 {
+		return r.GetByID(ctx, in.OrgID, in.ID)
+	}
+	res := r.db.WithContext(ctx).Model(&models.SaleModel{}).
+		Where("org_id = ? AND id = ?", in.OrgID, in.ID).
+		Updates(updates)
+	if res.Error != nil {
+		return saledomain.Sale{}, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return saledomain.Sale{}, gorm.ErrRecordNotFound
+	}
+	return r.GetByID(ctx, in.OrgID, in.ID)
+}
+
+func (r *Repository) UpdateStatus(ctx context.Context, in UpdateStatusInput) (saledomain.Sale, error) {
+	res := r.db.WithContext(ctx).Model(&models.SaleModel{}).
+		Where("org_id = ? AND id = ?", in.OrgID, in.ID).
+		Updates(map[string]any{
+			"status":     in.Status,
+			"updated_at": gorm.Expr("now()"),
+		})
+	if res.Error != nil {
+		return saledomain.Sale{}, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return saledomain.Sale{}, gorm.ErrRecordNotFound
+	}
+	return r.GetByID(ctx, in.OrgID, in.ID)
+}
+
 func (r *Repository) Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
 	now := time.Now().UTC()
 	res := r.db.WithContext(ctx).Model(&models.SaleModel{}).
@@ -346,7 +398,7 @@ func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx 
 		return tenantBusinessSettings{}, err
 	}
 
-	// Bootstrap tenant settings if missing for legacy/seed orgs.
+	// Bootstrap tenant settings if missing for restored or seeded tenants.
 	if err := tx.WithContext(ctx).Exec(`
 		INSERT INTO tenant_settings (
 			org_id, plan_code, hard_limits, currency, tax_rate, quote_prefix, sale_prefix,
@@ -430,7 +482,7 @@ func saleToDomain(saleRow models.SaleModel, itemRows []models.SaleItemModel) sal
 	}
 	return saledomain.Sale{
 		ID:            saleRow.ID,
-		OrgID:         saleRow.OrgID,
+		OrgID:      saleRow.OrgID,
 		BranchID:      saleRow.BranchID,
 		Number:        saleRow.Number,
 		CustomerID:    saleRow.CustomerID,
@@ -443,11 +495,12 @@ func saleToDomain(saleRow models.SaleModel, itemRows []models.SaleItemModel) sal
 		TaxTotal:      saleRow.TaxTotal,
 		Total:         saleRow.Total,
 		Currency:      saleRow.Currency,
+		IsFavorite:    saleRow.IsFavorite,
+		Tags:          append([]string(nil), saleRow.Tags...),
 		Notes:         saleRow.Notes,
 		CreatedBy:     saleRow.CreatedBy,
 		CreatedAt:     saleRow.CreatedAt,
 		VoidedAt:      saleRow.VoidedAt,
-		Tags:          append([]string(nil), saleRow.Tags...),
 		Metadata:      metadataFromJSONBytesSales(saleRow.Metadata),
 	}
 }

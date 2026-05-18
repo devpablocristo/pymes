@@ -29,7 +29,7 @@ type CandidateRecord = candidatesdomain.Candidate
 
 type CandidateRepository interface {
 	Upsert(ctx context.Context, in CandidateUpsert) (CandidateRecord, bool, error)
-	MarkNotified(ctx context.Context, tenantID, candidateID string, notifiedAt time.Time) error
+	MarkNotified(ctx context.Context, orgID, candidateID string, notifiedAt time.Time) error
 }
 
 type Service struct {
@@ -66,7 +66,7 @@ func (s *Service) NotifySaleCreated(ctx context.Context, sale saledomain.Sale) e
 		len(sale.Items),
 	)
 	return s.recordAndNotify(ctx, candidateInput{
-		orgID:       sale.OrgID,
+		orgID:    sale.OrgID,
 		actor:       sale.CreatedBy,
 		fingerprint: stableID("sale.created", sale.ID.String()),
 		title:       "Venta destacada registrada",
@@ -108,7 +108,7 @@ func (s *Service) NotifyPaymentCreated(ctx context.Context, orgID, saleID uuid.U
 		humanPaymentMethod(payment.Method),
 	)
 	return s.recordAndNotify(ctx, candidateInput{
-		orgID:       orgID,
+		orgID:    orgID,
 		actor:       payment.CreatedBy,
 		fingerprint: stableID("payment.created", payment.ID.String()),
 		title:       "Cobro destacado registrado",
@@ -149,7 +149,7 @@ func (s *Service) NotifyInventoryAdjusted(ctx context.Context, level inventorydo
 		formatNumber(level.MinQuantity),
 	)
 	return s.recordAndNotify(ctx, candidateInput{
-		orgID:       level.OrgID,
+		orgID:    level.OrgID,
 		actor:       actor,
 		fingerprint: bucketedID("inventory.low_stock", level.ProductID.String(), s.config.LowStockDedupWindow, time.Now().UTC()),
 		title:       "Stock crítico tras ajuste",
@@ -181,7 +181,7 @@ func (s *Service) NotifyInventoryAdjusted(ctx context.Context, level inventorydo
 }
 
 type candidateInput struct {
-	orgID       uuid.UUID
+	orgID    uuid.UUID
 	actor       string
 	fingerprint string
 	title       string

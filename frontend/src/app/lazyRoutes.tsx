@@ -21,6 +21,9 @@ export const ModulePage = lazy(() => import('../pages/ModulePage').then((mod) =>
 export const OnboardingPage = lazy(() =>
   import('../pages/OnboardingPage').then((mod) => ({ default: mod.OnboardingPage })),
 );
+export const InviteAcceptPage = lazy(() =>
+  import('../pages/InviteAcceptPage').then((mod) => ({ default: mod.InviteAcceptPage })),
+);
 export const RestaurantTableSessionsPage = lazy(() =>
   import('../pages/RestaurantTableSessionsPage').then((mod) => ({ default: mod.RestaurantTableSessionsPage })),
 );

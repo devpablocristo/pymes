@@ -6,6 +6,6 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescoreops"
 )
 
-func (c *Client) GetParty(ctx context.Context, orgID, partyID string) (map[string]any, error) {
-	return pymescoreops.GetParty(ctx, c.Client, orgID, partyID)
+func (c *Client) GetParty(ctx context.Context, tenantID, partyID string) (map[string]any, error) {
+	return pymescoreops.GetParty(ctx, c.Client, tenantID, partyID)
 }

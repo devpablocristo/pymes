@@ -3,6 +3,9 @@ name: Stack Smoke
 on:
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 concurrency:
   group: pymes-stack-smoke-${{ github.ref }}
   cancel-in-progress: true
@@ -32,9 +35,19 @@ jobs:
           INTERNAL_SERVICE_TOKEN=local-internal-token
           AUTH_ENABLE_JWT=false
           AUTH_ALLOW_API_KEY=true
-          REVIEW_API_KEY=nexus-review-admin-dev-key
-          REVIEW_CALLBACK_TOKEN=local-review-callback-token
+          GOVERNANCE_ADMIN_API_KEY=governance-admin-dev-key
+          GOVERNANCE_API_KEY=governance-admin-dev-key
+          GOVERNANCE_CALLBACK_TOKEN=local-governance-callback-token
+          GOVERNANCE_URL=http://host.docker.internal:18084
           EOF
+
+      - name: Start Nexus governance
+        working-directory: nexus
+        run: |
+          export GOVERNANCE_APPROVAL_PENDING_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback
+          export GOVERNANCE_APPROVAL_RESOLVED_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback,http://host.docker.internal:8200/v1/internal/governance-callback
+          export GOVERNANCE_CALLBACK_TOKEN=local-governance-callback-token
+          docker compose up -d --build governance governance-postgres
 
       - name: Build and start stack
         working-directory: pymes
@@ -44,12 +57,13 @@ jobs:
         working-directory: pymes
         run: |
           for attempt in $(seq 1 60); do
+            gov_status=$(curl -fsS http://127.0.0.1:18084/readyz >/dev/null && echo ok || true)
             cp_status=$(curl -fsS http://127.0.0.1:8100/readyz >/dev/null && echo ok || true)
             prof_status=$(curl -fsS http://127.0.0.1:8181/readyz >/dev/null && echo ok || true)
             work_status=$(curl -fsS http://127.0.0.1:8282/readyz >/dev/null && echo ok || true)
             ai_status=$(curl -fsS http://127.0.0.1:8200/readyz >/dev/null && echo ok || true)
             front_status=$(curl -fsS http://127.0.0.1:5180 >/dev/null && echo ok || true)
-            if [ "$cp_status" = "ok" ] && [ "$prof_status" = "ok" ] && [ "$work_status" = "ok" ] && [ "$ai_status" = "ok" ] && [ "$front_status" = "ok" ]; then
+            if [ "$gov_status" = "ok" ] && [ "$cp_status" = "ok" ] && [ "$prof_status" = "ok" ] && [ "$work_status" = "ok" ] && [ "$ai_status" = "ok" ] && [ "$front_status" = "ok" ]; then
               exit 0
             fi
             sleep 5
@@ -69,11 +83,11 @@ jobs:
           curl -fsS -H 'X-API-KEY: psk_local_admin' -H 'X-USER-ID: 123' http://127.0.0.1:8181/v1/teachers/professionals
           curl -fsS -H 'X-API-KEY: psk_local_admin' -H 'X-USER-ID: 123' http://127.0.0.1:8282/v1/auto-repair/vehicles
 
-      - name: Run review notifications E2E
+      - name: Run governance notifications E2E
         working-directory: pymes
         env:
           CALLBACK_TIMEOUT_SECONDS: "20"
-        run: make e2e-review-notifications
+        run: make e2e-governance-notifications
 
       - name: Print container logs on failure
         if: failure()
@@ -82,5 +96,6 @@ jobs:
 
       - name: Stop stack
         if: always()
-        working-directory: pymes
-        run: docker compose down -v
+        run: |
+          docker compose --project-directory "${{ github.workspace }}/pymes" down -v || true
+          docker compose --project-directory "${{ github.workspace }}/nexus" down -v || true

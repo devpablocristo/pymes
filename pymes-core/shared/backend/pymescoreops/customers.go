@@ -11,9 +11,9 @@ import (
 func ResolveCustomer(ctx context.Context, client *pymescorehttp.Client, orgID, name, phone, email string) (map[string]any, error) {
 	payload := map[string]string{
 		"org_id": orgID,
-		"name":   name,
-		"phone":  phone,
-		"email":  email,
+		"name":      name,
+		"phone":     phone,
+		"email":     email,
 	}
 	result, err := client.Post(ctx, "/v1/internal/v1/customers/resolve", orgID, payload)
 	if err != nil {

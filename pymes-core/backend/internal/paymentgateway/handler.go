@@ -15,6 +15,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway/handler/dto"
 	gatewaydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type gatewayUsecases interface {
@@ -26,7 +27,7 @@ type gatewayUsecases interface {
 	CreatePreference(ctx context.Context, orgID uuid.UUID, req CreatePreferenceRequest) (gatewaydomain.PaymentPreference, error)
 	GetPreference(ctx context.Context, orgID uuid.UUID, refType string, refID uuid.UUID) (gatewaydomain.PaymentPreference, error)
 	GetOrCreatePreference(ctx context.Context, orgID uuid.UUID, req CreatePreferenceRequest) (gatewaydomain.PaymentPreference, error)
-	GetPublicQuotePaymentLink(ctx context.Context, orgRef string, quoteID uuid.UUID) (gatewaydomain.PaymentPreference, error)
+	GetPublicQuotePaymentLink(ctx context.Context, tenantRef string, quoteID uuid.UUID) (gatewaydomain.PaymentPreference, error)
 
 	GenerateStaticQR(ctx context.Context, orgID uuid.UUID, size int) ([]byte, error)
 	BuildSalePaymentInfoWhatsApp(ctx context.Context, orgID uuid.UUID, saleID uuid.UUID) (WhatsAppResult, error)
@@ -75,7 +76,7 @@ func (h *Handler) RegisterExternalRoutes(public *gin.RouterGroup) {
 }
 
 func (h *Handler) Connect(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	orgID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -97,13 +98,13 @@ func (h *Handler) Callback(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"ok":     true,
+		"ok":        true,
 		"org_id": orgID.String(),
 	})
 }
 
 func (h *Handler) Status(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	orgID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -130,7 +131,7 @@ func (h *Handler) Status(c *gin.Context) {
 }
 
 func (h *Handler) Disconnect(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	orgID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -142,7 +143,7 @@ func (h *Handler) Disconnect(c *gin.Context) {
 }
 
 func (h *Handler) GetStaticQR(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	orgID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -155,7 +156,7 @@ func (h *Handler) GetStaticQR(c *gin.Context) {
 }
 
 func (h *Handler) DownloadStaticQR(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	orgID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -169,13 +170,13 @@ func (h *Handler) DownloadStaticQR(c *gin.Context) {
 }
 
 func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	orgID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
 	saleID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sale id"})
+		handlers.WriteValidation(c, "invalid sale id")
 		return
 	}
 
@@ -191,13 +192,13 @@ func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
 }
 
 func (h *Handler) GetSalePaymentLink(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	orgID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
 	saleID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sale id"})
+		handlers.WriteValidation(c, "invalid sale id")
 		return
 	}
 
@@ -210,13 +211,13 @@ func (h *Handler) GetSalePaymentLink(c *gin.Context) {
 }
 
 func (h *Handler) CreateQuotePaymentLink(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	orgID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
 	quoteID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid quote id"})
+		handlers.WriteValidation(c, "invalid quote id")
 		return
 	}
 
@@ -232,13 +233,13 @@ func (h *Handler) CreateQuotePaymentLink(c *gin.Context) {
 }
 
 func (h *Handler) GetQuotePaymentLink(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	orgID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
 	quoteID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid quote id"})
+		handlers.WriteValidation(c, "invalid quote id")
 		return
 	}
 
@@ -251,13 +252,13 @@ func (h *Handler) GetQuotePaymentLink(c *gin.Context) {
 }
 
 func (h *Handler) GetSalePaymentInfoWhatsApp(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	orgID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
 	saleID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sale id"})
+		handlers.WriteValidation(c, "invalid sale id")
 		return
 	}
 
@@ -270,13 +271,13 @@ func (h *Handler) GetSalePaymentInfoWhatsApp(c *gin.Context) {
 }
 
 func (h *Handler) GetSalePaymentLinkWhatsApp(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	orgID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
 	saleID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sale id"})
+		handlers.WriteValidation(c, "invalid sale id")
 		return
 	}
 
@@ -294,11 +295,11 @@ func (h *Handler) GetSalePaymentLinkWhatsApp(c *gin.Context) {
 func (h *Handler) GetPublicQuotePaymentLink(c *gin.Context) {
 	quoteID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid quote id"})
+		handlers.WriteValidation(c, "invalid quote id")
 		return
 	}
-	orgRef := strings.TrimSpace(c.Param("org_id"))
-	pref, err := h.uc.GetPublicQuotePaymentLink(c.Request.Context(), orgRef, quoteID)
+	tenantRef := strings.TrimSpace(c.Param("org_id"))
+	pref, err := h.uc.GetPublicQuotePaymentLink(c.Request.Context(), tenantRef, quoteID)
 	if err != nil {
 		handleGatewayError(c, err)
 		return
@@ -310,10 +311,10 @@ func (h *Handler) MercadoPagoWebhook(c *gin.Context) {
 	body, err := c.GetRawData()
 	if err != nil {
 		if ginmw.IsBodyTooLarge(err) {
-			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "payload too large"})
+			httperrors.Write(c, http.StatusRequestEntityTooLarge, "VALIDATION", "payload too large")
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+		handlers.WriteValidation(c, "invalid payload")
 		return
 	}
 	if err := h.uc.ProcessWebhook(c.Request.Context(), providerMercadoPago, c.Request.Header, body); err != nil {
@@ -323,8 +324,8 @@ func (h *Handler) MercadoPagoWebhook(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
-func parseAuthOrgID(c *gin.Context) (uuid.UUID, bool) {
-	return handlers.ParseAuthOrgID(c)
+func parseAuthTenantID(c *gin.Context) (uuid.UUID, bool) {
+	return handlers.ParseAuthTenantID(c)
 }
 
 func toPaymentLinkResponse(in gatewaydomain.PaymentPreference) dto.PaymentLinkResponse {
@@ -345,24 +346,24 @@ func toPaymentLinkResponse(in gatewaydomain.PaymentPreference) dto.PaymentLinkRe
 func handleGatewayError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, ErrPlanRestricted):
-		c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
+		httperrors.Write(c, http.StatusForbidden, "FORBIDDEN", "access denied")
 	case errors.Is(err, ErrPlanMonthlyLimitReached):
-		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
+		httperrors.Write(c, http.StatusTooManyRequests, "RATE_LIMITED", "rate limit exceeded")
 	case errors.Is(err, ErrGatewayNotConnected):
-		c.JSON(http.StatusPreconditionFailed, gin.H{"error": "mercadopago no conectado"})
+		httperrors.Write(c, http.StatusPreconditionFailed, "PRECONDITION_FAILED", "mercadopago no conectado")
 	case errors.Is(err, ErrInvalidOAuthState):
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 	case errors.Is(err, ErrInvalidWebhookSignature):
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized")
 	case errors.Is(err, ErrBankAliasMissing):
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "unprocessable request"})
+		httperrors.Write(c, http.StatusUnprocessableEntity, "VALIDATION", "unprocessable request")
 	case errors.Is(err, ErrUnsupportedProvider):
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 	case errors.Is(err, ErrInvalidReference):
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 	case errors.Is(err, ErrNotFound):
-		c.JSON(http.StatusNotFound, gin.H{"error": "resource not found"})
+		httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "resource not found")
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 	}
 }

@@ -11,12 +11,9 @@ import (
 
 	"github.com/google/uuid"
 
-	govdecision "github.com/devpablocristo/core/governance/go/decision"
-	kerneldomain "github.com/devpablocristo/core/governance/go/kernel/usecases/domain"
-	"github.com/devpablocristo/core/governance/go/risk"
 	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/core/governance/go/governanceclient"
 
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement/repository/models"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/purchases"
 	purchasesdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/purchases/usecases/domain"
@@ -42,35 +39,50 @@ type repositoryPort interface {
 	Delete(ctx context.Context, orgID, id uuid.UUID) error
 	Archive(ctx context.Context, orgID, id uuid.UUID) error
 	Restore(ctx context.Context, orgID, id uuid.UUID) error
-	ListPolicies(ctx context.Context, orgID uuid.UUID) ([]models.ProcurementPolicy, error)
-	GetPolicyByID(ctx context.Context, orgID, id uuid.UUID) (domain.ProcurementPolicy, error)
-	SavePolicy(ctx context.Context, p domain.ProcurementPolicy) (domain.ProcurementPolicy, error)
-	DeletePolicy(ctx context.Context, orgID, id uuid.UUID) error
+}
+
+// governancePort es la superficie del client de Nexus que procurement consume.
+// Contrato HTTP: Pymes nunca evalúa policies en proceso. Nexus es source of
+// truth y las policies viven en Nexus por tenant.
+type governancePort interface {
+	SimulateRequestForTenant(ctx context.Context, orgID string, body governanceclient.SimulateRequestBody) (governanceclient.SimulateResponse, error)
+	SubmitRequestForTenant(ctx context.Context, orgID, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
+	ListPoliciesForTenant(ctx context.Context, orgID string) (int, []byte, error)
+	GetPolicyForTenant(ctx context.Context, orgID, id string) (int, []byte, error)
+	CreatePolicyForTenant(ctx context.Context, orgID string, body any) (int, []byte, error)
+	UpdatePolicyForTenant(ctx context.Context, orgID, id string, body any) (int, []byte, error)
+	DeletePolicyForTenant(ctx context.Context, orgID, id string) (int, error)
 }
 
 type Usecases struct {
-	repo      repositoryPort
-	engine    *govdecision.Engine
-	purchases purchasesPort
-	audit     auditPort
-	timeline  timelinePort
-	webhooks  webhookPort
+	repo       repositoryPort
+	governance governancePort
+	purchases  purchasesPort
+	audit      auditPort
+	timeline   timelinePort
+	webhooks   webhookPort
 }
 
+// NewUsecases construye el módulo. governance es OBLIGATORIO: sin él,
+// procurement no puede decidir nada (Pymes no decide gobernanza local).
+// Pasar nil hace fail-fast en boot vía panic — preferible a corromper estado.
 func NewUsecases(
 	repo repositoryPort,
-	engine *govdecision.Engine,
+	governance governancePort,
 	purchases purchasesPort,
 	audit auditPort,
 	timeline timelinePort,
 	opts ...Option,
 ) *Usecases {
+	if governance == nil {
+		panic("procurement: governance client is required (set GOVERNANCE_URL / GOVERNANCE_API_KEY)")
+	}
 	u := &Usecases{
-		repo:      repo,
-		engine:    engine,
-		purchases: purchases,
-		audit:     audit,
-		timeline:  timeline,
+		repo:       repo,
+		governance: governance,
+		purchases:  purchases,
+		audit:      audit,
+		timeline:   timeline,
 	}
 	for _, o := range opts {
 		if o != nil {
@@ -81,7 +93,7 @@ func NewUsecases(
 }
 
 type CreateInput struct {
-	OrgID          uuid.UUID
+	OrgID       uuid.UUID
 	Actor          string
 	Title          string
 	Description    string
@@ -109,7 +121,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (domain.Procureme
 	}
 	req := domain.ProcurementRequest{
 		ID:             uuid.New(),
-		OrgID:          in.OrgID,
+		OrgID:       in.OrgID,
 		RequesterActor: actor,
 		Title:          strings.TrimSpace(in.Title),
 		Description:    strings.TrimSpace(in.Description),
@@ -135,7 +147,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (domain.Procureme
 }
 
 type UpdateInput struct {
-	OrgID          uuid.UUID
+	OrgID       uuid.UUID
 	ID             uuid.UUID
 	Actor          string
 	Title          string
@@ -241,6 +253,25 @@ func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor strin
 	return nil
 }
 
+// procurementSubmitParams arma los params de evidencia que viajan a Nexus.
+// El tenant efectivo viaja por el adapter de governance; el body queda como
+// evidencia de negocio para policy/eval.
+func procurementSubmitParams(req domain.ProcurementRequest, total float64) map[string]any {
+	return map[string]any{
+		"estimated_total": total,
+		"category":        req.Category,
+		"currency":        req.Currency,
+		"org_id":       req.OrgID.String(),
+	}
+}
+
+// Submit envía el procurement request a Nexus para evaluación. Si Nexus
+// permite (allow), se crea el purchase. Si requiere aprobación humana, Pymes
+// escala con SubmitRequest (persistente en Nexus) y el procurement queda en
+// PendingApproval con el nexus_request_id guardado en EvaluationJSON. Si
+// deniega, se rechaza.
+//
+// El motor de policies vive 100% en Nexus — Pymes ya no embebe nada.
 func (u *Usecases) Submit(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.ProcurementRequest, error) {
 	req, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
@@ -258,57 +289,77 @@ func (u *Usecases) Submit(ctx context.Context, orgID, id uuid.UUID, actor string
 	}
 	req.EstimatedTotal = total
 
-	kernelReq := kerneldomain.Request{
-		ID:        uuid.New().String(),
-		Subject:   kerneldomain.Subject{Type: kerneldomain.RequesterTypeHuman, ID: actor, Name: actor},
-		Action:    "procurement.submit",
-		Target:    kerneldomain.Target{System: "pymes", Resource: "procurement_request"},
-		Params:    map[string]any{"estimated_total": total, "category": req.Category, "currency": req.Currency},
-		CreatedAt: time.Now().UTC(),
+	body := governanceclient.SimulateRequestBody{
+		RequesterType:  "human",
+		RequesterID:    actor,
+		RequesterName:  actor,
+		ActionType:     "procurement.submit",
+		TargetSystem:   "pymes",
+		TargetResource: "procurement_request",
+		Params:         procurementSubmitParams(req, total),
+	}
+	sim, err := u.governance.SimulateRequestForTenant(ctx, orgID.String(), body)
+	if err != nil {
+		return domain.ProcurementRequest{}, fmt.Errorf("nexus simulate procurement.submit: %w", err)
 	}
 
-	policyRows, err := u.repo.ListPolicies(ctx, orgID)
-	if err != nil {
-		return domain.ProcurementRequest{}, err
-	}
-	policies := mapDBPoliciesToKernel(policyRows)
-	if len(policies) == 0 {
-		policies = defaultKernelPolicies()
+	evalRecord := map[string]any{
+		"decision":               sim.Decision,
+		"risk_level":             sim.RiskLevel,
+		"decision_reason":        sim.DecisionReason,
+		"status":                 sim.Status,
+		"would_require_approval": sim.WouldRequireApproval,
+		"policy_matched":         sim.PolicyMatched,
+		"evaluated_at":           time.Now().UTC().Format(time.RFC3339),
+		"source":                 "simulate",
 	}
 
-	eval, err := u.engine.Evaluate(govdecision.Input{
-		Request:  kernelReq,
-		Policies: policies,
-		History:  risk.History{},
-		Now:      time.Now().UTC(),
-	})
-	if err != nil {
-		return domain.ProcurementRequest{}, fmt.Errorf("governance evaluate: %w", err)
-	}
-	evalBytes, err := json.Marshal(eval)
-	if err != nil {
-		return domain.ProcurementRequest{}, err
-	}
-	req.EvaluationJSON = evalBytes
-	req.UpdatedAt = time.Now()
-
-	switch eval.Decision {
-	case kerneldomain.DecisionDeny:
+	switch sim.Decision {
+	case governanceclient.DecisionDeny:
 		req.Status = domain.StatusRejected
-	case kerneldomain.DecisionRequireApproval:
-		req.Status = domain.StatusPendingApproval
-	case kerneldomain.DecisionAllow:
+	case governanceclient.DecisionAllow:
 		req.Status = domain.StatusApproved
+	case governanceclient.DecisionRequireApproval:
+		// Escalamos a SubmitRequest para crear el request persistente en Nexus
+		// (con su approval row + audit). El procurement queda esperando que un
+		// humano apruebe en consola Nexus; el FSM se cierra cuando alguien
+		// llama Approve/Reject acá (que consultará el status en Nexus).
+		submitBody := governanceclient.SubmitRequestBody{
+			RequesterType:  body.RequesterType,
+			RequesterID:    body.RequesterID,
+			RequesterName:  body.RequesterName,
+			ActionType:     body.ActionType,
+			TargetSystem:   body.TargetSystem,
+			TargetResource: body.TargetResource,
+			Params:         body.Params,
+			Reason:         fmt.Sprintf("procurement request %s", req.ID),
+			Context:        "pymes-core procurement.submit",
+		}
+		idemKey := fmt.Sprintf("procurement-%s-%s", orgID.String(), req.ID)
+		submitResp, subErr := u.governance.SubmitRequestForTenant(ctx, orgID.String(), idemKey, submitBody)
+		if subErr != nil {
+			return domain.ProcurementRequest{}, fmt.Errorf("nexus submit procurement.submit (require_approval escalation): %w", subErr)
+		}
+		req.Status = domain.StatusPendingApproval
+		evalRecord["nexus_request_id"] = submitResp.RequestID
+		evalRecord["nexus_status"] = submitResp.Status
+		evalRecord["source"] = "submit_escalated"
 	default:
 		req.Status = domain.StatusPendingApproval
+		evalRecord["unknown_decision"] = sim.Decision
 	}
+
+	if evalBytes, mErr := json.Marshal(evalRecord); mErr == nil {
+		req.EvaluationJSON = evalBytes
+	}
+	req.UpdatedAt = time.Now()
 
 	out, err := u.repo.Update(ctx, req)
 	if err != nil {
 		return domain.ProcurementRequest{}, err
 	}
 
-	if eval.Decision == kerneldomain.DecisionAllow && u.purchases != nil {
+	if sim.Decision == governanceclient.DecisionAllow && u.purchases != nil {
 		pu, perr := u.createPurchaseFromRequest(ctx, out, actor)
 		if perr != nil {
 			slog.Error("procurement create purchase after approval", "error", perr, "request_id", out.ID)
@@ -321,20 +372,29 @@ func (u *Usecases) Submit(ctx context.Context, orgID, id uuid.UUID, actor string
 		}
 	}
 
-	u.logAudit(ctx, orgID, actor, "procurement_request.submitted", out.ID.String(), map[string]any{"decision": eval.Decision})
+	u.logAudit(ctx, orgID, actor, "procurement_request.submitted", out.ID.String(), map[string]any{"decision": sim.Decision})
 	if u.timeline != nil {
 		_ = u.timeline.RecordEvent(ctx, orgID, "procurement_request", out.ID, "procurement_request.submitted",
-			"Solicitud de compra enviada", out.Title, actor, map[string]any{"decision": string(eval.Decision)})
+			"Solicitud de compra enviada", out.Title, actor, map[string]any{"decision": sim.Decision})
 	}
 	u.emitWebhook(ctx, orgID, "procurement_request.submitted", map[string]any{
 		"procurement_request_id": out.ID.String(),
-		"decision":             string(eval.Decision),
+		"decision":               sim.Decision,
 		"status":                 string(out.Status),
-		"purchase_id":          nullableUUIDPtr(out.PurchaseID),
+		"purchase_id":            nullableUUIDPtr(out.PurchaseID),
 	})
 	return out, nil
 }
 
+// Approve finaliza un procurement request en Pendiente. Si fue escalado a
+// Nexus (require_approval), el caller ya debió aprobar en consola Nexus —
+// acá Pymes solo refleja el estado y crea el purchase.
+//
+// NOTA (deuda Fase 5): este endpoint hoy NO consulta Nexus para verificar
+// que la approval realmente ocurrió. Para no abrir un agujero de drift, el
+// caller (UI Pymes) debería redirigir al admin a consola Nexus para casos
+// que requieren approval. La validación cross-source queda para el contract
+// test de la Fase 5.
 func (u *Usecases) Approve(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.ProcurementRequest, error) {
 	req, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
@@ -368,7 +428,7 @@ func (u *Usecases) Approve(ctx context.Context, orgID, id uuid.UUID, actor strin
 	u.emitWebhook(ctx, orgID, "procurement_request.approved", map[string]any{
 		"procurement_request_id": out.ID.String(),
 		"status":                 string(out.Status),
-		"purchase_id":          nullableUUIDPtr(out.PurchaseID),
+		"purchase_id":            nullableUUIDPtr(out.PurchaseID),
 	})
 	return out, nil
 }
@@ -405,7 +465,7 @@ func (u *Usecases) createPurchaseFromRequest(ctx context.Context, req domain.Pro
 	}
 	notes := fmt.Sprintf("Generado desde solicitud interna %s", req.ID.String())
 	return u.purchases.Create(ctx, purchases.CreateInput{
-		OrgID:         req.OrgID,
+		OrgID:      req.OrgID,
 		SupplierName:  "Pendiente (solicitud interna)",
 		Status:        "draft",
 		PaymentStatus: "pending",

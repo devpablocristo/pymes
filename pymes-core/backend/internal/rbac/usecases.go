@@ -61,19 +61,19 @@ func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
 }
 
 func (u *Usecases) ListRoles(ctx context.Context, orgID string) ([]rbacdomain.Role, error) {
-	orgUUID, err := uuid.Parse(strings.TrimSpace(orgID))
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
 		return nil, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
 	}
-	return u.repo.ListRoles(ctx, orgUUID)
+	return u.repo.ListRoles(ctx, tenantUUID)
 }
 
 func (u *Usecases) GetRole(ctx context.Context, orgID, roleID string) (rbacdomain.Role, error) {
-	orgUUID, roleUUID, err := parseOrgRoleIDs(orgID, roleID)
+	tenantUUID, roleUUID, err := parseTenantRoleIDs(orgID, roleID)
 	if err != nil {
 		return rbacdomain.Role{}, err
 	}
-	out, err := u.repo.GetRole(ctx, orgUUID, roleUUID)
+	out, err := u.repo.GetRole(ctx, tenantUUID, roleUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return rbacdomain.Role{}, fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
@@ -84,7 +84,7 @@ func (u *Usecases) GetRole(ctx context.Context, orgID, roleID string) (rbacdomai
 }
 
 func (u *Usecases) CreateRole(ctx context.Context, orgID, actor, name, description string, perms []rbacdomain.Permission) (rbacdomain.Role, error) {
-	orgUUID, err := uuid.Parse(strings.TrimSpace(orgID))
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
 		return rbacdomain.Role{}, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
 	}
@@ -98,7 +98,7 @@ func (u *Usecases) CreateRole(ctx context.Context, orgID, actor, name, descripti
 	}
 
 	out, err := u.repo.CreateRole(ctx, rbacdomain.Role{
-		OrgID:       orgUUID,
+		OrgID:    tenantUUID,
 		Name:        strings.ToLower(name),
 		Description: strings.TrimSpace(description),
 		Permissions: cleanPerms,
@@ -118,12 +118,12 @@ func (u *Usecases) CreateRole(ctx context.Context, orgID, actor, name, descripti
 }
 
 func (u *Usecases) UpdateRole(ctx context.Context, orgID, roleID, actor string, description *string, permissions []rbacdomain.Permission) (rbacdomain.Role, error) {
-	orgUUID, roleUUID, err := parseOrgRoleIDs(orgID, roleID)
+	tenantUUID, roleUUID, err := parseTenantRoleIDs(orgID, roleID)
 	if err != nil {
 		return rbacdomain.Role{}, err
 	}
 
-	system, err := u.repo.IsSystemRole(ctx, orgUUID, roleUUID)
+	system, err := u.repo.IsSystemRole(ctx, tenantUUID, roleUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return rbacdomain.Role{}, fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
@@ -134,7 +134,7 @@ func (u *Usecases) UpdateRole(ctx context.Context, orgID, roleID, actor string, 
 		return rbacdomain.Role{}, fmt.Errorf("system roles cannot be modified: %w", httperrors.ErrForbidden)
 	}
 
-	current, err := u.repo.GetRole(ctx, orgUUID, roleUUID)
+	current, err := u.repo.GetRole(ctx, tenantUUID, roleUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return rbacdomain.Role{}, fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
@@ -169,11 +169,11 @@ func (u *Usecases) UpdateRole(ctx context.Context, orgID, roleID, actor string, 
 }
 
 func (u *Usecases) DeleteRole(ctx context.Context, orgID, roleID, actor string) error {
-	orgUUID, roleUUID, err := parseOrgRoleIDs(orgID, roleID)
+	tenantUUID, roleUUID, err := parseTenantRoleIDs(orgID, roleID)
 	if err != nil {
 		return err
 	}
-	system, err := u.repo.IsSystemRole(ctx, orgUUID, roleUUID)
+	system, err := u.repo.IsSystemRole(ctx, tenantUUID, roleUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
@@ -183,7 +183,7 @@ func (u *Usecases) DeleteRole(ctx context.Context, orgID, roleID, actor string) 
 	if system {
 		return fmt.Errorf("system roles cannot be deleted: %w", httperrors.ErrForbidden)
 	}
-	if err := u.repo.DeleteRole(ctx, orgUUID, roleUUID); err != nil {
+	if err := u.repo.DeleteRole(ctx, tenantUUID, roleUUID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
 		}
@@ -197,11 +197,11 @@ func (u *Usecases) DeleteRole(ctx context.Context, orgID, roleID, actor string) 
 }
 
 func (u *Usecases) AssignRole(ctx context.Context, orgID, roleID, userID, actor string) error {
-	orgUUID, roleUUID, userUUID, err := parseIDs(orgID, roleID, userID)
+	tenantUUID, roleUUID, userUUID, err := parseIDs(orgID, roleID, userID)
 	if err != nil {
 		return err
 	}
-	system, err := u.repo.IsSystemRole(ctx, orgUUID, roleUUID)
+	system, err := u.repo.IsSystemRole(ctx, tenantUUID, roleUUID)
 	if err != nil && err != gorm.ErrRecordNotFound {
 		return err
 	}
@@ -209,7 +209,7 @@ func (u *Usecases) AssignRole(ctx context.Context, orgID, roleID, userID, actor 
 		return fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
 	}
 	if !system {
-		if _, err := u.repo.GetRole(ctx, orgUUID, roleUUID); err != nil {
+		if _, err := u.repo.GetRole(ctx, tenantUUID, roleUUID); err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
 			}
@@ -217,7 +217,7 @@ func (u *Usecases) AssignRole(ctx context.Context, orgID, roleID, userID, actor 
 		}
 	}
 
-	if err := u.repo.AssignRole(ctx, orgUUID, roleUUID, userUUID, actor); err != nil {
+	if err := u.repo.AssignRole(ctx, tenantUUID, roleUUID, userUUID, actor); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("user or role not found in org: %w", httperrors.ErrNotFound)
 		}
@@ -231,11 +231,11 @@ func (u *Usecases) AssignRole(ctx context.Context, orgID, roleID, userID, actor 
 }
 
 func (u *Usecases) RemoveRole(ctx context.Context, orgID, roleID, userID, actor string) error {
-	orgUUID, roleUUID, userUUID, err := parseIDs(orgID, roleID, userID)
+	tenantUUID, roleUUID, userUUID, err := parseIDs(orgID, roleID, userID)
 	if err != nil {
 		return err
 	}
-	if err := u.repo.RemoveRole(ctx, orgUUID, roleUUID, userUUID); err != nil {
+	if err := u.repo.RemoveRole(ctx, tenantUUID, roleUUID, userUUID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("role assignment not found: %w", httperrors.ErrNotFound)
 		}
@@ -249,11 +249,11 @@ func (u *Usecases) RemoveRole(ctx context.Context, orgID, roleID, userID, actor 
 }
 
 func (u *Usecases) EffectivePermissions(ctx context.Context, orgID, userID string) (map[string][]string, error) {
-	orgUUID, userUUID, err := parseOrgUserIDs(orgID, userID)
+	tenantUUID, userUUID, err := parseTenantUserIDs(orgID, userID)
 	if err != nil {
 		return nil, err
 	}
-	m, err := u.repo.GetUserPermissions(ctx, orgUUID, userUUID)
+	m, err := u.repo.GetUserPermissions(ctx, tenantUUID, userUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -278,12 +278,12 @@ func (u *Usecases) HasPermission(ctx context.Context, orgID, actor, role string,
 		return false
 	}
 
-	orgUUID, err := uuid.Parse(strings.TrimSpace(orgID))
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
 		return false
 	}
 
-	permissions, err := u.getCachedPermissions(ctx, orgUUID, actor)
+	permissions, err := u.getCachedPermissions(ctx, tenantUUID, actor)
 	if err != nil {
 		return false
 	}
@@ -419,8 +419,8 @@ func permissionMapToResponse(m map[string]map[string]bool) map[string][]string {
 	return out
 }
 
-func parseOrgRoleIDs(orgID, roleID string) (uuid.UUID, uuid.UUID, error) {
-	orgUUID, err := uuid.Parse(strings.TrimSpace(orgID))
+func parseTenantRoleIDs(orgID, roleID string) (uuid.UUID, uuid.UUID, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
 		return uuid.Nil, uuid.Nil, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
 	}
@@ -428,11 +428,11 @@ func parseOrgRoleIDs(orgID, roleID string) (uuid.UUID, uuid.UUID, error) {
 	if err != nil {
 		return uuid.Nil, uuid.Nil, fmt.Errorf("invalid role_id: %w", httperrors.ErrBadInput)
 	}
-	return orgUUID, roleUUID, nil
+	return tenantUUID, roleUUID, nil
 }
 
 func parseIDs(orgID, roleID, userID string) (uuid.UUID, uuid.UUID, uuid.UUID, error) {
-	orgUUID, roleUUID, err := parseOrgRoleIDs(orgID, roleID)
+	tenantUUID, roleUUID, err := parseTenantRoleIDs(orgID, roleID)
 	if err != nil {
 		return uuid.Nil, uuid.Nil, uuid.Nil, err
 	}
@@ -440,11 +440,11 @@ func parseIDs(orgID, roleID, userID string) (uuid.UUID, uuid.UUID, uuid.UUID, er
 	if err != nil {
 		return uuid.Nil, uuid.Nil, uuid.Nil, fmt.Errorf("invalid user_id: %w", httperrors.ErrBadInput)
 	}
-	return orgUUID, roleUUID, userUUID, nil
+	return tenantUUID, roleUUID, userUUID, nil
 }
 
-func parseOrgUserIDs(orgID, userID string) (uuid.UUID, uuid.UUID, error) {
-	orgUUID, err := uuid.Parse(strings.TrimSpace(orgID))
+func parseTenantUserIDs(orgID, userID string) (uuid.UUID, uuid.UUID, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
 		return uuid.Nil, uuid.Nil, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
 	}
@@ -452,5 +452,5 @@ func parseOrgUserIDs(orgID, userID string) (uuid.UUID, uuid.UUID, error) {
 	if err != nil {
 		return uuid.Nil, uuid.Nil, fmt.Errorf("invalid user_id: %w", httperrors.ErrBadInput)
 	}
-	return orgUUID, userUUID, nil
+	return tenantUUID, userUUID, nil
 }

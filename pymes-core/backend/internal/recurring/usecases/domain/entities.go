@@ -8,7 +8,7 @@ import (
 
 type RecurringExpense struct {
 	ID            uuid.UUID  `json:"id"`
-	OrgID         uuid.UUID  `json:"org_id"`
+	OrgID      uuid.UUID  `json:"org_id"`
 	Description   string     `json:"description"`
 	Amount        float64    `json:"amount"`
 	Currency      string     `json:"currency"`
@@ -18,9 +18,12 @@ type RecurringExpense struct {
 	DayOfMonth    int        `json:"day_of_month"`
 	SupplierID    *uuid.UUID `json:"supplier_id,omitempty"`
 	IsActive      bool       `json:"is_active"`
+	IsFavorite    bool       `json:"is_favorite"`
+	Tags          []string   `json:"tags"`
 	NextDueDate   time.Time  `json:"next_due_date"`
 	LastPaidDate  *time.Time `json:"last_paid_date,omitempty"`
 	Notes         string     `json:"notes"`
+	ArchivedAt    *time.Time `json:"archived_at,omitempty"`
 	CreatedBy     string     `json:"created_by,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`

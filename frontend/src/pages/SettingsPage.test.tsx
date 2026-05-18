@@ -22,12 +22,12 @@ vi.mock('../lib/api', () => ({
   getMe: () => apiMocks.getMe(),
   getBillingStatus: () => apiMocks.getBillingStatus(),
   createPortal: () => apiMocks.createPortal(),
+  getNotificationsSummary: () => Promise.resolve({ unread_count: 0 }),
 }));
 
 const sessionFixture: SessionResponse = {
   auth: {
     org_id: '00000000-0000-0000-0000-000000000001',
-    tenant_id: '00000000-0000-0000-0000-000000000001',
     role: 'service',
     product_role: 'admin',
     scopes: ['admin:console:read'],
@@ -102,11 +102,11 @@ describe('SettingsPage (modo clave API)', () => {
     expect(screen.getByText('00000000-0000-0000-0000-000000000001')).toBeInTheDocument();
   });
 
-  it('muestra org_name del API cuando viene en la sesión', async () => {
+  it('muestra tenant_name del API cuando viene en la sesión', async () => {
     apiMocks.getSession.mockResolvedValue({
       auth: {
         ...sessionFixture.auth,
-        org_name: 'Fábrica Norte',
+        tenant_name: 'Fábrica Norte',
       },
     });
 

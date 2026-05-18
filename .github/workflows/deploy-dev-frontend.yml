@@ -1,0 +1,198 @@
+name: Deploy Frontend DEV (Firebase Hosting)
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Rama o ref a desplegar (default: develop)"
+        required: false
+        default: "develop"
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+concurrency:
+  group: pymes-deploy-dev-frontend
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      GCP_REGION: us-central1
+      GCP_PROJECT_ID: pymes-dev-352318
+      WIF_PROVIDER: projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
+      WIF_SERVICE_ACCOUNT: github-actions@pymes-dev-352318.iam.gserviceaccount.com
+      BACKEND_SERVICE_NAME: pymes-core
+      COMPANION_SERVICE_NAME: companion-dev
+      FIREBASE_HOSTING_SITE_ID: pymes-dev-352318
+      FRONTEND_CLERK_PUBLISHABLE_KEY: pk_test_c2VsZWN0ZWQtdGljay00OC5jbGVyay5hY2NvdW50cy5kZXYk
+      FIREBASE_TOOLS_VERSION: "13"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref_name }}
+
+      - name: Resolve deploy SHA
+        run: echo "DEPLOY_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Wait for CI success
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 1800))
+          while (( SECONDS < deadline )); do
+            runs_json="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow "CI" \
+              --commit "$DEPLOY_SHA" \
+              --event push \
+              --json databaseId,status,conclusion \
+              --limit 5)"
+            parsed="$(RUNS_JSON="$runs_json" python3 - <<'PY'
+          import json
+          import os
+
+          runs = json.loads(os.environ.get("RUNS_JSON", "[]"))
+          if not runs:
+              print("missing missing missing")
+          else:
+              run = runs[0]
+              print(run.get("databaseId"), run.get("status"), run.get("conclusion"))
+          PY
+          )"
+            read -r run_id status conclusion <<<"$parsed"
+            if [[ "$status" == "completed" ]]; then
+              if [[ "$conclusion" == "success" ]]; then
+                echo "CI $run_id pasó para $DEPLOY_SHA."
+                exit 0
+              fi
+              echo "::error::CI $run_id terminó con conclusion=$conclusion para $DEPLOY_SHA."
+              exit 1
+            fi
+            echo "Esperando CI para $DEPLOY_SHA (run=${run_id:-missing}, status=${status:-missing})..."
+            sleep 15
+          done
+          echo "::error::Timeout esperando CI para $DEPLOY_SHA."
+          exit 1
+
+      - name: Auth GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        run: |
+          set -euo pipefail
+          cd frontend
+          npm ci
+          # /v1/chat, /v1/chat/conversations* y /v1/notifications los
+          # atiende Companion vía Firebase rewrites (infra/verticals.yml).
+          # Same-origin = "/" inyectado en build.
+          VITE_API_URL="/" \
+          VITE_COMPANION_BASE_URL="/" \
+          VITE_WORKSHOPS_API_URL="/" \
+          VITE_PROFESSIONALS_API_URL="/" \
+          VITE_BEAUTY_API_URL="/" \
+          VITE_RESTAURANTS_API_URL="/" \
+          VITE_MEDICAL_API_URL="/" \
+          VITE_CLERK_PUBLISHABLE_KEY="${FRONTEND_CLERK_PUBLISHABLE_KEY}" \
+          npm run build
+
+      - name: Validate generated Firebase config
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user pyyaml
+          python3 scripts/infra/validate_verticals.py
+          python3 scripts/infra/generate_firebase.py --check
+
+      - name: Write Firebase target config
+        run: |
+          cat > .firebaserc <<EOF
+          {
+            "projects": {
+              "default": "${GCP_PROJECT_ID}"
+            },
+            "targets": {
+              "${GCP_PROJECT_ID}": {
+                "hosting": {
+                  "default": [
+                    "${FIREBASE_HOSTING_SITE_ID}"
+                  ]
+                }
+              }
+            }
+          }
+          EOF
+
+      - name: Deploy to Firebase Hosting
+        run: |
+          npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" deploy \
+            --project "${GCP_PROJECT_ID}" \
+            --config firebase.generated.json \
+            --only hosting \
+            --non-interactive
+
+      - name: Resolve service URLs
+        run: |
+          set -euo pipefail
+          echo "FRONTEND_URL=https://${FIREBASE_HOSTING_SITE_ID}.web.app" >> "$GITHUB_ENV"
+          backend_url="$(gcloud run services describe "$BACKEND_SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='value(status.url)')"
+          echo "BACKEND_URL=$backend_url" >> "$GITHUB_ENV"
+          companion_url="$(gcloud run services describe "$COMPANION_SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='value(status.url)' 2>/dev/null || true)"
+          echo "COMPANION_URL=$companion_url" >> "$GITHUB_ENV"
+
+      - name: Smoke checks
+        run: |
+          set -euo pipefail
+          frontend_ok=false
+          for _ in 1 2 3 4 5 6; do
+            if curl -fsS "${FRONTEND_URL}" >/dev/null; then
+              frontend_ok=true
+              break
+            fi
+            sleep 10
+          done
+          if [[ "${frontend_ok}" != true ]]; then
+            echo "::error::Frontend no respondió 200."
+            exit 1
+          fi
+          for _ in 1 2 3 4 5 6; do
+            if curl -fsS "${BACKEND_URL}/readyz" | grep -q '"status":"ready"'; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Backend readyz no respondió ready."
+          exit 1

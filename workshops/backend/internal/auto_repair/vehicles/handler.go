@@ -3,9 +3,9 @@ package vehicles
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
 	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -43,32 +43,28 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 	authGroup.GET(vehiclesBasePath+"/"+crudpaths.SegmentArchived, h.ListArchived)
 	authGroup.POST(vehiclesBasePath, h.Create)
 	authGroup.GET(vehiclesItemPath, h.Get)
-	authGroup.PUT(vehiclesItemPath, h.Update)
+	authGroup.PATCH(vehiclesItemPath, h.Update)
 	authGroup.DELETE(vehiclesItemPath, h.Delete)
+	authGroup.POST(vehiclesItemPath+"/"+crudpaths.SegmentArchive, h.Archive)
 	authGroup.POST(vehiclesItemPath+"/"+crudpaths.SegmentRestore, h.Restore)
 	authGroup.DELETE(vehiclesItemPath+"/"+crudpaths.SegmentHard, h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, ok := verticalgin.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	var after *uuid.UUID
-	if value := c.Query("after"); value != "" {
-		parsed, err := uuid.Parse(value)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid after"})
-			return
-		}
-		after = &parsed
+	limit := verticalgin.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	after, ok := verticalgin.ParseAfterUUIDQuery(c)
+	if !ok {
+		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		OrgID:  orgID,
-		Limit:  limit,
-		After:  after,
-		Search: c.Query("search"),
+		OrgID: orgID,
+		Limit:    limit,
+		After:    after,
+		Search:   c.Query("search"),
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -82,7 +78,7 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) ListArchived(c *gin.Context) {
-	orgID, ok := verticalgin.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -97,17 +93,21 @@ func (h *Handler) ListArchived(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	authCtx := auth.GetAuthContext(c)
-	orgID, ok := verticalgin.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
 	var req dto.CreateVehicleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
+	isFavorite := false
+	if req.IsFavorite != nil {
+		isFavorite = *req.IsFavorite
+	}
 	out, err := h.uc.Create(c.Request.Context(), domain.Vehicle{
-		OrgID:        orgID,
+		OrgID:     orgID,
 		CustomerID:   vertvalues.ParseOptionalUUID(req.CustomerID),
 		CustomerName: req.CustomerName,
 		LicensePlate: req.LicensePlate,
@@ -118,6 +118,8 @@ func (h *Handler) Create(c *gin.Context) {
 		Kilometers:   req.Kilometers,
 		Color:        req.Color,
 		Notes:        req.Notes,
+		IsFavorite:   isFavorite,
+		Tags:         req.Tags,
 	}, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -127,7 +129,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -140,13 +142,13 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
 	var req dto.UpdateVehicleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), orgID, id, UpdateInput{
@@ -160,6 +162,8 @@ func (h *Handler) Update(c *gin.Context) {
 		Kilometers:   req.Kilometers,
 		Color:        req.Color,
 		Notes:        req.Notes,
+		IsFavorite:   req.IsFavorite,
+		Tags:         req.Tags,
 	}, auth.GetAuthContext(c).Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -169,7 +173,7 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -180,8 +184,12 @@ func (h *Handler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+func (h *Handler) Archive(c *gin.Context) {
+	h.Delete(c)
+}
+
 func (h *Handler) Restore(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -193,7 +201,7 @@ func (h *Handler) Restore(c *gin.Context) {
 }
 
 func (h *Handler) HardDelete(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -213,9 +221,13 @@ func toVehicleItems(items []domain.Vehicle) []dto.VehicleItem {
 }
 
 func toVehicleItem(item domain.Vehicle) dto.VehicleItem {
+	tags := item.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	result := dto.VehicleItem{
 		ID:           item.ID.String(),
-		OrgID:        item.OrgID.String(),
+		OrgID:     item.OrgID.String(),
 		CustomerName: item.CustomerName,
 		LicensePlate: item.LicensePlate,
 		VIN:          item.VIN,
@@ -225,6 +237,8 @@ func toVehicleItem(item domain.Vehicle) dto.VehicleItem {
 		Kilometers:   item.Kilometers,
 		Color:        item.Color,
 		Notes:        item.Notes,
+		IsFavorite:   item.IsFavorite,
+		Tags:         tags,
 		CreatedAt:    item.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:    item.UpdatedAt.UTC().Format(time.RFC3339),
 	}

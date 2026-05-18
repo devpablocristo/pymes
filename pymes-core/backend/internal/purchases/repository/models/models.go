@@ -9,7 +9,7 @@ import (
 
 type PurchaseModel struct {
 	ID            uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	OrgID         uuid.UUID  `gorm:"type:uuid;index;not null"`
+	OrgID      uuid.UUID  `gorm:"type:uuid;index;not null"`
 	BranchID      *uuid.UUID `gorm:"type:uuid;index"`
 	Number        string
 	SupplierID    *uuid.UUID `gorm:"column:party_id;type:uuid"`
@@ -20,13 +20,14 @@ type PurchaseModel struct {
 	TaxTotal      float64
 	Total         float64
 	Currency      string
+	IsFavorite    bool           `gorm:"column:is_favorite;not null"`
+	Tags          pq.StringArray `gorm:"type:text[]"`
 	Notes         string
 	ReceivedAt    *time.Time
 	CreatedBy     string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
-	Tags          pq.StringArray `gorm:"type:text[];not null;default:'{}'"`
-	Metadata      []byte         `gorm:"type:jsonb;not null;default:'{}'"`
+	DeletedAt     *time.Time
 }
 
 func (PurchaseModel) TableName() string { return "purchases" }

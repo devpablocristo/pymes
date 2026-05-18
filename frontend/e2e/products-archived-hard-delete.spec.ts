@@ -5,14 +5,15 @@ import {
 } from './helpers-crud-edit-matrix';
 
 /**
- * Productos archivados: «Eliminar» debe llamar DELETE `/v1/products/{id}` (sin `/hard`), coherente con buildRestCrudDataSource.
+ * Productos archivados: «Eliminar» debe llamar DELETE `/v1/products/{id}/hard`,
+ * coherente con el contrato CRUD actual de eliminación definitiva.
  */
 test.describe('Productos archivados — eliminar definitivo', () => {
   test.beforeEach(async ({ page }) => {
     await installCrudEditMatrixMocks(page);
   });
 
-  test('confirmación Eliminar dispara DELETE sobre el ítem (sin /hard)', async ({ page }) => {
+  test('confirmación Eliminar dispara DELETE hard sobre el ítem', async ({ page }) => {
     await page.goto(`/${CRUD_EDIT_MATRIX_TENANT_SLUG}/products/list?archived=1`);
 
     await expect(page.locator('tbody tr').first()).toBeVisible({ timeout: 60_000 });
@@ -20,7 +21,7 @@ test.describe('Productos archivados — eliminar definitivo', () => {
     const deletePromise = page.waitForRequest((req) => {
       if (req.method() !== 'DELETE') return false;
       const u = req.url();
-      return u.includes('/v1/products/prod-arch-e2e-1') && !u.includes('/hard');
+      return u.includes('/v1/products/prod-arch-e2e-1/hard');
     });
 
     await page.locator('tbody tr').first().click();

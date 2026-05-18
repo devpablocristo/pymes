@@ -8,8 +8,8 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescorehttp"
 )
 
-func GetService(ctx context.Context, client *pymescorehttp.Client, orgID, serviceID string) (map[string]any, error) {
-	result, err := client.Get(ctx, fmt.Sprintf("/v1/internal/v1/services/%s", url.PathEscape(serviceID)), orgID)
+func GetService(ctx context.Context, client *pymescorehttp.Client, tenantID, serviceID string) (map[string]any, error) {
+	result, err := client.Get(ctx, fmt.Sprintf("/v1/internal/v1/services/%s", url.PathEscape(serviceID)), tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("get service: %w", err)
 	}

@@ -14,9 +14,6 @@ const apiMocks = vi.hoisted(() => ({
 
 const signOutMock = vi.hoisted(() => vi.fn<() => Promise<void>>().mockResolvedValue(undefined));
 const setActiveMock = vi.hoisted(() => vi.fn<(args: { organization: string }) => Promise<void>>().mockResolvedValue(undefined));
-const createOrganizationMock = vi.hoisted(() =>
-  vi.fn<(args: { name: string }) => Promise<{ id: string }>>().mockResolvedValue({ id: 'org_new' }),
-);
 const sessionReloadMock = vi.hoisted(() => vi.fn<() => Promise<void>>().mockResolvedValue(undefined));
 
 const useUserMock = vi.hoisted(() =>
@@ -53,7 +50,7 @@ vi.mock('@clerk/react', () => ({
     orgId: 'org_mock',
     orgRole: 'org:admin',
   }),
-  useClerk: () => ({ signOut: signOutMock, setActive: setActiveMock, createOrganization: createOrganizationMock }),
+  useClerk: () => ({ signOut: signOutMock, setActive: setActiveMock }),
   useSession: () => ({ session: { reload: sessionReloadMock } }),
   useOrganizationList: () => ({
     isLoaded: true,
@@ -72,6 +69,7 @@ vi.mock('../lib/api', () => ({
   getMe: () => apiMocks.getMe(),
   getBillingStatus: () => apiMocks.getBillingStatus(),
   updateTenantSettings: (...args: unknown[]) => apiMocks.updateTenantSettings(...args),
+  getNotificationsSummary: () => Promise.resolve({ unread_count: 0 }),
 }));
 
 import { SettingsPage } from './SettingsPage';
@@ -79,7 +77,6 @@ import { SettingsPage } from './SettingsPage';
 const sessionJwt: SessionResponse = {
   auth: {
     org_id: '00000000-0000-0000-0000-000000000099',
-    tenant_id: '00000000-0000-0000-0000-000000000099',
     role: 'admin',
     product_role: 'admin',
     scopes: [],
@@ -122,7 +119,6 @@ function renderSettingsClerk() {
 describe('SettingsPage (modo Clerk)', () => {
   beforeEach(() => {
     setActiveMock.mockClear();
-    createOrganizationMock.mockClear();
     sessionReloadMock.mockClear();
     apiMocks.getSession.mockResolvedValue(sessionJwt);
     apiMocks.getMe.mockResolvedValue(meWithPlaceholderUser);
@@ -149,7 +145,7 @@ describe('SettingsPage (modo Clerk)', () => {
     }));
   });
 
-  it('muestra nombre de organización desde Clerk en Cuenta', async () => {
+  it('muestra nombre de tenant desde Clerk en Cuenta', async () => {
     renderSettingsClerk();
 
     await waitFor(() => {
@@ -191,17 +187,16 @@ describe('SettingsPage (modo Clerk)', () => {
     expect(screen.getAllByText(/Cargando/i).length).toBeGreaterThan(0);
   });
 
-  it('muestra cambio de tenant con organizaciones disponibles', async () => {
+  it('muestra cambio de tenant disponible', async () => {
     renderSettingsClerk();
 
     await waitFor(() => {
-      expect(screen.getByText('Tenants y organizaciones')).toBeInTheDocument();
+      expect(screen.getByText('Tenants / Equipo')).toBeInTheDocument();
     });
 
     expect(screen.getByText('Tenant alternativo')).toBeInTheDocument();
     expect(screen.getAllByText('Actual').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Usar esta' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Crear y usar' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reabrir onboarding' })).toBeInTheDocument();
   });
 });

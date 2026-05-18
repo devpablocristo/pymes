@@ -105,7 +105,7 @@ func (u *Usecases) IssueToken(ctx context.Context, orgID uuid.UUID, actor, name 
 	hash := hashToken(plaintext)
 	token := domain.Token{
 		ID:        uuid.New(),
-		OrgID:     orgID,
+		OrgID:  orgID,
 		CreatedBy: strings.TrimSpace(actor),
 		Name:      strings.TrimSpace(name),
 		TokenHash: hash,

@@ -36,7 +36,7 @@ function ClerkAuthTokenBridge({ registerProviders }: { registerProviders: TokenP
   const { getToken } = useAuth();
 
   useEffect(() => {
-    const provider = createClerkTokenProvider(getToken);
+    const provider = createClerkTokenProvider(() => getToken({ skipCache: true }));
     registerProviders.forEach((registerProvider) => registerProvider(provider));
   }, [getToken, registerProviders]);
 
@@ -91,10 +91,33 @@ function ClerkProtectedRoute({ children }: PropsWithChildren) {
 
 export function SharedLoginPage() {
   const { t } = useI18n();
+  const location = useLocation();
+  const { isLoaded, isSignedIn } = useAuth();
+  const redirectUrl = authRedirectURLFromLocation(location);
   if (clerkEnabled) {
+    if (isClerkOrganizationTaskPath(location.pathname)) {
+      if (!isLoaded) {
+        return (
+          <div className="auth-layout">
+            <div className="spinner" aria-label="Cargando" />
+          </div>
+        );
+      }
+      if (isSignedIn) {
+        return <Navigate to="/onboarding" replace />;
+      }
+    }
     return (
       <div className="auth-layout">
-        <SignIn routing="path" path="/login" signUpUrl="/signup" />
+        <SignIn
+          routing="path"
+          path="/login"
+          signUpUrl={redirectUrl ? `/signup?redirect_url=${encodeURIComponent(redirectUrl)}` : '/signup'}
+          fallbackRedirectUrl={redirectUrl || undefined}
+          forceRedirectUrl={redirectUrl || undefined}
+          signUpFallbackRedirectUrl={redirectUrl || undefined}
+          signUpForceRedirectUrl={redirectUrl || undefined}
+        />
       </div>
     );
   }
@@ -111,10 +134,33 @@ export function SharedLoginPage() {
 
 export function SharedSignupPage() {
   const { t } = useI18n();
+  const location = useLocation();
+  const { isLoaded, isSignedIn } = useAuth();
+  const redirectUrl = authRedirectURLFromLocation(location);
   if (clerkEnabled) {
+    if (isClerkOrganizationTaskPath(location.pathname)) {
+      if (!isLoaded) {
+        return (
+          <div className="auth-layout">
+            <div className="spinner" aria-label="Cargando" />
+          </div>
+        );
+      }
+      if (isSignedIn) {
+        return <Navigate to="/onboarding" replace />;
+      }
+    }
     return (
       <div className="auth-layout">
-        <SignUp routing="path" path="/signup" signInUrl="/login" />
+        <SignUp
+          routing="path"
+          path="/signup"
+          signInUrl={redirectUrl ? `/login?redirect_url=${encodeURIComponent(redirectUrl)}` : '/login'}
+          fallbackRedirectUrl={redirectUrl || undefined}
+          forceRedirectUrl={redirectUrl || undefined}
+          signInFallbackRedirectUrl={redirectUrl || undefined}
+          signInForceRedirectUrl={redirectUrl || undefined}
+        />
       </div>
     );
   }
@@ -127,4 +173,23 @@ export function SharedSignupPage() {
       </div>
     </div>
   );
+}
+
+function isClerkOrganizationTaskPath(pathname: string): boolean {
+  const path = pathname.toLowerCase();
+  return path.includes('/tasks/choose-organization') || path.includes('/tasks/create-organization');
+}
+
+function authRedirectURLFromLocation(location: ReturnType<typeof useLocation>): string {
+  const params = new URLSearchParams(location.search);
+  const fromQuery = params.get('redirect_url')?.trim() ?? '';
+  if (fromQuery.startsWith('/')) {
+    return fromQuery;
+  }
+  const state = location.state as { from?: { pathname?: string; search?: string } } | null;
+  const pathname = state?.from?.pathname?.trim() ?? '';
+  if (!pathname.startsWith('/')) {
+    return '';
+  }
+  return `${pathname}${state?.from?.search ?? ''}`;
 }

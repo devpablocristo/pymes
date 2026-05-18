@@ -102,25 +102,21 @@ describe('DashboardVisualPage', () => {
     });
   });
 
-  it('registers page search and mounts the scheduling day summary with the shared client', async () => {
+  it('registers page search and mounts the dashboard sections', async () => {
     await renderDashboardVisualPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId('scheduling-day-summary')).toHaveTextContent('summary:es');
+      expect(screen.getByText('Agenda de hoy')).toBeInTheDocument();
     });
     expect(pageSearchMocks.usePageSearch).toHaveBeenCalled();
     expect(schedulingMocks.createSchedulingClient).toHaveBeenCalledTimes(1);
     expect(typeof schedulingMocks.createSchedulingClient.mock.calls[0][0]).toBe('function');
-    expect(schedulingMocks.capturedProps.at(-1)).toEqual(
-      expect.objectContaining({
-        client: schedulingMocks.client,
-        locale: 'es-AR',
-      }),
-    );
+    expect(schedulingMocks.capturedProps).toHaveLength(0);
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/sales-summary?context=home');
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/cashflow-summary?context=home');
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/quotes-pipeline?context=home');
     expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/recent-sales?context=home');
-    expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/top-products?context=home');
     expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/top-services?context=home');
-    expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/low-stock?context=home');
   });
 
   it('does not crash when dashboard payloads are incomplete', async () => {
@@ -128,8 +124,17 @@ describe('DashboardVisualPage', () => {
       if (String(path).includes('/v1/dashboard-data/sales-summary')) {
         return Promise.resolve({});
       }
+      if (String(path).includes('/v1/dashboard-data/recent-sales')) {
+        return Promise.resolve({ items: [{ id: 'sale-without-customer', total: 1200, status: 'paid' }] });
+      }
+      if (String(path).includes('/v1/dashboard-data/top-customers')) {
+        return Promise.resolve({ items: [{ id: 'customer-without-name', visit_count: 2 }] });
+      }
+      if (String(path).includes('/v1/purchases')) {
+        return Promise.resolve({ items: [{ id: 'purchase-without-supplier', amount: 900, status: 'pending' }] });
+      }
       if (String(path).includes('/v1/accounts/debtors')) {
-        return Promise.resolve({ items: [] });
+        return Promise.resolve({ items: [{ party_id: 'debtor-without-name', total_debt: 500 }] });
       }
       return Promise.resolve({ items: [] });
     });
@@ -137,7 +142,7 @@ describe('DashboardVisualPage', () => {
     await renderDashboardVisualPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Ventas')).toBeInTheDocument();
+      expect(screen.getByText('Ventas del mes')).toBeInTheDocument();
       expect(screen.queryByText('undefined')).not.toBeInTheDocument();
     });
   });
@@ -169,13 +174,16 @@ describe('DashboardVisualPage', () => {
       );
     });
     expect(apiMocks.apiRequest).toHaveBeenCalledWith(
-      '/v1/dashboard-data/top-products?context=home&branch_id=branch-active',
+      '/v1/dashboard-data/sales-summary?context=home&branch_id=branch-active',
+    );
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith(
+      '/v1/dashboard-data/cashflow-summary?context=home&branch_id=branch-active',
+    );
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith(
+      '/v1/dashboard-data/quotes-pipeline?context=home&branch_id=branch-active',
     );
     expect(apiMocks.apiRequest).toHaveBeenCalledWith(
       '/v1/dashboard-data/top-services?context=home&branch_id=branch-active',
-    );
-    expect(apiMocks.apiRequest).toHaveBeenCalledWith(
-      '/v1/dashboard-data/low-stock?context=home&branch_id=branch-active',
     );
   });
 });

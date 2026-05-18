@@ -14,7 +14,7 @@ const apiMocks = vi.hoisted(() => ({
   createInsightNotifications: vi.fn(),
 }));
 
-const reviewMocks = vi.hoisted(() => ({
+const governanceMocks = vi.hoisted(() => ({
   approveRequest: vi.fn(),
   rejectRequest: vi.fn(),
 }));
@@ -42,9 +42,9 @@ vi.mock('../lib/aiApi', () => ({
   createInsightNotifications: (...args: unknown[]) => apiMocks.createInsightNotifications(...args),
 }));
 
-vi.mock('../lib/reviewApi', () => ({
-  approveRequest: (...args: unknown[]) => reviewMocks.approveRequest(...args),
-  rejectRequest: (...args: unknown[]) => reviewMocks.rejectRequest(...args),
+vi.mock('../lib/governanceApi', () => ({
+  approveRequest: (...args: unknown[]) => governanceMocks.approveRequest(...args),
+  rejectRequest: (...args: unknown[]) => governanceMocks.rejectRequest(...args),
 }));
 
 vi.mock('../components/PageSearch', () => ({
@@ -151,8 +151,8 @@ describe('NotificationsCenterPage', () => {
     apiMocks.listInAppNotifications.mockReset();
     apiMocks.markInAppNotificationRead.mockReset();
     apiMocks.createInsightNotifications.mockReset();
-    reviewMocks.approveRequest.mockReset();
-    reviewMocks.rejectRequest.mockReset();
+    governanceMocks.approveRequest.mockReset();
+    governanceMocks.rejectRequest.mockReset();
     navigationMocks.navigate.mockReset();
     pageSearchMocks.usePageSearch.mockReset();
     shareMocks.openWhatsAppPrefilledShare.mockReset();
@@ -167,8 +167,8 @@ describe('NotificationsCenterPage', () => {
       content_language: 'es',
       items: [],
     });
-    reviewMocks.approveRequest.mockResolvedValue(undefined);
-    reviewMocks.rejectRequest.mockResolvedValue(undefined);
+    governanceMocks.approveRequest.mockResolvedValue(undefined);
+    governanceMocks.rejectRequest.mockResolvedValue(undefined);
     sessionStorage.clear();
   });
 
@@ -235,7 +235,7 @@ describe('NotificationsCenterPage', () => {
           title: 'Aprobación pendiente',
           kind: 'approval',
           chat_context: {
-            source: 'review_approval',
+            source: 'governance_approval',
             approval: {
               id: 'approval-1',
               request_id: 'request-1',
@@ -270,7 +270,7 @@ describe('NotificationsCenterPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /aprobar/i }));
 
     await waitFor(() => {
-      expect(reviewMocks.approveRequest).toHaveBeenCalledWith('approval-1', 'Aprobado por soporte');
+      expect(governanceMocks.approveRequest).toHaveBeenCalledWith('approval-1', 'Aprobado por soporte');
     });
   });
 

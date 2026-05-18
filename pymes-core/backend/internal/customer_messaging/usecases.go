@@ -222,7 +222,7 @@ func (u *Usecases) Connect(ctx context.Context, orgID uuid.UUID, phoneNumberID, 
 	}
 
 	conn := domain.Connection{
-		OrgID:              orgID,
+		OrgID:           orgID,
 		PhoneNumberID:      strings.TrimSpace(phoneNumberID),
 		WABAID:             strings.TrimSpace(wabaID),
 		AccessToken:        encryptedToken,
@@ -473,7 +473,7 @@ func (u *Usecases) linkOutboundToConversation(ctx context.Context, msg *domain.M
 func (u *Usecases) resolvePartyForSend(ctx context.Context, orgID, partyID uuid.UUID) (domain.Connection, string, string, string, error) {
 	conn, err := u.repo.GetConnection(ctx, orgID)
 	if err != nil {
-		return domain.Connection{}, "", "", "", domainerr.BusinessRule("whatsapp is not connected for this organization")
+		return domain.Connection{}, "", "", "", domainerr.BusinessRule("whatsapp is not connected for this tenant")
 	}
 	if !conn.IsActive {
 		return domain.Connection{}, "", "", "", domainerr.BusinessRule("whatsapp connection is inactive")
@@ -506,7 +506,7 @@ func (u *Usecases) resolvePartyForSend(ctx context.Context, orgID, partyID uuid.
 func (u *Usecases) buildOutboundMessage(conn domain.Connection, orgID uuid.UUID, partyID *uuid.UUID, phone string, msgType domain.MessageType, body, waMessageID string) domain.Message {
 	return domain.Message{
 		ID:            uuid.New(),
-		OrgID:         orgID,
+		OrgID:      orgID,
 		PhoneNumberID: conn.PhoneNumberID,
 		Direction:     domain.DirectionOutbound,
 		WAMessageID:   waMessageID,

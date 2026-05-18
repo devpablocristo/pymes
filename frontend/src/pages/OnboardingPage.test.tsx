@@ -9,9 +9,13 @@ import type { TenantSettings } from '../lib/types';
 import { OnboardingPage } from './OnboardingPage';
 
 const apiMocks = vi.hoisted(() => ({
+  createTenant: vi.fn<() => Promise<{ org_id: string; clerk_org_id: string }>>(),
   updateTenantSettings: vi.fn<() => Promise<TenantSettings>>(),
+  updateTenantSettingsWithSetupKey: vi.fn<() => Promise<TenantSettings>>(),
   listSchedulingBranches: vi.fn<() => Promise<{ items: Array<Record<string, unknown>> }>>(),
+  listSchedulingBranchesWithSetupKey: vi.fn<() => Promise<{ items: Array<Record<string, unknown>> }>>(),
   createSchedulingBranch: vi.fn<() => Promise<Record<string, unknown>>>(),
+  createSchedulingBranchWithSetupKey: vi.fn<() => Promise<Record<string, unknown>>>(),
 }));
 
 const navigationMocks = vi.hoisted(() => ({
@@ -28,9 +32,13 @@ vi.mock('../lib/auth', () => ({
 }));
 
 vi.mock('../lib/api', () => ({
+  createTenant: (...args: unknown[]) => apiMocks.createTenant(...args),
   updateTenantSettings: (...args: unknown[]) => apiMocks.updateTenantSettings(...args),
+  updateTenantSettingsWithSetupKey: (...args: unknown[]) => apiMocks.updateTenantSettingsWithSetupKey(...args),
   listSchedulingBranches: (...args: unknown[]) => apiMocks.listSchedulingBranches(...args),
+  listSchedulingBranchesWithSetupKey: (...args: unknown[]) => apiMocks.listSchedulingBranchesWithSetupKey(...args),
   createSchedulingBranch: (...args: unknown[]) => apiMocks.createSchedulingBranch(...args),
+  createSchedulingBranchWithSetupKey: (...args: unknown[]) => apiMocks.createSchedulingBranchWithSetupKey(...args),
 }));
 
 vi.mock('../lib/tenantProfile', async () => {
@@ -43,7 +51,7 @@ vi.mock('../lib/tenantProfile', async () => {
 });
 
 vi.mock('@clerk/react', () => ({
-  useClerk: () => ({ loaded: false, createOrganization: vi.fn(), setActive: vi.fn() }),
+  useClerk: () => ({ loaded: false, setActive: vi.fn() }),
   useOrganization: () => ({ organization: null, isLoaded: false }),
   useSession: () => ({ session: null }),
 }));
@@ -126,13 +134,25 @@ function renderOnboardingPage() {
 describe('OnboardingPage scheduling setup', () => {
   beforeEach(() => {
     apiMocks.updateTenantSettings.mockReset();
+    apiMocks.updateTenantSettingsWithSetupKey.mockReset();
+    apiMocks.createTenant.mockReset();
     apiMocks.listSchedulingBranches.mockReset();
+    apiMocks.listSchedulingBranchesWithSetupKey.mockReset();
     apiMocks.createSchedulingBranch.mockReset();
+    apiMocks.createSchedulingBranchWithSetupKey.mockReset();
     navigationMocks.navigate.mockReset();
     profileMocks.syncTenantProfileFromSettings.mockReset();
     profileMocks.saveTenantProfile.mockReset();
     apiMocks.listSchedulingBranches.mockResolvedValue({ items: [] });
+    apiMocks.listSchedulingBranchesWithSetupKey.mockResolvedValue({ items: [] });
     apiMocks.createSchedulingBranch.mockResolvedValue({
+      id: 'branch-principal',
+      code: 'principal',
+      name: 'Principal',
+      timezone: 'UTC',
+      active: true,
+    });
+    apiMocks.createSchedulingBranchWithSetupKey.mockResolvedValue({
       id: 'branch-principal',
       code: 'principal',
       name: 'Principal',
@@ -174,6 +194,7 @@ describe('OnboardingPage scheduling setup', () => {
           scheduling_enabled: true,
           uses_billing: true,
         }),
+        {},
       );
     });
 
@@ -184,6 +205,7 @@ describe('OnboardingPage scheduling setup', () => {
         name: 'Principal',
         active: true,
       }),
+      {},
     );
     expect(profileMocks.syncTenantProfileFromSettings).toHaveBeenCalled();
     expect(navigationMocks.navigate).toHaveBeenCalledWith('/', { replace: true });
@@ -232,6 +254,7 @@ describe('OnboardingPage scheduling setup', () => {
           business_name: 'Bicimax',
           vertical: 'workshops',
         }),
+        {},
       );
     });
 
@@ -275,7 +298,7 @@ describe('OnboardingPage scheduling setup', () => {
     expect(apiMocks.createSchedulingBranch).not.toHaveBeenCalled();
   });
 
-  it('shows sub-vertical options for professionals, beauty and restaurants', () => {
+  it('shows sub-vertical options for professionals, beauty, restaurants and medical', () => {
     renderOnboardingPage();
 
     fireEvent.change(screen.getByLabelText('¿Cómo se llama tu negocio o actividad?'), {
@@ -296,5 +319,8 @@ describe('OnboardingPage scheduling setup', () => {
     expect(screen.getByRole('button', { name: /^Restaurante/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Bar\s*Barra/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Caf[eé] \/ Cafeter[ií]a/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Medicina/i }));
+    expect(screen.getByRole('button', { name: /^Medicina laboral/i })).toBeInTheDocument();
   });
 });

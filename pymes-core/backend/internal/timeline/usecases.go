@@ -53,7 +53,7 @@ func (u *Usecases) Record(ctx context.Context, in timelinedomain.Entry) (timelin
 
 func (u *Usecases) RecordEvent(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, eventType, title, description, actor string, metadata map[string]any) error {
 	_, err := u.Record(ctx, timelinedomain.Entry{
-		OrgID:       orgID,
+		OrgID:    orgID,
 		EntityType:  entityType,
 		EntityID:    entityID,
 		EventType:   eventType,

@@ -55,7 +55,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.TableSess
 		out = append(out, domain.TableSessionListItem{
 			TableSession: domain.TableSession{
 				ID:         rw.ID,
-				OrgID:      rw.OrgID,
+				OrgID:   rw.OrgID,
 				TableID:    rw.TableID,
 				GuestCount: rw.GuestCount,
 				PartyLabel: rw.PartyLabel,
@@ -99,7 +99,7 @@ func (r *Repository) OpenSession(ctx context.Context, orgID, tableID uuid.UUID, 
 		now := time.Now().UTC()
 		row := models.TableSessionModel{
 			ID:         uuid.New(),
-			OrgID:      orgID,
+			OrgID:   orgID,
 			TableID:    tableID,
 			GuestCount: guestCount,
 			PartyLabel: partyLabel,
@@ -160,7 +160,7 @@ func (r *Repository) CloseSession(ctx context.Context, orgID, sessionID uuid.UUI
 func toDomain(row models.TableSessionModel) domain.TableSession {
 	return domain.TableSession{
 		ID:         row.ID,
-		OrgID:      row.OrgID,
+		OrgID:   row.OrgID,
 		TableID:    row.TableID,
 		GuestCount: row.GuestCount,
 		PartyLabel: row.PartyLabel,

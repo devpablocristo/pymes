@@ -8,12 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	saasmiddleware "github.com/devpablocristo/core/saas/go/shared/middleware"
 	ctxkeys "github.com/devpablocristo/core/security/go/contextkeys"
 )
 
-// GinSaaSAuthMiddleware runs core/saas/go net/http auth and copies principal into Gin context
-// using the same keys as the legacy handlers package (org_id, actor, role, scopes, auth_method).
+// GinSaaSAuthMiddleware runs Pymes tenant auth and copies principal into Gin context
+// using the shared handler keys.
 func GinSaaSAuthMiddleware(svc *SaaSServices) gin.HandlerFunc {
 	if svc == nil || svc.AuthMiddleware == nil {
 		return func(c *gin.Context) { c.Next() }
@@ -33,26 +32,28 @@ func GinSaaSAuthMiddleware(svc *SaaSServices) gin.HandlerFunc {
 }
 
 func copyPrincipalToGin(c *gin.Context, reqCtx context.Context) {
-	principal, ok := saasmiddleware.PrincipalFromContext(reqCtx)
+	principal, ok := tenantPrincipalFromContext(reqCtx)
 	if !ok {
 		return
 	}
 	authMethod := strings.TrimSpace(principal.AuthMethod)
 
-	var orgIDStr string
-	if id, err := uuid.Parse(strings.TrimSpace(principal.TenantID)); err == nil {
-		orgIDStr = id.String()
-		c.Set(ctxkeys.CtxKeyOrgID, orgIDStr)
-	} else if strings.TrimSpace(principal.TenantID) != "" {
-		orgIDStr = strings.TrimSpace(principal.TenantID)
-		c.Set(ctxkeys.CtxKeyOrgID, orgIDStr)
+	var tenantIDStr string
+	if id, err := uuid.Parse(strings.TrimSpace(principal.OrgID)); err == nil {
+		tenantIDStr = id.String()
+		c.Set(ctxkeys.CtxKeyOrgID, tenantIDStr)
+		c.Set(ctxkeys.CtxKeyTenantID, tenantIDStr)
+	} else if strings.TrimSpace(principal.OrgID) != "" {
+		tenantIDStr = strings.TrimSpace(principal.OrgID)
+		c.Set(ctxkeys.CtxKeyOrgID, tenantIDStr)
+		c.Set(ctxkeys.CtxKeyTenantID, tenantIDStr)
 	}
 
 	if authMethod == "api_key" {
 		if strings.TrimSpace(principal.Actor) != "" {
 			c.Set(ctxkeys.CtxKeyActor, strings.TrimSpace(principal.Actor))
-		} else if orgIDStr != "" {
-			c.Set(ctxkeys.CtxKeyActor, "api_key:"+orgIDStr)
+		} else if tenantIDStr != "" {
+			c.Set(ctxkeys.CtxKeyActor, "api_key:"+tenantIDStr)
 		}
 		if strings.TrimSpace(principal.Role) != "" {
 			c.Set(ctxkeys.CtxKeyRole, strings.TrimSpace(principal.Role))

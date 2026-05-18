@@ -100,19 +100,6 @@ describe('getTenantProfile', () => {
     expect(getTenantProfile()).toBeNull();
   });
 
-  it('normalizes legacy bike_shop profiles on read', () => {
-    mockStorage.getJSON.mockReturnValue({
-      ...FULL_PROFILE,
-      vertical: 'bike_shop',
-    });
-
-    expect(getTenantProfile()).toEqual(
-      expect.objectContaining({
-        vertical: 'workshops',
-        subVertical: 'bike_shop',
-      }),
-    );
-  });
 });
 
 describe('saveTenantProfile', () => {
@@ -121,20 +108,6 @@ describe('saveTenantProfile', () => {
     expect(mockStorage.setJSON).toHaveBeenCalledWith('pymes:tenant_profile', FULL_PROFILE);
   });
 
-  it('normalizes legacy bike_shop profiles on save', () => {
-    saveTenantProfile({
-      ...FULL_PROFILE,
-      vertical: 'bike_shop' as never,
-    });
-
-    expect(mockStorage.setJSON).toHaveBeenCalledWith(
-      'pymes:tenant_profile',
-      expect.objectContaining({
-        vertical: 'workshops',
-        subVertical: 'bike_shop',
-      }),
-    );
-  });
 });
 
 describe('clearTenantProfile', () => {
@@ -195,7 +168,7 @@ describe('tenantProfileFromSettings', () => {
     expect(result!.usesScheduling).toBe(true);
   });
 
-  it('preserves a compatible local sub-vertical when syncing from backend settings', () => {
+  it('preserves a matching local sub-vertical when syncing from backend settings', () => {
     mockStorage.getJSON.mockReturnValue({
       ...FULL_PROFILE,
       vertical: 'workshops',

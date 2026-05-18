@@ -45,11 +45,11 @@ func (c *Client) Post(ctx context.Context, path, orgID string, payload any) (map
 	return c.decode(status, body)
 }
 
-// ResolveOrgRef traduce external_id de Clerk (org_...), slug o UUID a org_id interno (vía core internal API).
+// ResolveOrgRef traduce una referencia externa de identidad, slug o UUID a tenant_id interno.
 func (c *Client) ResolveOrgRef(ctx context.Context, ref string) (map[string]any, error) {
 	q := url.Values{}
 	q.Set("ref", ref)
-	return c.Get(ctx, "/v1/internal/v1/orgs/resolve-ref?"+q.Encode(), "")
+	return c.Get(ctx, "/v1/internal/v1/tenants/resolve-ref?"+q.Encode(), "")
 }
 
 func (c *Client) headerOpts(orgID string) []httpclient.RequestOption {
@@ -58,7 +58,7 @@ func (c *Client) headerOpts(orgID string) []httpclient.RequestOption {
 		opts = append(opts, httpclient.WithHeader("X-Internal-Service-Token", c.token))
 	}
 	if orgID != "" {
-		opts = append(opts, httpclient.WithHeader("X-Org-ID", orgID))
+		opts = append(opts, httpclient.WithHeader("X-Pymes-Tenant-ID", orgID))
 	}
 	return opts
 }

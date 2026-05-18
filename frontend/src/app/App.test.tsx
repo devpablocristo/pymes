@@ -16,10 +16,6 @@ vi.mock('../components/AuthTokenBridge', () => ({
   AuthTokenBridge: () => null,
 }));
 
-vi.mock('../components/ClerkSessionOrgSync', () => ({
-  ClerkSessionOrgSync: () => null,
-}));
-
 vi.mock('../components/ProtectedRoute', () => ({
   ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -32,11 +28,13 @@ vi.mock('../lib/api', () => ({
   getTenantSettings: () => apiMocks.getTenantSettings(),
   getSession: () => apiMocks.getSession(),
   apiRequest: (...args: unknown[]) => apiMocks.apiRequest(...args),
+  registerTenantSlugProvider: () => () => undefined,
 }));
 
 vi.mock('./lazyRoutes', () => ({
   LoginPage: () => <div>login</div>,
   SignupPage: () => <div>signup</div>,
+  InviteAcceptPage: () => <div>invite accept</div>,
   OnboardingPage: () => <div>onboarding</div>,
   Shell: ({ children }: { children: React.ReactNode }) => <div>shell{children}</div>,
 }));
@@ -49,7 +47,7 @@ vi.mock('./suspended', () => ({
   Suspended: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-function renderApp(initialEntries = ['/dashboard']) {
+function renderApp(initialEntries = ['/taller-norte/dashboard']) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -129,13 +127,21 @@ describe('App onboarding gating', () => {
     apiMocks.getSession.mockResolvedValue({
       auth: {
         org_id: '00000000-0000-0000-0000-000000000001',
-        org_name: 'Org Demo',
-        tenant_id: '00000000-0000-0000-0000-000000000001',
+        tenant_name: 'Tenant Demo',
+        tenant_slug: 'taller-norte',
         role: 'admin',
         product_role: 'admin',
         scopes: [],
         actor: 'user-1',
         auth_method: 'jwt',
+      },
+      tenant: {
+        id: '00000000-0000-0000-0000-000000000001',
+        slug: 'taller-norte',
+        name: 'Tenant Demo',
+      },
+      membership: {
+        role: 'admin',
       },
     });
     apiMocks.apiRequest.mockResolvedValue({ items: [] });
@@ -144,7 +150,7 @@ describe('App onboarding gating', () => {
   it('hidrata el perfil local desde tenant settings y deja pasar al shell', async () => {
     apiMocks.getTenantSettings.mockResolvedValue(buildTenantSettings());
 
-    renderApp();
+    renderApp(['/taller-norte/dashboard']);
 
     await waitFor(() => {
       expect(screen.getByText('shell')).toBeInTheDocument();
@@ -169,7 +175,7 @@ describe('App onboarding gating', () => {
       }),
     );
 
-    renderApp();
+    renderApp(['/taller-norte/dashboard']);
 
     await waitFor(() => {
       expect(screen.getByText('onboarding')).toBeInTheDocument();
@@ -196,12 +202,64 @@ describe('App onboarding gating', () => {
       }),
     );
 
-    renderApp();
+    renderApp(['/taller-norte/dashboard']);
 
     await waitFor(() => {
       expect(screen.getByText('onboarding')).toBeInTheDocument();
     });
 
+    expect(getTenantProfile()).toBeNull();
+  });
+
+  it('limpia el perfil local y no monta el shell si la URL pide otro tenant', async () => {
+    saveTenantProfile({
+      businessName: 'Medlab',
+      teamSize: 'small',
+      sells: 'both',
+      clientLabel: 'pacientes',
+      usesScheduling: true,
+      usesBilling: true,
+      currency: 'ARS',
+      paymentMethod: 'mixed',
+      vertical: 'medical',
+      subVertical: 'occupational_health',
+      completedAt: '2026-05-07T00:00:00.000Z',
+    });
+    apiMocks.getTenantSettings.mockResolvedValue(buildTenantSettings());
+
+    renderApp(['/medlab/invoices/list']);
+
+    await waitFor(() => {
+      expect(screen.getByText('Acceso al tenant denegado')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('routes')).not.toBeInTheDocument();
+    expect(getTenantProfile()).toBeNull();
+  });
+
+  it('bloquea el shell si backend rechaza la membresía aunque exista perfil local', async () => {
+    saveTenantProfile({
+      businessName: 'Taller Norte',
+      teamSize: 'small',
+      sells: 'both',
+      clientLabel: 'clientes',
+      usesScheduling: true,
+      usesBilling: true,
+      currency: 'ARS',
+      paymentMethod: 'mixed',
+      vertical: 'workshops',
+      completedAt: '2026-04-02T10:00:00.000Z',
+    });
+    const forbidden = Object.assign(new Error('active tenant membership required'), { status: 403 });
+    apiMocks.getTenantSettings.mockRejectedValue(forbidden);
+
+    renderApp(['/taller-norte/invoices/list']);
+
+    await waitFor(() => {
+      expect(screen.getByText('Acceso al tenant denegado')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('routes')).not.toBeInTheDocument();
     expect(getTenantProfile()).toBeNull();
   });
 });

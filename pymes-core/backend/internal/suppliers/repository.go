@@ -22,24 +22,25 @@ type Repository struct{ db *gorm.DB }
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 type ListParams struct {
-	OrgID  uuid.UUID
-	Limit  int
-	After  *uuid.UUID
-	Search string
-	Tag    string
-	Sort   string
-	Order  string
+	OrgID uuid.UUID
+	Limit    int
+	After    *uuid.UUID
+	Search   string
+	Tag      string
+	Sort     string
+	Order    string
 }
 
 type supplierPartyRow struct {
 	ID          uuid.UUID
-	OrgID       uuid.UUID
+	OrgID    uuid.UUID
 	DisplayName string `gorm:"column:display_name"`
 	Email       string
 	Phone       string
 	Address     []byte `gorm:"column:address"`
 	TaxID       string `gorm:"column:tax_id"`
 	Notes       string
+	IsFavorite  bool           `gorm:"column:is_favorite"`
 	Tags        pq.StringArray `gorm:"type:text[];column:tags"`
 	Metadata    []byte         `gorm:"column:metadata"`
 	CreatedAt   time.Time      `gorm:"column:created_at"`
@@ -51,7 +52,7 @@ type supplierPartyRow struct {
 func (r *Repository) List(ctx context.Context, p ListParams) ([]supplierdomain.Supplier, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
-	q := r.baseQuery(ctx, p.OrgID)
+	q := r.baseQuery(ctx, p.OrgID).Where("p.deleted_at IS NULL")
 	if tag := strings.TrimSpace(p.Tag); tag != "" {
 		q = q.Where("? = ANY(p.tags)", tag)
 	}
@@ -105,7 +106,7 @@ func (r *Repository) Create(ctx context.Context, in supplierdomain.Supplier) (su
 	if err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Table("parties").Create(map[string]any{
 			"id":           partyID,
-			"org_id":       in.OrgID,
+			"org_id":    in.OrgID,
 			"party_type":   "organization",
 			"display_name": strings.TrimSpace(in.Name),
 			"email":        strings.TrimSpace(in.Email),
@@ -113,6 +114,7 @@ func (r *Repository) Create(ctx context.Context, in supplierdomain.Supplier) (su
 			"address":      addr,
 			"tax_id":       strings.TrimSpace(in.TaxID),
 			"notes":        strings.TrimSpace(in.Notes),
+			"is_favorite":  in.IsFavorite,
 			"tags":         pq.StringArray(utils.NormalizeTags(in.Tags)),
 			"metadata":     meta,
 			"created_at":   time.Now().UTC(),
@@ -173,6 +175,7 @@ func (r *Repository) Update(ctx context.Context, in supplierdomain.Supplier) (su
 				"address":      addr,
 				"tax_id":       strings.TrimSpace(in.TaxID),
 				"notes":        strings.TrimSpace(in.Notes),
+				"is_favorite":  in.IsFavorite,
 				"tags":         pq.StringArray(utils.NormalizeTags(in.Tags)),
 				"metadata":     meta,
 				"updated_at":   time.Now().UTC(),
@@ -234,6 +237,7 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]suppl
 			p.address,
 			p.tax_id,
 			p.notes,
+			p.is_favorite,
 			p.tags,
 			p.metadata,
 			p.created_at,
@@ -334,6 +338,7 @@ func (r *Repository) baseQuery(ctx context.Context, orgID uuid.UUID) *gorm.DB {
 			p.address,
 			p.tax_id,
 			p.notes,
+			p.is_favorite,
 			p.tags,
 			p.metadata,
 			p.created_at,
@@ -342,7 +347,7 @@ func (r *Repository) baseQuery(ctx context.Context, orgID uuid.UUID) *gorm.DB {
 			COALESCE(pr.metadata->>'contact_name', p.metadata->>'contact_name', '') AS contact_name
 		`).
 		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'supplier' AND pr.is_active = true").
-		Where("p.org_id = ? AND p.deleted_at IS NULL", orgID)
+		Where("p.org_id = ?", orgID)
 }
 
 func supplierFromPartyRow(row supplierPartyRow) supplierdomain.Supplier {
@@ -357,7 +362,7 @@ func supplierFromPartyRow(row supplierPartyRow) supplierdomain.Supplier {
 	}
 	return supplierdomain.Supplier{
 		ID:          row.ID,
-		OrgID:       row.OrgID,
+		OrgID:    row.OrgID,
 		Name:        row.DisplayName,
 		TaxID:       row.TaxID,
 		Email:       row.Email,
@@ -365,6 +370,7 @@ func supplierFromPartyRow(row supplierPartyRow) supplierdomain.Supplier {
 		Address:     addr,
 		ContactName: row.ContactName,
 		Notes:       row.Notes,
+		IsFavorite:  row.IsFavorite,
 		Tags:        append([]string(nil), row.Tags...),
 		Metadata:    meta,
 		CreatedAt:   row.CreatedAt,

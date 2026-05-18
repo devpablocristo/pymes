@@ -26,7 +26,7 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 func (r *Repository) Create(ctx context.Context, req domain.ProcurementRequest) (domain.ProcurementRequest, error) {
 	m := models.ProcurementRequest{
 		ID:             req.ID,
-		OrgID:          req.OrgID,
+		OrgID:       req.OrgID,
 		RequesterActor: req.RequesterActor,
 		Title:          req.Title,
 		Description:    req.Description,
@@ -184,86 +184,6 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *Repository) ListPolicies(ctx context.Context, orgID uuid.UUID) ([]models.ProcurementPolicy, error) {
-	var rows []models.ProcurementPolicy
-	if err := r.db.WithContext(ctx).Where("org_id = ?", orgID).Order("priority ASC, id ASC").Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	return rows, nil
-}
-
-func (r *Repository) GetPolicyByID(ctx context.Context, orgID, id uuid.UUID) (domain.ProcurementPolicy, error) {
-	var m models.ProcurementPolicy
-	if err := r.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).First(&m).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return domain.ProcurementPolicy{}, ErrNotFound
-		}
-		return domain.ProcurementPolicy{}, err
-	}
-	return policyModelToDomain(m), nil
-}
-
-func (r *Repository) SavePolicy(ctx context.Context, p domain.ProcurementPolicy) (domain.ProcurementPolicy, error) {
-	m := policyDomainToModel(p)
-	if m.ID == uuid.Nil {
-		m.ID = uuid.New()
-	}
-	now := time.Now()
-	if m.CreatedAt.IsZero() {
-		m.CreatedAt = now
-	}
-	m.UpdatedAt = now
-	if err := r.db.WithContext(ctx).Save(&m).Error; err != nil {
-		return domain.ProcurementPolicy{}, err
-	}
-	return policyModelToDomain(m), nil
-}
-
-func (r *Repository) DeletePolicy(ctx context.Context, orgID, id uuid.UUID) error {
-	res := r.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).Delete(&models.ProcurementPolicy{})
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return ErrNotFound
-	}
-	return nil
-}
-
-func policyModelToDomain(m models.ProcurementPolicy) domain.ProcurementPolicy {
-	return domain.ProcurementPolicy{
-		ID:           m.ID,
-		OrgID:        m.OrgID,
-		Name:         m.Name,
-		Expression:   m.Expression,
-		Effect:       m.Effect,
-		Priority:     m.Priority,
-		Mode:         m.Mode,
-		Enabled:      m.Enabled,
-		ActionFilter: m.ActionFilter,
-		SystemFilter: m.SystemFilter,
-		CreatedAt:    m.CreatedAt,
-		UpdatedAt:    m.UpdatedAt,
-	}
-}
-
-func policyDomainToModel(p domain.ProcurementPolicy) models.ProcurementPolicy {
-	return models.ProcurementPolicy{
-		ID:           p.ID,
-		OrgID:        p.OrgID,
-		Name:         p.Name,
-		Expression:   p.Expression,
-		Effect:       p.Effect,
-		Priority:     p.Priority,
-		Mode:         p.Mode,
-		Enabled:      p.Enabled,
-		ActionFilter: p.ActionFilter,
-		SystemFilter: p.SystemFilter,
-		CreatedAt:    p.CreatedAt,
-		UpdatedAt:    p.UpdatedAt,
-	}
-}
-
 func toDomain(m models.ProcurementRequest, lines []models.ProcurementRequestLine) domain.ProcurementRequest {
 	dl := make([]domain.RequestLine, 0, len(lines))
 	for _, l := range lines {
@@ -283,7 +203,7 @@ func toDomain(m models.ProcurementRequest, lines []models.ProcurementRequestLine
 	}
 	return domain.ProcurementRequest{
 		ID:             m.ID,
-		OrgID:          m.OrgID,
+		OrgID:       m.OrgID,
 		RequesterActor: m.RequesterActor,
 		Title:          m.Title,
 		Description:    m.Description,

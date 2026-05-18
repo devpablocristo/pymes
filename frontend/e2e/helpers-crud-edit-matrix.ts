@@ -21,6 +21,9 @@ export function crudEditMatrixListPath(resourceId: string): string {
   if (resourceId === 'products') {
     return `/${tenant}/products/list`;
   }
+  if (resourceId === 'payments') {
+    return `/${tenant}/payments/list`;
+  }
   return `/${tenant}/${slug}`;
 }
 
@@ -78,10 +81,19 @@ export async function installCrudEditMatrixMocks(page: Page): Promise<void> {
         contentType: 'application/json',
         body: JSON.stringify({
           auth: {
-            org_id: 'e2e-org-001',
-            org_name: 'E2E Org',
+            tenant_id: 'e2e-org-001',
+            tenant_name: 'E2E Tenant',
+            tenant_slug: CRUD_EDIT_MATRIX_TENANT_SLUG,
             product_role: 'admin',
             auth_method: 'api_key',
+          },
+          tenant: {
+            id: 'e2e-org-001',
+            slug: CRUD_EDIT_MATRIX_TENANT_SLUG,
+            name: 'E2E Tenant',
+          },
+          membership: {
+            role: 'admin',
           },
         }),
       });
@@ -384,12 +396,12 @@ export async function installCrudEditMatrixMocks(page: Page): Promise<void> {
         paginated([
           {
             id: 'wo-e2e-1',
-            org_id: 'e2e-org-001',
+            tenant_id: 'e2e-org-001',
             branch_id: 'br-e2e',
             number: 'OT-E2E-1',
-            target_type: path.includes('bike-shop') ? 'bicycle' : 'vehicle',
-            target_id: path.includes('bike-shop') ? 'bike-e2e-1' : 'veh-e2e-1',
-            target_label: path.includes('bike-shop') ? 'Bici E2E' : 'ABC123',
+            asset_type: path.includes('bike-shop') ? 'bicycle' : 'vehicle',
+            asset_id: path.includes('bike-shop') ? 'bike-e2e-1' : 'veh-e2e-1',
+            asset_label: path.includes('bike-shop') ? 'Bici E2E' : 'ABC123',
             customer_id: '00000000-0000-4000-8000-000000000020',
             customer_name: 'Cliente E2E',
             status: 'draft',
@@ -554,6 +566,36 @@ export async function installCrudEditMatrixMocks(page: Page): Promise<void> {
         total: 100,
         currency: 'ARS',
         created_at: iso(),
+      }),
+      invoices: () => ({
+        id: 'inv-e2e-1',
+        number: 'INV-E2E',
+        customer_name: 'Cliente demo',
+        issued_date: '2026-01-01',
+        due_date: '2026-02-01',
+        status: 'pending',
+        discount_percent: 0,
+        tax_percent: 21,
+        items: [{ id: 'line-e2e-1', description: 'Item E2E', qty: 1, unit: 'unidad', unit_price: 100 }],
+        is_favorite: false,
+        tags: [],
+      }),
+      employees: () => ({
+        id: 'emp-e2e-1',
+        tenant_id: 'e2e-org-001',
+        first_name: 'Empleado',
+        last_name: 'E2E',
+        email: 'empleado@test.local',
+        phone: '',
+        position: 'Operaciones',
+        status: 'active',
+        hire_date: '2026-01-01',
+        notes: '',
+        is_favorite: false,
+        tags: [],
+        created_by: 'e2e',
+        created_at: iso(),
+        updated_at: iso(),
       }),
       cashflow: () => ({
         id: 'cf-e2e-1',

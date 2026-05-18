@@ -1,8 +1,8 @@
-import { request, type RequestOptions } from '@devpablocristo/core-authn/http/fetch';
+import { apiRequest, type TenantAwareRequestOptions } from './api';
 
 type VerticalRequestConfig = {
   envVar: string;
-  fallbackPorts: number[];
+  devPorts: number[];
   translateError?: (message: string) => string;
   /** Límite de espera (ms). 0 = sin límite. Evita spinners infinitos si el vertical no responde. */
   timeoutMs?: number;
@@ -28,7 +28,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
   });
 }
 
-function resolveVerticalBaseURLs(envVar: string, fallbackPorts: number[]): string[] {
+function resolveVerticalBaseURLs(envVar: string, devPorts: number[]): string[] {
   const candidates: string[] = [];
   const env = import.meta.env as Record<string, string | undefined>;
   const configured = env[envVar]?.trim();
@@ -36,14 +36,16 @@ function resolveVerticalBaseURLs(envVar: string, fallbackPorts: number[]): strin
     candidates.push(configured);
   }
 
-  // Solo usar fallbacks basados en el hostname actual del navegador.
-  // No hardcodear localhost para evitar requests a localhost en produccion.
+  // Solo usar puertos de desarrollo cuando el navegador corre localmente.
+  // En hosting real, un puerto como web.app:8282 es un falso destino y rompe DEV.
   if (typeof window !== 'undefined') {
     const protocol = window.location.protocol || 'http:';
     const hostname = window.location.hostname || 'localhost';
-    fallbackPorts.forEach((port) => {
-      candidates.push(`${protocol}//${hostname}:${port}`);
-    });
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      devPorts.forEach((port) => {
+        candidates.push(`${protocol}//${hostname}:${port}`);
+      });
+    }
   }
 
   return [...new Set(candidates)];
@@ -69,16 +71,16 @@ function normalizeErrorMessage(raw: string, translateError?: (message: string) =
 }
 
 export function createVerticalRequest(config: VerticalRequestConfig) {
-  const baseURLs = resolveVerticalBaseURLs(config.envVar, config.fallbackPorts);
+  const baseURLs = resolveVerticalBaseURLs(config.envVar, config.devPorts);
   const timeoutMs = config.timeoutMs ?? 0;
   const timeoutMessage =
     config.timeoutMessage ??
     'El servidor tardó demasiado en responder. Comprobá que el backend vertical esté en marcha y el puerto en VITE_*_API_URL.';
 
-  return async function verticalRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  return async function verticalRequest<T>(path: string, options: TenantAwareRequestOptions = {}): Promise<T> {
     const run = async (): Promise<T> => {
       try {
-        return await request<T>(path, { ...options, baseURLs });
+        return await apiRequest<T>(path, { ...options, baseURLs });
       } catch (error) {
         if (error instanceof Error) {
           throw new Error(normalizeErrorMessage(error.message, config.translateError));

@@ -29,7 +29,7 @@ func (r *Repository) Upsert(ctx context.Context, in CandidateUpsert) (CandidateR
 	}
 	orgID, err := uuid.Parse(in.TenantID)
 	if err != nil {
-		return CandidateRecord{}, false, fmt.Errorf("parse tenant_id: %w", err)
+		return CandidateRecord{}, false, fmt.Errorf("parse org_id: %w", err)
 	}
 
 	var row models.CandidateModel
@@ -42,7 +42,7 @@ func (r *Repository) Upsert(ctx context.Context, in CandidateUpsert) (CandidateR
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		row = models.CandidateModel{
 			ID:              uuid.New(),
-			OrgID:           orgID,
+			OrgID:        orgID,
 			Kind:            in.Kind,
 			EventType:       in.EventType,
 			EntityType:      in.EntityType,
@@ -90,17 +90,17 @@ func (r *Repository) Upsert(ctx context.Context, in CandidateUpsert) (CandidateR
 	return toCandidateRecord(row), shouldNotify, nil
 }
 
-func (r *Repository) ListByTenant(ctx context.Context, tenantID string, limit int) ([]CandidateRecord, error) {
+func (r *Repository) ListByTenant(ctx context.Context, orgID string, limit int) ([]CandidateRecord, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 100
 	}
-	orgID, err := uuid.Parse(tenantID)
+	tenantUUID, err := uuid.Parse(orgID)
 	if err != nil {
-		return nil, fmt.Errorf("parse tenant_id: %w", err)
+		return nil, fmt.Errorf("parse org_id: %w", err)
 	}
 	var rows []models.CandidateModel
 	if err := r.db.WithContext(ctx).
-		Where("org_id = ?", orgID).
+		Where("org_id = ?", tenantUUID).
 		Order("last_seen_at DESC").
 		Limit(limit).
 		Find(&rows).Error; err != nil {
@@ -113,13 +113,13 @@ func (r *Repository) ListByTenant(ctx context.Context, tenantID string, limit in
 	return out, nil
 }
 
-func (r *Repository) MarkNotified(ctx context.Context, tenantID, candidateID string, notifiedAt time.Time) error {
+func (r *Repository) MarkNotified(ctx context.Context, orgID, candidateID string, notifiedAt time.Time) error {
 	if notifiedAt.IsZero() {
 		notifiedAt = time.Now().UTC()
 	}
-	orgID, err := uuid.Parse(tenantID)
+	tenantUUID, err := uuid.Parse(orgID)
 	if err != nil {
-		return fmt.Errorf("parse tenant_id: %w", err)
+		return fmt.Errorf("parse org_id: %w", err)
 	}
 	id, err := uuid.Parse(candidateID)
 	if err != nil {
@@ -131,14 +131,14 @@ func (r *Repository) MarkNotified(ctx context.Context, tenantID, candidateID str
 		"updated_at":       notifiedAt.UTC(),
 	}
 	var row models.CandidateModel
-	if err := r.db.WithContext(ctx).First(&row, "id = ? AND org_id = ?", id, orgID).Error; err != nil {
+	if err := r.db.WithContext(ctx).First(&row, "id = ? AND org_id = ?", id, tenantUUID).Error; err != nil {
 		return err
 	}
 	if row.FirstNotifiedAt == nil {
 		updates["first_notified_at"] = notifiedAt.UTC()
 	}
 	return r.db.WithContext(ctx).Model(&models.CandidateModel{}).
-		Where("id = ? AND org_id = ?", id, orgID).
+		Where("id = ? AND org_id = ?", id, tenantUUID).
 		Updates(updates).Error
 }
 

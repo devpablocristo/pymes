@@ -16,7 +16,7 @@ type Address struct {
 
 type Supplier struct {
 	ID          uuid.UUID
-	OrgID       uuid.UUID
+	OrgID    uuid.UUID
 	Name        string
 	TaxID       string
 	Email       string
@@ -24,6 +24,7 @@ type Supplier struct {
 	Address     Address
 	ContactName string
 	Notes       string
+	IsFavorite  bool
 	Tags        []string
 	Metadata    map[string]any
 	CreatedAt   time.Time

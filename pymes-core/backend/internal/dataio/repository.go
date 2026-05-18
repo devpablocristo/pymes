@@ -297,7 +297,7 @@ func createCustomerParty(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, row 
 	address, meta, tags := customerPartyData(row)
 	if err := tx.WithContext(ctx).Table("parties").Create(map[string]any{
 		"id":           partyID,
-		"org_id":       orgID,
+		"org_id":    orgID,
 		"party_type":   partyType,
 		"display_name": strings.TrimSpace(row["name"]),
 		"email":        strings.TrimSpace(row["email"]),
@@ -351,7 +351,7 @@ func createSupplierParty(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, row 
 	address, meta, roleMeta, tags := supplierPartyData(row)
 	if err := tx.WithContext(ctx).Table("parties").Create(map[string]any{
 		"id":           partyID,
-		"org_id":       orgID,
+		"org_id":    orgID,
 		"party_type":   "organization",
 		"display_name": strings.TrimSpace(row["name"]),
 		"email":        strings.TrimSpace(row["email"]),
@@ -526,7 +526,7 @@ func splitName(name string) (string, string) {
 }
 
 const (
-	maxImportProductImageURLs = 20
+	maxImportProductImageURLs   = 20
 	maxImportProductImageURLLen = 2048
 )
 

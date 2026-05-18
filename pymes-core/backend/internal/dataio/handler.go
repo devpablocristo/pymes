@@ -39,7 +39,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 func (h *Handler) Preview(c *gin.Context) {
 	filename, body, err := readUpload(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	out, err := h.uc.Preview(c.Request.Context(), c.Param("entity"), filename, body)
@@ -56,13 +56,13 @@ type confirmRequest struct {
 }
 
 func (h *Handler) Confirm(c *gin.Context) {
-	orgID, ok := handlers.ParseAuthOrgID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
 	var req confirmRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	auth := handlers.GetAuthContext(c)
@@ -85,18 +85,18 @@ func (h *Handler) Template(c *gin.Context) {
 }
 
 func (h *Handler) Export(c *gin.Context) {
-	orgID, ok := handlers.ParseAuthOrgID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
 	from, err := parseDate(c.Query("from"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	to, err := parseDate(c.Query("to"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	content, contentType, filename, err := h.uc.Export(c.Request.Context(), c.Param("entity"), orgID, c.Query("format"), from, to)

@@ -26,7 +26,7 @@ func (r *internalAPIKeyResolver) ResolveAPIKey(raw string) (users.ResolvedAPIKey
 	}
 	hash := utils.SHA256Hex(raw)
 	type row struct {
-		ID    uuid.UUID `gorm:"column:id"`
+		ID       uuid.UUID `gorm:"column:id"`
 		OrgID uuid.UUID `gorm:"column:org_id"`
 	}
 	var kr row

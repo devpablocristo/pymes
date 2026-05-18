@@ -27,11 +27,10 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 var (
 	ErrNotFound      = errors.New("service not found")
 	ErrAlreadyExists = errors.New("service already exists")
-	ErrArchived      = errors.New("service archived")
 )
 
 type ListParams struct {
-	OrgID    uuid.UUID
+	OrgID uuid.UUID
 	Limit    int
 	After    *uuid.UUID
 	Search   string
@@ -100,7 +99,7 @@ func (r *Repository) Create(ctx context.Context, in servicedomain.Service) (serv
 	meta, _ := json.Marshal(in.Metadata)
 	row := models.ServiceModel{
 		ID:                     uuid.New(),
-		OrgID:                  in.OrgID,
+		OrgID:               in.OrgID,
 		Code:                   strings.TrimSpace(in.Code),
 		Name:                   strings.TrimSpace(in.Name),
 		Description:            strings.TrimSpace(in.Description),
@@ -111,6 +110,7 @@ func (r *Repository) Create(ctx context.Context, in servicedomain.Service) (serv
 		Currency:               strings.TrimSpace(in.Currency),
 		DefaultDurationMinutes: in.DefaultDurationMinutes,
 		IsActive:               in.IsActive,
+		IsFavorite:             in.IsFavorite,
 		Tags:                   pq.StringArray(utils.NormalizeTags(in.Tags)),
 		Metadata:               meta,
 		CreatedAt:              time.Now().UTC(),
@@ -125,9 +125,11 @@ func (r *Repository) Create(ctx context.Context, in servicedomain.Service) (serv
 	return toDomain(row), nil
 }
 
+// GetByID devuelve el servicio independientemente de su estado de archivado.
+// El caller decide qué hacer con DeletedAt (Update rechaza archivados; el handler los expone con deleted_at).
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (servicedomain.Service, error) {
 	var row models.ServiceModel
-	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).Take(&row).Error
+	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return servicedomain.Service{}, ErrNotFound
@@ -150,6 +152,7 @@ func (r *Repository) Update(ctx context.Context, in servicedomain.Service) (serv
 		"currency":                 strings.TrimSpace(in.Currency),
 		"default_duration_minutes": in.DefaultDurationMinutes,
 		"is_active":                in.IsActive,
+		"is_favorite":              in.IsFavorite,
 		"tags":                     pq.StringArray(utils.NormalizeTags(in.Tags)),
 		"metadata":                 meta,
 		"updated_at":               time.Now().UTC(),
@@ -241,7 +244,7 @@ func toDomain(row models.ServiceModel) servicedomain.Service {
 	}
 	return servicedomain.Service{
 		ID:                     row.ID,
-		OrgID:                  row.OrgID,
+		OrgID:               row.OrgID,
 		Code:                   row.Code,
 		Name:                   row.Name,
 		Description:            row.Description,
@@ -252,6 +255,7 @@ func toDomain(row models.ServiceModel) servicedomain.Service {
 		Currency:               row.Currency,
 		DefaultDurationMinutes: row.DefaultDurationMinutes,
 		IsActive:               row.IsActive,
+		IsFavorite:             row.IsFavorite,
 		Tags:                   append([]string(nil), row.Tags...),
 		Metadata:               meta,
 		CreatedAt:              row.CreatedAt,

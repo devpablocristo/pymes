@@ -11,27 +11,31 @@ import (
 )
 
 type Principal struct {
-	OrgID  string   `json:"org_id"`
-	Actor  string   `json:"actor"`
-	Role   string   `json:"role"`
-	Scopes []string `json:"scopes"`
+	OrgID string   `json:"org_id"`
+	Actor    string   `json:"actor"`
+	Role     string   `json:"role"`
+	Scopes   []string `json:"scopes"`
 }
 
 type TokenVerifier interface {
 	VerifyToken(ctx context.Context, tokenString string) (*jwt.Token, error)
 }
 
-// OrgRefResolver traduce un identificador de tenant del JWT (p. ej. org_... de Clerk) al UUID interno de orgs.
+// OrgRefResolver traduce un identificador de tenant del JWT (p. ej. org_... de Clerk) al UUID interno de tenants.
 type OrgRefResolver interface {
 	ResolveOrgID(ctx context.Context, ref string) (string, error)
 }
 
+type TenantMembershipResolver interface {
+	FindActiveMembershipRole(ctx context.Context, orgID, actor string) (string, bool, error)
+}
+
 // IdentityConfig alinea verticales con core/saas: claims configurables + resolución de org externa.
 type IdentityConfig struct {
-	Issuer         string
-	Audience       string
-	OrgClaim       string
-	RoleClaim      string
+	Issuer            string
+	Audience          string
+	OrgClaim          string
+	RoleClaim         string
 	OrgRefResolver OrgRefResolver
 }
 
@@ -76,7 +80,7 @@ func (r *IdentityResolver) ResolvePrincipal(ctx context.Context, token string) (
 	if c := strings.TrimSpace(r.cfg.OrgClaim); c != "" {
 		orgNames = append(orgNames, c)
 	}
-	orgNames = append(orgNames, "tenant_id", "org_id", "o.id")
+	orgNames = append(orgNames, "org_id", "org_id", "o.id")
 
 	rawOrg := firstStringClaim(claims, orgNames...)
 	if strings.TrimSpace(rawOrg) == "" {

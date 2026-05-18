@@ -1,5 +1,5 @@
-// Package httperrors wrapper thin de core/http/go/gin para Gin.
-// Mantiene compatibilidad con los 87+ archivos que importan este paquete.
+// Package httperrors es un wrapper fino de core/http/go/gin para Gin.
+// Mantiene el punto de import compartido por core y verticales.
 // Los sentinels, Respond y Write delegan a core.
 package httperrors
 
@@ -7,8 +7,8 @@ import (
 	corepostgres "github.com/devpablocristo/core/databases/postgres/go"
 	"github.com/gin-gonic/gin"
 
-	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/devpablocristo/core/errors/go/domainerr"
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 )
 
 // Sentinel errors — domainerr.Error, soportan errors.Is por Kind.
@@ -20,7 +20,7 @@ var (
 	ErrNotDraft  = domainerr.Conflict("resource is not in draft status")
 )
 
-// ErrorResponse re-exporta el tipo de core para compatibilidad.
+// ErrorResponse re-exporta el tipo de core.
 type ErrorResponse = ginmw.ErrorResponse
 
 // IsUniqueViolation detecta errores de constraint UNIQUE de PostgreSQL.

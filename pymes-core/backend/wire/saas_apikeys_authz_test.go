@@ -2,8 +2,6 @@ package wire
 
 import (
 	"testing"
-
-	kerneldomain "github.com/devpablocristo/core/saas/go/kernel/usecases/domain"
 )
 
 func TestAPIKeyManagementAllowed(t *testing.T) {
@@ -26,7 +24,7 @@ func TestAPIKeyManagementAllowed(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			p := kerneldomain.Principal{TenantID: "org-1", Role: tc.role, Scopes: tc.scopes, AuthMethod: tc.authMethod}
+			p := tenantPrincipal{OrgID: "org-1", Role: tc.role, Scopes: tc.scopes, AuthMethod: tc.authMethod}
 			if got := apiKeyManagementAllowed(p); got != tc.want {
 				t.Fatalf("apiKeyManagementAllowed(%q, %v, %q) = %v, want %v", tc.role, tc.scopes, tc.authMethod, got, tc.want)
 			}

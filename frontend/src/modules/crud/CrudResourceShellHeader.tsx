@@ -7,10 +7,16 @@ import {
 } from '@devpablocristo/modules-crud-ui';
 import { useMemo } from 'react';
 import type { ReactNode } from 'react';
+import { NavLink, matchPath, useLocation, useNavigate } from 'react-router-dom';
 import { CrudArchivedSearchParamToggle } from './CrudArchivedSearchParamToggle';
 import { CrudToolbarActionButtons } from './CrudToolbarActionButtons';
 import { useCrudArchivedSearchParam } from './useCrudArchivedSearchParam';
+import { useViewModes } from './ViewModeTabsCtx';
 import type { CrudStateMachineConfig } from '../../components/CrudPage';
+import { HeaderMenu } from '../../components/HeaderMenu';
+import { useHeaderMenuItems } from '../../components/useHeaderMenuItems';
+import { NotificationsDropdown } from '../../components/NotificationsDropdown';
+import { tenantLink, useTenantSlug } from '../../lib/tenantSlug';
 import './CrudResourceShellHeader.css';
 
 export type CrudResourceShellHeaderConfigLike<T extends { id: string }> = {
@@ -79,6 +85,18 @@ export function CrudResourceShellHeader<T extends { id: string }>({
 }: CrudResourceShellHeaderProps<T>) {
   const { archived: showArchived } = useCrudArchivedSearchParam();
   const str = strings;
+  const navigate = useNavigate();
+  const slug = useTenantSlug();
+  const contextualMenuItems = useHeaderMenuItems();
+  const viewModes = useViewModes();
+  const { pathname } = useLocation();
+
+  function isModeActive(mode: { path: string; contextPattern?: string }): boolean {
+    return Boolean(
+      matchPath({ path: mode.path, end: true }, pathname) ||
+        (mode.contextPattern && matchPath({ path: mode.contextPattern, end: false }, pathname)),
+    );
+  }
 
   const vars = useMemo(
     () => ({
@@ -104,8 +122,26 @@ export function CrudResourceShellHeader<T extends { id: string }>({
   const searchEnabled = crudConfig?.featureFlags?.searchBar !== false;
   const archivedToggleEnabled = crudConfig?.featureFlags?.archivedToggle !== false;
 
+  const viewTabsNode =
+    viewModes && viewModes.length > 1 ? (
+      <nav className="m-view-tabs" aria-label="Vista">
+        {viewModes.map((mode) => (
+          <NavLink
+            key={mode.path}
+            to={mode.path}
+            draggable={false}
+            className={`m-view-tabs__item${isModeActive(mode) ? ' m-view-tabs__item--active' : ''}`}
+          >
+            {mode.label}
+          </NavLink>
+        ))}
+      </nav>
+    ) : null;
+
   const headerActionsResolved = (
-    <CrudShellHeaderActionsColumn
+    <>
+      {viewTabsNode}
+      <CrudShellHeaderActionsColumn
       search={
         searchEnabled
           ? {
@@ -138,10 +174,40 @@ export function CrudResourceShellHeader<T extends { id: string }>({
       ) : null}
       {extraHeaderActions}
     </CrudShellHeaderActionsColumn>
+    </>
   );
 
   return (
-    <div className="crud-resource-shell-header">
+    <div className="crud-resource-shell-header page-stack">
+      <div className="page-layout__header-top-row">
+        <div className="topbar-actions">
+          {contextualMenuItems.map((item) => (
+            <button
+              key={`${item.label}:${item.href}`}
+              type="button"
+              className="topbar-icon-btn"
+              aria-label={item.label}
+              title={item.label}
+              onClick={() => {
+                item.onSelect?.();
+                navigate(item.href);
+              }}
+            >
+              <i className={`ti ti-${topbarContextualIcon(item.label)}`} aria-hidden="true" />
+            </button>
+          ))}
+          <NotificationsDropdown />
+          <button
+            type="button"
+            className="topbar-icon-btn"
+            aria-label="Configuración"
+            onClick={() => navigate(tenantLink('/settings', slug))}
+          >
+            <i className="ti ti-settings" aria-hidden="true" />
+          </button>
+        </div>
+        <HeaderMenu items={contextualMenuItems} />
+      </div>
       <CrudPageShell
         title={showArchived ? titleArchivedView : titleActive}
         subtitle={subtitle}
@@ -153,4 +219,15 @@ export function CrudResourceShellHeader<T extends { id: string }>({
       </CrudPageShell>
     </div>
   );
+}
+
+function topbarContextualIcon(label: string): string {
+  const normalized = label.trim().toLowerCase();
+  if (normalized.startsWith('configurar')) {
+    return 'adjustments-horizontal';
+  }
+  if (normalized.startsWith('volver')) {
+    return 'arrow-left';
+  }
+  return 'dots';
 }

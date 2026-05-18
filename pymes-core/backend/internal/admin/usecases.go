@@ -33,7 +33,7 @@ func (u *Usecases) GetBootstrap(ctx context.Context, orgID string, role string, 
 	}
 	return map[string]any{
 		"auth": map[string]any{
-			"org_id":       orgID,
+			"org_id":    orgID,
 			"role":         role,
 			"product_role": authz.ProductRole(role, scopes),
 			"scopes":       scopes,

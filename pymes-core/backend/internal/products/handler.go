@@ -48,6 +48,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.DELETE(productsItemPath, rbac.RequirePermission("products", "delete"), h.Delete)
 	auth.POST(productsItemPath+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("products", "update"), h.Archive)
 	auth.POST(productsItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("products", "update"), h.Restore)
+	auth.DELETE(productsItemPath+"/"+crudpaths.SegmentHard, rbac.RequirePermission("products", "delete"), h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -63,7 +64,7 @@ func (h *Handler) listProducts(c *gin.Context, forceArchived bool) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		writeValidation(c, "invalid org")
+		writeValidation(c, "invalid tenant")
 		return
 	}
 	if strings.TrimSpace(c.Query("type")) != "" {
@@ -77,7 +78,7 @@ func (h *Handler) listProducts(c *gin.Context, forceArchived bool) {
 	}
 	archived := forceArchived || strings.EqualFold(strings.TrimSpace(c.Query("archived")), "true")
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		OrgID:    orgID,
+		OrgID: orgID,
 		Limit:    limit,
 		After:    after,
 		Search:   c.Query("search"),
@@ -104,7 +105,7 @@ func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		writeValidation(c, "invalid org")
+		writeValidation(c, "invalid tenant")
 		return
 	}
 	var req dto.CreateProductRequest
@@ -124,7 +125,7 @@ func (h *Handler) Create(c *gin.Context) {
 		isActive = *req.IsActive
 	}
 	out, err := h.uc.Create(c.Request.Context(), productdomain.Product{
-		OrgID:       orgID,
+		OrgID:    orgID,
 		SKU:         req.SKU,
 		Name:        req.Name,
 		Description: req.Description,
@@ -137,7 +138,13 @@ func (h *Handler) Create(c *gin.Context) {
 		ImageURLs:   append([]string(nil), req.ImageURLs...),
 		TrackStock:  trackStock,
 		IsActive:    isActive,
-		Tags:        req.Tags,
+		IsFavorite: func() bool {
+			if req.IsFavorite == nil {
+				return false
+			}
+			return *req.IsFavorite
+		}(),
+		Tags: req.Tags,
 		Metadata: func() map[string]any {
 			if req.Metadata == nil {
 				return map[string]any{}
@@ -156,7 +163,7 @@ func (h *Handler) Get(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		writeValidation(c, "invalid org")
+		writeValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -176,7 +183,7 @@ func (h *Handler) Update(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		writeValidation(c, "invalid org")
+		writeValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -205,6 +212,7 @@ func (h *Handler) Update(c *gin.Context) {
 		ImageURLs:   req.ImageURLs,
 		TrackStock:  req.TrackStock,
 		IsActive:    req.IsActive,
+		IsFavorite:  req.IsFavorite,
 		Tags:        req.Tags,
 		Metadata:    req.Metadata,
 	}, a.Actor)
@@ -216,10 +224,14 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
+	h.Archive(c)
+}
+
+func (h *Handler) HardDelete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		writeValidation(c, "invalid org")
+		writeValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -238,7 +250,7 @@ func (h *Handler) Archive(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		writeValidation(c, "invalid org")
+		writeValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -257,7 +269,7 @@ func (h *Handler) Restore(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		writeValidation(c, "invalid org")
+		writeValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -276,7 +288,7 @@ func toProductItem(in productdomain.Product) dto.ProductItem {
 	disp := displayProductImageURLs(in)
 	item := dto.ProductItem{
 		ID:          in.ID.String(),
-		OrgID:       in.OrgID.String(),
+		OrgID:    in.OrgID.String(),
 		SKU:         in.SKU,
 		Name:        in.Name,
 		Description: in.Description,
@@ -288,6 +300,7 @@ func toProductItem(in productdomain.Product) dto.ProductItem {
 		ImageURL:    "",
 		TrackStock:  in.TrackStock,
 		IsActive:    in.IsActive,
+		IsFavorite:  in.IsFavorite,
 		Tags:        in.Tags,
 		Metadata:    in.Metadata,
 		CreatedAt:   in.CreatedAt.UTC().Format(time.RFC3339),
@@ -319,7 +332,6 @@ func rejectLegacyProductTypeField(c *gin.Context) bool {
 			return false
 		}
 	}
-	c.Request.Body = io.NopCloser(bytes.NewReader(body))
 	return true
 }
 

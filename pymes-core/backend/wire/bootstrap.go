@@ -19,6 +19,7 @@ import (
 	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/accounts"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/admin"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/agent"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/attachments"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/businessinsights"
@@ -31,9 +32,12 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dashboard"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dataio"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/employees"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/governanceproxy"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inappnotifications"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/internalapi"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inventory"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/invoices"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/notifications"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/outwebhooks"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/party"
@@ -51,7 +55,6 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/recurring"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reports"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/returns"
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reviewproxy"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/sales"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/scheduler"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/services"
@@ -61,6 +64,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/timeline"
 	"github.com/devpablocristo/pymes/pymes-core/backend/migrations"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
+	sharedauth "github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
 )
 
@@ -84,11 +88,14 @@ func InitializeApp() *app.App {
 		StripePriceGrowth:     cfg.StripePriceGrowth,
 		StripePriceEnterprise: cfg.StripePriceEnterprise,
 		FrontendURL:           cfg.FrontendURL,
+		PublicBaseURL:         cfg.PublicBaseURL,
+		Environment:           cfg.Environment,
+		ClerkSecretKey:        cfg.ClerkSecretKey,
 		ClerkWebhookSecret:    cfg.ClerkWebhookSecret,
 		JWKSURL:               cfg.JWKSURL,
 		JWTIssuer:             cfg.JWTIssuer,
 		JWTAudience:           cfg.JWTAudience,
-		JWTOrgClaim:           cfg.JWTOrgClaim,
+		JWTTenantClaim:        cfg.JWTTenantClaim,
 		JWTRoleClaim:          cfg.JWTRoleClaim,
 		JWTScopesClaim:        cfg.JWTScopesClaim,
 		JWTActorClaim:         cfg.JWTActorClaim,
@@ -100,6 +107,7 @@ func InitializeApp() *app.App {
 	}
 
 	auditRepo := audit.NewRepository(db)
+	agentRepo := agent.NewRepository(db)
 	adminRepo := admin.NewRepository(db)
 	attachmentsRepo := attachments.NewRepository(db)
 	businessInsightsRepo := businessinsights.NewRepository(db)
@@ -114,6 +122,8 @@ func InitializeApp() *app.App {
 	inventoryRepo := inventory.NewRepository(db)
 	cashflowRepo := cashflow.NewRepository(db)
 	salesRepo := sales.NewRepository(db)
+	invoicesRepo := invoices.NewRepository(db)
+	employeesRepo := employees.NewRepository(db)
 	quotesRepo := quotes.NewRepository(db)
 	reportsRepo := reports.NewRepository(db)
 	returnsRepo := returns.NewRepository(db)
@@ -148,8 +158,7 @@ func InitializeApp() *app.App {
 	dashboardUC := dashboard.NewUsecases(dashboardRepo)
 	priceListsUC := pricelists.NewUsecases(priceListsRepo)
 	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC, purchases.WithTimeline(timelineUC), purchases.WithWebhooks(outwebhooksUC))
-	procurementEngine := procurement.NewGovernanceEngine()
-	procurementUC := procurement.NewUsecases(procurementRepo, procurementEngine, purchasesUC, auditUC, timelineUC, procurement.WithWebhooks(outwebhooksUC))
+	// procurement requiere Nexus governance: ya no hay motor local.
 	reportsUC := reports.NewUsecases(reportsRepo)
 	recurringUC := recurring.NewUsecases(recurringRepo, auditUC)
 	rbacUC := rbac.NewUsecases(rbacRepo, auditUC)
@@ -210,17 +219,18 @@ func InitializeApp() *app.App {
 	schedulerUC := scheduler.NewUsecases(schedulerRepo, cfg.ExchangeRateProvider, outwebhooksUC, paymentGatewayUC, schedulingUC, emailSender, cfg.PublicBaseURL)
 	notificationUC := notifications.NewUsecases(notificationRepo, emailSender, logger)
 
-	reviewURL := strings.TrimSpace(os.Getenv("REVIEW_URL"))
-	reviewAPIKey := strings.TrimSpace(os.Getenv("REVIEW_API_KEY"))
-	var reviewClient *reviewproxy.Client
-	inAppNotifUC := inappnotifications.NewUsecases(inAppNotifRepo)
-	if reviewURL != "" {
-		reviewClient = reviewproxy.NewClient(reviewURL, reviewAPIKey)
-		inAppNotifUC = inappnotifications.NewUsecases(
-			inAppNotifRepo,
-			inappnotifications.WithApprovalSource(reviewproxy.NewPendingApprovalSource(reviewClient)),
-		)
+	governanceURL := strings.TrimSpace(os.Getenv("GOVERNANCE_URL"))
+	governanceAPIKey := strings.TrimSpace(os.Getenv("GOVERNANCE_API_KEY"))
+	if governanceURL == "" {
+		logger.Fatal().Msg("GOVERNANCE_URL is required: pymes procurement now delegates all governance decisions to Nexus")
 	}
+	governanceClient := governanceproxy.NewClient(governanceURL, governanceAPIKey)
+	inAppNotifUC := inappnotifications.NewUsecases(
+		inAppNotifRepo,
+		inappnotifications.WithApprovalSource(governanceproxy.NewPendingApprovalSource(governanceClient)),
+	)
+	agentUC := agent.NewUsecases(agentRepo, governanceClient, auditUC)
+	procurementUC := procurement.NewUsecases(procurementRepo, governanceClient, purchasesUC, auditUC, timelineUC, procurement.WithWebhooks(outwebhooksUC))
 	businessInsightsUC := businessinsights.NewService(businessInsightsRepo, inAppNotifUC, businessinsights.Config{
 		FeaturedSaleThreshold:    cfg.InsightsFeaturedSaleThreshold,
 		FeaturedPaymentThreshold: cfg.InsightsFeaturedPaymentThreshold,
@@ -240,10 +250,13 @@ func InitializeApp() *app.App {
 	)
 	paymentsUC := payments.NewUsecases(paymentsRepo, auditUC, businessInsightsUC)
 	quotesUC := quotes.NewUsecases(quotesRepo, salesUC, auditUC)
+	invoicesUC := invoices.NewUsecases(invoicesRepo, auditUC)
+	employeesUC := employees.NewUsecases(employeesRepo, auditUC)
 
 	partyUC := party.NewUsecases(partyRepo, auditUC, party.WithTimeline(timelineUC), party.WithWebhooks(outwebhooksUC))
 	pdfgenUC := pdfgen.NewUsecases(quotesUC, salesUC, adminUC)
 
+	agentHandler := agent.NewHandler(agentUC, rbacUC)
 	auditHandler := audit.NewHandler(auditUC)
 	adminHandler := admin.NewHandler(adminUC)
 	attachmentsHandler := attachments.NewHandler(attachmentsUC)
@@ -254,6 +267,8 @@ func InitializeApp() *app.App {
 	inventoryHandler := inventory.NewHandler(inventoryUC)
 	cashflowHandler := cashflow.NewHandler(cashflowUC)
 	salesHandler := sales.NewHandler(salesUC)
+	invoicesHandler := invoices.NewHandler(invoicesUC)
+	employeesHandler := employees.NewHandler(employeesUC)
 	accountsHandler := accounts.NewHandler(accountsUC)
 	currencyHandler := currency.NewHandler(currencyUC)
 	dashboardHandler := dashboard.NewHandler(dashboardUC)
@@ -281,16 +296,20 @@ func InitializeApp() *app.App {
 	customerMessagingHandler := customer_messaging.NewHandler(customerMessagingUC)
 	publicAPIRepo := publicapi.NewRepository(db, schedulingUC)
 	publicAPIHandler := publicapi.NewHandler(publicAPIRepo)
-	publicSchedulingHandler := schedulingpublichttp.NewHandler(publicAPIRepo, func(err error) bool { return err == publicapi.ErrOrgNotFound })
-	var resolveOrgRefFn func(context.Context, string) (uuid.UUID, bool, error)
+	publicSchedulingHandler := schedulingpublichttp.NewHandler(publicAPIRepo, func(err error) bool { return err == publicapi.ErrTenantNotFound })
+	var resolveTenantRefFn func(context.Context, string) (uuid.UUID, bool, error)
 	if saasSvc != nil {
-		resolveOrgRefFn = saasSvc.ResolveOrgRef
+		resolveTenantRefFn = saasSvc.ResolveOrgRef
 	}
-	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, servicesUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), inAppNotifUC, customerMessagingUC, resolveOrgRefFn)
+	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, servicesUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), inAppNotifUC, customerMessagingUC, resolveTenantRefFn)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(ginmw.NewCORS(ginmw.CORSConfig{Origins: []string{cfg.FrontendURL}}))
+	router.Use(gin.Logger())
+	router.Use(ginmw.NewCORS(ginmw.CORSConfig{
+		Origins:      []string{cfg.FrontendURL},
+		AllowHeaders: []string{sharedauth.TenantSlugHeader},
+	}))
 	ginmw.RegisterHealthEndpoints(router, func(ctx context.Context) error {
 		return store.Ping(ctx, db)
 	})
@@ -311,10 +330,10 @@ func InitializeApp() *app.App {
 		},
 		scheduler: schedulerHandler,
 	})
-	registerInternalV1Routes(v1, cfg.InternalServiceToken, strings.TrimSpace(cfg.ReviewCallbackToken), internalV1Registrars{
-		api:             internalAPIHandler,
-		scheduling:      schedulingHandler,
-		reviewCallbacks: internalAPIHandler,
+	registerInternalV1Routes(v1, cfg.InternalServiceToken, strings.TrimSpace(cfg.GovernanceCallbackToken), internalV1Registrars{
+		api:                 internalAPIHandler,
+		scheduling:          schedulingHandler,
+		governanceCallbacks: internalAPIHandler,
 	}, rbacMiddleware.RequirePermission)
 	registerTenantPublicRoutes(v1, tenantPublicRegistrars{
 		api:            publicAPIHandler,
@@ -326,6 +345,7 @@ func InitializeApp() *app.App {
 			adminHandler,
 			attachmentsHandler,
 			rbacHandler,
+			agentHandler,
 			auditHandler,
 			notificationHandler,
 			inAppNotifHandler,
@@ -353,6 +373,8 @@ func InitializeApp() *app.App {
 			recurringHandler,
 			returnsHandler,
 			salesHandler,
+			invoicesHandler,
+			employeesHandler,
 			quotesHandler,
 			reportsHandler,
 		},
@@ -363,7 +385,7 @@ func InitializeApp() *app.App {
 		},
 		paymentGateway: paymentGatewayHandler,
 	})
-	registerReviewRuntime(authGroup, reviewClient, reviewURL, cfg.ReviewSyncInterval, inAppNotifUC, logger)
+	registerGovernanceRuntime(authGroup, governanceClient, governanceURL, cfg.GovernanceSyncInterval, inAppNotifUC, logger)
 
 	AttachSaaSUnmatchedRoutes(router, saasSvc)
 

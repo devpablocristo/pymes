@@ -9,8 +9,9 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	supplierdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/suppliers/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type RepositoryPort interface {
@@ -64,6 +65,7 @@ type UpdateInput struct {
 	Address     *supplierdomain.Address
 	ContactName *string
 	Notes       *string
+	IsFavorite  *bool
 	Tags        *[]string
 	Metadata    *map[string]any
 }
@@ -74,6 +76,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return supplierdomain.Supplier{}, fmt.Errorf("supplier not found: %w", httperrors.ErrNotFound)
 		}
+		return supplierdomain.Supplier{}, err
+	}
+	if err := archive.IfArchived(current.DeletedAt, "supplier"); err != nil {
 		return supplierdomain.Supplier{}, err
 	}
 	if in.Name != nil {
@@ -96,6 +101,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	if in.Notes != nil {
 		current.Notes = strings.TrimSpace(*in.Notes)
+	}
+	if in.IsFavorite != nil {
+		current.IsFavorite = *in.IsFavorite
 	}
 	if in.Tags != nil {
 		current.Tags = append([]string(nil), (*in.Tags)...)

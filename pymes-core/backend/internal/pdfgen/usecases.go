@@ -17,15 +17,15 @@ import (
 )
 
 type QuotePort interface {
-	GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error)
+	GetByID(ctx context.Context, tenantID, quoteID uuid.UUID) (quotedomain.Quote, error)
 }
 
 type SalePort interface {
-	GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
+	GetByID(ctx context.Context, tenantID, saleID uuid.UUID) (saledomain.Sale, error)
 }
 
 type AdminPort interface {
-	GetTenantSettings(ctx context.Context, orgID string) (admindomain.TenantSettings, error)
+	GetTenantSettings(ctx context.Context, tenantID string) (admindomain.TenantSettings, error)
 }
 
 type Usecases struct {
@@ -38,15 +38,15 @@ func NewUsecases(quotes QuotePort, sales SalePort, admin AdminPort) *Usecases {
 	return &Usecases{quotes: quotes, sales: sales, admin: admin}
 }
 
-func (u *Usecases) RenderQuotePDF(ctx context.Context, orgID, quoteID uuid.UUID) ([]byte, string, error) {
+func (u *Usecases) RenderQuotePDF(ctx context.Context, tenantID, quoteID uuid.UUID) ([]byte, string, error) {
 	if u.quotes == nil || u.admin == nil {
 		return nil, "", domainerr.Validation("pdf service unavailable")
 	}
-	quote, err := u.quotes.GetByID(ctx, orgID, quoteID)
+	quote, err := u.quotes.GetByID(ctx, tenantID, quoteID)
 	if err != nil {
 		return nil, "", err
 	}
-	settings, err := u.admin.GetTenantSettings(ctx, orgID.String())
+	settings, err := u.admin.GetTenantSettings(ctx, tenantID.String())
 	if err != nil {
 		return nil, "", err
 	}
@@ -59,15 +59,15 @@ func (u *Usecases) RenderQuotePDF(ctx context.Context, orgID, quoteID uuid.UUID)
 	return output(pdf), quote.Number + ".pdf", nil
 }
 
-func (u *Usecases) RenderSaleReceipt(ctx context.Context, orgID, saleID uuid.UUID) ([]byte, string, error) {
+func (u *Usecases) RenderSaleReceipt(ctx context.Context, tenantID, saleID uuid.UUID) ([]byte, string, error) {
 	if u.sales == nil || u.admin == nil {
 		return nil, "", domainerr.Validation("pdf service unavailable")
 	}
-	sale, err := u.sales.GetByID(ctx, orgID, saleID)
+	sale, err := u.sales.GetByID(ctx, tenantID, saleID)
 	if err != nil {
 		return nil, "", err
 	}
-	settings, err := u.admin.GetTenantSettings(ctx, orgID.String())
+	settings, err := u.admin.GetTenantSettings(ctx, tenantID.String())
 	if err != nil {
 		return nil, "", err
 	}

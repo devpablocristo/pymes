@@ -1,11 +1,8 @@
-import type { ReactNode } from 'react';
-import { Route, Routes, Navigate, useLocation, useParams } from 'react-router-dom';
+import { Route, Routes, Navigate, useParams } from 'react-router-dom';
 import type { CrudViewModeId } from '../components/CrudPage';
 import { PageLayout } from '../components/PageLayout';
-import { toCrudResourceSlug } from '../crud/crudResourceSlug';
 import { useBranchSelection } from '../lib/useBranchSelection';
-import { useTenantSlug } from '../lib/tenantSlug';
-import { getTenantProfile } from '../lib/tenantProfile';
+import { useOptionalTenantAccess } from '../lib/tenantAccessContext';
 import {
   CalendarPage,
   ConfiguredCrudSectionPage,
@@ -18,14 +15,13 @@ import {
   SettingsHubPage,
   ConfiguredCrudModePage,
   ConfiguredCrudRouteModePage,
+  ConfiguredCrudNestedRouteModePage,
   UnifiedChatPage,
   CustomerMessagingCampaignsPage,
   CustomerMessagingInboxPage,
   AutomationRulesPage,
   WatcherConfigPage,
 } from './lazyRoutes';
-
-type WorkOrdersResourceId = 'carWorkOrders' | 'bikeWorkOrders';
 
 function BranchSelectionLoading() {
   return (
@@ -34,45 +30,6 @@ function BranchSelectionLoading() {
         <p>Cargando sucursal…</p>
       </div>
     </PageLayout>
-  );
-}
-
-/** Resuelve qué variante de work-orders mostrar según el subvertical del profile. */
-function resolveWorkOrdersResourceId(): WorkOrdersResourceId {
-  const profile = getTenantProfile();
-  return profile?.subVertical === 'bike_shop' ? 'bikeWorkOrders' : 'carWorkOrders';
-}
-
-function normalizeLegacyWorkOrdersRemainder(remainder: string): string {
-  if (!remainder || remainder === '/') {
-    return '/list';
-  }
-  if (remainder === '/board' || remainder.startsWith('/board/')) {
-    return '/list';
-  }
-  if (remainder.startsWith('/edit/')) {
-    return '/list';
-  }
-  return remainder;
-}
-
-function WorkOrdersLegacyAliasRedirect() {
-  const { orgSlug = '' } = useParams();
-  const profileSlug = useTenantSlug();
-  const slug = profileSlug ?? orgSlug;
-  const location = useLocation();
-  const resourceSlug = toCrudResourceSlug(resolveWorkOrdersResourceId());
-  const remainder = location.pathname.replace(/^\/[^/]+\/work-orders/, '');
-
-  if (!slug) {
-    return <Navigate to="/onboarding" replace />;
-  }
-
-  return (
-    <Navigate
-      to={`/${slug}/${resourceSlug}${normalizeLegacyWorkOrdersRemainder(remainder)}${location.search}${location.hash}`}
-      replace
-    />
   );
 }
 
@@ -101,65 +58,74 @@ function InventorySectionLayout({ slug }: { slug: string }) {
   );
 }
 
-/** Raíz: resuelve el slug del tenant activo y redirige al dashboard; si no hay profile, a /onboarding. */
+function MedicalOccupationalHealthExamsSectionLayout({ slug }: { slug: string }) {
+  const baseRoute = `/${slug}/medical/occupational-health/exams`;
+  return (
+    <ConfiguredCrudSectionPage
+      resourceId="occupationalHealthExams"
+      baseRoute={baseRoute}
+      actionLink={{
+        to: `${baseRoute}/configure`,
+        label: 'Configurar',
+        hideWhenActivePattern: `${baseRoute}/configure`,
+        activeReplacement: {
+          to: `${baseRoute}/list`,
+          label: 'Volver a medicina laboral',
+        },
+      }}
+    />
+  );
+}
+
+/** Raíz protegida: solo redirige si el TenantAccessBoundary ya validó el tenant. */
 function RootTenantRedirect() {
-  const slug = useTenantSlug();
+  const slug = useOptionalTenantAccess()?.tenantSlug ?? null;
   if (!slug) return <Navigate to="/onboarding" replace />;
   return <Navigate to={`/${slug}/dashboard`} replace />;
 }
 
-/** Catch-all para URLs legacy sin slug: prepende el slug actual y preserva el resto del path. */
-function LegacyPathRedirect() {
-  const slug = useTenantSlug();
-  const location = useLocation();
-  if (!slug) return <Navigate to="/onboarding" replace />;
-  return <Navigate to={`/${slug}${location.pathname}${location.search}${location.hash}`} replace />;
-}
-
-/** Valida que el :orgSlug de la URL coincida con el profile. Si no hay profile, manda a /onboarding. */
-function TenantSlugGate({ children }: { children: ReactNode }) {
-  const { orgSlug = '' } = useParams();
-  const slug = useTenantSlug();
-  if (!slug) return <Navigate to="/onboarding" replace />;
-  // Dev: aceptamos cualquier slug en la URL. En prod con backend esto se valida contra orgs.slug.
-  void orgSlug;
-  return <>{children}</>;
-}
-
 function TenantScopedRoutes() {
-  const { orgSlug = '' } = useParams();
-  const profileSlug = useTenantSlug();
-  const slug = profileSlug ?? orgSlug;
+  const { tenantSlug = '' } = useParams();
+  const accessSlug = useOptionalTenantAccess()?.tenantSlug ?? null;
+  const slug = accessSlug ?? tenantSlug;
   return (
     <Routes>
       <Route index element={<Navigate to="dashboard" replace />} />
       <Route path="dashboard" element={<DashboardVisualPage />} />
       <Route path="chat" element={<UnifiedChatPage />} />
-      <Route path="assistant/commercial" element={<Navigate to="../chat" replace />} />
       <Route path="notifications" element={<NotificationsCenterPage />} />
       <Route path="agenda" element={<CalendarPage />} />
-      <Route path="calendar" element={<Navigate to="../agenda" replace />} />
       <Route path="settings" element={<SettingsHubPage />} />
-      <Route path="settings/keys" element={<Navigate to="../settings" replace />} />
-      <Route path="settings/notifications" element={<Navigate to="../settings?section=notifications" replace />} />
-      <Route path="admin" element={<Navigate to="../settings" replace />} />
-      <Route path="billing" element={<Navigate to="../settings?section=gateway" replace />} />
-      <Route path="audit" element={<Navigate to="../settings?section=audit" replace />} />
-      <Route path="roles" element={<Navigate to="../settings?section=rbac" replace />} />
       <Route path="automation-rules" element={<AutomationRulesPage />} />
       <Route path="customer-messaging/campaigns" element={<CustomerMessagingCampaignsPage />} />
       <Route path="customer-messaging/inbox" element={<CustomerMessagingInboxPage />} />
       <Route path="watcher-config" element={<WatcherConfigPage />} />
       <Route path="restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />
-
-      {/* alias legado: /work-orders/* -> recurso CRUD canónico según subvertical */}
-      <Route path="work-orders/*" element={<WorkOrdersLegacyAliasRedirect />} />
+      <Route path="medical/occupational-health/exams" element={<MedicalOccupationalHealthExamsSectionLayout slug={slug} />}>
+        <Route
+          index
+          element={<ConfiguredCrudIndexRedirect resourceId="occupationalHealthExams" baseRoute={`/${slug}/medical/occupational-health/exams`} />}
+        />
+        <Route
+          path="configure"
+          element={
+            <CrudUiConfigurePage
+              resourceId="occupationalHealthExams"
+              backPath="/medical/occupational-health/exams/list"
+            />
+          }
+        />
+        <Route
+          path=":modePath"
+          element={<ConfiguredCrudNestedRouteModePage resourceId="occupationalHealthExams" baseRoute={`/${slug}/medical/occupational-health/exams`} />}
+        />
+      </Route>
 
       {/* inventory: sección con sus propios routes */}
       <Route path="inventory" element={<InventorySectionLayout slug={slug} />}>
         <Route index element={<ConfiguredCrudIndexRedirect resourceId="inventory" baseRoute={`/${slug}/inventory`} />} />
         <Route path="list" element={<InventoryModePage modeId="list" />} />
-        <Route path="configure" element={<CrudUiConfigurePage />} />
+        <Route path="configure" element={<CrudUiConfigurePage resourceId="inventory" backPath="/inventory/list" />} />
         <Route path="explorer" element={<Navigate to="../list" replace />} />
         <Route path="gallery" element={<InventoryModePage modeId="gallery" />} />
         <Route path="board" element={<InventoryModePage modeId="kanban" />} />
@@ -173,46 +139,12 @@ function TenantScopedRoutes() {
   );
 }
 
-/** Legacy: /modules/:moduleId/... → /{slug}/:moduleId/... */
-function LegacyModulesRedirect() {
-  const slug = useTenantSlug();
-  const { moduleId = '' } = useParams();
-  const location = useLocation();
-  if (!slug) return <Navigate to="/onboarding" replace />;
-  const remainder = location.pathname.replace(/^\/modules\/[^/]+/, '');
-  return <Navigate to={`/${slug}/${moduleId}${remainder}${location.search}${location.hash}`} replace />;
-}
-
-/** Legacy: /workshops/{sub}/{module}/* → recursos canónicos bajo /{slug}/... */
-export function resolveLegacyWorkshopDestination(slug: string, pathname: string): string {
-  const match = pathname.match(/^\/workshops\/([^/]+)\/([^/]+)(\/.*)?$/);
-  const segment = match?.[1] ?? '';
-  const moduleId = match?.[2] ?? '';
-  const remainder = match?.[3] ?? '';
-
-  if (segment === 'auto-repair' && moduleId === 'vehicles') {
-    return `/${slug}/${toCrudResourceSlug('workshopVehicles')}${remainder}`;
-  }
-  if (segment === 'bike-shop') {
-    return `/${slug}/${toCrudResourceSlug('bikeWorkOrders')}${normalizeLegacyWorkOrdersRemainder(remainder)}`;
-  }
-  return `/${slug}/${toCrudResourceSlug('carWorkOrders')}${normalizeLegacyWorkOrdersRemainder(remainder)}`;
-}
-
-function LegacyWorkshopsRedirect() {
-  const slug = useTenantSlug();
-  const location = useLocation();
-  if (!slug) return <Navigate to="/onboarding" replace />;
-  const destination = resolveLegacyWorkshopDestination(slug, location.pathname);
-  return <Navigate to={`${destination}${location.search}${location.hash}`} replace />;
-}
-
 /**
  * Rutas bajo el Shell autenticado (producto).
  *
- * Política de URL: `/{tenant-slug}/{recurso}/{subpath}`. El tenant slug se
- * deriva de `tenantProfile.businessName` slugificado. URLs viejas sin slug
- * redirigen automáticamente al slug actual.
+ * Política de URL: `/{tenant-slug}/{recurso}/{subpath}`.
+ * El slug ya fue validado por `TenantAccessBoundary`; acá no se corrige
+ * silenciosamente una URL manipulada.
  */
 export function ShellRoutes() {
   return (
@@ -221,39 +153,11 @@ export function ShellRoutes() {
 
       {/* Rutas autenticadas bajo tenant slug */}
       <Route
-        path="/:orgSlug/*"
-        element={
-          <TenantSlugGate>
-            <TenantScopedRoutes />
-          </TenantSlugGate>
-        }
+        path="/:tenantSlug/*"
+        element={<TenantScopedRoutes />}
       />
 
-      {/* Legacy redirects: capturan URLs autenticadas viejas y prepende slug. */}
-      <Route path="/dashboard/*" element={<LegacyPathRedirect />} />
-      <Route path="/chat/*" element={<LegacyPathRedirect />} />
-      <Route path="/notifications/*" element={<LegacyPathRedirect />} />
-      <Route path="/agenda/*" element={<LegacyPathRedirect />} />
-      <Route path="/calendar/*" element={<LegacyPathRedirect />} />
-      <Route path="/settings/*" element={<LegacyPathRedirect />} />
-      <Route path="/admin/*" element={<LegacyPathRedirect />} />
-      <Route path="/billing/*" element={<LegacyPathRedirect />} />
-      <Route path="/invoices/*" element={<LegacyPathRedirect />} />
-      <Route path="/audit/*" element={<LegacyPathRedirect />} />
-      <Route path="/roles/*" element={<LegacyPathRedirect />} />
-      <Route path="/automation-rules/*" element={<LegacyPathRedirect />} />
-      <Route path="/customer-messaging/*" element={<LegacyPathRedirect />} />
-      <Route path="/watcher-config/*" element={<LegacyPathRedirect />} />
-      <Route path="/assistant/*" element={<LegacyPathRedirect />} />
-      <Route path="/restaurants/*" element={<LegacyPathRedirect />} />
-
-      {/* /modules/* → /{slug}/* */}
-      <Route path="/modules/:moduleId/*" element={<LegacyModulesRedirect />} />
-
-      <Route path="/work-orders/*" element={<LegacyPathRedirect />} />
-
-      {/* /workshops/{sub}/* → recursos CRUD canónicos */}
-      <Route path="/workshops/*" element={<LegacyWorkshopsRedirect />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

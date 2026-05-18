@@ -45,6 +45,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.DELETE(servicesItemPath, rbac.RequirePermission("services", "delete"), h.Delete)
 	auth.POST(servicesItemPath+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("services", "update"), h.Archive)
 	auth.POST(servicesItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("services", "update"), h.Restore)
+	auth.DELETE(servicesItemPath+"/"+crudpaths.SegmentHard, rbac.RequirePermission("services", "delete"), h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -60,7 +61,7 @@ func (h *Handler) listServices(c *gin.Context, forceArchived bool) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		writeValidation(c, "invalid org")
+		writeValidation(c, "invalid tenant")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -70,7 +71,7 @@ func (h *Handler) listServices(c *gin.Context, forceArchived bool) {
 	}
 	archived := forceArchived || strings.EqualFold(strings.TrimSpace(c.Query("archived")), "true")
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		OrgID:    orgID,
+		OrgID: orgID,
 		Limit:    limit,
 		After:    after,
 		Search:   c.Query("search"),
@@ -97,7 +98,7 @@ func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		writeValidation(c, "invalid org")
+		writeValidation(c, "invalid tenant")
 		return
 	}
 	var req dto.CreateServiceRequest
@@ -110,7 +111,7 @@ func (h *Handler) Create(c *gin.Context) {
 		isActive = *req.IsActive
 	}
 	out, err := h.uc.Create(c.Request.Context(), servicedomain.Service{
-		OrgID:                  orgID,
+		OrgID:               orgID,
 		Code:                   req.Code,
 		Name:                   req.Name,
 		Description:            req.Description,
@@ -121,7 +122,13 @@ func (h *Handler) Create(c *gin.Context) {
 		Currency:               req.Currency,
 		DefaultDurationMinutes: req.DefaultDurationMinutes,
 		IsActive:               isActive,
-		Tags:                   req.Tags,
+		IsFavorite: func() bool {
+			if req.IsFavorite == nil {
+				return false
+			}
+			return *req.IsFavorite
+		}(),
+		Tags: req.Tags,
 		Metadata: func() map[string]any {
 			if req.Metadata == nil {
 				return map[string]any{}
@@ -140,7 +147,7 @@ func (h *Handler) Get(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		writeValidation(c, "invalid org")
+		writeValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -160,7 +167,7 @@ func (h *Handler) Update(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		writeValidation(c, "invalid org")
+		writeValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -184,6 +191,7 @@ func (h *Handler) Update(c *gin.Context) {
 		Currency:               req.Currency,
 		DefaultDurationMinutes: req.DefaultDurationMinutes,
 		IsActive:               req.IsActive,
+		IsFavorite:             req.IsFavorite,
 		Tags:                   req.Tags,
 		Metadata:               req.Metadata,
 	}, a.Actor)
@@ -195,10 +203,14 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
+	h.Archive(c)
+}
+
+func (h *Handler) HardDelete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		writeValidation(c, "invalid org")
+		writeValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -217,7 +229,7 @@ func (h *Handler) Archive(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		writeValidation(c, "invalid org")
+		writeValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -236,7 +248,7 @@ func (h *Handler) Restore(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		writeValidation(c, "invalid org")
+		writeValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -254,7 +266,7 @@ func (h *Handler) Restore(c *gin.Context) {
 func toServiceItem(in servicedomain.Service) dto.ServiceItem {
 	return dto.ServiceItem{
 		ID:                     in.ID.String(),
-		OrgID:                  in.OrgID.String(),
+		OrgID:               in.OrgID.String(),
 		Code:                   in.Code,
 		Name:                   in.Name,
 		Description:            in.Description,
@@ -265,6 +277,7 @@ func toServiceItem(in servicedomain.Service) dto.ServiceItem {
 		Currency:               in.Currency,
 		DefaultDurationMinutes: in.DefaultDurationMinutes,
 		IsActive:               in.IsActive,
+		IsFavorite:             in.IsFavorite,
 		Tags:                   in.Tags,
 		Metadata:               in.Metadata,
 		CreatedAt:              in.CreatedAt.UTC().Format(time.RFC3339),

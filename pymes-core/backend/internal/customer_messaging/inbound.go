@@ -21,7 +21,7 @@ import (
 )
 
 type Connection struct {
-	OrgID         uuid.UUID
+	OrgID      uuid.UUID
 	PhoneNumberID string
 	WABAID        string
 	AccessToken   string
@@ -46,7 +46,7 @@ type MetaClientPort interface {
 }
 
 type InboundMessage struct {
-	OrgID         uuid.UUID
+	OrgID      uuid.UUID
 	PhoneNumberID string
 	FromPhone     string
 	Text          string
@@ -205,7 +205,7 @@ func (u *Usecases) HandleInboundWebhook(ctx context.Context, payload []byte) (In
 				now := time.Now()
 				inboundMsg := domain.Message{
 					ID:             uuid.New(),
-					OrgID:          orgID,
+					OrgID:       orgID,
 					PhoneNumberID:  msg.PhoneNumberID,
 					Direction:      domain.DirectionInbound,
 					WAMessageID:    msg.MessageID,

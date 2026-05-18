@@ -48,7 +48,7 @@ func TestRenderQuotePDFHappyPath(t *testing.T) {
 	uc := NewUsecases(
 		&fakeQuotes{quote: quotedomain.Quote{
 			ID:           quoteID,
-			OrgID:        orgID,
+			OrgID:     orgID,
 			Number:       "P-001",
 			CustomerName: "Test Customer",
 			Status:       "draft",
@@ -95,7 +95,7 @@ func TestRenderSaleReceiptHappyPath(t *testing.T) {
 		&fakeQuotes{},
 		&fakeSales{sale: saledomain.Sale{
 			ID:            saleID,
-			OrgID:         orgID,
+			OrgID:      orgID,
 			Number:        "V-042",
 			CustomerName:  "Buyer",
 			PaymentMethod: "transfer",

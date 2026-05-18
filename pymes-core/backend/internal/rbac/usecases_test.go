@@ -41,7 +41,7 @@ func (f *fakeRepo) GetActorPermissions(_ context.Context, _ uuid.UUID, _ string)
 }
 
 func TestUsecases_HasPermission(t *testing.T) {
-	orgID := uuid.New().String()
+	tenantID := uuid.New().String()
 	uc := NewUsecases(&fakeRepo{perms: map[string]map[string]bool{"sales": {"create": true}}}, nil)
 
 	tests := []struct {
@@ -67,7 +67,7 @@ func TestUsecases_HasPermission(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := uc.HasPermission(context.Background(), orgID, "actor-1", tt.role, tt.scopes, tt.authMethod, tt.resource, tt.action)
+			got := uc.HasPermission(context.Background(), tenantID, "actor-1", tt.role, tt.scopes, tt.authMethod, tt.resource, tt.action)
 			if got != tt.want {
 				t.Fatalf("HasPermission() = %v, want %v", got, tt.want)
 			}

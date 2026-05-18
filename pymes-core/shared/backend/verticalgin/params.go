@@ -11,16 +11,16 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 )
 
-func ParseAuthOrgID(c *gin.Context) (uuid.UUID, bool) {
-	return auth.ParseAuthOrgID(c)
+func ParseAuthTenantID(c *gin.Context) (uuid.UUID, bool) {
+	return auth.ParseAuthTenantID(c)
 }
 
 func ParseUUIDParam(c *gin.Context, param string, field string) (uuid.UUID, bool) {
 	return ginmw.ParseUUIDParam(c, param)
 }
 
-func ParseAuthOrgAndParamID(c *gin.Context, param string, field string) (uuid.UUID, uuid.UUID, bool) {
-	orgID, ok := ParseAuthOrgID(c)
+func ParseAuthTenantAndParamID(c *gin.Context, param string, field string) (uuid.UUID, uuid.UUID, bool) {
+	orgID, ok := ParseAuthTenantID(c)
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}

@@ -82,7 +82,7 @@ func TestHandlerGetBusinessInfoReturnsSchedulingEnabled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := &fakeRepo{
 		businessInfo: BusinessInfo{
-			OrgID:             uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+			OrgID:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 			Name:              "Demo Org",
 			Slug:              "demo-org",
 			BusinessName:      "Demo Scheduling",

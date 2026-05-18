@@ -233,7 +233,7 @@ func (h *Handler) readAuth(c *gin.Context) (uuid.UUID, bool) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return uuid.Nil, false
 	}
 	return orgID, true
@@ -246,7 +246,7 @@ func (h *Handler) readBranchID(c *gin.Context) (*uuid.UUID, bool) {
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		handlers.WriteValidation(c, "invalid branch_id")
 		return nil, false
 	}
 	return &id, true
@@ -259,20 +259,20 @@ func (h *Handler) readAuthAndRange(c *gin.Context) (uuid.UUID, time.Time, time.T
 	}
 	from, err := parseDate(c.Query("from"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid from (expected YYYY-MM-DD)"})
+		handlers.WriteValidation(c, "invalid from (expected YYYY-MM-DD)")
 		return uuid.Nil, time.Time{}, time.Time{}, false
 	}
 	to, err := parseDate(c.Query("to"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid to (expected YYYY-MM-DD)"})
+		handlers.WriteValidation(c, "invalid to (expected YYYY-MM-DD)")
 		return uuid.Nil, time.Time{}, time.Time{}, false
 	}
 	if from.IsZero() || to.IsZero() {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "from and to query params are required"})
+		handlers.WriteValidation(c, "from and to query params are required")
 		return uuid.Nil, time.Time{}, time.Time{}, false
 	}
 	if to.Before(from) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date range"})
+		handlers.WriteValidation(c, "invalid date range")
 		return uuid.Nil, time.Time{}, time.Time{}, false
 	}
 	// Include full "to" day.

@@ -58,7 +58,7 @@ func (r *Repository) CreateRole(ctx context.Context, in rbacdomain.Role) (rbacdo
 	now := time.Now().UTC()
 	m := models.RoleModel{
 		ID:          uuid.New(),
-		OrgID:       in.OrgID,
+		OrgID:    in.OrgID,
 		Name:        strings.TrimSpace(in.Name),
 		Description: strings.TrimSpace(in.Description),
 		IsSystem:    in.IsSystem,
@@ -114,7 +114,7 @@ func (r *Repository) DeleteRole(ctx context.Context, orgID, roleID uuid.UUID) er
 }
 
 func (r *Repository) AssignRole(ctx context.Context, orgID, roleID, userID uuid.UUID, assignedBy string) error {
-	if ok, err := r.isOrgMember(ctx, orgID, userID); err != nil {
+	if ok, err := r.isTenantMember(ctx, orgID, userID); err != nil {
 		return err
 	} else if !ok {
 		return gorm.ErrRecordNotFound
@@ -126,7 +126,7 @@ func (r *Repository) AssignRole(ctx context.Context, orgID, roleID, userID uuid.
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return r.db.WithContext(ctx).Create(&models.UserRoleModel{
-				OrgID:      orgID,
+				OrgID:   orgID,
 				UserID:     userID,
 				RoleID:     roleID,
 				AssignedBy: assignedBy,
@@ -161,7 +161,7 @@ func (r *Repository) IsSystemRole(ctx context.Context, orgID, roleID uuid.UUID) 
 }
 
 func (r *Repository) GetUserPermissions(ctx context.Context, orgID, userID uuid.UUID) (map[string]map[string]bool, error) {
-	if ok, err := r.isOrgAdmin(ctx, orgID, userID); err != nil {
+	if ok, err := r.isTenantAdmin(ctx, orgID, userID); err != nil {
 		return nil, err
 	} else if ok {
 		return map[string]map[string]bool{"*": {"*": true}}, nil
@@ -196,7 +196,7 @@ func (r *Repository) findActorUserID(ctx context.Context, orgID uuid.UUID, actor
 		return uuid.Nil, false, nil
 	}
 	if id, err := uuid.Parse(actor); err == nil {
-		if ok, err := r.isOrgMember(ctx, orgID, id); err != nil {
+		if ok, err := r.isTenantMember(ctx, orgID, id); err != nil {
 			return uuid.Nil, false, err
 		} else if ok {
 			return id, true, nil
@@ -209,7 +209,7 @@ func (r *Repository) findActorUserID(ctx context.Context, orgID uuid.UUID, actor
 	var row userRow
 	err := r.db.WithContext(ctx).Table("users u").
 		Select("u.id").
-		Joins("JOIN org_members om ON om.user_id = u.id AND om.org_id = ?", orgID).
+		Joins("JOIN org_members tm ON tm.user_id = u.id AND tm.org_id = ?", orgID).
 		Where("u.external_id = ?", actor).
 		Limit(1).
 		Scan(&row).Error
@@ -222,7 +222,7 @@ func (r *Repository) findActorUserID(ctx context.Context, orgID uuid.UUID, actor
 	return row.ID, true, nil
 }
 
-func (r *Repository) isOrgAdmin(ctx context.Context, orgID, userID uuid.UUID) (bool, error) {
+func (r *Repository) isTenantAdmin(ctx context.Context, orgID, userID uuid.UUID) (bool, error) {
 	type row struct {
 		Role string `gorm:"column:role"`
 	}
@@ -234,7 +234,7 @@ func (r *Repository) isOrgAdmin(ctx context.Context, orgID, userID uuid.UUID) (b
 	return strings.EqualFold(strings.TrimSpace(out.Role), "admin"), nil
 }
 
-func (r *Repository) isOrgMember(ctx context.Context, orgID, userID uuid.UUID) (bool, error) {
+func (r *Repository) isTenantMember(ctx context.Context, orgID, userID uuid.UUID) (bool, error) {
 	type row struct {
 		ID uuid.UUID `gorm:"column:user_id"`
 	}
@@ -293,7 +293,7 @@ func (r *Repository) replaceRolePermissions(ctx context.Context, roleID uuid.UUI
 func roleToDomain(in models.RoleModel, perms []rbacdomain.Permission) rbacdomain.Role {
 	return rbacdomain.Role{
 		ID:          in.ID,
-		OrgID:       in.OrgID,
+		OrgID:    in.OrgID,
 		Name:        in.Name,
 		Description: in.Description,
 		IsSystem:    in.IsSystem,

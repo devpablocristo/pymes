@@ -10,6 +10,7 @@ import (
 
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
 )
 
 type UsecasesPort interface {
@@ -43,7 +44,7 @@ func (h *Handler) RegisterWorkOrderRoutes(authGroup *gin.RouterGroup) {
 func (h *Handler) CreateBooking(c *gin.Context) {
 	var payload map[string]any
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	if payload == nil {
@@ -99,7 +100,7 @@ func (h *Handler) CreatePaymentLink(c *gin.Context) {
 func parseID(c *gin.Context) (uuid.UUID, bool) {
 	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		verticalgin.WriteValidation(c, "invalid id")
 		return uuid.Nil, false
 	}
 	return id, true

@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	productdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/products/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
@@ -50,17 +50,7 @@ func (u *Usecases) Create(ctx context.Context, in productdomain.Product, actor s
 	if len(in.Name) < 2 {
 		return productdomain.Product{}, fmt.Errorf("name must be at least 2 characters: %w", httperrors.ErrBadInput)
 	}
-	meta := in.Metadata
-	if meta == nil {
-		meta = map[string]any{}
-	}
-	urls := append([]string(nil), in.ImageURLs...)
-	if len(urls) == 0 {
-		if fromMeta, ok := parseImageURLsFromMetadata(meta); ok {
-			urls = append(urls, fromMeta...)
-		}
-	}
-	urls, err := normalizeProductImageURLs(urls)
+	urls, err := normalizeProductImageURLs(in.ImageURLs)
 	if err != nil {
 		return productdomain.Product{}, err
 	}
@@ -69,8 +59,7 @@ func (u *Usecases) Create(ctx context.Context, in productdomain.Product, actor s
 	if len(in.ImageURLs) > 0 {
 		in.ImageURL = in.ImageURLs[0]
 	}
-	in.Metadata = mergeProductMetadataImageURLs(meta, urlsForMetadataSync(in))
-	if len(in.ImageURL) > maxLenForProductImageURL(in.ImageURL) {
+	if len(in.ImageURL) > maxProductImageURLLen {
 		return productdomain.Product{}, fmt.Errorf("image_url too long: %w", httperrors.ErrBadInput)
 	}
 	if in.Unit == "" {
@@ -110,6 +99,7 @@ type UpdateInput struct {
 	ImageURLs   *[]string
 	TrackStock  *bool
 	IsActive    *bool
+	IsFavorite  *bool
 	Tags        *[]string
 	Metadata    *map[string]any
 }
@@ -117,9 +107,12 @@ type UpdateInput struct {
 func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (productdomain.Product, error) {
 	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, ErrNotFound) {
 			return productdomain.Product{}, fmt.Errorf("product not found: %w", httperrors.ErrNotFound)
 		}
+		return productdomain.Product{}, err
+	}
+	if err := archive.IfArchived(current.DeletedAt, "product"); err != nil {
 		return productdomain.Product{}, err
 	}
 	if in.SKU != nil {
@@ -147,12 +140,6 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		v := *in.TaxRate
 		current.TaxRate = &v
 	}
-	if in.Metadata != nil {
-		current.Metadata = *in.Metadata
-	}
-	if in.Tags != nil {
-		current.Tags = append([]string(nil), (*in.Tags)...)
-	}
 	if in.ImageURLs != nil {
 		urls, err := normalizeProductImageURLs(*in.ImageURLs)
 		if err != nil {
@@ -164,20 +151,11 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		} else {
 			current.ImageURL = ""
 		}
-	} else if mdRaw, mdOK := parseImageURLsFromMetadata(current.Metadata); mdOK {
-		urls, err := normalizeProductImageURLs(mdRaw)
-		if err != nil {
-			return productdomain.Product{}, err
-		}
-		current.ImageURLs = urls
-		if len(urls) > 0 {
-			current.ImageURL = urls[0]
-		} else {
-			current.ImageURL = ""
-		}
-	} else if in.ImageURL != nil {
+	}
+	// Si el cliente manda sólo image_url (sin image_urls), actualiza el thumbnail
+	// sin borrar la galería existente. Para vaciar la galería hay que enviar image_urls=[].
+	if in.ImageURL != nil && in.ImageURLs == nil {
 		current.ImageURL = strings.TrimSpace(*in.ImageURL)
-		current.ImageURLs = nil
 	}
 	if in.TrackStock != nil {
 		current.TrackStock = *in.TrackStock
@@ -185,12 +163,20 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if in.IsActive != nil {
 		current.IsActive = *in.IsActive
 	}
-	current.Metadata = mergeProductMetadataImageURLs(current.Metadata, urlsForMetadataSync(current))
+	if in.IsFavorite != nil {
+		current.IsFavorite = *in.IsFavorite
+	}
+	if in.Tags != nil {
+		current.Tags = append([]string(nil), (*in.Tags)...)
+	}
+	if in.Metadata != nil {
+		current.Metadata = *in.Metadata
+	}
 
 	if len(current.Name) < 2 {
 		return productdomain.Product{}, fmt.Errorf("name must be at least 2 characters: %w", httperrors.ErrBadInput)
 	}
-	if len(current.ImageURL) > maxLenForProductImageURL(current.ImageURL) {
+	if len(current.ImageURL) > maxProductImageURLLen {
 		return productdomain.Product{}, fmt.Errorf("image_url too long: %w", httperrors.ErrBadInput)
 	}
 	if strings.TrimSpace(current.Currency) == "" {

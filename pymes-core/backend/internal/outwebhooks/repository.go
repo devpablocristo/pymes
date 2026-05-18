@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/http/go/pagination"
@@ -30,7 +31,7 @@ func (r *Repository) ListEndpoints(ctx context.Context, orgID uuid.UUID) ([]webh
 }
 
 func (r *Repository) CreateEndpoint(ctx context.Context, in webhookdomain.Endpoint) (webhookdomain.Endpoint, error) {
-	row := models.EndpointModel{ID: in.ID, OrgID: in.OrgID, URL: in.URL, Secret: in.Secret, Events: in.Events, IsActive: in.IsActive, CreatedBy: in.CreatedBy, CreatedAt: in.CreatedAt, UpdatedAt: in.UpdatedAt}
+	row := models.EndpointModel{ID: in.ID, OrgID: in.OrgID, URL: in.URL, Secret: in.Secret, Events: pq.StringArray(in.Events), IsActive: in.IsActive, CreatedBy: in.CreatedBy, CreatedAt: in.CreatedAt, UpdatedAt: in.UpdatedAt}
 	if err := r.db.WithContext(ctx).Create(&row).Error; err != nil {
 		return webhookdomain.Endpoint{}, err
 	}
@@ -46,7 +47,7 @@ func (r *Repository) GetEndpoint(ctx context.Context, orgID, id uuid.UUID) (webh
 }
 
 func (r *Repository) UpdateEndpoint(ctx context.Context, in webhookdomain.Endpoint) (webhookdomain.Endpoint, error) {
-	updates := map[string]any{"url": in.URL, "secret": in.Secret, "events": in.Events, "is_active": in.IsActive, "updated_at": in.UpdatedAt}
+	updates := map[string]any{"url": in.URL, "secret": in.Secret, "events": pq.StringArray(in.Events), "is_active": in.IsActive, "updated_at": in.UpdatedAt}
 	if err := r.db.WithContext(ctx).Model(&models.EndpointModel{}).Where("org_id = ? AND id = ?", in.OrgID, in.ID).Updates(updates).Error; err != nil {
 		return webhookdomain.Endpoint{}, err
 	}
@@ -162,7 +163,7 @@ func (r *Repository) DeleteOldDeliveries(ctx context.Context, olderThan time.Tim
 }
 
 func toEndpointDomain(row models.EndpointModel) webhookdomain.Endpoint {
-	return webhookdomain.Endpoint{ID: row.ID, OrgID: row.OrgID, URL: row.URL, Secret: row.Secret, Events: row.Events, IsActive: row.IsActive, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return webhookdomain.Endpoint{ID: row.ID, OrgID: row.OrgID, URL: row.URL, Secret: row.Secret, Events: []string(row.Events), IsActive: row.IsActive, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }
 
 func toDeliveryDomain(row models.DeliveryModel) webhookdomain.Delivery {

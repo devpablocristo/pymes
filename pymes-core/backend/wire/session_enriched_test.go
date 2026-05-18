@@ -6,17 +6,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	kerneldomain "github.com/devpablocristo/core/saas/go/kernel/usecases/domain"
-	saasmiddleware "github.com/devpablocristo/core/saas/go/middleware"
 )
 
 type sessionStubJWTVerifier struct{}
 
-func (sessionStubJWTVerifier) Verify(ctx context.Context, token string) (kerneldomain.Principal, error) {
+func (sessionStubJWTVerifier) Verify(ctx context.Context, token string) (tenantPrincipal, error) {
 	_ = token
-	return kerneldomain.Principal{
-		TenantID:   "org-uuid",
+	return tenantPrincipal{
+		OrgID:   "org-uuid",
 		Actor:      "user_xxx",
 		Role:       "viewer",
 		Scopes:     []string{},
@@ -26,10 +23,10 @@ func (sessionStubJWTVerifier) Verify(ctx context.Context, token string) (kerneld
 
 type sessionStubAPIKeyVerifier struct{}
 
-func (sessionStubAPIKeyVerifier) Verify(ctx context.Context, token string) (kerneldomain.Principal, error) {
+func (sessionStubAPIKeyVerifier) Verify(ctx context.Context, token string) (tenantPrincipal, error) {
 	_ = token
-	return kerneldomain.Principal{
-		TenantID:   "org-uuid",
+	return tenantPrincipal{
+		OrgID:   "org-uuid",
 		Actor:      "api_key:key-1",
 		Role:       "service",
 		Scopes:     []string{},
@@ -40,7 +37,7 @@ func (sessionStubAPIKeyVerifier) Verify(ctx context.Context, token string) (kern
 func TestHandleSessionEnriched_ProductRoleUser(t *testing.T) {
 	t.Parallel()
 	mux := http.NewServeMux()
-	authMW := saasmiddleware.NewAuthMiddleware(sessionStubJWTVerifier{}, nil)
+	authMW := newTenantAuthMiddleware(sessionStubJWTVerifier{}, nil)
 	registerProtected(mux, authMW, "GET /session", func(w http.ResponseWriter, r *http.Request) {
 		handleSessionEnriched(w, r, nil)
 	})
@@ -74,17 +71,14 @@ func TestHandleSessionEnriched_ProductRoleUser(t *testing.T) {
 		t.Fatalf("product_role=%v", auth["product_role"])
 	}
 	if auth["org_id"] != "org-uuid" {
-		t.Fatalf("org_id=%v", auth["org_id"])
-	}
-	if auth["tenant_id"] != "org-uuid" {
-		t.Fatalf("tenant_id=%v", auth["tenant_id"])
+		t.Fatalf("org_id =%v", auth["org_id"])
 	}
 }
 
 func TestHandleSessionEnriched_ServiceWithoutConsoleScopesIsUser(t *testing.T) {
 	t.Parallel()
 	mux := http.NewServeMux()
-	authMW := saasmiddleware.NewAuthMiddleware(nil, sessionStubAPIKeyVerifier{})
+	authMW := newTenantAuthMiddleware(nil, sessionStubAPIKeyVerifier{})
 	registerProtected(mux, authMW, "GET /session", func(w http.ResponseWriter, r *http.Request) {
 		handleSessionEnriched(w, r, nil)
 	})

@@ -1,14 +1,28 @@
 import { parsePaginatedResponse } from '@devpablocristo/core-browser/crud';
-import { crudItemPath, type CrudFieldValue } from '@devpablocristo/modules-crud-ui';
-import { isValidElement, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import './PymesSimpleCrudListModeContent.css';
 import { apiRequest } from '../lib/api';
-import { REST_ARCHIVE_VIA_POST_BASE_PATHS } from './restCrudDataSource';
 import { useOptionalBranchSelection } from '../lib/useBranchSelection';
 import { readActiveBranchId } from '../lib/branchSelectionStorage';
 import { useI18n } from '../lib/i18n';
 import { PymesCrudResourceShellHeader } from './PymesCrudResourceShellHeader';
 import { appendBranchIdToCrudListQuery, isBranchScopedCrudResource } from './branchScopedCrud';
+import {
+  activeFields,
+  buildEditorBlocks,
+  buildEditorMediaUrls,
+  buildEditorSections,
+  buildEditorStats,
+  buildEmptyFormValues,
+  buildFallbackFormValuesFromRow,
+  buildTableColumns,
+  crudRecordItemPath,
+  normalizeError,
+  pickStringValue,
+  resolveEditorSectionId,
+  toDialogField,
+  type CrudListResponse,
+} from './PymesSimpleCrudListModeContent.helpers';
 import { usePymesCrudConfigQuery } from './usePymesCrudConfigQuery';
 import { usePymesCrudHeaderFeatures } from './usePymesCrudHeaderFeatures';
 import {
@@ -17,194 +31,26 @@ import {
   CrudPaginationBar,
   CrudTableSurface,
   CrudValueKanbanSurface,
+  isDisplayableCrudImageSrc,
   getCrudStateMachineColumnDefaultState,
   openCrudFormDialog,
   buildFreeMovementStateMachine,
   useCrudArchivedSearchParam,
   useCrudConfiguredValueKanban,
   useCrudRemoteGalleryPage,
-  type CrudActionDialogField,
-  type CrudEntityEditorModalBlock,
-  type CrudEntityEditorModalSection,
-  type CrudEntityEditorModalStat,
-  type CrudTableSurfaceColumn,
 } from '../modules/crud';
-import { extractCrudRecordImageUrls, pickGalleryHeroCrudImageSrc } from '../modules/crud/crudLinkedEntityImageUrls';
 import type {
-  CrudColumn,
   CrudHelpers,
-  CrudEditorModalFieldConfig,
   CrudFormField,
   CrudFormValues,
   CrudPageConfig,
   CrudRowAction,
   CrudViewModeId,
 } from '../components/CrudPage';
-import { buildStandardCrudImageUrlsModalFieldConfig } from './standardCrudMedia';
 
-/** Fallback cuando `editorModal.fieldConfig.image_urls` viene incompleto (sin `editControl`) — evita el textarea con base64. */
-const CRUD_IMAGE_URLS_EDITOR_DEFAULTS = buildStandardCrudImageUrlsModalFieldConfig();
-
-type CrudListResponse<T> = {
-  items: T[];
-  has_more?: boolean;
-  next_cursor?: string | null;
-};
-
-function emptyValueForField(field: CrudFormField): CrudFieldValue {
-  return field.type === 'checkbox' ? false : '';
-}
-
-function resolveEditorFieldConfig(
-  field: CrudFormField,
-  overrides?: CrudEditorModalFieldConfig,
-  fallbackSectionId?: string,
-): CrudEditorModalFieldConfig {
-  // Importante: propagar editControl / visible / readValue desde editorModal.fieldConfig.
-  // Para `image_urls`, fusionar con defaults del carrusel: si el recurso solo pasó helperText u otras
-  // props parciales, un spread simple no rellena editControl y React cae en <textarea> con data URLs.
-  const defaults = field.key === 'image_urls' ? CRUD_IMAGE_URLS_EDITOR_DEFAULTS : undefined;
-  const o = overrides ?? {};
-  return {
-    sectionId: o.sectionId ?? fallbackSectionId ?? defaults?.sectionId,
-    fullWidth: o.fullWidth ?? field.fullWidth ?? defaults?.fullWidth,
-    helperText: o.helperText ?? defaults?.helperText,
-    hidden: o.hidden ?? defaults?.hidden,
-    readOnly: o.readOnly ?? defaults?.readOnly,
-    visible: o.visible ?? defaults?.visible,
-    readValue: o.readValue ?? defaults?.readValue,
-    editControl: o.editControl ?? defaults?.editControl,
-  };
-}
-
-function toDialogField(
-  field: CrudFormField,
-  values: CrudFormValues,
-  editorFieldConfig?: CrudEditorModalFieldConfig,
-  fallbackSectionId?: string,
-): CrudActionDialogField {
-  const resolvedEditorFieldConfig = resolveEditorFieldConfig(field, editorFieldConfig, fallbackSectionId);
-  return {
-    id: field.key,
-    label: field.label,
-    type:
-      field.type === 'email' ||
-      field.type === 'tel' ||
-      field.type === 'number' ||
-      field.type === 'textarea' ||
-      field.type === 'datetime-local' ||
-      field.type === 'select' ||
-      field.type === 'checkbox'
-        ? field.type
-        : 'text',
-    placeholder: field.placeholder,
-    required: field.required,
-    rows: field.rows,
-    defaultValue: values[field.key] ?? emptyValueForField(field),
-    options: field.options,
-    sectionId: resolvedEditorFieldConfig.sectionId,
-    helperText: resolvedEditorFieldConfig.helperText,
-    fullWidth: resolvedEditorFieldConfig.fullWidth,
-    readOnly: resolvedEditorFieldConfig.readOnly,
-    editControl: resolvedEditorFieldConfig.editControl
-      ? ({ value, values: dialogValues, setValue }) =>
-          resolvedEditorFieldConfig.editControl?.({ value, values: dialogValues, setValue })
-      : undefined,
-    visible: resolvedEditorFieldConfig.visible
-      ? ({ value, values: dialogValues, editing }) =>
-          Boolean(resolvedEditorFieldConfig.visible?.({ value, values: dialogValues, editing }))
-      : undefined,
-    readValue: resolvedEditorFieldConfig.readValue
-      ? ({ value, values: dialogValues }) => resolvedEditorFieldConfig.readValue?.({ value, values: dialogValues })
-      : undefined,
-  };
-}
-
-function buildEmptyFormValues(fields: CrudFormField[]): CrudFormValues {
-  return Object.fromEntries(fields.map((field) => [field.key, emptyValueForField(field)]));
-}
-
-function activeFields(fields: CrudFormField[], editing: boolean) {
-  return fields.filter((field) => {
-    if (editing && field.createOnly) return false;
-    if (!editing && field.editOnly) return false;
-    return true;
-  });
-}
-
-function normalizeError(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
-}
-
-function buildEditorSections<T extends { id: string }>(
-  crudConfig: CrudPageConfig<T>,
-): CrudEntityEditorModalSection[] | undefined {
-  return crudConfig.editorModal?.sections?.map((section) => ({
-    id: section.id,
-    title: section.title,
-    description: section.description,
-  }));
-}
-
-function resolveEditorSectionId<T extends { id: string }>(
-  crudConfig: CrudPageConfig<T>,
-  fieldKey: string,
-): string | undefined {
-  return crudConfig.editorModal?.sections?.find((section) => section.fieldKeys?.includes(fieldKey))?.id;
-}
-
-function buildEditorBlocks<T extends { id: string }>(
-  crudConfig: CrudPageConfig<T>,
-): CrudEntityEditorModalBlock[] | undefined {
-  return crudConfig.editorModal?.blocks?.map((block) => ({
-    id: block.id,
-    kind: block.kind,
-    field: block.field,
-    sectionId: block.sectionId,
-    label: block.label,
-    required: block.required,
-    visible: block.visible
-      ? ({ values, editing, row }) => Boolean(block.visible?.({ values, editing, row: row as T | undefined }))
-      : undefined,
-  }));
-}
-
-function buildEditorStats<T extends { id: string }>(
-  crudConfig: CrudPageConfig<T>,
-  row: T | undefined,
-  initialValues: CrudFormValues,
-  editing: boolean,
-): CrudEntityEditorModalStat[] | undefined {
-  return crudConfig.editorModal?.stats?.map((stat) => ({
-    id: stat.id,
-    label: stat.label,
-    tone: stat.tone,
-    value: (values) => stat.value({ row, values: values as CrudFormValues, editing }),
-  }));
-}
-
-function pickStringValue(row: Record<string, unknown>, candidates: string[]) {
-  for (const key of candidates) {
-    const raw = row[key];
-    if (typeof raw === 'string' && raw.trim()) return raw.trim();
-    if (typeof raw === 'number' && Number.isFinite(raw)) return String(raw);
-  }
-  return '';
-}
-
-function toSortablePrimitive(value: unknown): string | number | boolean | null {
-  if (value == null) return null;
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
-  if (Array.isArray(value)) return value.map((entry) => String(entry ?? '').trim()).join(', ');
-  if (typeof value === 'object') return JSON.stringify(value);
-  return String(value);
-}
-
-function buildEditorMediaUrls<T extends { id: string }>(row: T | undefined) {
-  if (!row) return undefined;
-  const record = row as Record<string, unknown>;
-  const urls = extractCrudRecordImageUrls(record);
-  return urls.length ? urls : undefined;
+function listGalleryDisplayableImageUrls<T extends { id: string }>(row: T): string[] {
+  const urls = buildEditorMediaUrls(row);
+  return (urls ?? []).filter(isDisplayableCrudImageSrc);
 }
 
 export function PymesSimpleCrudListModeContent<T extends { id: string }>({
@@ -338,51 +184,9 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
     archived,
   });
 
-  const columns = useMemo<CrudTableSurfaceColumn<T>[]>(() => {
+  const columns = useMemo(() => {
     if (!crudConfig) return [];
-    const tagsEnabled = crudConfig.featureFlags?.tagsColumn !== false;
-    const sourceColumns = archived && crudConfig.archivedColumns?.length ? crudConfig.archivedColumns : crudConfig.columns;
-    const mappedColumns: CrudTableSurfaceColumn<T>[] = sourceColumns
-      .filter((column) => tagsEnabled || column.key !== 'tags')
-      .map((column: CrudColumn<T>) => ({
-        id: column.key,
-        header: column.header,
-        className: column.className,
-        render: (row: T) => {
-          const value = row[column.key];
-          return column.render ? column.render(value, row) : String(value ?? '—');
-        },
-        sortValue: (row: T) => {
-          const raw = row[column.key];
-          if (!column.render) {
-            return toSortablePrimitive(raw);
-          }
-          const rendered = column.render(raw, row);
-          if (typeof rendered === 'string' || typeof rendered === 'number' || typeof rendered === 'boolean') {
-            return rendered;
-          }
-          if (isValidElement(rendered)) {
-            const child = (rendered.props as { children?: unknown } | null)?.children;
-            return toSortablePrimitive(child);
-          }
-          return toSortablePrimitive(raw);
-        },
-      }));
-
-    if (
-      tagsEnabled &&
-      crudConfig.renderTagsCell &&
-      !mappedColumns.some((column) => column.id === 'tags')
-    ) {
-      mappedColumns.push({
-        id: 'tags',
-        header: 'Etiquetas Internas',
-        className: 'cell-tags',
-        render: (row) => crudConfig.renderTagsCell?.(row) ?? '—',
-      });
-    }
-
-    return mappedColumns;
+    return buildTableColumns(crudConfig, archived);
   }, [archived, crudConfig]);
 
   const runCreateOrEdit = useCallback(
@@ -398,8 +202,8 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
           return;
         }
       }
-      // Si no hay formFields declarados (p. ej. inventory, audit, timeline,
-      // attachments, cashflow), generamos fields read-only desde columns para
+      // Si no hay formFields declarados (p. ej. vistas derivadas puntuales),
+      // generamos fields read-only desde columns para
       // que todos los CRUDs abran el mismo Editor modal. En create no aplica.
       const declaredFields = crudConfig.formFields ?? [];
       const effectiveFields: CrudFormField[] =
@@ -417,25 +221,18 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         ...buildEmptyFormValues(fields),
         ...createDefaults,
       };
-      // Fallback para CRUDs sin `toFormValues` útil (audit/attachments/timeline):
-      // mapear valores directos de `row[columnKey]`, pasados por el render de la columna cuando existe.
-      const fallbackFromRow = (r: T): CrudFormValues => {
-        const rec = r as unknown as Record<string, unknown>;
-        const out: CrudFormValues = {};
-        for (const column of crudConfig.columns) {
-          const raw = rec[String(column.key)];
-          if (column.render) {
-            const rendered = column.render(raw as CrudFieldValue, r);
-            out[String(column.key)] = typeof rendered === 'string' ? rendered : String(raw ?? '');
-          } else {
-            out[String(column.key)] = String(raw ?? '');
-          }
-        }
-        return out;
-      };
-      let currentValues = editing && editorRow ? crudConfig.toFormValues(editorRow) : createInitialValues;
+      // Cuando el CRUD no declara formFields, los campos se generan read-only
+      // desde columns. En ese caso preferimos
+      // readValue para que los valores mostrados pasen por column.render
+      // (ej. "is_low_stock=false" → "Normal") en vez de exponer el bool crudo.
+      const useColumnFallback = declaredFields.length === 0;
+      let currentValues = editing && editorRow
+        ? useColumnFallback
+          ? buildFallbackFormValuesFromRow(crudConfig, editorRow)
+          : crudConfig.toFormValues(editorRow)
+        : createInitialValues;
       if (editing && editorRow && Object.keys(currentValues).length === 0) {
-        currentValues = fallbackFromRow(editorRow);
+        currentValues = buildFallbackFormValuesFromRow(crudConfig, editorRow);
       }
       const dialogTitle =
         editing && editorRow
@@ -446,7 +243,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
           ? true
           : crudConfig.editorModal?.canEdit
             ? crudConfig.editorModal.canEdit(editorRow)
-            : (crudConfig.allowEdit ?? true);
+            : (crudConfig.allowEdit ?? false);
       const visibleFields = fields.filter(
         (field) => !crudConfig.editorModal?.fieldConfig?.[field.key]?.hidden,
       );
@@ -455,12 +252,13 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         subtitle: undefined,
         eyebrow: editing ? undefined : crudConfig.editorModal?.eyebrow ?? crudConfig.labelPluralCap,
         allowEdit: allowEditRecord,
-        mediaUrls: editing ? buildEditorMediaUrls(editorRow) : undefined,
-        mediaFieldId: crudConfig.editorModal?.mediaFieldKey,
+        mediaUrls:
+          editing && !crudConfig.editorModal?.disableBuiltInMedia ? buildEditorMediaUrls(editorRow) : undefined,
+        mediaFieldId: crudConfig.editorModal?.disableBuiltInMedia ? undefined : crudConfig.editorModal?.mediaFieldKey,
         dialogMode: editing ? 'update' : 'create',
         submitLabel: editing ? 'Guardar' : 'Crear',
         editLabel: 'Editar',
-        cancelEditLabel: 'Cancelar',
+        cancelEditLabel: 'Cerrar',
         closeLabel: archived ? 'Salir' : 'Cerrar',
         initialValues: currentValues,
         fields: visibleFields.map((field) =>
@@ -473,11 +271,11 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         ),
         blocks,
         sections: buildEditorSections(crudConfig),
-        stats: buildEditorStats(crudConfig, editorRow, currentValues, editing),
+        stats: buildEditorStats(crudConfig, editorRow, editing),
         row: editorRow,
         confirmDiscard: crudConfig.editorModal?.confirmDiscard,
         archiveAction:
-          editing && editorRow && !archived && crudConfig.supportsArchived
+          editing && editorRow && !archived && crudConfig.supportsArchived && crudConfig.allowDelete !== false
             ? {
                 label: 'Archivar',
                 busyLabel: 'Archivando…',
@@ -493,12 +291,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
                     if (crudConfig.dataSource?.deleteItem) {
                       await crudConfig.dataSource.deleteItem(editorRow);
                     } else if (crudConfig.basePath) {
-                      const itemPath = crudItemPath(crudConfig.basePath, editorRow.id);
-                      if (REST_ARCHIVE_VIA_POST_BASE_PATHS.has(crudConfig.basePath)) {
-                        await apiRequest(`${itemPath}/archive`, { method: 'POST', body: {} });
-                      } else {
-                        await apiRequest(itemPath, { method: 'DELETE' });
-                      }
+                      await apiRequest(crudRecordItemPath(crudConfig.basePath, editorRow.id), { method: 'DELETE' });
                     }
                     setItems((current) => current.filter((item) => item.id !== editorRow!.id));
                     selectItem(null);
@@ -521,7 +314,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
                     if (crudConfig.dataSource?.restore) {
                       await crudConfig.dataSource.restore(editorRow);
                     } else if (crudConfig.basePath) {
-                      await apiRequest(`${crudItemPath(crudConfig.basePath, editorRow.id)}/restore`, { method: 'POST', body: {} });
+                      await apiRequest(`${crudRecordItemPath(crudConfig.basePath, editorRow.id)}/restore`, { method: 'POST', body: {} });
                     }
                     setItems((current) => current.filter((item) => item.id !== editorRow!.id));
                     selectItem(null);
@@ -536,12 +329,12 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         deleteAction:
           editing && editorRow && archived
             ? {
-                label: 'Eliminar',
-                busyLabel: 'Eliminando…',
+                label: 'Eliminar definitivo',
+                busyLabel: 'Eliminando definitivamente…',
                 confirm: {
                   title: `Eliminar ${crudConfig.label}`,
                   description: `Esta acción elimina definitivamente ${crudConfig.label} y no se puede deshacer.`,
-                  confirmLabel: 'Eliminar',
+                  confirmLabel: 'Eliminar definitivo',
                   cancelLabel: 'Cancelar',
                 },
                 onDelete: async () => {
@@ -550,12 +343,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
                     if (crudConfig.dataSource?.hardDelete) {
                       await crudConfig.dataSource.hardDelete(editorRow);
                     } else if (crudConfig.basePath) {
-                      const itemPath = crudItemPath(crudConfig.basePath, editorRow.id);
-                      if (REST_ARCHIVE_VIA_POST_BASE_PATHS.has(crudConfig.basePath)) {
-                        await apiRequest(itemPath, { method: 'DELETE' });
-                      } else {
-                        await apiRequest(`${itemPath}/hard`, { method: 'DELETE' });
-                      }
+                      await apiRequest(`${crudRecordItemPath(crudConfig.basePath, editorRow.id)}/hard`, { method: 'DELETE' });
                     }
                     setItems((current) => current.filter((item) => item.id !== editorRow!.id));
                     selectItem(null);
@@ -567,38 +355,36 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
                 },
               }
             : undefined,
-      });
-      if (!values) return;
-      const submittedValues = editing ? { ...currentValues, ...values } : { ...createInitialValues, ...values };
-      if (!crudConfig.isValid(submittedValues)) {
-        setError(`Revisá los campos de ${crudConfig.label}.`);
-        return;
-      }
+        onSubmit: async (submittedValues) => {
+          const nextValues = editing ? { ...currentValues, ...submittedValues } : { ...createInitialValues, ...submittedValues };
+          if (!crudConfig.isValid(nextValues)) {
+            throw new Error(`Revisá los campos de ${crudConfig.label}.`);
+          }
 
-      try {
-        if (editing && row) {
-          if (crudConfig.dataSource?.update) {
-            await crudConfig.dataSource.update(row, submittedValues);
+          setError(null);
+          if (editing && row) {
+            if (crudConfig.dataSource?.update) {
+              await crudConfig.dataSource.update(row, nextValues);
+            } else if (crudConfig.basePath) {
+              await apiRequest(crudRecordItemPath(crudConfig.basePath, row.id), {
+                method: 'PATCH',
+                body: crudConfig.toBody ? crudConfig.toBody(nextValues) : (nextValues as Record<string, unknown>),
+              });
+            }
+          } else if (crudConfig.dataSource?.create) {
+            await crudConfig.dataSource.create(nextValues);
           } else if (crudConfig.basePath) {
-            await apiRequest(crudItemPath(crudConfig.basePath, row.id), {
-              method: 'PUT',
-              body: crudConfig.toBody ? crudConfig.toBody(submittedValues) : (submittedValues as Record<string, unknown>),
+            await apiRequest(crudConfig.basePath, {
+              method: 'POST',
+              body: crudConfig.toBody ? crudConfig.toBody(nextValues) : (nextValues as Record<string, unknown>),
             });
           }
-        } else if (crudConfig.dataSource?.create) {
-          await crudConfig.dataSource.create(submittedValues);
-        } else if (crudConfig.basePath) {
-          await apiRequest(crudConfig.basePath, {
-            method: 'POST',
-            body: crudConfig.toBody ? crudConfig.toBody(submittedValues) : (submittedValues as Record<string, unknown>),
-          });
-        }
-        await reload();
-      } catch (submitError) {
-        setError(normalizeError(submitError, `No se pudo guardar ${crudConfig.label}.`));
-      }
+          await reload();
+        },
+      });
+      if (!values) return;
     },
-    [archived, crudConfig, reload, setError],
+    [archived, crudConfig, reload, selectItem, setError, setItems],
   );
 
   const canCreate = crudConfig?.allowCreate ?? Boolean(crudConfig?.formFields.length);
@@ -616,7 +402,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
 
   const resolvedTableRowClick = useMemo(() => {
     if (onRowClick) return onRowClick;
-    // Todo click abre el Editor modal. Si `allowEdit=false` (explícito) o `formFields=[]`,
+    // Todo click abre el Editor modal. Si `allowEdit=false` o `formFields=[]`,
     // `runCreateOrEdit` arma fields read-only desde `columns` automáticamente.
     return (row: T) => {
       void runCreateOrEdit(row);
@@ -660,7 +446,6 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
   const cardMeta = (row: T) =>
     kanbanCardConfig?.meta?.(row) ??
     pickStringValue(rowRecordValues(row), ['total', 'amount', 'price', 'created_at', 'valid_until', 'next_due_date']);
-  const cardImageSrc = (row: T) => pickGalleryHeroCrudImageSrc(rowRecordValues(row));
 
   if (!crudConfig) {
     return (
@@ -713,8 +498,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
             title: cardTitle,
             subtitle: (row) => cardSubtitle(row),
             meta: (row) => cardMeta(row),
-            imageSrc: cardImageSrc,
-            imageAlt: cardTitle,
+            imageUrls: (row) => listGalleryDisplayableImageUrls(row),
           }}
           onSelect={(row) => {
             selectItem(row.id);

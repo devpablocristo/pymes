@@ -9,9 +9,11 @@ export function humanRoutedLabel(mode: string, language: LanguageCode = 'es'): s
   if (mode === 'insight_chat') return pick(language, 'Análisis', 'Insights');
   if (mode === 'customers') return pick(language, 'Clientes', 'Customers');
   if (mode === 'products') return pick(language, 'Productos', 'Products');
+  if (mode === 'services') return pick(language, 'Servicios', 'Services');
   if (mode === 'sales') return pick(language, 'Ventas', 'Sales');
   if (mode === 'collections') return pick(language, 'Cobros', 'Collections');
   if (mode === 'purchases') return pick(language, 'Compras', 'Purchases');
+  if (mode === 'employees') return pick(language, 'Empleados', 'Employees');
   if (mode === 'general') return pick(language, 'Asesor del negocio', 'Business advisor');
   if (mode === 'internal_procurement') return pick(language, 'Compras internas', 'Internal procurement');
   if (mode === 'internal_sales') return pick(language, 'Ventas', 'Sales');
@@ -22,12 +24,19 @@ export function humanInsightScopeLabel(scope: string, language: LanguageCode = '
   if (scope === 'sales_collections') return pick(language, 'Ventas y cobranzas', 'Sales and collections');
   if (scope === 'inventory_profit') return pick(language, 'Inventario y rentabilidad', 'Inventory and profitability');
   if (scope === 'customers_retention') return pick(language, 'Clientes y retención', 'Customers and retention');
+  if (scope === 'customers') return pick(language, 'Clientes', 'Customers');
+  if (scope === 'products') return pick(language, 'Productos', 'Products');
+  if (scope === 'services') return pick(language, 'Servicios', 'Services');
+  if (scope === 'purchases') return pick(language, 'Compras', 'Purchases');
+  if (scope === 'scheduling') return pick(language, 'Agenda', 'Schedule');
+  if (scope === 'operations') return pick(language, 'Operación', 'Operations');
+  if (scope === 'employees') return pick(language, 'Empleados', 'Employees');
+  if (scope === 'general') return pick(language, 'General', 'General');
   return scope;
 }
 
 export function humanRoutingSourceLabel(source: PymesRoutingSource, language: LanguageCode = 'es'): string {
   if (source === 'copilot_agent') return pick(language, 'Análisis', 'Insights');
-  if (source === 'read_fallback') return pick(language, 'Fallback lectura', 'Read fallback');
   if (source === 'ui_hint') return pick(language, 'Selección manual', 'Manual selection');
   return pick(language, 'Orquestador', 'Orchestrator');
 }

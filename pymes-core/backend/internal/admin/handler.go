@@ -44,7 +44,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup) {
 func (h *Handler) GetBootstrap(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	if !authz.IsAdmin(authCtx.Role, authCtx.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
+		httperrors.Write(c, http.StatusForbidden, "FORBIDDEN", "admin permissions required")
 		return
 	}
 	payload, err := h.uc.GetBootstrap(c.Request.Context(), authCtx.OrgID, authCtx.Role, authCtx.Scopes, authCtx.Actor, authCtx.AuthMethod)
@@ -57,10 +57,6 @@ func (h *Handler) GetBootstrap(c *gin.Context) {
 
 func (h *Handler) GetTenantSettings(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	if !authz.CanReadConsoleSettings(authCtx.Role, authCtx.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin read permission required"})
-		return
-	}
 	settings, err := h.uc.GetTenantSettings(c.Request.Context(), authCtx.OrgID)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -72,12 +68,12 @@ func (h *Handler) GetTenantSettings(c *gin.Context) {
 func (h *Handler) UpdateTenantSettings(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	if !authz.CanWriteConsoleSettings(authCtx.Role, authCtx.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin write permission required"})
+		httperrors.Write(c, http.StatusForbidden, "FORBIDDEN", "admin write permission required")
 		return
 	}
 	var req dto.UpdateTenantSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	var onboardingCompletedAt **time.Time
@@ -89,58 +85,58 @@ func (h *Handler) UpdateTenantSettings(c *gin.Context) {
 			if value == "" {
 				onboardingCompletedAt = new(*time.Time)
 			} else {
-			parsed, err := time.Parse(time.RFC3339, value)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid onboarding_completed_at"})
-				return
-			}
-			onboardingCompletedAt = new(*time.Time)
-			*onboardingCompletedAt = &parsed
+				parsed, err := time.Parse(time.RFC3339, value)
+				if err != nil {
+					handlers.WriteValidation(c, "invalid onboarding_completed_at")
+					return
+				}
+				onboardingCompletedAt = new(*time.Time)
+				*onboardingCompletedAt = &parsed
 			}
 		}
 	}
 	schedulingEnabled := req.SchedulingEnabled
 	updated, err := h.uc.UpdateTenantSettings(c.Request.Context(), authCtx.OrgID, admindomain.TenantSettingsPatch{
-		PlanCode:                 req.PlanCode,
-		HardLimits:               req.HardLimits,
-		Currency:                 req.Currency,
-		SupportedCurrencies:      req.SupportedCurrencies,
-		TaxRate:                  req.TaxRate,
-		QuotePrefix:              req.QuotePrefix,
-		SalePrefix:               req.SalePrefix,
-		AllowNegativeStock:       req.AllowNegativeStock,
-		PurchasePrefix:           req.PurchasePrefix,
-		ReturnPrefix:             req.ReturnPrefix,
-		CreditNotePrefix:         req.CreditNotePrefix,
-		BusinessName:             req.BusinessName,
-		BusinessTaxID:            req.BusinessTaxID,
-		BusinessAddress:          req.BusinessAddress,
-		BusinessPhone:            req.BusinessPhone,
-		BusinessEmail:            req.BusinessEmail,
-		TeamSize:                 req.TeamSize,
-		Sells:                    req.Sells,
-		ClientLabel:              req.ClientLabel,
-		UsesBilling:              req.UsesBilling,
-		PaymentMethod:            req.PaymentMethod,
-		Vertical:                 req.Vertical,
-		OnboardingCompletedAt:    onboardingCompletedAt,
-		WAQuoteTemplate:          req.WAQuoteTemplate,
-		WAReceiptTemplate:        req.WAReceiptTemplate,
-		WADefaultCountryCode:     req.WADefaultCountryCode,
-		SchedulingEnabled:        schedulingEnabled,
+		PlanCode:                req.PlanCode,
+		HardLimits:              req.HardLimits,
+		Currency:                req.Currency,
+		SupportedCurrencies:     req.SupportedCurrencies,
+		TaxRate:                 req.TaxRate,
+		QuotePrefix:             req.QuotePrefix,
+		SalePrefix:              req.SalePrefix,
+		AllowNegativeStock:      req.AllowNegativeStock,
+		PurchasePrefix:          req.PurchasePrefix,
+		ReturnPrefix:            req.ReturnPrefix,
+		CreditNotePrefix:        req.CreditNotePrefix,
+		BusinessName:            req.BusinessName,
+		BusinessTaxID:           req.BusinessTaxID,
+		BusinessAddress:         req.BusinessAddress,
+		BusinessPhone:           req.BusinessPhone,
+		BusinessEmail:           req.BusinessEmail,
+		TeamSize:                req.TeamSize,
+		Sells:                   req.Sells,
+		ClientLabel:             req.ClientLabel,
+		UsesBilling:             req.UsesBilling,
+		PaymentMethod:           req.PaymentMethod,
+		Vertical:                req.Vertical,
+		OnboardingCompletedAt:   onboardingCompletedAt,
+		WAQuoteTemplate:         req.WAQuoteTemplate,
+		WAReceiptTemplate:       req.WAReceiptTemplate,
+		WADefaultCountryCode:    req.WADefaultCountryCode,
+		SchedulingEnabled:       schedulingEnabled,
 		SchedulingLabel:         req.SchedulingLabel,
 		SchedulingReminderHours: req.SchedulingReminderHours,
-		SecondaryCurrency:        req.SecondaryCurrency,
-		DefaultRateType:          req.DefaultRateType,
-		AutoFetchRates:           req.AutoFetchRates,
-		ShowDualPrices:           req.ShowDualPrices,
-		BankHolder:               req.BankHolder,
-		BankCBU:                  req.BankCBU,
-		BankAlias:                req.BankAlias,
-		BankName:                 req.BankName,
-		ShowQRInPDF:              req.ShowQRInPDF,
-		WAPaymentTemplate:        req.WAPaymentTemplate,
-		WAPaymentLinkTemplate:    req.WAPaymentLinkTemplate,
+		SecondaryCurrency:       req.SecondaryCurrency,
+		DefaultRateType:         req.DefaultRateType,
+		AutoFetchRates:          req.AutoFetchRates,
+		ShowDualPrices:          req.ShowDualPrices,
+		BankHolder:              req.BankHolder,
+		BankCBU:                 req.BankCBU,
+		BankAlias:               req.BankAlias,
+		BankName:                req.BankName,
+		ShowQRInPDF:             req.ShowQRInPDF,
+		WAPaymentTemplate:       req.WAPaymentTemplate,
+		WAPaymentLinkTemplate:   req.WAPaymentLinkTemplate,
 	}, &authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -152,7 +148,7 @@ func (h *Handler) UpdateTenantSettings(c *gin.Context) {
 func (h *Handler) ListActivity(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	if !authz.CanReadConsoleSettings(authCtx.Role, authCtx.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin read permission required"})
+		httperrors.Write(c, http.StatusForbidden, "FORBIDDEN", "admin read permission required")
 		return
 	}
 	items, err := h.uc.ListActivity(c.Request.Context(), authCtx.OrgID, 200)

@@ -1,7 +1,6 @@
 import { type CrudFieldValue, type CrudFormValues } from '../components/CrudPage';
 import { formatCrudMoney } from '../modules/crud';
 import {
-  asBoolean,
   asNumber,
   asOptionalString,
   asString,
@@ -48,19 +47,6 @@ export function toProcurementRequestCrudBody(values: CrudFormValues): Record<str
     estimated_total: asNumber(values.estimated_total),
     currency: asOptionalString(values.currency) ?? 'ARS',
     lines: parseProcurementRequestLines(values.lines_json),
-  };
-}
-
-export function toProcurementPolicyCrudBody(values: CrudFormValues): Record<string, unknown> {
-  return {
-    name: asString(values.name),
-    expression: asString(values.expression),
-    effect: asString(values.effect),
-    priority: asNumber(values.priority),
-    mode: asString(values.mode),
-    enabled: asBoolean(values.enabled),
-    action_filter: asOptionalString(values.action_filter) ?? '',
-    system_filter: asOptionalString(values.system_filter) ?? '',
   };
 }
 
@@ -180,11 +166,11 @@ export const partyCrudFormFields = [
   { key: 'email', label: 'Email', type: 'email' as const },
   { key: 'phone', label: 'Telefono', type: 'tel' as const },
   { key: 'tax_id', label: 'CUIT / CUIL' },
-  { key: 'tags', label: 'Etiquetas Internas', placeholder: 'cliente, proveedor' },
+  { key: 'tags', label: 'Etiquetas internas', placeholder: 'cliente, proveedor' },
   { key: 'person_first_name', label: 'Nombre persona' },
   { key: 'person_last_name', label: 'Apellido persona' },
   { key: 'org_legal_name', label: 'Razon social', fullWidth: true },
   { key: 'org_trade_name', label: 'Nombre comercial' },
   { key: 'org_tax_condition', label: 'Condicion fiscal' },
-  { key: 'notes', label: 'Notas', type: 'textarea' as const, fullWidth: true },
+  { key: 'notes', label: 'Notas internas', type: 'textarea' as const, fullWidth: true },
 ];

@@ -19,8 +19,9 @@ import (
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in CreateSaleInput) (saledomain.Sale, error)
+	Update(ctx context.Context, in UpdateSaleInput) (saledomain.Sale, error)
+	UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (saledomain.Sale, error)
 	GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
-	PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in SalePatchFields, actor string) (saledomain.Sale, error)
 	Void(ctx context.Context, orgID, saleID uuid.UUID, actor string) (saledomain.Sale, error)
 }
 
@@ -34,7 +35,14 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET("/sales", rbac.RequirePermission("sales", "read"), h.List)
 	auth.POST("/sales", rbac.RequirePermission("sales", "create"), h.Create)
 	auth.GET("/sales/:id", rbac.RequirePermission("sales", "read"), h.Get)
-	auth.PATCH("/sales/:id", rbac.RequirePermission("sales", "update"), h.Patch)
+	auth.PATCH("/sales/:id", rbac.RequirePermission("sales", "update"), h.Update)
+	handlers.RegisterStatusEndpoint(
+		auth, rbac, "sales", "update", "/sales",
+		func(ctx context.Context, orgID, id uuid.UUID, next, actor string) (saledomain.Sale, error) {
+			return h.uc.UpdateStatus(ctx, UpdateStatusInput{OrgID: orgID, ID: id, Status: next}, actor)
+		},
+		func(s saledomain.Sale) any { return toSaleResponse(s) },
+	)
 	auth.POST("/sales/:id/void", rbac.RequirePermission("sales", "void"), h.Void)
 }
 
@@ -42,7 +50,7 @@ func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 
@@ -56,7 +64,7 @@ func (h *Handler) List(c *gin.Context) {
 	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return
 		}
 		branchID = &id
@@ -64,7 +72,7 @@ func (h *Handler) List(c *gin.Context) {
 	if v := strings.TrimSpace(c.Query("customer_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid customer_id"})
+			handlers.WriteValidation(c, "invalid customer_id")
 			return
 		}
 		customerID = &id
@@ -72,17 +80,17 @@ func (h *Handler) List(c *gin.Context) {
 
 	from, err := parseDatePtr(c.Query("from"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid from"})
+		handlers.WriteValidation(c, "invalid from")
 		return
 	}
 	to, err := parseDatePtr(c.Query("to"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid to"})
+		handlers.WriteValidation(c, "invalid to")
 		return
 	}
 
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		OrgID:         orgID,
+		OrgID:      orgID,
 		BranchID:      branchID,
 		Limit:         limit,
 		After:         after,
@@ -114,13 +122,13 @@ func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 
 	var req dto.CreateSaleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 
@@ -129,7 +137,7 @@ func (h *Handler) Create(c *gin.Context) {
 	if req.CustomerID != nil && strings.TrimSpace(*req.CustomerID) != "" {
 		id, err := uuid.Parse(strings.TrimSpace(*req.CustomerID))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid customer_id"})
+			handlers.WriteValidation(c, "invalid customer_id")
 			return
 		}
 		customerID = &id
@@ -138,7 +146,7 @@ func (h *Handler) Create(c *gin.Context) {
 	if req.QuoteID != nil && strings.TrimSpace(*req.QuoteID) != "" {
 		id, err := uuid.Parse(strings.TrimSpace(*req.QuoteID))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid quote_id"})
+			handlers.WriteValidation(c, "invalid quote_id")
 			return
 		}
 		quoteID = &id
@@ -146,7 +154,7 @@ func (h *Handler) Create(c *gin.Context) {
 	if req.BranchID != nil && strings.TrimSpace(*req.BranchID) != "" {
 		id, err := uuid.Parse(strings.TrimSpace(*req.BranchID))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return
 		}
 		branchID = &id
@@ -158,7 +166,7 @@ func (h *Handler) Create(c *gin.Context) {
 		if it.ProductID != nil && strings.TrimSpace(*it.ProductID) != "" {
 			id, err := uuid.Parse(strings.TrimSpace(*it.ProductID))
 			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product_id"})
+				handlers.WriteValidation(c, "invalid product_id")
 				return
 			}
 			productID = &id
@@ -167,7 +175,7 @@ func (h *Handler) Create(c *gin.Context) {
 		if it.ServiceID != nil && strings.TrimSpace(*it.ServiceID) != "" {
 			id, err := uuid.Parse(strings.TrimSpace(*it.ServiceID))
 			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service_id"})
+				handlers.WriteValidation(c, "invalid service_id")
 				return
 			}
 			serviceID = &id
@@ -183,17 +191,21 @@ func (h *Handler) Create(c *gin.Context) {
 		})
 	}
 
+	isFavorite := false
+	if req.IsFavorite != nil {
+		isFavorite = *req.IsFavorite
+	}
 	out, err := h.uc.Create(c.Request.Context(), CreateSaleInput{
-		OrgID:         orgID,
+		OrgID:      orgID,
 		BranchID:      branchID,
 		CustomerID:    customerID,
 		CustomerName:  req.CustomerName,
 		QuoteID:       quoteID,
 		PaymentMethod: req.PaymentMethod,
 		Items:         items,
-		Notes:         req.Notes,
+		IsFavorite:    isFavorite,
 		Tags:          req.Tags,
-		Metadata:      req.Metadata,
+		Notes:         req.Notes,
 		CreatedBy:     a.Actor,
 	})
 	if err != nil {
@@ -207,12 +219,12 @@ func (h *Handler) Get(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
@@ -223,52 +235,31 @@ func (h *Handler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, toSaleResponse(out))
 }
 
-func (h *Handler) Patch(c *gin.Context) {
+func (h *Handler) Update(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	var req dto.PatchSaleRequest
+	var req dto.UpdateSaleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	if req.Tags == nil && req.Metadata == nil && req.Notes == nil && req.PaymentMethod == nil && req.CustomerName == nil && req.BranchID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "no patch fields"})
-		return
-	}
-
-	var branchID *uuid.UUID
-	if req.BranchID != nil && strings.TrimSpace(*req.BranchID) != "" {
-		bid, err := uuid.Parse(strings.TrimSpace(*req.BranchID))
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
-			return
-		}
-		branchID = &bid
-	}
-
-	var pm *string
-	if req.PaymentMethod != nil {
-		t := strings.TrimSpace(*req.PaymentMethod)
-		pm = &t
-	}
-
-	out, err := h.uc.PatchSale(c.Request.Context(), orgID, id, SalePatchFields{
-		Tags:          req.Tags,
-		Metadata:      req.Metadata,
-		Notes:         req.Notes,
-		PaymentMethod: pm,
-		CustomerName:  req.CustomerName,
-		BranchID:      branchID,
-	}, a.Actor)
+	out, err := h.uc.Update(c.Request.Context(), UpdateSaleInput{
+		OrgID:   orgID,
+		ID:         id,
+		IsFavorite: req.IsFavorite,
+		Tags:       req.Tags,
+		Notes:      req.Notes,
+		Actor:      a.Actor,
+	})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -280,12 +271,12 @@ func (h *Handler) Void(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 
@@ -298,9 +289,13 @@ func (h *Handler) Void(c *gin.Context) {
 }
 
 func toSaleResponse(in saledomain.Sale) dto.SaleResponse {
+	tags := in.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	resp := dto.SaleResponse{
 		ID:            in.ID.String(),
-		OrgID:         in.OrgID.String(),
+		OrgID:      in.OrgID.String(),
 		Number:        in.Number,
 		CustomerName:  in.CustomerName,
 		Status:        in.Status,
@@ -310,11 +305,11 @@ func toSaleResponse(in saledomain.Sale) dto.SaleResponse {
 		TaxTotal:      in.TaxTotal,
 		Total:         in.Total,
 		Currency:      in.Currency,
+		IsFavorite:    in.IsFavorite,
+		Tags:          tags,
 		Notes:         in.Notes,
 		CreatedBy:     in.CreatedBy,
 		CreatedAt:     in.CreatedAt.UTC().Format(time.RFC3339),
-		Tags:          in.Tags,
-		Metadata:      in.Metadata,
 	}
 	if in.BranchID != nil {
 		resp.BranchID = in.BranchID.String()

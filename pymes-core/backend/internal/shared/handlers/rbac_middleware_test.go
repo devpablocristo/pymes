@@ -45,7 +45,7 @@ func TestRBACMiddleware_RequirePermission(t *testing.T) {
 			m := NewRBACMiddleware(fakeChecker{allow: tt.allow})
 
 			r.Use(func(c *gin.Context) {
-				c.Set(types.CtxKeyOrgID, "00000000-0000-0000-0000-000000000001")
+				c.Set(types.CtxKeyTenantID, "00000000-0000-0000-0000-000000000001")
 				c.Set(types.CtxKeyActor, "local-admin")
 				c.Set(types.CtxKeyRole, "member")
 				c.Set(types.CtxKeyScopes, []string{})
@@ -74,7 +74,7 @@ func TestRBACMiddleware_RequirePermission_FailsClosedWhenCheckerMissing(t *testi
 	m := NewRBACMiddleware(nil)
 
 	r.Use(func(c *gin.Context) {
-		c.Set(types.CtxKeyOrgID, "00000000-0000-0000-0000-000000000001")
+		c.Set(types.CtxKeyTenantID, "00000000-0000-0000-0000-000000000001")
 		c.Set(types.CtxKeyActor, "local-admin")
 		c.Set(types.CtxKeyRole, "member")
 		c.Set(types.CtxKeyScopes, []string{})
@@ -101,7 +101,7 @@ func TestRBACMiddleware_RequirePermission_FailsClosedWhenMiddlewareIsNil(t *test
 	var m *RBACMiddleware
 
 	r.Use(func(c *gin.Context) {
-		c.Set(types.CtxKeyOrgID, "00000000-0000-0000-0000-000000000001")
+		c.Set(types.CtxKeyTenantID, "00000000-0000-0000-0000-000000000001")
 		c.Set(types.CtxKeyActor, "local-admin")
 		c.Set(types.CtxKeyRole, "member")
 		c.Set(types.CtxKeyScopes, []string{})

@@ -22,7 +22,7 @@ func NewUsecases(cp controlPlanePort) *Usecases {
 
 func (u *Usecases) CreateBooking(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error) {
 	if strings.TrimSpace(orgID) == "" {
-		return nil, fmt.Errorf("org_id is required: %w", httperrors.ErrBadInput)
+		return nil, fmt.Errorf("tenant_id is required: %w", httperrors.ErrBadInput)
 	}
 	out := copyMap(payload)
 	out["org_id"] = orgID

@@ -41,7 +41,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) ListEndpoints(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	orgID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -54,13 +54,13 @@ func (h *Handler) ListEndpoints(c *gin.Context) {
 }
 
 func (h *Handler) CreateEndpoint(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	orgID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
 	var req endpointRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	auth := handlers.GetAuthContext(c)
@@ -73,7 +73,7 @@ func (h *Handler) CreateEndpoint(c *gin.Context) {
 }
 
 func (h *Handler) GetEndpoint(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -86,13 +86,13 @@ func (h *Handler) GetEndpoint(c *gin.Context) {
 }
 
 func (h *Handler) UpdateEndpoint(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
 	var req endpointRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	current, err := h.uc.GetEndpoint(c.Request.Context(), orgID, id)
@@ -115,7 +115,7 @@ func (h *Handler) UpdateEndpoint(c *gin.Context) {
 }
 
 func (h *Handler) DeleteEndpoint(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -127,7 +127,7 @@ func (h *Handler) DeleteEndpoint(c *gin.Context) {
 }
 
 func (h *Handler) ListDeliveries(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -141,7 +141,7 @@ func (h *Handler) ListDeliveries(c *gin.Context) {
 }
 
 func (h *Handler) TestEndpoint(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -156,7 +156,7 @@ func (h *Handler) TestEndpoint(c *gin.Context) {
 func (h *Handler) ReplayDelivery(c *gin.Context) {
 	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	if err := h.uc.ReplayDelivery(c.Request.Context(), id); err != nil {
@@ -180,24 +180,24 @@ func (r endpointRequest) IsActiveOrDefault() bool {
 	return *r.IsActive
 }
 
-func parseOrg(c *gin.Context) (uuid.UUID, bool) {
+func parseTenant(c *gin.Context) (uuid.UUID, bool) {
 	auth := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(auth.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return uuid.Nil, false
 	}
 	return orgID, true
 }
 
-func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
-	orgID, ok := parseOrg(c)
+func parseTenantAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
+	orgID, ok := parseTenant(c)
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
 	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return uuid.Nil, uuid.Nil, false
 	}
 	return orgID, id, true

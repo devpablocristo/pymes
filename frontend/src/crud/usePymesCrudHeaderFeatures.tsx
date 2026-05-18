@@ -66,22 +66,39 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
     [items],
   );
   const hasTagSignals = normalizedTagValues.length > 0;
-  const tagPillsFeatureOn = crudConfig?.featureFlags?.tagPills !== false;
-  /**
-   * Solo mostrar chips de etiquetas internas cuando hay valores que filtrar.
-   * Si no, una segunda fila con solo «Todos» duplica la franja de responsable (`CreatedByPillsBar`)
-   * y confunde (mismo label, distinta dimensión).
-   */
-  const showTagPills = tagPillsFeatureOn && hasTagSignals;
+
+  // Las etiquetas internas (tags) son la franja canónica de filtro rápido en el header.
+  // Siempre aparecen cuando hay al menos un tag en los datos — se priorizan sobre el
+  // filtro por creador, que queda como opción secundaria solo si no hay tags. Esto evita que
+  // aparezcan chips tipo "Asignado a mí", "Seeds" o actor ids en lugar de tags.
+  const tagFilterEnabled = hasTagSignals;
 
   const creatorFilterEnabled =
-    enableCreatorFilter && crudConfig?.featureFlags?.creatorFilter !== false && hasCreatorSignals;
+    enableCreatorFilter &&
+    crudConfig?.featureFlags?.creatorFilter !== false &&
+    hasCreatorSignals &&
+    !tagFilterEnabled;
   const headerQuickFilterStripEnabled = creatorFilterEnabled && listHeaderInlineSlot != null;
 
   const creatorFilteredItems = useMemo(
     () => (creatorFilterEnabled && preSearchFilter ? preSearchFilter(items) : items),
     [creatorFilterEnabled, items, preSearchFilter],
   );
+
+  const tagFilterOptions = useMemo(
+    () =>
+      normalizedTagValues.map((tag) => ({
+          value: tag,
+          label: tag,
+          matches: (row: T) => {
+            const rec = row as Record<string, unknown>;
+            const tags = Array.isArray(rec.tags) ? rec.tags : [];
+            return tags.some((raw) => String(raw ?? '').trim() === tag);
+          },
+        })),
+    [normalizedTagValues],
+  );
+  const tagValues = useMemo(() => tagFilterOptions.map((option) => option.value), [tagFilterOptions]);
 
   const supplierCategoryFilterOptions = useMemo(
     () =>
@@ -111,6 +128,18 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
     [items, resourceId],
   );
 
+  const favoriteFilterOption = useMemo(
+    () => ({
+      value: 'favorites',
+      label: 'Favoritos',
+      matches: (row: T) => {
+        const rec = row as Record<string, unknown>;
+        return rec.is_favorite === true;
+      },
+    }),
+    [],
+  );
+
   const workOrderStatusFilterOptions = useMemo(
     () =>
       resourceId !== 'carWorkOrders' && resourceId !== 'bikeWorkOrders'
@@ -138,26 +167,38 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
   );
 
   const tagFilteredItems = useMemo(() => {
-    if (tagFilter === 'all' || !hasTagSignals) return creatorFilteredItems;
+    if (!tagFilterEnabled || tagFilter === 'all') return creatorFilteredItems;
     return creatorFilteredItems.filter((row) => {
       const rec = row as Record<string, unknown>;
       const tags = Array.isArray(rec.tags) ? rec.tags : [];
       return tags.some((raw) => String(raw ?? '').trim() === tagFilter);
     });
-  }, [creatorFilteredItems, hasTagSignals, tagFilter]);
+  }, [creatorFilteredItems, tagFilterEnabled, tagFilter]);
 
   const resolvedValueFilterOptions = resolveCrudValueFilterOptions(crudConfig);
   const stateFilterEnabled = resolvedValueFilterOptions.length > 0;
   const workOrderStateFilterEnabled = workOrderStatusFilterOptions.length > 0;
   const categoryFilterEnabled = supplierCategoryFilterOptions.length > 0;
-  const valueFilterEnabled =
-    crudConfig?.featureFlags?.valueFilter !== false &&
-    (stateFilterEnabled || workOrderStateFilterEnabled || categoryFilterEnabled);
-  const valueFilterOptions = stateFilterEnabled
-    ? resolvedValueFilterOptions
-    : workOrderStateFilterEnabled
-      ? workOrderStatusFilterOptions
-      : supplierCategoryFilterOptions;
+  const valueFilterEnabled = crudConfig?.featureFlags?.valueFilter !== false;
+  const valueFilterOptions = useMemo(() => {
+    const baseOptions = stateFilterEnabled
+      ? resolvedValueFilterOptions
+      : workOrderStateFilterEnabled
+        ? workOrderStatusFilterOptions
+      : categoryFilterEnabled
+        ? supplierCategoryFilterOptions
+        : tagFilterOptions;
+    return [favoriteFilterOption, ...baseOptions];
+  }, [
+    categoryFilterEnabled,
+    favoriteFilterOption,
+    resolvedValueFilterOptions,
+    stateFilterEnabled,
+    supplierCategoryFilterOptions,
+    tagFilterOptions,
+    workOrderStateFilterEnabled,
+    workOrderStatusFilterOptions,
+  ]);
 
   const valueFilteredItems = useMemo(() => {
     if (!valueFilterEnabled || valueFilter === 'all') return tagFilteredItems;
@@ -177,31 +218,17 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
       onChange={setValueFilter}
       options={valueFilterOptions}
       className="crud-status-selector"
-      ariaLabel={
-        stateFilterEnabled || workOrderStateFilterEnabled ? 'Filtrar por estado' : 'Filtrar por categoría'
-      }
+      ariaLabel={stateFilterEnabled || workOrderStateFilterEnabled ? 'Filtrar por estado' : categoryFilterEnabled ? 'Filtrar por categoría' : 'Filtrar por etiqueta'}
     />
   ) : null;
 
-  const creatorStripEl =
-    headerQuickFilterStripEnabled && listHeaderInlineSlot ? listHeaderInlineSlot({ items }) : null;
-  const tagPillsEl = showTagPills ? (
-    <TagPillsBar tags={normalizedTagValues} value={tagFilter} onChange={setTagFilter} />
-  ) : null;
-
-  const headerLeadSlot =
-    creatorStripEl || tagPillsEl ? (
-      <div
-        className={
-          creatorStripEl && tagPillsEl
-            ? 'crud-list-header-lead crud-list-header-lead--stacked'
-            : 'crud-list-header-lead'
-        }
-      >
-        {creatorStripEl}
-        {tagPillsEl}
-      </div>
-    ) : undefined;
+  const headerLeadSlot = headerQuickFilterStripEnabled ? (
+    <div className="crud-list-header-lead">{listHeaderInlineSlot?.({ items })}</div>
+  ) : tagFilterEnabled ? (
+    <div className="crud-list-header-lead">
+      <TagPillsBar tags={tagValues} value={tagFilter} onChange={setTagFilter} />
+    </div>
+  ) : undefined;
 
   return {
     crudConfig,

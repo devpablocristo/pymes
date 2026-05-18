@@ -44,7 +44,7 @@ func (r *Repository) Create(ctx context.Context, in timelinedomain.Entry) (timel
 	payload, _ := json.Marshal(defaultMetadata(in.Metadata))
 	row := models.TimelineEntryModel{
 		ID:          in.ID,
-		OrgID:       in.OrgID,
+		OrgID:    in.OrgID,
 		EntityType:  in.EntityType,
 		EntityID:    in.EntityID,
 		EventType:   in.EventType,
@@ -67,7 +67,7 @@ func toDomain(row models.TimelineEntryModel) timelinedomain.Entry {
 	}
 	return timelinedomain.Entry{
 		ID:          row.ID,
-		OrgID:       row.OrgID,
+		OrgID:    row.OrgID,
 		EntityType:  row.EntityType,
 		EntityID:    row.EntityID,
 		EventType:   row.EventType,

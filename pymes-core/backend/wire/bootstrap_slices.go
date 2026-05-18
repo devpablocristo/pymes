@@ -10,8 +10,8 @@ import (
 	"github.com/rs/zerolog"
 
 	schedulinghttp "github.com/devpablocristo/modules/scheduling/go/httpgin"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/governanceproxy"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inappnotifications"
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reviewproxy"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 )
 
@@ -43,8 +43,8 @@ type externalRoutesRegistrar interface {
 	RegisterExternalRoutes(*gin.RouterGroup)
 }
 
-type reviewCallbackRoutesRegistrar interface {
-	RegisterReviewCallbackRoutes(*gin.RouterGroup)
+type governanceCallbackRoutesRegistrar interface {
+	RegisterGovernanceCallbackRoutes(*gin.RouterGroup)
 }
 
 type publicV1Registrars struct {
@@ -65,12 +65,12 @@ func registerPublicV1Routes(v1 *gin.RouterGroup, registrars publicV1Registrars) 
 }
 
 type internalV1Registrars struct {
-	api             groupRoutesRegistrar
-	scheduling      permissionRoutesRegistrar
-	reviewCallbacks reviewCallbackRoutesRegistrar
+	api                 groupRoutesRegistrar
+	scheduling          permissionRoutesRegistrar
+	governanceCallbacks governanceCallbackRoutesRegistrar
 }
 
-func registerInternalV1Routes(v1 *gin.RouterGroup, internalServiceToken, reviewCallbackToken string, registrars internalV1Registrars, require schedulinghttp.PermissionBinder) {
+func registerInternalV1Routes(v1 *gin.RouterGroup, internalServiceToken, governanceCallbackToken string, registrars internalV1Registrars, require schedulinghttp.PermissionBinder) {
 	internalGroup := v1.Group("/internal/v1")
 	internalGroup.Use(ginmw.NewInternalServiceAuth(internalServiceToken))
 	if registrars.api != nil {
@@ -80,12 +80,12 @@ func registerInternalV1Routes(v1 *gin.RouterGroup, internalServiceToken, reviewC
 		registrars.scheduling.RegisterRoutes(internalGroup, require)
 	}
 
-	if reviewCallbackToken == "" || registrars.reviewCallbacks == nil {
+	if governanceCallbackToken == "" || registrars.governanceCallbacks == nil {
 		return
 	}
-	reviewCallbackGroup := v1.Group("/internal/v1")
-	reviewCallbackGroup.Use(ginmw.NewInternalServiceAuth(reviewCallbackToken))
-	registrars.reviewCallbacks.RegisterReviewCallbackRoutes(reviewCallbackGroup)
+	governanceCallbackGroup := v1.Group("/internal/v1")
+	governanceCallbackGroup.Use(ginmw.NewInternalServiceAuth(governanceCallbackToken))
+	registrars.governanceCallbacks.RegisterGovernanceCallbackRoutes(governanceCallbackGroup)
 }
 
 type tenantPublicRegistrars struct {
@@ -147,13 +147,13 @@ func registerAuthenticatedV1Routes(v1 *gin.RouterGroup, saasSvc *SaaSServices, r
 	return authGroup
 }
 
-func registerReviewRuntime(authGroup *gin.RouterGroup, reviewClient *reviewproxy.Client, reviewURL string, syncInterval time.Duration, inAppNotifUC *inappnotifications.Usecases, logger zerolog.Logger) {
-	if reviewClient == nil {
+func registerGovernanceRuntime(authGroup *gin.RouterGroup, governanceClient *governanceproxy.Client, governanceURL string, syncInterval time.Duration, inAppNotifUC *inappnotifications.Usecases, logger zerolog.Logger) {
+	if governanceClient == nil {
 		return
 	}
 
-	reviewproxy.NewHandler(reviewClient).RegisterRoutes(authGroup)
-	logger.Info().Str("review_url", reviewURL).Msg("review proxy enabled")
+	governanceproxy.NewHandler(governanceClient).RegisterRoutes(authGroup)
+	logger.Info().Str("governance_url", governanceURL).Msg("governance proxy enabled")
 
 	if syncInterval <= 0 || inAppNotifUC == nil {
 		return

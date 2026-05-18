@@ -1,12 +1,16 @@
 package dto
 
 type DiningAreaItem struct {
-	ID        string `json:"id"`
-	OrgID     string `json:"org_id"`
-	Name      string `json:"name"`
-	SortOrder int    `json:"sort_order"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID         string         `json:"id"`
+	OrgID   string         `json:"org_id"`
+	Name       string         `json:"name"`
+	SortOrder  int            `json:"sort_order"`
+	IsFavorite bool           `json:"is_favorite"`
+	Tags       []string       `json:"tags"`
+	Metadata   map[string]any `json:"metadata"`
+	CreatedAt  string         `json:"created_at"`
+	UpdatedAt  string         `json:"updated_at"`
+	DeletedAt  *string        `json:"deleted_at,omitempty"`
 }
 
 type ListDiningAreasResponse struct {
@@ -17,11 +21,17 @@ type ListDiningAreasResponse struct {
 }
 
 type CreateDiningAreaRequest struct {
-	Name      string `json:"name" binding:"required"`
-	SortOrder int    `json:"sort_order"`
+	Name       string         `json:"name" binding:"required"`
+	SortOrder  int            `json:"sort_order"`
+	IsFavorite *bool          `json:"is_favorite,omitempty"`
+	Tags       []string       `json:"tags,omitempty"`
+	Metadata   map[string]any `json:"metadata,omitempty"`
 }
 
 type UpdateDiningAreaRequest struct {
-	Name      *string `json:"name"`
-	SortOrder *int    `json:"sort_order"`
+	Name       *string         `json:"name"`
+	SortOrder  *int            `json:"sort_order"`
+	IsFavorite *bool           `json:"is_favorite,omitempty"`
+	Tags       *[]string       `json:"tags,omitempty"`
+	Metadata   *map[string]any `json:"metadata"`
 }

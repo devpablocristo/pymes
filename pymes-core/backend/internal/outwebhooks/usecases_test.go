@@ -165,7 +165,7 @@ func TestCreateEndpointRejectsResolvedPrivateHost(t *testing.T) {
 
 	_, err := uc.CreateEndpoint(context.Background(), webhookdomain.Endpoint{
 		OrgID: uuid.New(),
-		URL:   "https://internal.example/hooks",
+		URL:      "https://internal.example/hooks",
 	})
 	if err == nil {
 		t.Fatal("CreateEndpoint() error = nil, want private network validation error")
@@ -185,7 +185,7 @@ func TestCreateEndpointRejectsUnresolvedHost(t *testing.T) {
 
 	_, err := uc.CreateEndpoint(context.Background(), webhookdomain.Endpoint{
 		OrgID: uuid.New(),
-		URL:   "https://missing.example/hooks",
+		URL:      "https://missing.example/hooks",
 	})
 	if err == nil {
 		t.Fatal("CreateEndpoint() error = nil, want resolution error")
@@ -205,7 +205,7 @@ func TestCreateEndpointAllowsResolvedPublicHost(t *testing.T) {
 	}
 
 	got, err := uc.CreateEndpoint(context.Background(), webhookdomain.Endpoint{
-		OrgID:    uuid.New(),
+		OrgID: uuid.New(),
 		URL:      "https://public.example/hooks",
 		IsActive: true,
 		Events:   []string{"sales.created"},

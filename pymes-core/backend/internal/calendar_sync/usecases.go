@@ -118,7 +118,7 @@ func (u *Usecases) StartGoogleConnect(ctx context.Context, orgID uuid.UUID, acto
 	}
 	if err := u.repo.CreateOAuthState(ctx, domain.OAuthState{
 		State:     state,
-		OrgID:     orgID,
+		OrgID:  orgID,
 		CreatedBy: strings.TrimSpace(actor),
 		Provider:  domain.ProviderGoogle,
 		ExpiresAt: time.Now().UTC().Add(u.cfg.stateTTL()),
@@ -178,7 +178,7 @@ func (u *Usecases) HandleGoogleCallback(ctx context.Context, state, code string)
 	}
 	conn := domain.Connection{
 		ID:                    uuid.New(),
-		OrgID:                 st.OrgID,
+		OrgID:              st.OrgID,
 		CreatedBy:             st.CreatedBy,
 		Provider:              domain.ProviderGoogle,
 		Scopes:                tok.Scope,

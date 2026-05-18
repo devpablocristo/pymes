@@ -118,7 +118,7 @@ func TestListArchivedRoutePassesArchivedFlag(t *testing.T) {
 
 func testServiceAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Set(ctxkeys.CtxKeyOrgID, "00000000-0000-0000-0000-000000000001")
+		c.Set(ctxkeys.CtxKeyTenantID, "00000000-0000-0000-0000-000000000001")
 		c.Set(ctxkeys.CtxKeyActor, "tester")
 		c.Next()
 	}

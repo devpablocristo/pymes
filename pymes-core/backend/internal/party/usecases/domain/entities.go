@@ -16,7 +16,7 @@ type Address struct {
 
 type Party struct {
 	ID           uuid.UUID          `json:"id"`
-	OrgID        uuid.UUID          `json:"org_id"`
+	OrgID     uuid.UUID          `json:"org_id"`
 	PartyType    string             `json:"party_type"`
 	DisplayName  string             `json:"display_name"`
 	Email        string             `json:"email,omitempty"`
@@ -24,6 +24,7 @@ type Party struct {
 	Address      Address            `json:"address"`
 	TaxID        string             `json:"tax_id,omitempty"`
 	Notes        string             `json:"notes,omitempty"`
+	IsFavorite   bool               `json:"is_favorite"`
 	Tags         []string           `json:"tags,omitempty"`
 	Metadata     map[string]any     `json:"metadata,omitempty"`
 	CreatedAt    time.Time          `json:"created_at"`
@@ -56,7 +57,7 @@ type PartyAgent struct {
 type PartyRole struct {
 	ID          uuid.UUID      `json:"id"`
 	PartyID     uuid.UUID      `json:"party_id"`
-	OrgID       uuid.UUID      `json:"org_id"`
+	OrgID    uuid.UUID      `json:"org_id"`
 	Role        string         `json:"role"`
 	IsActive    bool           `json:"is_active"`
 	PriceListID *uuid.UUID     `json:"price_list_id,omitempty"`
@@ -66,7 +67,7 @@ type PartyRole struct {
 
 type PartyRelationship struct {
 	ID               uuid.UUID      `json:"id"`
-	OrgID            uuid.UUID      `json:"org_id"`
+	OrgID         uuid.UUID      `json:"org_id"`
 	FromPartyID      uuid.UUID      `json:"from_party_id"`
 	ToPartyID        uuid.UUID      `json:"to_party_id"`
 	RelationshipType string         `json:"relationship_type"`

@@ -10,7 +10,7 @@ import (
 
 type SaleModel struct {
 	ID            uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	OrgID         uuid.UUID  `gorm:"type:uuid;index;not null"`
+	OrgID      uuid.UUID  `gorm:"type:uuid;index;not null"`
 	BranchID      *uuid.UUID `gorm:"type:uuid;index"`
 	Number        string     `gorm:"not null"`
 	CustomerID    *uuid.UUID `gorm:"column:party_id;type:uuid"`
@@ -22,12 +22,13 @@ type SaleModel struct {
 	TaxTotal      float64    `gorm:"type:numeric(15,2)"`
 	Total         float64    `gorm:"type:numeric(15,2)"`
 	Currency      string
+	IsFavorite    bool           `gorm:"column:is_favorite;not null"`
+	Tags          pq.StringArray `gorm:"type:text[];not null;default:'{}'"`
 	Notes         string
 	CreatedBy     string
 	CreatedAt     time.Time
 	VoidedAt      *time.Time
-	Tags          pq.StringArray `gorm:"type:text[];not null;default:'{}'"`
-	Metadata      []byte         `gorm:"type:jsonb;not null;default:'{}'"`
+	Metadata      []byte `gorm:"type:jsonb;not null;default:'{}'"`
 }
 
 func (SaleModel) TableName() string { return "sales" }

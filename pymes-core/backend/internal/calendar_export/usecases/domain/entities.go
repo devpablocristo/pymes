@@ -17,15 +17,15 @@ import (
 // sólo el hash. La única vez que el plaintext aparece es en la respuesta de
 // IssueResult, después de la creación.
 type Token struct {
-	ID          uuid.UUID
-	OrgID       uuid.UUID
-	CreatedBy   string
-	Name        string
-	TokenHash   string
-	Scopes      string
-	LastUsedAt  *time.Time
-	RevokedAt   *time.Time
-	CreatedAt   time.Time
+	ID         uuid.UUID
+	OrgID   uuid.UUID
+	CreatedBy  string
+	Name       string
+	TokenHash  string
+	Scopes     string
+	LastUsedAt *time.Time
+	RevokedAt  *time.Time
+	CreatedAt  time.Time
 }
 
 // IssueResult es lo único que devuelve el caso de uso de creación: la entidad

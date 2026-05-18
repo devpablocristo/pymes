@@ -2,7 +2,6 @@ import type { CrudFieldValue, CrudPageConfig, CrudResourceConfigMap } from '../.
 import { apiRequest } from '../../lib/api';
 import { withCSVToolbar } from '../../crud/csvToolbar';
 import {
-  asBoolean,
   asNumber,
   asOptionalString,
   asString,
@@ -33,21 +32,6 @@ export type ProcurementRequest = {
   created_at?: string;
   updated_at?: string;
   archived_at?: string | null;
-};
-
-export type ProcurementPolicy = {
-  id: string;
-  org_id?: string;
-  name: string;
-  expression: string;
-  effect: string;
-  priority: number;
-  mode: string;
-  enabled: boolean;
-  action_filter: string;
-  system_filter: string;
-  created_at?: string;
-  updated_at?: string;
 };
 
 export type RolePermission = {
@@ -90,19 +74,6 @@ function toProcurementRequestCrudBody(values: Record<string, CrudFieldValue | un
     estimated_total: asNumber(values.estimated_total),
     currency: asOptionalString(values.currency) ?? 'ARS',
     lines: parseProcurementRequestLines(values.lines_json),
-  };
-}
-
-function toProcurementPolicyCrudBody(values: Record<string, CrudFieldValue | undefined>): Record<string, unknown> {
-  return {
-    name: asString(values.name),
-    expression: asString(values.expression),
-    effect: asString(values.effect),
-    priority: asNumber(values.priority),
-    mode: asString(values.mode),
-    enabled: asBoolean(values.enabled),
-    action_filter: asOptionalString(values.action_filter) ?? '',
-    system_filter: asOptionalString(values.system_filter) ?? '',
   };
 }
 
@@ -210,65 +181,6 @@ export function createProcurementRequestsCrudConfig(): CrudResourceConfigMap['pr
     }),
     isValid: (values) => asString(values.title).trim().length >= 2 && asString(values.lines_json).trim().length > 0,
     viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="procurementRequests" />),
-  }, {});
-}
-
-export function createProcurementPoliciesCrudConfig(): CrudResourceConfigMap['procurementPolicies'] {
-  return withCSVToolbar('procurementPolicies', {
-    label: 'política de compras',
-    labelPlural: 'políticas de compras',
-    labelPluralCap: 'Políticas de compras (Nexus Governance)',
-    dataSource: {
-      list: async () => (await apiRequest<{ items: ProcurementPolicy[] }>('/v1/procurement-policies')).items ?? [],
-      create: async (values) => {
-        await apiRequest('/v1/procurement-policies', { method: 'POST', body: toProcurementPolicyCrudBody(values) });
-      },
-      update: async (row, values) => {
-        await apiRequest(`/v1/procurement-policies/${row.id}`, { method: 'PATCH', body: toProcurementPolicyCrudBody(values) });
-      },
-      deleteItem: async (row) => {
-        await apiRequest(`/v1/procurement-policies/${row.id}`, { method: 'DELETE' });
-      },
-    },
-    columns: [
-      {
-        key: 'name',
-        header: 'Política',
-        className: 'cell-name',
-      },
-      { key: 'effect', header: 'Efecto', render: (_v, row: ProcurementPolicy) => row.effect || '—' },
-      { key: 'priority', header: 'Prioridad', render: (_v, row: ProcurementPolicy) => String(row.priority ?? '—') },
-      { key: 'mode', header: 'Modo', render: (_v, row: ProcurementPolicy) => row.mode || '—' },
-      { key: 'enabled', header: 'Activa', render: (_v, row: ProcurementPolicy) => (row.enabled ? 'Sí' : 'No') },
-      { key: 'action_filter', header: 'Acción', className: 'cell-notes' },
-    ],
-    formFields: [
-      { key: 'name', label: 'Nombre', required: true },
-      { key: 'expression', label: 'Expresión CEL', type: 'textarea', required: true, fullWidth: true },
-      { key: 'effect', label: 'Efecto', required: true, placeholder: 'allow | deny | require_approval' },
-      { key: 'priority', label: 'Prioridad', type: 'number' },
-      { key: 'mode', label: 'Modo', placeholder: 'enforce | shadow' },
-      { key: 'enabled', label: 'Activa', type: 'checkbox' },
-      { key: 'action_filter', label: 'Filtro de acción', placeholder: 'procurement.submit' },
-      { key: 'system_filter', label: 'Filtro de sistema', placeholder: 'pymes' },
-    ],
-    searchText: (row: ProcurementPolicy) =>
-      [row.name, row.expression, row.effect, row.action_filter].filter(Boolean).join(' '),
-    toFormValues: (row: ProcurementPolicy) => ({
-      name: row.name ?? '',
-      expression: row.expression ?? '',
-      effect: row.effect ?? '',
-      priority: row.priority?.toString() ?? '100',
-      mode: row.mode ?? 'enforce',
-      enabled: row.enabled ?? true,
-      action_filter: row.action_filter ?? '',
-      system_filter: row.system_filter ?? '',
-    }),
-    isValid: (values) =>
-      asString(values.name).trim().length >= 2 &&
-      asString(values.expression).trim().length > 0 &&
-      asString(values.effect).trim().length > 0,
-    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="procurementPolicies" />),
   }, {});
 }
 

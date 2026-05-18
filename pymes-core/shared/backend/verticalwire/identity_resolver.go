@@ -14,16 +14,16 @@ import (
 
 // BuildIdentityResolver construye el resolver JWT de verticales, alineado con claims de Clerk/core/saas.
 func BuildIdentityResolver(cfg verticalconfig.Config, log zerolog.Logger, cpHTTP *pymescorehttp.Client) *auth.IdentityResolver {
-	var orgRes auth.OrgRefResolver
+	var tenantRes auth.OrgRefResolver
 	if cpHTTP != nil {
-		orgRes = NewCoreOrgRefResolver(cpHTTP)
+		tenantRes = NewCoreTenantRefResolver(cpHTTP)
 	}
 	ic := auth.IdentityConfig{
-		Issuer:         cfg.JWTIssuer,
-		Audience:       strings.TrimSpace(cfg.JWTAudience),
-		OrgClaim:       strings.TrimSpace(cfg.JWTOrgClaim),
-		RoleClaim:      strings.TrimSpace(cfg.JWTRoleClaim),
-		OrgRefResolver: orgRes,
+		Issuer:            cfg.JWTIssuer,
+		Audience:          strings.TrimSpace(cfg.JWTAudience),
+		OrgClaim:          strings.TrimSpace(cfg.JWTTenantClaim),
+		RoleClaim:         strings.TrimSpace(cfg.JWTRoleClaim),
+		OrgRefResolver: tenantRes,
 	}
 	if cfg.JWKSURL == "" {
 		log.Warn().Msg("JWKS_URL not set; JWT auth will fail unless AUTH_ENABLE_JWT=false")
@@ -37,13 +37,13 @@ func BuildIdentityResolver(cfg verticalconfig.Config, log zerolog.Logger, cpHTTP
 	return auth.NewIdentityResolverWithConfig(verifier, ic)
 }
 
-// CoreOrgRefResolver resuelve org_... / slug / UUID vía pymes-core internal API.
+// CoreOrgRefResolver resuelve Clerk organization id, slug o UUID a tenant_id vía pymes-core internal API.
 type CoreOrgRefResolver struct {
 	client *pymescorehttp.Client
 }
 
-// NewCoreOrgRefResolver crea un resolver que llama a GET /v1/internal/v1/orgs/resolve-ref.
-func NewCoreOrgRefResolver(client *pymescorehttp.Client) *CoreOrgRefResolver {
+// NewCoreTenantRefResolver crea un resolver que llama a GET /v1/internal/v1/tenants/resolve-ref.
+func NewCoreTenantRefResolver(client *pymescorehttp.Client) *CoreOrgRefResolver {
 	return &CoreOrgRefResolver{client: client}
 }
 
@@ -58,7 +58,7 @@ func (r *CoreOrgRefResolver) ResolveOrgID(ctx context.Context, ref string) (stri
 	s, _ := m["org_id"].(string)
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return "", fmt.Errorf("missing org_id in core response")
+		return "", fmt.Errorf("missing tenant_id in core response")
 	}
 	return s, nil
 }

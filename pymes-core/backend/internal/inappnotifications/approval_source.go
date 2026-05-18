@@ -11,8 +11,8 @@ import (
 
 const (
 	approvalNotificationKind       = "approval"
-	approvalNotificationEntityType = "review_approval"
-	approvalNotificationSource     = "review_approval"
+	approvalNotificationEntityType = "governance_approval"
+	approvalNotificationSource     = "governance_approval"
 	approvalSyncLimit              = 200
 	approvalEventPending           = "approval_pending"
 	approvalEventResolved          = "approval_resolved"
@@ -20,7 +20,7 @@ const (
 
 type PendingApproval struct {
 	ID             string
-	OrgID          string
+	OrgID       string
 	RequestID      string
 	ActionType     string
 	TargetResource string
@@ -39,7 +39,7 @@ type ApprovalSource interface {
 type ApprovalEvent struct {
 	Event          string  `json:"event"`
 	ApprovalID     string  `json:"approval_id,omitempty"`
-	OrgID          string  `json:"org_id,omitempty"`
+	OrgID       string  `json:"org_id,omitempty"`
 	RequestID      string  `json:"request_id"`
 	Decision       string  `json:"decision,omitempty"`
 	DecidedBy      string  `json:"decided_by,omitempty"`
@@ -61,7 +61,7 @@ type approvalMetadata struct {
 
 type approvalMetadataPayload struct {
 	ID             string  `json:"id"`
-	OrgID          string  `json:"org_id,omitempty"`
+	OrgID       string  `json:"org_id,omitempty"`
 	RequestID      string  `json:"request_id"`
 	ActionType     string  `json:"action_type"`
 	TargetResource string  `json:"target_resource"`
@@ -77,10 +77,10 @@ func approvalNotificationID(approvalID string) string {
 	return approvalNotificationSource + ":" + strings.TrimSpace(approvalID)
 }
 
-func buildApprovalNotification(tenantID, recipientID string, approval PendingApproval) coredomain.Notification {
+func buildApprovalNotification(orgID, recipientID string, approval PendingApproval) coredomain.Notification {
 	return coredomain.Notification{
 		ID:          approvalNotificationID(approval.ID),
-		TenantID:    tenantID,
+		TenantID:    orgID,
 		RecipientID: recipientID,
 		Title:       buildApprovalTitle(approval),
 		Body:        buildApprovalBody(approval),
@@ -127,7 +127,7 @@ func buildApprovalMetadata(approval PendingApproval) json.RawMessage {
 		Source: approvalNotificationSource,
 		Approval: approvalMetadataPayload{
 			ID:             strings.TrimSpace(approval.ID),
-			OrgID:          strings.TrimSpace(approval.OrgID),
+			OrgID:       strings.TrimSpace(approval.OrgID),
 			RequestID:      strings.TrimSpace(approval.RequestID),
 			ActionType:     strings.TrimSpace(approval.ActionType),
 			TargetResource: strings.TrimSpace(approval.TargetResource),
@@ -140,7 +140,7 @@ func buildApprovalMetadata(approval PendingApproval) json.RawMessage {
 		},
 	})
 	if err != nil {
-		return json.RawMessage(`{"source":"review_approval"}`)
+		return json.RawMessage(`{"source":"governance_approval"}`)
 	}
 	return json.RawMessage(payload)
 }
@@ -162,7 +162,7 @@ func parseApprovalCreatedAt(raw string) time.Time {
 func approvalEventToPendingApproval(event ApprovalEvent) PendingApproval {
 	return PendingApproval{
 		ID:             strings.TrimSpace(event.ApprovalID),
-		OrgID:          strings.TrimSpace(event.OrgID),
+		OrgID:       strings.TrimSpace(event.OrgID),
 		RequestID:      strings.TrimSpace(event.RequestID),
 		ActionType:     strings.TrimSpace(event.ActionType),
 		TargetResource: strings.TrimSpace(event.TargetResource),

@@ -115,10 +115,10 @@ export type ProductRole = 'admin' | 'user';
 
 export type BootstrapAuthPayload = {
   org_id: string;
-  /** Nombre legible desde `orgs.name` (GET /session); puede faltar si no hay fila o está vacío. */
-  org_name?: string | null;
-  /** Mismo UUID que `org_id`; nombre alineado con kernel `tenant_id`. */
-  tenant_id?: string;
+  /** Nombre legible desde `tenants.name` (GET /session); puede faltar si no hay fila o está vacío. */
+  tenant_name?: string | null;
+  /** Slug canónico validado por backend para rutas tenant-scoped. */
+  tenant_slug?: string | null;
   /** Rol crudo del JWT / API (p. ej. owner, admin, viewer, service). */
   role: string;
   product_role: ProductRole;
@@ -132,6 +132,18 @@ export type BootstrapAuthPayload = {
 /** Auth del tenant vía GET /v1/session. */
 export type SessionResponse = {
   auth: BootstrapAuthPayload;
+  tenant?: {
+    id: string;
+    slug?: string | null;
+    name?: string | null;
+  };
+  membership?: {
+    role: string;
+  };
+  user?: {
+    id?: string;
+    external_id?: string;
+  };
 };
 
 /** Respuesta de `GET /v1/users/me` (perfil SaaS / core). */

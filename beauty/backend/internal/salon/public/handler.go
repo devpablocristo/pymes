@@ -9,15 +9,16 @@ import (
 
 	"github.com/devpablocristo/pymes/beauty/backend/internal/shared/pymescore"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
 )
 
 // coreServicesPort expone el catálogo público de servicios servido por pymes-core.
 type coreServicesPort interface {
-	ListPublicServices(ctx context.Context, orgRef, vertical, segment, search string) ([]pymescore.CoreService, error)
+	ListPublicServices(ctx context.Context, tenantRef, vertical, segment, search string) ([]pymescore.CoreService, error)
 }
 
 type bookingPort interface {
-	BookScheduling(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error)
+	BookScheduling(ctx context.Context, tenantRef string, payload map[string]any) (map[string]any, error)
 }
 
 type Handler struct {
@@ -33,23 +34,23 @@ func NewHandler(coreServices coreServicesPort, bookings bookingPort) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
-	group.GET("/public/:org_slug/beauty/services", h.ListServices)
-	group.POST("/public/:org_slug/beauty/bookings", h.BookScheduling)
+	group.GET("/public/:tenant_slug/beauty/services", h.ListServices)
+	group.POST("/public/:tenant_slug/beauty/bookings", h.BookScheduling)
 }
 
 func (h *Handler) ListServices(c *gin.Context) {
-	orgSlug := strings.TrimSpace(c.Param("org_slug"))
-	if orgSlug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "org_slug is required"})
+	tenantSlug := strings.TrimSpace(c.Param("tenant_slug"))
+	if tenantSlug == "" {
+		verticalgin.WriteValidation(c, "tenant_slug is required")
 		return
 	}
 	if h.coreServices == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "core services not configured"})
+		verticalgin.WriteError(c, http.StatusServiceUnavailable, "UPSTREAM_UNAVAILABLE", "core services not configured")
 		return
 	}
 	items, err := h.coreServices.ListPublicServices(
 		c.Request.Context(),
-		orgSlug,
+		tenantSlug,
 		"beauty",
 		"salon",
 		strings.TrimSpace(c.Query("search")),
@@ -76,28 +77,28 @@ func (h *Handler) ListServices(c *gin.Context) {
 			"tax_rate":         item.TaxRate,
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"items": publicItems})
+	verticalgin.WriteListResponse(c, publicItems, int64(len(publicItems)), false, "")
 }
 
 func (h *Handler) BookScheduling(c *gin.Context) {
 	if h.bookings == nil {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "booking not configured"})
+		verticalgin.WriteError(c, http.StatusNotImplemented, "UPSTREAM_UNAVAILABLE", "booking not configured")
 		return
 	}
-	orgSlug := strings.TrimSpace(c.Param("org_slug"))
-	if orgSlug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "org_slug is required"})
+	tenantSlug := strings.TrimSpace(c.Param("tenant_slug"))
+	if tenantSlug == "" {
+		verticalgin.WriteValidation(c, "tenant_slug is required")
 		return
 	}
 	var payload map[string]any
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	if payload == nil {
 		payload = map[string]any{}
 	}
-	out, err := h.bookings.BookScheduling(c.Request.Context(), orgSlug, payload)
+	out, err := h.bookings.BookScheduling(c.Request.Context(), tenantSlug, payload)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

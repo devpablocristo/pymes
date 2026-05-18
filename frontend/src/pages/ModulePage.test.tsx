@@ -30,6 +30,7 @@ vi.mock('../lib/api', () => ({
   apiRequest: (...args: [string]) => apiMocks.apiRequest(...args),
   getSession: () => apiMocks.getSession(),
   downloadAPIFile: (...args: unknown[]) => apiMocks.downloadAPIFile(...args),
+  getNotificationsSummary: () => Promise.resolve({ unread_count: 0 }),
 }));
 
 function renderModulePage(initialPath: string) {
@@ -86,7 +87,7 @@ describe('ModulePage', () => {
     expect(screen.getByText('Cargando modulo…')).toBeInTheDocument();
   });
 
-  it('muestra fallback de error si falla la resolución del módulo', async () => {
+  it('muestra error si falla la resolución del módulo', async () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     crudMocks.hasLazyCrudResource.mockRejectedValueOnce(new Error('boom module'));
 

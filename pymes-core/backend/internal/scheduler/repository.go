@@ -62,7 +62,7 @@ func (r *Repository) ListDueSchedulingReminders(ctx context.Context, now time.Ti
 	err := r.db.WithContext(ctx).Raw(`
 		SELECT
 			b.org_id,
-			COALESCE(o.slug, b.org_id::text) AS org_slug,
+			COALESCE(o.slug, b.org_id::text) AS tenant_slug,
 			b.id AS booking_id,
 			b.customer_name,
 			b.customer_email,

@@ -1,14 +1,24 @@
-import { useClerk, useOrganization, useSession } from '@clerk/react';
+import { useClerk, useSession, useUser } from '@clerk/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clerkEnabled } from '../lib/auth';
-import { createSchedulingBranch, listSchedulingBranches, updateTenantSettings } from '../lib/api';
+import {
+  createSchedulingBranch,
+  createSchedulingBranchWithSetupKey,
+  createTenant,
+  listTenants,
+  listSchedulingBranches,
+  listSchedulingBranchesWithSetupKey,
+  updateTenantSettings,
+  updateTenantSettingsWithSetupKey,
+} from '../lib/api';
 import { formatClerkAPIUserMessage } from '../lib/clerkErrors';
 import { useI18n } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
 import {
   saveTenantProfile,
+  clearTenantProfile,
   syncTenantProfileFromSettings,
   type PaymentMethod,
   type SellsType,
@@ -18,7 +28,25 @@ import {
   type VerticalType,
 } from '../lib/tenantProfile';
 
-type VerticalGroup = 'commercial' | 'professionals' | 'workshops' | 'beauty' | 'restaurants';
+const existingTenantLookupTimeoutMs = 15_000;
+
+function withExistingTenantLookupTimeout<T>(promise: Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error('tenant_lookup_timeout')), existingTenantLookupTimeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
+}
+
+type VerticalGroup = 'commercial' | 'professionals' | 'workshops' | 'beauty' | 'restaurants' | 'medical';
 type OnboardingSubVerticalOption = {
   value: string;
   vertical: VerticalType;
@@ -39,6 +67,11 @@ const VERTICAL_GROUP_KEYS: { value: VerticalGroup; labelKey: string; descKey: st
     value: 'restaurants',
     labelKey: 'onboarding.vertical.restaurants',
     descKey: 'onboarding.vertical.restaurantsDesc',
+  },
+  {
+    value: 'medical',
+    labelKey: 'onboarding.vertical.medical',
+    descKey: 'onboarding.vertical.medicalDesc',
   },
 ];
 
@@ -111,6 +144,14 @@ const SUB_VERTICAL_KEYS: Partial<Record<VerticalGroup, OnboardingSubVerticalOpti
       descKey: 'onboarding.vertical.cafeDesc',
     },
   ],
+  medical: [
+    {
+      value: 'occupational_health',
+      vertical: 'medical',
+      labelKey: 'onboarding.vertical.occupationalHealth',
+      descKey: 'onboarding.vertical.occupationalHealthDesc',
+    },
+  ],
 };
 
 const GROUP_TO_VERTICAL: Partial<Record<VerticalGroup, VerticalType>> = {
@@ -119,6 +160,7 @@ const GROUP_TO_VERTICAL: Partial<Record<VerticalGroup, VerticalType>> = {
   workshops: 'workshops',
   beauty: 'beauty',
   restaurants: 'restaurants',
+  medical: 'medical',
 };
 
 const ALL_VERTICAL_LABEL_KEYS: Record<VerticalType, string> = {
@@ -127,6 +169,7 @@ const ALL_VERTICAL_LABEL_KEYS: Record<VerticalType, string> = {
   workshops: 'onboarding.vertical.workshops',
   beauty: 'onboarding.vertical.beauty',
   restaurants: 'onboarding.vertical.restaurants',
+  medical: 'onboarding.vertical.medical',
 };
 
 type Step = 1 | 2 | 3 | 4;
@@ -136,8 +179,21 @@ function resolveDefaultBranchTimezone(): string {
   return timezone || 'UTC';
 }
 
-async function ensureDefaultBranchExists(): Promise<void> {
-  const current = await listSchedulingBranches();
+function slugifyTenantNameForOnboarding(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+}
+
+async function ensureDefaultBranchExists(tenantSlug?: string, setupAPIKey?: string): Promise<void> {
+  const options = tenantSlug ? { tenantSlug } : {};
+  const current = setupAPIKey && tenantSlug
+    ? await listSchedulingBranchesWithSetupKey(setupAPIKey, tenantSlug)
+    : await listSchedulingBranches(options);
   if ((current.items ?? []).length > 0) {
     return;
   }
@@ -148,9 +204,15 @@ async function ensureDefaultBranchExists(): Promise<void> {
     active: true,
   };
   try {
-    await createSchedulingBranch(payload);
+    if (setupAPIKey && tenantSlug) {
+      await createSchedulingBranchWithSetupKey(payload, setupAPIKey, tenantSlug);
+    } else {
+      await createSchedulingBranch(payload, options);
+    }
   } catch (error) {
-    const refreshed = await listSchedulingBranches();
+    const refreshed = setupAPIKey && tenantSlug
+      ? await listSchedulingBranchesWithSetupKey(setupAPIKey, tenantSlug)
+      : await listSchedulingBranches(options);
     if ((refreshed.items ?? []).length > 0) {
       return;
     }
@@ -185,29 +247,31 @@ const PAYMENT_KEYS: { value: PaymentMethod; labelKey: string }[] = [
 
 type ClerkOnboardingBridges = {
   loaded: boolean;
-  createOrganization: (params: { name: string }) => Promise<{ id: string }>;
-  setActive: (params: { organization: string }) => Promise<void>;
-  organization: { id: string } | null;
-  orgLoaded: boolean;
-  afterSetActiveOrg?: () => Promise<void>;
+  signOut: () => Promise<void>;
+  setActiveOrganization: (organizationID: string) => Promise<void>;
+  user: { name: string; email: string } | null;
 };
 
 function OnboardingPageClerkBridge() {
   const clerk = useClerk();
   const { session } = useSession();
-  const { organization, isLoaded: orgLoaded } = useOrganization();
+  const { user } = useUser();
+  const userEmail = user?.primaryEmailAddress?.emailAddress?.trim() ?? '';
+  const userName =
+    user?.fullName?.trim() ||
+    [user?.firstName, user?.lastName].map((part) => part?.trim()).filter(Boolean).join(' ') ||
+    userEmail;
 
   const bridges: ClerkOnboardingBridges = {
     loaded: clerk.loaded,
-    createOrganization: (params) => clerk.createOrganization(params),
-    setActive: (params) => clerk.setActive(params),
-    organization: organization ? { id: organization.id } : null,
-    orgLoaded,
-    afterSetActiveOrg: session
-      ? async () => {
-          await session.reload();
-        }
-      : undefined,
+    signOut: () => clerk.signOut({ redirectUrl: '/login' }),
+    // Resuelve la task `choose-organization` de Clerk activando la org recién creada
+    // antes del redirect al dashboard. Sin esto, `taskUrls` rebota a /onboarding.
+    setActiveOrganization: async (organizationID: string) => {
+      await clerk.setActive({ organization: organizationID });
+      await session?.reload().catch(() => undefined);
+    },
+    user: user ? { name: userName, email: userEmail } : null,
   };
 
   return <OnboardingPageInner clerkBridges={bridges} />;
@@ -240,6 +304,52 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
 
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState('');
+  const [checkingExistingTenant, setCheckingExistingTenant] = useState(Boolean(clerkBridges));
+  const hasClerkBridge = Boolean(clerkBridges);
+  const clerkBridgeLoaded = clerkBridges?.loaded ?? false;
+
+  useEffect(() => {
+    if (!hasClerkBridge) {
+      setCheckingExistingTenant(false);
+      return;
+    }
+    if (!clerkBridgeLoaded) {
+      return;
+    }
+    let cancelled = false;
+    setCheckingExistingTenant(true);
+    void withExistingTenantLookupTimeout(listTenants())
+      .then(async (result) => {
+        if (cancelled) {
+          return;
+        }
+        const tenant = (result.items ?? []).find((item) => item.slug && item.clerk_org_id);
+        if (tenant?.slug && tenant.clerk_org_id) {
+          // CRÍTICO: resolver la task `choose-organization` de Clerk activando
+          // la org ANTES del redirect. Si no, ClerkProvider con `taskUrls` ve la
+          // task pendiente al recargar y rebota de vuelta a /onboarding (loop
+          // infinito que ve el user invitado al primer login).
+          try {
+            await clerkBridges?.setActiveOrganization(tenant.clerk_org_id);
+          } catch (err) {
+            // si falla setActive, el `activate_org` en el query del redirect
+            // es el segundo intento desde RequireActiveTenant.
+            console.warn('[OnboardingPage] setActiveOrganization failed; relying on activate_org fallback', err);
+          }
+          window.location.assign(`/${tenant.slug}/dashboard?activate_org=${encodeURIComponent(tenant.clerk_org_id)}`);
+          return;
+        }
+        setCheckingExistingTenant(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCheckingExistingTenant(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [clerkBridgeLoaded, hasClerkBridge]);
 
   const resolvedVertical: VerticalType | '' = verticalGroup
     ? SUB_VERTICAL_KEYS[verticalGroup]
@@ -267,8 +377,16 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
     4: true,
   };
 
-  const clerkReady = !clerkBridges || (clerkBridges.loaded && clerkBridges.orgLoaded);
+  const clerkReady = !clerkBridges || clerkBridges.loaded;
   const canFinishStep4 = canNext[4] && !finishing && clerkReady;
+
+  if (checkingExistingTenant) {
+    return (
+      <div className="onboarding-layout">
+        <div className="spinner" aria-label="Cargando" />
+      </div>
+    );
+  }
 
   function next() {
     if (step < 4) setStep((step + 1) as Step);
@@ -276,6 +394,16 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
 
   function back() {
     if (step > 1) setStep((step - 1) as Step);
+  }
+
+  async function handleSignOut(): Promise<void> {
+    clearTenantProfile();
+    queryClient.clear();
+    if (clerkBridges) {
+      await clerkBridges.signOut();
+      return;
+    }
+    navigate('/login', { replace: true });
   }
 
   async function finish() {
@@ -295,19 +423,28 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
 
     setFinishError('');
     setFinishing(true);
+    let tenantSlugForSetup = '';
+    let setupAPIKey = '';
+    let activeClerkOrgID = '';
 
     if (clerkBridges) {
-      if (!clerkBridges.loaded || !clerkBridges.orgLoaded) {
+      if (!clerkBridges.loaded) {
         setFinishError(t('onboarding.clerk.sessionNotReady'));
         setFinishing(false);
         return;
       }
       try {
         const name = profile.businessName.trim();
-        if (!clerkBridges.organization) {
-          const created = await clerkBridges.createOrganization({ name });
-          await clerkBridges.setActive({ organization: created.id });
-          await clerkBridges.afterSetActiveOrg?.();
+        const requestedTenantSlug = slugifyTenantNameForOnboarding(name);
+        const created = await createTenant({
+          name,
+          slug: requestedTenantSlug || undefined,
+        });
+        activeClerkOrgID = created.clerk_org_id;
+        tenantSlugForSetup = created.slug ?? '';
+        setupAPIKey = created.raw_key ?? '';
+        if (!tenantSlugForSetup) {
+          throw new Error('No se pudo resolver el slug del tenant activo.');
         }
       } catch (err) {
         setFinishError(formatClerkAPIUserMessage(err, t('onboarding.clerk.organizationFailed')));
@@ -317,8 +454,8 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
     }
 
     try {
-      await ensureDefaultBranchExists();
-      const updated = await updateTenantSettings({
+      await ensureDefaultBranchExists(tenantSlugForSetup, setupAPIKey);
+      const tenantSettingsPatch = {
         business_name: profile.businessName,
         team_size: profile.teamSize,
         sells: profile.sells,
@@ -329,13 +466,33 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
         payment_method: profile.paymentMethod,
         vertical: profile.vertical,
         onboarding_completed_at: profile.completedAt,
-      });
+      };
+      const updated = setupAPIKey && tenantSlugForSetup
+        ? await updateTenantSettingsWithSetupKey(tenantSettingsPatch, setupAPIKey, tenantSlugForSetup)
+        : await updateTenantSettings(tenantSettingsPatch, tenantSlugForSetup ? { tenantSlug: tenantSlugForSetup } : {});
       queryClient.setQueryData(queryKeys.tenant.settings, updated);
       const syncedProfile = syncTenantProfileFromSettings(updated);
       saveTenantProfile({
         ...(syncedProfile ?? profile),
         ...(profile.subVertical ? { subVertical: profile.subVertical } : {}),
       });
+      if (clerkBridges && tenantSlugForSetup) {
+        if (activeClerkOrgID) {
+          // Activar la org en la sesión Clerk antes del refresh resuelve la task
+          // `choose-organization`; si fallara, `activate_org` en la URL la recupera.
+          try {
+            await clerkBridges.setActiveOrganization(activeClerkOrgID);
+          } catch {
+            // ignorar — el fallback de `activate_org` cubre el caso
+          }
+        }
+        const dashboardPath = `/${tenantSlugForSetup}/dashboard`;
+        const target = activeClerkOrgID
+          ? `${dashboardPath}?activate_org=${encodeURIComponent(activeClerkOrgID)}`
+          : dashboardPath;
+        window.location.assign(target);
+        return;
+      }
       navigate('/', { replace: true });
     } catch (err) {
       setFinishError(
@@ -357,6 +514,16 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
         <div className="onboarding-header">
           <h1>{t('onboarding.header.title')}</h1>
           <p>{t('onboarding.header.subtitle')}</p>
+          <div className="onboarding-account-panel" aria-label="Usuario actual">
+            <div>
+              <span>Estás logueado como</span>
+              <strong>{clerkBridges?.user?.name || 'Usuario actual'}</strong>
+              <small>{clerkBridges?.user?.email || 'Sin email disponible'}</small>
+            </div>
+            <button type="button" className="onboarding-signout" onClick={() => void handleSignOut()}>
+              Cerrar sesión
+            </button>
+          </div>
           <div className="onboarding-progress">
             {[1, 2, 3, 4].map((s) => (
               <span key={s} className={`onboarding-dot${s === step ? ' active' : ''}${s < step ? ' done' : ''}`} />

@@ -2,7 +2,7 @@ package dto
 
 type ProductItem struct {
 	ID          string         `json:"id"`
-	OrgID       string         `json:"org_id"`
+	OrgID    string         `json:"org_id"`
 	SKU         string         `json:"sku,omitempty"`
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
@@ -15,6 +15,7 @@ type ProductItem struct {
 	ImageURLs   []string       `json:"image_urls,omitempty"`
 	TrackStock  bool           `json:"track_stock"`
 	IsActive    bool           `json:"is_active"`
+	IsFavorite  bool           `json:"is_favorite"`
 	Tags        []string       `json:"tags"`
 	Metadata    map[string]any `json:"metadata"`
 	CreatedAt   string         `json:"created_at"`
@@ -42,6 +43,7 @@ type CreateProductRequest struct {
 	ImageURLs   []string       `json:"image_urls,omitempty"`
 	TrackStock  *bool          `json:"track_stock"`
 	IsActive    *bool          `json:"is_active"`
+	IsFavorite  *bool          `json:"is_favorite"`
 	Tags        []string       `json:"tags"`
 	Metadata    map[string]any `json:"metadata"`
 }
@@ -59,6 +61,7 @@ type UpdateProductRequest struct {
 	ImageURLs   *[]string       `json:"image_urls,omitempty"`
 	TrackStock  *bool           `json:"track_stock"`
 	IsActive    *bool           `json:"is_active"`
+	IsFavorite  *bool           `json:"is_favorite"`
 	Tags        *[]string       `json:"tags"`
 	Metadata    *map[string]any `json:"metadata"`
 }

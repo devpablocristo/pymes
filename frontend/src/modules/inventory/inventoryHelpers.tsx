@@ -1,25 +1,17 @@
-import { type CrudColumn, type CrudFormField, type CrudFormValues, type CrudPageConfig } from '../../components/CrudPage';
+import { type CrudColumn, type CrudFieldValue, type CrudFormField, type CrudFormValues, type CrudPageConfig } from '../../components/CrudPage';
 import type { CrudToolbarAction } from '@devpablocristo/modules-crud-ui';
-import { renderTagBadges } from '../../crud/crudTagBadges';
+import { buildStandardCrudViewModes, formatCrudLinkedEntityImageUrlsToForm, parseCrudLinkedEntityImageUrlList } from '../../modules/crud';
 import {
   asBoolean,
   asNumber,
-  asOptionalNumber,
   asOptionalString,
   asString,
-  parseImageURLList,
 } from '../../crud/resourceConfigs.shared';
-import { buildStandardCrudImageUrlsModalFieldConfig } from '../../crud/standardCrudMedia';
-import { formatCrudRecordImageUrlsToForm } from '../../modules/crud/crudLinkedEntityImageUrls';
-import { buildStandardCrudViewModes, renderCrudActiveBadge } from '../../modules/crud';
-import { formatPartyTagList, parsePartyTagCsv } from '../parties';
+import { buildStandardInternalFields, formatTagCsv, parseTagCsv } from '../crud';
 import {
-  currencyOptions,
+  asCrudString,
   parseMetadataStringMap,
   productCategoryOptions,
-  productKindOptions,
-  productUnitOptions,
-  taxRateOptions,
 } from '../../lib/formPresets';
 
 export type ProductRecord = {
@@ -36,6 +28,7 @@ export type ProductRecord = {
   image_urls?: string[];
   track_stock: boolean;
   is_active: boolean;
+  is_favorite?: boolean;
   deleted_at?: string | null;
   tags?: string[];
   metadata?: Record<string, unknown>;
@@ -52,6 +45,14 @@ export type StockRecord = {
   updated_at: string;
 };
 
+function formatProductImagesForEditor(values: string[] | undefined, singleImageUrl?: string): string {
+  return formatCrudLinkedEntityImageUrlsToForm(values, singleImageUrl);
+}
+
+function parseProductImagesFromEditor(value: CrudFieldValue | undefined): string[] {
+  return parseCrudLinkedEntityImageUrlList(asCrudString(value));
+}
+
 export function createProductColumns<T extends ProductRecord>(): CrudColumn<T>[] {
   return [
     { key: 'name', header: 'Producto', className: 'cell-name' },
@@ -61,49 +62,15 @@ export function createProductColumns<T extends ProductRecord>(): CrudColumn<T>[]
       render: (_v, row) =>
         row.sku || (typeof row.metadata?.barcode === 'string' ? String(row.metadata.barcode) : '') || '—',
     },
-    {
-      key: 'metadata',
-      header: '★',
-      className: 'cell-narrow',
-      render: (_v, row) =>
-        row.metadata?.favorite === true || String(row.metadata?.favorite).toLowerCase() === 'true' ? (
-          <span title="Favorito">★</span>
-        ) : (
-          '—'
-        ),
-    },
     { key: 'unit', header: 'Unidad', render: (_v, row) => row.unit || '—' },
     { key: 'price', header: 'Precio', render: (value, row) => `${row.currency ?? 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
     { key: 'cost_price', header: 'Costo', render: (value, row) => `${row.currency ?? 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
-    {
-      key: 'tags',
-      header: 'Etiquetas Internas',
-      className: 'cell-tags',
-      render: (_value, row) => renderTagBadges(row.tags),
-    },
-    {
-      key: 'track_stock',
-      header: 'Stock',
-      render: (value) => renderCrudActiveBadge(Boolean(value), 'Controlado', 'Sin control'),
-    },
-    {
-      key: 'is_active',
-      header: 'Estado',
-      render: (value) => renderCrudActiveBadge(Boolean(value)),
-    },
   ];
 }
 
 export function productFormFields(): CrudFormField[] {
   return [
-    { key: 'metadata_favorite', label: 'Favorito', type: 'checkbox' },
-    { key: 'tags', label: 'Etiquetas Internas', placeholder: 'nuevo, combo, premium' },
-    {
-      key: 'image_urls',
-      label: 'Imágenes',
-      type: 'textarea',
-      fullWidth: true,
-    },
+    { key: 'image_urls', label: 'Imágenes', type: 'textarea', rows: 3, fullWidth: true },
     { key: 'name', label: 'Nombre', required: true, placeholder: 'Nombre del producto' },
     { key: 'sku', label: 'Código interno', placeholder: 'PROD-001' },
     {
@@ -112,20 +79,17 @@ export function productFormFields(): CrudFormField[] {
       type: 'select',
       options: productCategoryOptions,
     },
-    {
-      key: 'metadata_kind',
-      label: 'Tipo de producto',
-      type: 'select',
-      options: productKindOptions,
-    },
     { key: 'metadata_barcode', label: 'Código de barras', placeholder: '7791234567890' },
-    { key: 'unit', label: 'Unidad', type: 'select', options: productUnitOptions },
     { key: 'price', label: 'Precio', type: 'number', required: true, placeholder: '0.00' },
-    { key: 'currency', label: 'Moneda', type: 'select', options: currencyOptions },
-    { key: 'cost_price', label: 'Costo', type: 'number', placeholder: '0.00' },
-    { key: 'metadata_margin_percent', label: 'Margen (%)', type: 'number', placeholder: '35' },
-    { key: 'tax_rate', label: 'IVA', type: 'select', options: taxRateOptions },
-    { key: 'track_stock', label: 'Controla stock', type: 'checkbox' },
+    {
+      key: 'track_stock',
+      label: 'Controla stock',
+      type: 'select',
+      options: [
+        { label: 'Sí', value: 'true' },
+        { label: 'No', value: 'false' },
+      ],
+    },
     {
       key: 'is_active',
       label: 'Estado comercial',
@@ -135,7 +99,7 @@ export function productFormFields(): CrudFormField[] {
         { label: 'Inactivo', value: 'false' },
       ],
     },
-    { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
+    ...buildStandardInternalFields({ tagsPlaceholder: 'nuevo, combo, premium' }),
   ];
 }
 
@@ -146,7 +110,7 @@ export function buildProductSearchText(row: ProductRecord): string {
     row.description,
     row.unit,
     row.currency,
-    formatPartyTagList(row.tags),
+    formatTagCsv(row.tags),
     typeof row.metadata?.barcode === 'string' ? row.metadata.barcode : '',
     typeof row.metadata?.category === 'string' ? row.metadata.category : '',
   ]
@@ -165,62 +129,37 @@ export function buildProductFormValues(row: ProductRecord) {
     tax_rate: row.tax_rate?.toString() ?? '',
     track_stock: row.track_stock ?? true,
     is_active: row.is_active ? 'true' : 'false',
-    tags: formatPartyTagList(row.tags),
-    image_urls: formatCrudRecordImageUrlsToForm(row as unknown as Record<string, unknown>),
-    description: row.description ?? '',
+    is_favorite: row.is_favorite ?? false,
+    tags: formatTagCsv(row.tags),
+    image_urls: formatProductImagesForEditor(row.image_urls, row.image_url),
+    notes: row.description ?? '',
     metadata_category: typeof row.metadata?.category === 'string' ? row.metadata.category : '',
     metadata_kind: typeof row.metadata?.kind === 'string' ? row.metadata.kind : 'simple',
     metadata_barcode: typeof row.metadata?.barcode === 'string' ? row.metadata.barcode : '',
     metadata_margin_percent:
       row.metadata?.margin_percent === undefined || row.metadata?.margin_percent === null ? '' : String(row.metadata.margin_percent),
-    metadata_favorite:
-      row.metadata?.favorite === true ||
-      String(row.metadata?.favorite ?? '').toLowerCase() === 'true' ||
-      row.metadata?.favorite === 1,
   };
 }
 
 export function productFormToBody(values: CrudFormValues): Record<string, unknown> {
   const price = asNumber(values.price);
-  const directCost = asOptionalNumber(values.cost_price);
-  const marginPercent = asOptionalNumber(values.metadata_margin_percent);
-  const derivedCost =
-    directCost !== undefined
-      ? directCost
-      : marginPercent !== undefined && Number.isFinite(marginPercent)
-        ? Math.max(0, price - price * (marginPercent / 100))
-        : 0;
-  const metadata: Record<string, unknown> = parseMetadataStringMap(undefined, {
-    category: asOptionalString(values.metadata_category),
-    kind: asOptionalString(values.metadata_kind),
-    barcode: asOptionalString(values.metadata_barcode),
-    margin_percent: asOptionalString(values.metadata_margin_percent),
-  });
-  if (asBoolean(values.metadata_favorite)) {
-    metadata.favorite = true;
-  } else {
-    delete metadata.favorite;
-  }
-  const imgUrls = parseImageURLList(values.image_urls);
-  if (imgUrls.length > 0) {
-    metadata.image_urls = imgUrls;
-  } else {
-    delete metadata.image_urls;
-  }
   return {
     name: asString(values.name),
     sku: asOptionalString(values.sku),
-    unit: asOptionalString(values.unit),
+    unit: 'unit',
     price,
-    currency: asOptionalString(values.currency) ?? 'ARS',
-    cost_price: derivedCost,
-    tax_rate: asOptionalNumber(values.tax_rate),
+    currency: 'ARS',
+    cost_price: 0,
     track_stock: asBoolean(values.track_stock),
     is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-    tags: parsePartyTagCsv(values.tags),
-    description: asOptionalString(values.description),
-    image_urls: imgUrls,
-    metadata,
+    is_favorite: asBoolean(values.is_favorite),
+    tags: parseTagCsv(values.tags),
+    image_urls: parseProductImagesFromEditor(values.image_urls),
+    description: asOptionalString(values.notes),
+    metadata: parseMetadataStringMap(undefined, {
+      category: asOptionalString(values.metadata_category),
+      barcode: asOptionalString(values.metadata_barcode),
+    }),
   };
 }
 
@@ -238,13 +177,13 @@ export function createProductCrudConfig<T extends ProductRecord>(options: {
   | 'label'
   | 'labelPlural'
   | 'labelPluralCap'
+  | 'allowEdit'
   | 'columns'
   | 'formFields'
   | 'searchText'
   | 'toFormValues'
   | 'toBody'
   | 'isValid'
-  | 'editorModal'
 > {
   return {
     supportsArchived: true,
@@ -256,19 +195,13 @@ export function createProductCrudConfig<T extends ProductRecord>(options: {
     label: 'producto',
     labelPlural: 'productos',
     labelPluralCap: 'Productos',
+    allowEdit: true,
     columns: createProductColumns<T & { id: string }>(),
     formFields: productFormFields(),
     searchText: buildProductSearchText as CrudPageConfig<T & { id: string }>['searchText'],
     toFormValues: buildProductFormValues as CrudPageConfig<T & { id: string }>['toFormValues'],
     toBody: productFormToBody,
     isValid: isValidProductForm,
-    editorModal: {
-      /** Carrusel superior sincronizado con el mismo campo que guardamos (`values.image_urls`). */
-      mediaFieldKey: 'image_urls',
-      fieldConfig: {
-        image_urls: buildStandardCrudImageUrlsModalFieldConfig(),
-      },
-    },
   };
 }
 
@@ -383,17 +316,18 @@ export function createStockCrudConfig<T extends StockRecord>(options: {
     labelPlural: 'productos en el inventario',
     labelPluralCap: 'Inventario',
     allowCreate: false,
+    // Inventario edita el producto subyacente (favoritos/tags/stock min) vía /v1/products/:id.
     allowEdit: true,
-    allowDelete: false,
+    allowDelete: true,
     supportsArchived: true,
     archivedEmptyState: 'No hay productos archivados en inventario.',
     searchPlaceholder: 'Buscar...',
     emptyState: 'No hay productos en el inventario.',
-    viewModes: buildStandardCrudViewModes(options.renderList, {
-      renderGallery: options.renderGallery,
-      renderKanban: options.renderBoard,
-      ariaLabel: 'Vistas de inventario',
-    }),
+    viewModes: [
+      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vistas de inventario', isDefault: true, render: options.renderList },
+      { id: 'gallery', label: 'Galería', path: 'gallery', ariaLabel: 'Vistas de inventario', render: options.renderGallery },
+      { id: 'kanban', label: 'Tablero', path: 'board', ariaLabel: 'Vistas de inventario', render: options.renderBoard },
+    ],
     rowActions: [],
     toolbarActions: [createStockNewProductAction() as CrudToolbarAction<T>],
     columns: createStockColumns<T>(),

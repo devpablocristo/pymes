@@ -34,7 +34,7 @@ func (allowAllRBAC) HasPermission(ctx context.Context, orgID, actor, role string
 
 func authContextMiddleware(orgID uuid.UUID, actor string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Set(types.CtxKeyOrgID, orgID.String())
+		c.Set(types.CtxKeyTenantID, orgID.String())
 		c.Set(types.CtxKeyActor, actor)
 		c.Set(types.CtxKeyRole, "member")
 		c.Set(types.CtxKeyScopes, []string{})
@@ -59,7 +59,7 @@ func TestHTTPSendText(t *testing.T) {
 	partyID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	repo := &testRepo{
 		domainConn: domain.Connection{
-			OrgID:         orgID,
+			OrgID:      orgID,
 			PhoneNumberID: "123456789",
 			AccessToken:   "plain-token",
 			IsActive:      true,
@@ -67,9 +67,9 @@ func TestHTTPSendText(t *testing.T) {
 		partyPhone: "+5491112345678",
 		partyName:  "Juan",
 		optIns: []domain.OptIn{{
-			OrgID:   orgID,
-			PartyID: partyID,
-			Status:  domain.OptInStatusOptedIn,
+			OrgID: orgID,
+			PartyID:  partyID,
+			Status:   domain.OptInStatusOptedIn,
 		}},
 	}
 	metaClient := &testMetaClient{}
@@ -126,7 +126,7 @@ func TestHTTPListMessages(t *testing.T) {
 	repo := &testRepo{
 		messages: []domain.Message{{
 			ID:            msgID,
-			OrgID:         orgID,
+			OrgID:      orgID,
 			PhoneNumberID: "pn",
 			Direction:     domain.DirectionOutbound,
 			WAMessageID:   "wamid-1",
@@ -169,7 +169,7 @@ func TestHTTPGetConnection(t *testing.T) {
 	at := time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC)
 	repo := &testRepo{
 		domainConn: domain.Connection{
-			OrgID:              orgID,
+			OrgID:           orgID,
 			PhoneNumberID:      "phone-1",
 			WABAID:             "waba-1",
 			DisplayPhoneNumber: "+54 11 1234",

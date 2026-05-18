@@ -1,0 +1,304 @@
+name: Deploy Backend DEV (Cloud Run)
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Rama o ref a desplegar (default: develop)"
+        required: false
+        default: "develop"
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+concurrency:
+  group: pymes-deploy-dev-backend
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      GCP_REGION: us-central1
+      GCP_PROJECT_ID: pymes-dev-352318
+      ARTIFACT_REGISTRY: pymes
+      IMAGE_NAME: pymes-core
+      SERVICE_NAME: pymes-core
+      CLOUD_RUN_SERVICE_ACCOUNT: 884236221349-compute@developer.gserviceaccount.com
+      WIF_PROVIDER: projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
+      WIF_SERVICE_ACCOUNT: github-actions@pymes-dev-352318.iam.gserviceaccount.com
+      FIREBASE_HOSTING_SITE_ID: pymes-dev-352318
+      CLOUDSQL_INSTANCE: pymes-dev-352318:us-central1:pymes-dev-db
+      JWKS_URL: https://selected-tick-48.clerk.accounts.dev/.well-known/jwks.json
+      JWT_ISSUER: https://selected-tick-48.clerk.accounts.dev
+      GOVERNANCE_URL: ${{ vars.DEV_GOVERNANCE_URL || 'https://governance-dev-mxk6wlxnsq-uc.a.run.app' }}
+      SECRET_DATABASE_URL_NAME: DATABASE_URL
+      SECRET_CLERK_SECRET_KEY_NAME: CLERK_SECRET_KEY
+      SECRET_GOVERNANCE_API_KEY_NAME: GOVERNANCE_API_KEY
+      AUTH_ENABLE_JWT: "true"
+      AUTH_ALLOW_API_KEY: "true"
+      NOTIFICATION_BACKEND: noop
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref_name }}
+
+      - name: Auth GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker "${{ env.GCP_REGION }}-docker.pkg.dev" --quiet
+
+      - name: Resolve deploy SHA
+        run: echo "DEPLOY_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Wait for CI success
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 1800))
+          while (( SECONDS < deadline )); do
+            runs_json="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow "CI" \
+              --commit "$DEPLOY_SHA" \
+              --event push \
+              --json databaseId,status,conclusion \
+              --limit 5)"
+            parsed="$(RUNS_JSON="$runs_json" python3 - <<'PY'
+          import json
+          import os
+
+          runs = json.loads(os.environ.get("RUNS_JSON", "[]"))
+          if not runs:
+              print("missing missing missing")
+          else:
+              run = runs[0]
+              print(run.get("databaseId"), run.get("status"), run.get("conclusion"))
+          PY
+          )"
+            read -r run_id status conclusion <<<"$parsed"
+            if [[ "$status" == "completed" ]]; then
+              if [[ "$conclusion" == "success" ]]; then
+                echo "CI $run_id pasó para $DEPLOY_SHA."
+                exit 0
+              fi
+              echo "::error::CI $run_id terminó con conclusion=$conclusion para $DEPLOY_SHA."
+              exit 1
+            fi
+            echo "Esperando CI para $DEPLOY_SHA (run=${run_id:-missing}, status=${status:-missing})..."
+            sleep 15
+          done
+          echo "::error::Timeout esperando CI para $DEPLOY_SHA."
+          exit 1
+
+      - name: Install DB preflight tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          curl -fsSL \
+            -o /tmp/cloud-sql-proxy \
+            https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.18.3/cloud-sql-proxy.linux.amd64
+          chmod +x /tmp/cloud-sql-proxy
+
+      - name: Preflight pymes-core migrations
+        env:
+          PROJECT_ID: ${{ env.GCP_PROJECT_ID }}
+          CLOUD_SQL_PROXY_BIN: /tmp/cloud-sql-proxy
+        run: |
+          scripts/fix-pymes-core-migration-dirty-gcp.sh repair-known-dev-dirty
+          scripts/fix-pymes-core-migration-dirty-gcp.sh check-clean
+
+      - name: Stage backend build context
+        run: |
+          set -euo pipefail
+          build_root="${RUNNER_TEMP}/pymes-backend-build"
+          rm -rf "$build_root"
+          mkdir -p "$build_root/pymes"
+          rsync -a \
+            --exclude '.git/' \
+            --exclude 'node_modules/' \
+            --exclude 'frontend/node_modules/' \
+            --exclude 'ai/.venv/' \
+            ./ "$build_root/pymes/"
+          echo "BUILD_ROOT=$build_root" >> "$GITHUB_ENV"
+
+      - name: Build y push imagen
+        run: |
+          set -euo pipefail
+          image_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY}/${IMAGE_NAME}:${DEPLOY_SHA}"
+          docker build -f "${BUILD_ROOT}/pymes/pymes-core/backend/Dockerfile.prod" -t "$image_uri" "$BUILD_ROOT"
+          docker push "$image_uri"
+          echo "IMAGE_URI=$image_uri" >> "$GITHUB_ENV"
+          digest="$(gcloud artifacts docker images describe "$image_uri" --format='value(image_summary.fully_qualified_digest)')"
+          if [[ -z "$digest" ]]; then
+            echo "::error::No se pudo resolver digest para $image_uri."
+            exit 1
+          fi
+          echo "IMAGE_DIGEST=$digest" >> "$GITHUB_ENV"
+
+      - name: Resolve existing service URL
+        run: |
+          set -euo pipefail
+          service_url="$(gcloud run services describe "$SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='value(status.url)' 2>/dev/null || true)"
+          echo "SERVICE_URL_EXISTING=${service_url}" >> "$GITHUB_ENV"
+
+      - name: Resolve required GCP secrets
+        run: |
+          set -euo pipefail
+          for secret_name in \
+            "$SECRET_DATABASE_URL_NAME" \
+            "$SECRET_CLERK_SECRET_KEY_NAME" \
+            "$SECRET_GOVERNANCE_API_KEY_NAME"; do
+            if ! gcloud secrets versions access latest \
+              --secret="$secret_name" \
+              --project="$GCP_PROJECT_ID" >/dev/null; then
+              echo "::error::No se pudo acceder al secret requerido $secret_name."
+              exit 1
+            fi
+          done
+          secret_flags="DATABASE_URL=${SECRET_DATABASE_URL_NAME}:latest"
+          secret_flags="${secret_flags},CLERK_SECRET_KEY=${SECRET_CLERK_SECRET_KEY_NAME}:latest"
+          secret_flags="${secret_flags},GOVERNANCE_API_KEY=${SECRET_GOVERNANCE_API_KEY_NAME}:latest"
+          echo "SECRET_FLAGS=$secret_flags" >> "$GITHUB_ENV"
+
+      - name: Deploy to Cloud Run (DEV)
+        run: |
+          set -euo pipefail
+          frontend_url="https://${FIREBASE_HOSTING_SITE_ID}.web.app"
+          env_vars="ENVIRONMENT=dev,AUTH_ENABLE_JWT=${AUTH_ENABLE_JWT},AUTH_ALLOW_API_KEY=${AUTH_ALLOW_API_KEY},NOTIFICATION_BACKEND=${NOTIFICATION_BACKEND},FRONTEND_URL=${frontend_url}"
+          if [[ -n "${SERVICE_URL_EXISTING:-}" ]]; then
+            env_vars="${env_vars},PUBLIC_BASE_URL=${SERVICE_URL_EXISTING}"
+          fi
+          if [[ -n "${JWKS_URL}" ]]; then
+            env_vars="${env_vars},JWKS_URL=${JWKS_URL}"
+          fi
+          if [[ -n "${JWT_ISSUER}" ]]; then
+            env_vars="${env_vars},JWT_ISSUER=${JWT_ISSUER}"
+          fi
+          if [[ -n "${GOVERNANCE_URL}" ]]; then
+            env_vars="${env_vars},GOVERNANCE_URL=${GOVERNANCE_URL}"
+          fi
+          # AI_SERVICE_URL: pymes-ai decomisionado (Fase 4
+          # modular-swinging-hummingbird). Cuando Companion exponga el endpoint
+          # /v1/internal/customer-messaging/inbound, reactivar la inyección.
+          gcloud run deploy "$SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --image="$IMAGE_URI" \
+            --service-account="$CLOUD_RUN_SERVICE_ACCOUNT" \
+            --add-cloudsql-instances="$CLOUDSQL_INSTANCE" \
+            --allow-unauthenticated \
+            --port=8080 \
+            --memory=512Mi \
+            --cpu=1 \
+            --min-instances=1 \
+            --max-instances=1 \
+            --timeout=300 \
+            --set-env-vars="${env_vars}" \
+            --remove-secrets="JWT_ISSUER" \
+            --update-secrets="${SECRET_FLAGS}"
+
+      - name: Resolve service URL
+        run: |
+          set -euo pipefail
+          service_url="$(gcloud run services describe "$SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='value(status.url)')"
+          if [[ -z "$service_url" ]]; then
+            echo "::error::No se pudo resolver status.url del backend."
+            exit 1
+          fi
+          echo "SERVICE_URL=$service_url" >> "$GITHUB_ENV"
+
+      - name: Guardrail latest revision + URLs
+        run: |
+          set -euo pipefail
+          service_json="$(gcloud run services describe "$SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='json')"
+          SERVICE_JSON="$service_json" python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          svc = json.loads(os.environ["SERVICE_JSON"])
+          status = {item.get("type"): item for item in svc.get("status", {}).get("conditions", [])}
+          if status.get("Ready", {}).get("status") != "True":
+              print("ERROR: Cloud Run service no esta Ready=True.")
+              sys.exit(1)
+          latest_created = svc.get("status", {}).get("latestCreatedRevisionName")
+          latest_ready = svc.get("status", {}).get("latestReadyRevisionName")
+          if latest_created != latest_ready:
+              print(f"ERROR: latestCreatedRevisionName ({latest_created}) != latestReadyRevisionName ({latest_ready}).")
+              sys.exit(1)
+          traffic = svc.get("status", {}).get("traffic", [])
+          latest_100 = any(t.get("latestRevision") is True and int(t.get("percent", 0)) == 100 for t in traffic)
+          if not latest_100:
+              print("ERROR: tráfico no está 100% en latestRevision.")
+              sys.exit(1)
+          envs = svc.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [{}])[0].get("env", [])
+          watched = {"PUBLIC_BASE_URL", "FRONTEND_URL", "AI_SERVICE_URL", "GOVERNANCE_URL"}
+          for env in envs:
+              name = env.get("name", "")
+              value = env.get("value", "")
+              if name in watched and value and "---" in value:
+                  print(f"ERROR: URL taggeada detectada en {name}={value}")
+                  sys.exit(1)
+          print("Guardrail OK.")
+          PY
+          latest_ready="$(SERVICE_JSON="$service_json" python3 - <<'PY'
+          import json
+          import os
+
+          svc = json.loads(os.environ["SERVICE_JSON"])
+          print(svc.get("status", {}).get("latestReadyRevisionName", ""))
+          PY
+          )"
+          revision_image="$(gcloud run revisions describe "$latest_ready" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='value(spec.containers[0].image)')"
+          if [[ "$revision_image" != "$IMAGE_DIGEST" ]]; then
+            echo "::error::Imagen activa $revision_image no coincide con digest esperado $IMAGE_DIGEST."
+            exit 1
+          fi
+
+      - name: Smoke checks
+        run: |
+          set -euo pipefail
+          sleep 20
+          for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            if curl -fsS "${SERVICE_URL}/readyz" | grep -q '"status":"ready"'; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Backend readyz no respondió ready."
+          exit 1

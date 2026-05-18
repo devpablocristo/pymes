@@ -27,11 +27,10 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 var (
 	ErrNotFound      = errors.New("product not found")
 	ErrAlreadyExists = errors.New("product already exists")
-	ErrArchived      = errors.New("product archived")
 )
 
 type ListParams struct {
-	OrgID    uuid.UUID
+	OrgID uuid.UUID
 	Limit    int
 	After    *uuid.UUID
 	Search   string
@@ -100,7 +99,7 @@ func (r *Repository) Create(ctx context.Context, in productdomain.Product) (prod
 	}
 	row := models.ProductModel{
 		ID:          uuid.New(),
-		OrgID:       in.OrgID,
+		OrgID:    in.OrgID,
 		Type:        "product",
 		SKU:         strings.TrimSpace(in.SKU),
 		Name:        strings.TrimSpace(in.Name),
@@ -114,6 +113,7 @@ func (r *Repository) Create(ctx context.Context, in productdomain.Product) (prod
 		ImageURLs:   pq.StringArray(imgURLs),
 		TrackStock:  in.TrackStock,
 		IsActive:    in.IsActive,
+		IsFavorite:  in.IsFavorite,
 		Tags:        pq.StringArray(utils.NormalizeTags(in.Tags)),
 		Metadata:    meta,
 		CreatedAt:   time.Now().UTC(),
@@ -128,9 +128,11 @@ func (r *Repository) Create(ctx context.Context, in productdomain.Product) (prod
 	return toDomain(row), nil
 }
 
+// GetByID devuelve el producto independientemente de su estado de archivado.
+// El caller decide qué hacer con DeletedAt (Update rechaza archivados; el handler los expone con deleted_at).
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (productdomain.Product, error) {
 	var row models.ProductModel
-	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ? AND deleted_at IS NULL AND type = 'product'", orgID, id).Take(&row).Error
+	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ? AND type = 'product'", orgID, id).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return productdomain.Product{}, ErrNotFound
@@ -160,6 +162,7 @@ func (r *Repository) Update(ctx context.Context, in productdomain.Product) (prod
 		"image_urls":     pq.StringArray(imgURLs),
 		"track_stock":    in.TrackStock,
 		"is_active":      in.IsActive,
+		"is_favorite":    in.IsFavorite,
 		"tags":           pq.StringArray(utils.NormalizeTags(in.Tags)),
 		"metadata":       meta,
 		"updated_at":     time.Now().UTC(),
@@ -271,7 +274,7 @@ func toDomain(row models.ProductModel) productdomain.Product {
 	}
 	p := productdomain.Product{
 		ID:          row.ID,
-		OrgID:       row.OrgID,
+		OrgID:    row.OrgID,
 		SKU:         row.SKU,
 		Name:        row.Name,
 		Description: row.Description,
@@ -284,6 +287,7 @@ func toDomain(row models.ProductModel) productdomain.Product {
 		ImageURLs:   append([]string(nil), row.ImageURLs...),
 		TrackStock:  row.TrackStock,
 		IsActive:    row.IsActive,
+		IsFavorite:  row.IsFavorite,
 		Tags:        append([]string(nil), row.Tags...),
 		Metadata:    meta,
 		CreatedAt:   row.CreatedAt,

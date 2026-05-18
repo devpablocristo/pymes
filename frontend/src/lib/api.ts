@@ -1,4 +1,8 @@
-import { request, requestResponse, type RequestOptions } from '@devpablocristo/core-authn/http/fetch';
+import {
+  request as coreRequest,
+  requestResponse as coreRequestResponse,
+  type RequestOptions,
+} from '@devpablocristo/core-authn/http/fetch';
 import type {
   APIKeyItem,
   BillingStatus,
@@ -10,6 +14,126 @@ import type {
   TenantSettingsUpdatePayload,
 } from './types';
 
+const TENANT_SLUG_HEADER = 'X-Pymes-Tenant-Slug';
+const RESERVED_TENANT_PATHS = new Set(['login', 'signup', 'invite', 'onboarding']);
+
+export type TenantAwareRequestOptions = RequestOptions & {
+  tenantSlug?: string | null;
+  skipTenantSlug?: boolean;
+};
+
+type TenantSlugProvider = () => string | null;
+
+let tenantSlugProvider: TenantSlugProvider | null = null;
+
+export function registerTenantSlugProvider(provider: TenantSlugProvider): () => void {
+  tenantSlugProvider = provider;
+  return () => {
+    if (tenantSlugProvider === provider) {
+      tenantSlugProvider = null;
+    }
+  };
+}
+
+function withTenantSlugHeader(options: TenantAwareRequestOptions = {}): RequestOptions {
+  const { tenantSlug, skipTenantSlug, ...rest } = options;
+  const slug = (
+    tenantSlug ??
+    (skipTenantSlug ? null : tenantSlugProvider?.() ?? readTenantSlugFromLocation()) ??
+    ''
+  ).trim();
+  if (!slug) {
+    return rest;
+  }
+  return {
+    ...rest,
+    headers: {
+      ...(rest.headers ?? {}),
+      [TENANT_SLUG_HEADER]: slug,
+    },
+  };
+}
+
+function readTenantSlugFromLocation(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const segment = window.location.pathname.split('/').find((part) => part.trim() !== '')?.trim() ?? '';
+  if (!segment || RESERVED_TENANT_PATHS.has(segment)) {
+    return null;
+  }
+  return segment;
+}
+
+async function request<T = unknown>(path: string, options: TenantAwareRequestOptions = {}): Promise<T> {
+  return coreRequest<T>(path, withTenantSlugHeader(options));
+}
+
+async function requestResponse(path: string, options: TenantAwareRequestOptions = {}): Promise<Response> {
+  return coreRequestResponse(path, withTenantSlugHeader(options));
+}
+
+function resolveAPIBaseURL(): string {
+  const configured = import.meta.env.VITE_API_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+  if (typeof window === 'undefined') {
+    return 'http://localhost:8100';
+  }
+  return `${window.location.protocol}//${window.location.hostname || 'localhost'}:8100`;
+}
+
+async function readSetupKeyError(response: Response): Promise<Error> {
+  const text = await response.text().catch(() => response.statusText);
+  if (!text) {
+    return new Error(response.statusText || `HTTP ${response.status}`);
+  }
+  try {
+    const body = JSON.parse(text) as { error?: string | { message?: string; code?: string }; message?: string };
+    if (body.error && typeof body.error === 'object') {
+      return new Error(body.error.message || body.error.code || text);
+    }
+    if (typeof body.error === 'string') {
+      return new Error(body.error);
+    }
+    if (body.message) {
+      return new Error(body.message);
+    }
+  } catch {
+    // keep raw text below
+  }
+  return new Error(text);
+}
+
+async function requestWithTenantSetupKey<T = unknown>(
+  path: string,
+  apiKey: string,
+  tenantSlug: string,
+  options: Pick<TenantAwareRequestOptions, 'method' | 'body'> = {},
+): Promise<T> {
+  const response = await fetch(`${resolveAPIBaseURL()}${path}`, {
+    method: options.method ?? 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-KEY': apiKey,
+      [TENANT_SLUG_HEADER]: tenantSlug,
+    },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+  if (!response.ok) {
+    throw await readSetupKeyError(response);
+  }
+  if (response.status === 204) {
+    return undefined as T;
+  }
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    return (await response.json()) as T;
+  }
+  return (await response.text()) as T;
+}
+
 function normalizeTenantSettings(settings: TenantSettings): TenantSettings {
   return {
     ...settings,
@@ -17,17 +141,38 @@ function normalizeTenantSettings(settings: TenantSettings): TenantSettings {
   };
 }
 
-export async function getSession(): Promise<SessionResponse> {
-  return request('/v1/session');
+export async function getSession(options: TenantAwareRequestOptions = {}): Promise<SessionResponse> {
+  return request('/v1/session', options);
 }
 
-export async function getTenantSettings(): Promise<TenantSettings> {
-  const response = await request<TenantSettings>('/v1/admin/tenant-settings');
+export async function getTenantSettings(options: TenantAwareRequestOptions = {}): Promise<TenantSettings> {
+  const response = await request<TenantSettings>('/v1/admin/tenant-settings', options);
   return normalizeTenantSettings(response);
 }
 
-export async function updateTenantSettings(payload: TenantSettingsUpdatePayload): Promise<TenantSettings> {
-  const response = await request<TenantSettings>('/v1/admin/tenant-settings', { method: 'PATCH', body: payload });
+export async function updateTenantSettings(
+  payload: TenantSettingsUpdatePayload,
+  options: TenantAwareRequestOptions = {},
+): Promise<TenantSettings> {
+  const response = await request<TenantSettings>('/v1/admin/tenant-settings', {
+    ...options,
+    method: 'PATCH',
+    body: payload,
+  });
+  return normalizeTenantSettings(response);
+}
+
+export async function updateTenantSettingsWithSetupKey(
+  payload: TenantSettingsUpdatePayload,
+  apiKey: string,
+  tenantSlug: string,
+): Promise<TenantSettings> {
+  const response = await requestWithTenantSetupKey<TenantSettings>(
+    '/v1/admin/tenant-settings',
+    apiKey,
+    tenantSlug,
+    { method: 'PATCH', body: payload },
+  );
   return normalizeTenantSettings(response);
 }
 
@@ -40,8 +185,15 @@ export type SchedulingBranchSummary = {
   active: boolean;
 };
 
-export async function listSchedulingBranches(): Promise<{ items: SchedulingBranchSummary[] }> {
-  return request('/v1/scheduling/branches');
+export async function listSchedulingBranches(options: TenantAwareRequestOptions = {}): Promise<{ items: SchedulingBranchSummary[] }> {
+  return request('/v1/scheduling/branches', options);
+}
+
+export async function listSchedulingBranchesWithSetupKey(
+  apiKey: string,
+  tenantSlug: string,
+): Promise<{ items: SchedulingBranchSummary[] }> {
+  return requestWithTenantSetupKey('/v1/scheduling/branches', apiKey, tenantSlug);
 }
 
 export async function createSchedulingBranch(payload: {
@@ -50,35 +202,67 @@ export async function createSchedulingBranch(payload: {
   timezone: string;
   address?: string;
   active?: boolean;
-}): Promise<SchedulingBranchSummary> {
-  return request('/v1/scheduling/branches', { method: 'POST', body: payload });
+}, options: TenantAwareRequestOptions = {}): Promise<SchedulingBranchSummary> {
+  return request('/v1/scheduling/branches', { ...options, method: 'POST', body: payload });
+}
+
+export async function createSchedulingBranchWithSetupKey(payload: {
+  code: string;
+  name: string;
+  timezone: string;
+  address?: string;
+  active?: boolean;
+}, apiKey: string, tenantSlug: string): Promise<SchedulingBranchSummary> {
+  return requestWithTenantSetupKey('/v1/scheduling/branches', apiKey, tenantSlug, {
+    method: 'POST',
+    body: payload,
+  });
 }
 
 export async function getBillingStatus(): Promise<BillingStatus> {
   return request('/v1/billing/status');
 }
 
+export type TenantSummary = {
+  id: string;
+  slug?: string;
+  name: string;
+  clerk_org_id?: string;
+  role: 'owner' | 'admin' | 'member' | string;
+};
+
+export async function listTenants(): Promise<{ items: TenantSummary[] }> {
+  return request('/v1/tenants');
+}
+
+export async function createTenant(payload: {
+  name: string;
+  slug?: string;
+}): Promise<{ org_id: string; clerk_org_id: string; slug?: string; raw_key?: string; key?: APIKeyItem }> {
+  return request('/v1/tenants', { method: 'POST', body: payload });
+}
+
 export async function createPortal(payload: { return_url: string }): Promise<{ portal_url: string }> {
   return request('/v1/billing/portal', { method: 'POST', body: payload });
 }
 
-export async function getAPIKeys(orgID: string): Promise<{ items: APIKeyItem[] }> {
-  return request(`/v1/orgs/${orgID}/api-keys`);
+export async function getAPIKeys(tenantID: string): Promise<{ items: APIKeyItem[] }> {
+  return request(`/v1/tenants/${tenantID}/api-keys`);
 }
 
 export async function createAPIKey(
-  orgID: string,
+  tenantID: string,
   payload: { name: string; scopes: string[] },
 ): Promise<{ key: APIKeyItem; raw_key: string }> {
-  return request(`/v1/orgs/${orgID}/api-keys`, { method: 'POST', body: payload });
+  return request(`/v1/tenants/${tenantID}/api-keys`, { method: 'POST', body: payload });
 }
 
-export async function rotateAPIKey(orgID: string, keyID: string): Promise<{ key: APIKeyItem; raw_key: string }> {
-  return request(`/v1/orgs/${orgID}/api-keys/${keyID}/rotate`, { method: 'POST', body: {} });
+export async function rotateAPIKey(tenantID: string, keyID: string): Promise<{ key: APIKeyItem; raw_key: string }> {
+  return request(`/v1/tenants/${tenantID}/api-keys/${keyID}/rotate`, { method: 'POST', body: {} });
 }
 
-export async function deleteAPIKey(orgID: string, keyID: string): Promise<void> {
-  await request(`/v1/orgs/${orgID}/api-keys/${keyID}`, { method: 'DELETE' });
+export async function deleteAPIKey(tenantID: string, keyID: string): Promise<void> {
+  await request(`/v1/tenants/${tenantID}/api-keys/${keyID}`, { method: 'DELETE' });
 }
 
 export type InAppNotificationItem = {
@@ -128,17 +312,83 @@ export async function downloadAuditExportCsv(): Promise<string> {
   return downloadAPIFile('/v1/audit/export?format=csv');
 }
 
-export type OrgMemberRow = {
+export type TenantMemberRow = {
   id: string;
   org_id?: string;
   user_id: string;
   role?: string;
+  status?: string;
   joined_at?: string;
-  user?: { id?: string; email?: string; name?: string };
+  user?: { id?: string; email?: string; name?: string; given_name?: string; family_name?: string };
 };
 
-export async function listOrgMembers(orgId: string): Promise<{ items: OrgMemberRow[] }> {
-  return request(`/v1/orgs/${orgId}/members`);
+export async function listTenantMembers(tenantId: string): Promise<{ items: TenantMemberRow[] }> {
+  return request(`/v1/tenants/${tenantId}/members`);
+}
+
+export async function removeTenantMember(tenantId: string, userId: string): Promise<void> {
+  await request(`/v1/tenants/${tenantId}/members/${userId}`, { method: 'DELETE' });
+}
+
+export type TenantInvitation = {
+  id: string;
+  org_id: string;
+  email: string;
+  role: string;
+  status: 'pending' | 'accepted' | 'revoked' | 'expired';
+  clerk_invitation_id?: string;
+  invited_by_user_id: string;
+  accepted_by_user_id?: string;
+  expires_at: string;
+  accepted_at?: string;
+  revoked_at?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TenantInvitationPreview = {
+  org_id: string;
+  tenant_slug: string;
+  tenant_name: string;
+  email: string;
+  role: string;
+  status: TenantInvitation['status'];
+  expires_at: string;
+};
+
+export async function listTenantInvites(tenantId: string): Promise<{ items: TenantInvitation[] }> {
+  return request(`/v1/tenants/${tenantId}/invites`);
+}
+
+export async function createTenantInvite(
+  tenantId: string,
+  payload: { email: string; role: string },
+): Promise<{ invite: TenantInvitation }> {
+  return request(`/v1/tenants/${tenantId}/invites`, { method: 'POST', body: payload });
+}
+
+export async function revokeTenantInvite(inviteId: string): Promise<{ invite: TenantInvitation }> {
+  return request(`/v1/tenant-invites/${inviteId}/revoke`, { method: 'POST', body: {} });
+}
+
+export async function resendTenantInvite(inviteId: string): Promise<{ invite: TenantInvitation }> {
+  return request(`/v1/tenant-invites/${inviteId}/resend`, { method: 'POST', body: {} });
+}
+
+export async function acceptTenantInvite(token: string): Promise<{ invite: TenantInvitation; clerk_org_id: string; tenant_slug?: string }> {
+  return request('/v1/tenant-invites/accept', { method: 'POST', body: { token }, skipTenantSlug: true });
+}
+
+export async function previewTenantInvite(token: string): Promise<{ invite: TenantInvitationPreview }> {
+  return request(`/v1/tenant-invites/preview?token=${encodeURIComponent(token)}`, { skipTenantSlug: true });
+}
+
+export async function setInitialPassword(password: string): Promise<void> {
+  await request('/v1/users/me/set-initial-password', {
+    method: 'POST',
+    body: { password },
+    skipTenantSlug: true,
+  });
 }
 
 export type RbacRoleSummary = {
@@ -172,6 +422,9 @@ export type SalePaymentRow = {
   amount: number;
   notes?: string;
   received_at: string;
+  is_favorite?: boolean;
+  tags?: string[];
+  archived_at?: string | null;
   created_by?: string;
   created_at?: string;
 };
@@ -200,11 +453,11 @@ export async function patchMeProfile(payload: {
   return request('/v1/users/me/profile', { method: 'PATCH', body: payload });
 }
 
-export async function apiRequest<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function apiRequest<T = unknown>(path: string, options: TenantAwareRequestOptions = {}): Promise<T> {
   return request<T>(path, options);
 }
 
-export async function downloadAPIFile(path: string, options: RequestOptions = {}): Promise<string> {
+export async function downloadAPIFile(path: string, options: TenantAwareRequestOptions = {}): Promise<string> {
   const response = await requestResponse(path, options);
   const disposition = response.headers.get('content-disposition') ?? '';
   const match = disposition.match(/filename="?([^";]+)"?/i);

@@ -11,14 +11,17 @@ import (
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inventory"
 	saledomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/sales/usecases/domain"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/status"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in CreateInput) (saledomain.Sale, error)
+	Update(ctx context.Context, in UpdateInput) (saledomain.Sale, error)
 	GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
 	Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
+	UpdateStatus(ctx context.Context, in UpdateStatusInput) (saledomain.Sale, error)
 	PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in SalePatchFields) (saledomain.Sale, error)
 	GetTenantSettings(ctx context.Context, orgID uuid.UUID) (currency string, taxRate float64, salePrefix string, err error)
 	GetProductSnapshot(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error)
@@ -98,17 +101,33 @@ type CreateSaleItemInput struct {
 }
 
 type CreateSaleInput struct {
-	OrgID         uuid.UUID
+	OrgID      uuid.UUID
 	BranchID      *uuid.UUID
 	CustomerID    *uuid.UUID
 	CustomerName  string
 	QuoteID       *uuid.UUID
 	PaymentMethod string
 	Items         []CreateSaleItemInput
-	Notes         string
+	IsFavorite    bool
 	Tags          []string
+	Notes         string
 	Metadata      map[string]any
 	CreatedBy     string
+}
+
+type UpdateSaleInput struct {
+	OrgID   uuid.UUID
+	ID         uuid.UUID
+	IsFavorite *bool
+	Tags       *[]string
+	Notes      *string
+	Actor      string
+}
+
+type UpdateStatusInput struct {
+	OrgID  uuid.UUID
+	ID     uuid.UUID
+	Status string
 }
 
 func (u *Usecases) List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error) {
@@ -225,7 +244,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 
 	total := subtotal + taxTotal
 	out, err := u.repo.Create(ctx, CreateInput{
-		OrgID:         in.OrgID,
+		OrgID:      in.OrgID,
 		BranchID:      in.BranchID,
 		CustomerID:    in.CustomerID,
 		CustomerName:  strings.TrimSpace(in.CustomerName),
@@ -235,8 +254,9 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 		TaxTotal:      taxTotal,
 		Total:         total,
 		Currency:      currency,
-		Notes:         strings.TrimSpace(in.Notes),
+		IsFavorite:    in.IsFavorite,
 		Tags:          in.Tags,
+		Notes:         strings.TrimSpace(in.Notes),
 		Metadata:      in.Metadata,
 		CreatedBy:     strings.TrimSpace(in.CreatedBy),
 		Items:         createItems,
@@ -269,6 +289,26 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 	}
 	if u.notifier != nil {
 		_ = u.notifier.NotifySaleCreated(ctx, out)
+	}
+	return out, nil
+}
+
+func (u *Usecases) Update(ctx context.Context, in UpdateSaleInput) (saledomain.Sale, error) {
+	out, err := u.repo.Update(ctx, UpdateInput{
+		OrgID:   in.OrgID,
+		ID:         in.ID,
+		IsFavorite: in.IsFavorite,
+		Tags:       in.Tags,
+		Notes:      in.Notes,
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return saledomain.Sale{}, fmt.Errorf("sale not found: %w", httperrors.ErrNotFound)
+		}
+		return saledomain.Sale{}, err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, in.OrgID.String(), in.Actor, "sale.updated", "sale", in.ID.String(), map[string]any{})
 	}
 	return out, nil
 }
@@ -316,6 +356,55 @@ func (u *Usecases) PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in Sa
 	}
 	if u.audit != nil {
 		u.audit.Log(ctx, orgID.String(), actor, "sale.patched", "sale", saleID.String(), map[string]any{})
+	}
+	return out, nil
+}
+
+func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (saledomain.Sale, error) {
+	next := strings.TrimSpace(strings.ToLower(in.Status))
+	if next == "" {
+		return saledomain.Sale{}, fmt.Errorf("status is required: %w", httperrors.ErrBadInput)
+	}
+
+	// Leemos el estado actual para validar transición. Si la entidad no existe,
+	// devolvemos NotFound antes de tocar el FSM.
+	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return saledomain.Sale{}, fmt.Errorf("sale not found: %w", httperrors.ErrNotFound)
+		}
+		return saledomain.Sale{}, err
+	}
+
+	// Same-status es idempotente: no toca DB ni emite side effects.
+	if current.Status == next {
+		return current, nil
+	}
+
+	// Validación de transición vía FSM canónico (ver fsm.go).
+	if err := saleStateMachine.Validate(current.Status, next); err != nil {
+		return saledomain.Sale{}, status.MapFSMError(current.Status, next, err)
+	}
+
+	out, err := u.repo.UpdateStatus(ctx, UpdateStatusInput{
+		OrgID:  in.OrgID,
+		ID:     in.ID,
+		Status: next,
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return saledomain.Sale{}, fmt.Errorf("sale not found: %w", httperrors.ErrNotFound)
+		}
+		return saledomain.Sale{}, fmt.Errorf("update sale status: %w", err)
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, in.OrgID.String(), actor, "sale.status_updated", "sale", out.ID.String(), map[string]any{"status": out.Status})
+	}
+	if u.timeline != nil && out.CustomerID != nil {
+		_ = u.timeline.RecordEvent(ctx, in.OrgID, "parties", *out.CustomerID, "sale.status_updated", "Estado de venta actualizado", out.Number, actor, map[string]any{"sale_id": out.ID.String(), "status": out.Status})
+	}
+	if u.webhooks != nil {
+		_ = u.webhooks.Enqueue(ctx, in.OrgID, "sale.status_updated", map[string]any{"sale_id": out.ID.String(), "customer_id": nullableUUID(out.CustomerID), "status": out.Status})
 	}
 	return out, nil
 }

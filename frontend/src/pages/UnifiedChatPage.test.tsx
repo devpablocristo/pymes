@@ -27,12 +27,19 @@ function buildChatReply(overrides?: Partial<PymesAssistantChatResponse>): PymesA
     reply: 'Respuesta del asistente',
     request_id: 'req-1',
     routed_agent: 'sales',
-    routing_source: 'llm',
-    output_kind: 'chat',
+    routing_source: 'orchestrator',
+    output_kind: 'chat_reply',
+    content_language: 'es',
     tokens_used: 10,
     tool_calls: [],
     pending_confirmations: [],
     blocks: [],
+    analysis_scope: 'sales_collections',
+    answer_mode: 'analysis',
+    deterministic: { used: false, summary: '', blocks: [] },
+    dashboard_links: [],
+    llm: { used: true, provider: 'gemini', model: 'gemini-test', status: 'ok' },
+    evidence: { tools: [], record_counts: {}, period: null },
     ...overrides,
   } as PymesAssistantChatResponse;
 }
@@ -248,5 +255,66 @@ describe('UnifiedChatPage', () => {
     await waitFor(() => {
       expect(aiMocks.getConversation).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('renderiza badges, KPIs, tabla y link de una respuesta determinista', async () => {
+    aiMocks.pymesAssistantChat.mockResolvedValue(
+      buildChatReply({
+        reply: 'Ventas hoy: $100.000.',
+        answer_mode: 'facts_only',
+        llm: { used: false, provider: null, model: null, status: 'unavailable' },
+        deterministic: {
+          used: true,
+          summary: 'Ventas hoy: $100.000.',
+          blocks: [],
+        },
+        evidence: {
+          tools: ['get_sales_summary', 'get_debtors'],
+          record_counts: { get_sales_summary: 4, get_debtors: 1 },
+          period: { label: 'hoy', from: '2026-05-05', to: '2026-05-05' },
+        },
+        blocks: [
+          { type: 'text', text: 'Ventas hoy: $100.000.' },
+          {
+            type: 'kpi_group',
+            title: 'Resumen operativo',
+            items: [{ label: 'Ventas', value: '$100.000', trend: 'unknown', context: 'hoy' }],
+          },
+          {
+            type: 'table',
+            title: 'Deudores',
+            columns: ['Cliente', 'Saldo'],
+            rows: [['Taller Beta', '$18.000']],
+            empty_state: 'Sin deudores',
+          },
+          {
+            type: 'actions',
+            actions: [
+              {
+                id: 'open_dashboard_0',
+                kind: 'open_url',
+                label: 'Ver dashboard',
+                url: 'dashboard',
+                style: 'ghost',
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    renderUnifiedChat();
+
+    expect(await within(getMessagesPane()).findByText('Historial A')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva conversación' }));
+    const textbox = screen.getByRole('textbox', { name: /Ej\.: resumí ventas del mes o preguntá libre/i });
+    fireEvent.change(textbox, { target: { value: '¿Cuánto vendí hoy?' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }));
+
+    expect(await within(getMessagesPane()).findByText('Determinista')).toBeInTheDocument();
+    expect(await within(getMessagesPane()).findByText('2 herramientas')).toBeInTheDocument();
+    expect(await within(getMessagesPane()).findByText('Período hoy')).toBeInTheDocument();
+    expect(await within(getMessagesPane()).findByText('Resumen operativo')).toBeInTheDocument();
+    expect(await within(getMessagesPane()).findByText('Taller Beta')).toBeInTheDocument();
+    expect(await within(getMessagesPane()).findByRole('button', { name: 'Ver dashboard' })).toBeInTheDocument();
   });
 });

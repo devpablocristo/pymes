@@ -13,6 +13,18 @@ import { applyAdminSkin } from './lib/adminSkin';
 import { applyTheme } from './lib/theme';
 import { initSentry, captureError } from './lib/sentry';
 import { commonMessages } from './lib/i18n/messages/common';
+// Fuentes — cargadas via @fontsource/* (no Google Fonts CDN) para que el
+// bundler las procese, evitar render-blocking y soportar offline. Se importan
+// los pesos exactos que usan los tokens (300–700 + italic 400 / 400-500 mono).
+import '@fontsource/plus-jakarta-sans/300.css';
+import '@fontsource/plus-jakarta-sans/400.css';
+import '@fontsource/plus-jakarta-sans/400-italic.css';
+import '@fontsource/plus-jakarta-sans/500.css';
+import '@fontsource/plus-jakarta-sans/600.css';
+import '@fontsource/plus-jakarta-sans/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+
 import '@devpablocristo/modules-ui-modal/styles.css';
 import './styles.css';
 
@@ -74,7 +86,12 @@ const app = (
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   clerkEnabled ? (
-    <ClerkProvider publishableKey={clerkPublishableKey} localization={esMX} appearance={clerkAppearance}>
+    <ClerkProvider
+      publishableKey={clerkPublishableKey}
+      localization={esMX}
+      appearance={clerkAppearance}
+      taskUrls={{ 'choose-organization': '/onboarding' }}
+    >
       {app}
     </ClerkProvider>
   ) : (

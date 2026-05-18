@@ -10,7 +10,7 @@ func TestSaaSDefaultAPIKeyScopesBaseline(t *testing.T) {
 
 	got := saasDefaultAPIKeyScopes()
 	if slices.Contains(got, "admin:full") {
-		t.Fatalf("saasDefaultAPIKeyScopes() must not contain deprecated scope admin:full: %#v", got)
+		t.Fatalf("saasDefaultAPIKeyScopes() must not contain removed scope admin:full: %#v", got)
 	}
 	for _, required := range []string{"admin:console:read", "admin:console:write"} {
 		if !slices.Contains(got, required) {

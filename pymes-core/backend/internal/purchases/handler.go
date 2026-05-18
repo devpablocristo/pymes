@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/devpablocristo/core/http/go/pagination"
+	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -17,11 +18,14 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
 	Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error)
 	Update(ctx context.Context, in UpdateInput, actor string) (purchasesdomain.Purchase, error)
 	UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (purchasesdomain.Purchase, error)
-	PatchAnnotations(ctx context.Context, orgID, id uuid.UUID, patch PurchasePatchFields, actor string) (purchasesdomain.Purchase, error)
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 }
 
 type Handler struct{ uc usecasesPort }
@@ -30,15 +34,25 @@ func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
 	auth.GET("/purchases", rbac.RequirePermission("purchases", "read"), h.List)
+	auth.GET("/purchases/"+crudpaths.SegmentArchived, rbac.RequirePermission("purchases", "read"), h.ListArchived)
 	auth.POST("/purchases", rbac.RequirePermission("purchases", "create"), h.Create)
 	auth.GET("/purchases/:id", rbac.RequirePermission("purchases", "read"), h.Get)
-	auth.PUT("/purchases/:id", rbac.RequirePermission("purchases", "update"), h.Update)
-	auth.PATCH("/purchases/:id", rbac.RequirePermission("purchases", "update"), h.Patch)
-	auth.PATCH("/purchases/:id/status", rbac.RequirePermission("purchases", "update"), h.UpdateStatus)
+	auth.PATCH("/purchases/:id", rbac.RequirePermission("purchases", "update"), h.Update)
+	handlers.RegisterStatusEndpoint(
+		auth, rbac, "purchases", "update", "/purchases",
+		func(ctx context.Context, orgID, id uuid.UUID, next, actor string) (purchasesdomain.Purchase, error) {
+			return h.uc.UpdateStatus(ctx, UpdateStatusInput{OrgID: orgID, ID: id, Status: next}, actor)
+		},
+		func(p purchasesdomain.Purchase) any { return p },
+	)
+	auth.DELETE("/purchases/:id", rbac.RequirePermission("purchases", "delete"), h.Delete)
+	auth.POST("/purchases/:id/"+crudpaths.SegmentArchive, rbac.RequirePermission("purchases", "update"), h.Archive)
+	auth.POST("/purchases/:id/"+crudpaths.SegmentRestore, rbac.RequirePermission("purchases", "delete"), h.Restore)
+	auth.DELETE("/purchases/:id/"+crudpaths.SegmentHard, rbac.RequirePermission("purchases", "delete"), h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	orgID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -47,7 +61,7 @@ func (h *Handler) List(c *gin.Context) {
 	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return
 		}
 		branchID = &id
@@ -57,19 +71,42 @@ func (h *Handler) List(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	handlers.WriteOffsetListResponse(c, items, limit, len(items))
+}
+
+func (h *Handler) ListArchived(c *gin.Context) {
+	orgID, ok := parseTenant(c)
+	if !ok {
+		return
+	}
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	var branchID *uuid.UUID
+	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			handlers.WriteValidation(c, "invalid branch_id")
+			return
+		}
+		branchID = &id
+	}
+	items, err := h.uc.ListArchived(c.Request.Context(), orgID, branchID, c.Query("status"), limit)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	handlers.WriteOffsetListResponse(c, items, limit, len(items))
 }
 
 func (h *Handler) Create(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	var req dto.CreatePurchaseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	payload, err := buildCreateInput(orgID, req, authCtx.Actor)
@@ -86,7 +123,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -100,13 +137,13 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
 	var req dto.CreatePurchaseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	payload, err := buildCreateInput(orgID, req, authCtx.Actor)
@@ -114,19 +151,7 @@ func (h *Handler) Update(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	out, err := h.uc.Update(c.Request.Context(), UpdateInput{
-		ID:            id,
-		OrgID:         orgID,
-		BranchID:      payload.BranchID,
-		SupplierID:    payload.SupplierID,
-		SupplierName:  payload.SupplierName,
-		Status:        payload.Status,
-		PaymentStatus: payload.PaymentStatus,
-		Notes:         payload.Notes,
-		Tags:          payload.Tags,
-		Metadata:      payload.Metadata,
-		Items:         payload.Items,
-	}, authCtx.Actor)
+	out, err := h.uc.Update(c.Request.Context(), UpdateInput{ID: id, OrgID: orgID, BranchID: payload.BranchID, SupplierID: payload.SupplierID, SupplierName: payload.SupplierName, Status: payload.Status, PaymentStatus: payload.PaymentStatus, IsFavorite: payload.IsFavorite, Tags: payload.Tags, Notes: payload.Notes, Items: payload.Items}, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -134,57 +159,47 @@ func (h *Handler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-func (h *Handler) Patch(c *gin.Context) {
+func (h *Handler) Delete(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
-	var req dto.PatchPurchaseRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
-		return
-	}
-	patch := PurchasePatchFields{
-		Tags:          req.Tags,
-		Metadata:      req.Metadata,
-		Notes:         req.Notes,
-		PaymentStatus: req.PaymentStatus,
-		SupplierName:  req.SupplierName,
-	}
-	if patch.Tags == nil && patch.Metadata == nil && patch.Notes == nil && patch.PaymentStatus == nil && patch.SupplierName == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "no patch fields"})
-		return
-	}
-	out, err := h.uc.PatchAnnotations(c.Request.Context(), orgID, id, patch, authCtx.Actor)
-	if err != nil {
+	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, out)
+	c.Status(http.StatusNoContent)
 }
 
-func (h *Handler) UpdateStatus(c *gin.Context) {
+func (h *Handler) Archive(c *gin.Context) {
+	h.Delete(c)
+}
+
+func (h *Handler) Restore(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
-	var req dto.UpdatePurchaseStatusRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
-		return
-	}
-	out, err := h.uc.UpdateStatus(c.Request.Context(), UpdateStatusInput{
-		ID:     id,
-		OrgID:  orgID,
-		Status: strings.TrimSpace(req.Status),
-	}, authCtx.Actor)
-	if err != nil {
+	if err := h.uc.Restore(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, out)
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) HardDelete(c *gin.Context) {
+	authCtx := handlers.GetAuthContext(c)
+	orgID, id, ok := parseTenantAndID(c)
+	if !ok {
+		return
+	}
+	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func buildCreateInput(orgID uuid.UUID, req dto.CreatePurchaseRequest, actor string) (CreateInput, error) {
@@ -228,24 +243,13 @@ func buildCreateInput(orgID uuid.UUID, req dto.CreatePurchaseRequest, actor stri
 		}
 		items = append(items, purchasesdomain.PurchaseItem{ProductID: productID, ServiceID: serviceID, Description: strings.TrimSpace(item.Description), Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: taxRate})
 	}
-	return CreateInput{
-		OrgID:         orgID,
-		BranchID:      branchID,
-		SupplierID:    supplierID,
-		SupplierName:  strings.TrimSpace(req.SupplierName),
-		Status:        strings.TrimSpace(req.Status),
-		PaymentStatus: strings.TrimSpace(req.PaymentStatus),
-		Notes:         strings.TrimSpace(req.Notes),
-		CreatedBy:     actor,
-		Tags:          req.Tags,
-		Metadata:      req.Metadata,
-		Items:         items,
-	}, nil
+	isFavorite := req.IsFavorite != nil && *req.IsFavorite
+	return CreateInput{OrgID: orgID, BranchID: branchID, SupplierID: supplierID, SupplierName: strings.TrimSpace(req.SupplierName), Status: strings.TrimSpace(req.Status), PaymentStatus: strings.TrimSpace(req.PaymentStatus), IsFavorite: isFavorite, Tags: req.Tags, Notes: strings.TrimSpace(req.Notes), CreatedBy: actor, Items: items}, nil
 }
 
-func parseOrg(c *gin.Context) (uuid.UUID, bool) {
-	return handlers.ParseAuthOrgID(c)
+func parseTenant(c *gin.Context) (uuid.UUID, bool) {
+	return handlers.ParseAuthTenantID(c)
 }
-func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
-	return handlers.ParseAuthOrgAndParamID(c, "id", "id")
+func parseTenantAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
+	return handlers.ParseAuthTenantAndParamID(c, "id", "id")
 }

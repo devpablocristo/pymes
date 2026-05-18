@@ -4,16 +4,20 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type PriceListModel struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID       uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID    uuid.UUID `gorm:"type:uuid;index;not null"`
 	Name        string
 	Description string
 	IsDefault   bool
 	Markup      float64
 	IsActive    bool
+	IsFavorite  bool           `gorm:"column:is_favorite;not null"`
+	Tags        pq.StringArray `gorm:"type:text[]"`
+	DeletedAt   *time.Time     `gorm:"column:deleted_at;index"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

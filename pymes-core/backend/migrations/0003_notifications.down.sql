@@ -1,4 +1,7 @@
-DROP INDEX IF EXISTS idx_notification_log_user_created;
-DROP INDEX IF EXISTS idx_notification_log_org_created;
+-- 0003_notifications.down.sql
+
+DROP TRIGGER IF EXISTS trg_notification_preferences_updated_at ON notification_preferences;
+
+DROP TABLE IF EXISTS in_app_notifications;
 DROP TABLE IF EXISTS notification_log;
 DROP TABLE IF EXISTS notification_preferences;

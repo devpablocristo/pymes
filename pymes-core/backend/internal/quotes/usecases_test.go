@@ -20,6 +20,7 @@ type mockQuoteRepo struct {
 	createFn            func(ctx context.Context, in CreateInput) (quotedomain.Quote, error)
 	getByIDFn           func(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error)
 	setStatusFn         func(ctx context.Context, orgID, quoteID uuid.UUID, status string) (quotedomain.Quote, error)
+	setStatusCalled     int
 }
 
 func (m *mockQuoteRepo) List(ctx context.Context, p ListParams) ([]quotedomain.Quote, int64, bool, *uuid.UUID, error) {
@@ -45,13 +46,18 @@ func (m *mockQuoteRepo) PatchAnnotations(context.Context, uuid.UUID, uuid.UUID, 
 	return quotedomain.Quote{}, nil
 }
 
-func (m *mockQuoteRepo) DeleteDraft(ctx context.Context, orgID, quoteID uuid.UUID) error { return nil }
-func (m *mockQuoteRepo) Archive(ctx context.Context, orgID, quoteID uuid.UUID) error     { return nil }
-func (m *mockQuoteRepo) Restore(ctx context.Context, orgID, quoteID uuid.UUID) error     { return nil }
-func (m *mockQuoteRepo) HardDelete(ctx context.Context, orgID, quoteID uuid.UUID) error  { return nil }
+func (m *mockQuoteRepo) DeleteDraft(ctx context.Context, orgID, quoteID uuid.UUID) error {
+	return nil
+}
+func (m *mockQuoteRepo) Archive(ctx context.Context, orgID, quoteID uuid.UUID) error { return nil }
+func (m *mockQuoteRepo) Restore(ctx context.Context, orgID, quoteID uuid.UUID) error { return nil }
+func (m *mockQuoteRepo) HardDelete(ctx context.Context, orgID, quoteID uuid.UUID) error {
+	return nil
+}
 func (m *mockQuoteRepo) SetStatus(ctx context.Context, orgID, quoteID uuid.UUID, status string) (quotedomain.Quote, error) {
+	m.setStatusCalled++
 	if m.setStatusFn == nil {
-		return quotedomain.Quote{}, nil
+		return quotedomain.Quote{ID: quoteID, OrgID: orgID, Status: status}, nil
 	}
 	return m.setStatusFn(ctx, orgID, quoteID, status)
 }
@@ -108,7 +114,7 @@ func TestCreateQuote_PersistsSelectedBranch(t *testing.T) {
 			}
 			return quotedomain.Quote{
 				ID:        quoteID,
-				OrgID:     in.OrgID,
+				OrgID:  in.OrgID,
 				BranchID:  in.BranchID,
 				Number:    "PRE-00001",
 				Status:    "draft",
@@ -129,7 +135,7 @@ func TestCreateQuote_PersistsSelectedBranch(t *testing.T) {
 	uc := NewUsecases(repo, nil, audit)
 
 	out, err := uc.Create(context.Background(), CreateQuoteInput{
-		OrgID:     orgID,
+		OrgID:  orgID,
 		BranchID:  &branchID,
 		CreatedBy: "tester",
 		Items: []QuoteItemInput{
@@ -173,7 +179,7 @@ func TestQuoteToSale_PropagatesBranchToSales(t *testing.T) {
 			taxRate := 21.0
 			return quotedomain.Quote{
 				ID:           quoteID,
-				OrgID:        orgID,
+				OrgID:     orgID,
 				BranchID:     &branchID,
 				CustomerName: "Cliente Demo",
 				Status:       "sent",
@@ -208,7 +214,7 @@ func TestQuoteToSale_PropagatesBranchToSales(t *testing.T) {
 			}
 			return salesdomain.Sale{
 				ID:       saleID,
-				OrgID:    orgID,
+				OrgID: orgID,
 				BranchID: in.BranchID,
 				Number:   "VTA-00001",
 				Status:   "completed",

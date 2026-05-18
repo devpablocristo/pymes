@@ -16,9 +16,9 @@ import (
 )
 
 type inAppRepoStub struct {
-	userByExternal map[string]uuid.UUID
-	onlyUserByOrg  map[uuid.UUID]uuid.UUID
-	appended       []coredomain.Notification
+	userByExternal   map[string]uuid.UUID
+	onlyUserByTenant map[uuid.UUID]uuid.UUID
+	appended         []coredomain.Notification
 }
 
 type candidateRepoStub struct {
@@ -33,12 +33,12 @@ func (s *inAppRepoStub) GetUserIDByExternalID(externalID string) (uuid.UUID, boo
 	return id, ok
 }
 
-func (s *inAppRepoStub) GetOnlyUserIDByOrg(orgID uuid.UUID) (uuid.UUID, bool) {
-	id, ok := s.onlyUserByOrg[orgID]
+func (s *inAppRepoStub) GetOnlyUserIDByTenant(orgID uuid.UUID) (uuid.UUID, bool) {
+	id, ok := s.onlyUserByTenant[orgID]
 	return id, ok
 }
 
-func (s *inAppRepoStub) ListUserIDsByOrg(uuid.UUID) ([]uuid.UUID, error) { return nil, nil }
+func (s *inAppRepoStub) ListUserIDsByTenant(uuid.UUID) ([]uuid.UUID, error) { return nil, nil }
 func (s *inAppRepoStub) ListOrgIDsWithUsers() ([]uuid.UUID, error)       { return nil, nil }
 func (s *inAppRepoStub) ResolveApprovalNotifications(context.Context, string, string, string, time.Time) (int64, error) {
 	return 0, nil
@@ -97,15 +97,15 @@ func TestNotifySaleCreatedCreatesNotificationForFeaturedSale(t *testing.T) {
 	orgID := uuid.New()
 	userID := uuid.New()
 	repo := &inAppRepoStub{
-		userByExternal: map[string]uuid.UUID{"seller-1": userID},
-		onlyUserByOrg:  map[uuid.UUID]uuid.UUID{orgID: userID},
+		userByExternal:   map[string]uuid.UUID{"seller-1": userID},
+		onlyUserByTenant: map[uuid.UUID]uuid.UUID{orgID: userID},
 	}
 	candidates := &candidateRepoStub{shouldNotify: true}
 	svc := NewService(candidates, inappnotifications.NewUsecases(repo), Config{})
 
 	err := svc.NotifySaleCreated(context.Background(), saledomain.Sale{
 		ID:        uuid.New(),
-		OrgID:     orgID,
+		OrgID:  orgID,
 		Number:    "VTA-0012",
 		Total:     120000,
 		Currency:  "ARS",
@@ -142,8 +142,8 @@ func TestNotifyPaymentCreatedSkipsSmallPayments(t *testing.T) {
 	orgID := uuid.New()
 	userID := uuid.New()
 	repo := &inAppRepoStub{
-		userByExternal: map[string]uuid.UUID{"cashier-1": userID},
-		onlyUserByOrg:  map[uuid.UUID]uuid.UUID{orgID: userID},
+		userByExternal:   map[string]uuid.UUID{"cashier-1": userID},
+		onlyUserByTenant: map[uuid.UUID]uuid.UUID{orgID: userID},
 	}
 	svc := NewService(&candidateRepoStub{shouldNotify: true}, inappnotifications.NewUsecases(repo), Config{})
 
@@ -167,15 +167,15 @@ func TestNotifyInventoryAdjustedCreatesNotificationOnLowStock(t *testing.T) {
 	orgID := uuid.New()
 	userID := uuid.New()
 	repo := &inAppRepoStub{
-		userByExternal: map[string]uuid.UUID{"stock-user": userID},
-		onlyUserByOrg:  map[uuid.UUID]uuid.UUID{orgID: userID},
+		userByExternal:   map[string]uuid.UUID{"stock-user": userID},
+		onlyUserByTenant: map[uuid.UUID]uuid.UUID{orgID: userID},
 	}
 	candidates := &candidateRepoStub{shouldNotify: true}
 	svc := NewService(candidates, inappnotifications.NewUsecases(repo), Config{})
 
 	err := svc.NotifyInventoryAdjusted(context.Background(), inventorydomain.StockLevel{
 		ProductID:   uuid.New(),
-		OrgID:       orgID,
+		OrgID:    orgID,
 		ProductName: "Cubierta Maxxis",
 		Quantity:    1,
 		MinQuantity: 3,

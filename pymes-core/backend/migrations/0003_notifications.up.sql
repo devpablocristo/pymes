@@ -1,25 +1,66 @@
+-- 0003_notifications.up.sql
+-- Notification preferences (per user), notification log (org-scoped envío
+-- de email/sms/etc.), in-app notifications.
+--
+-- Schema saas como source of truth. Pymes-core/0036/0037 (rename a
+-- pymes_notification_*) desaparecen porque ya no hay colisión con la lib.
+
 CREATE TABLE IF NOT EXISTS notification_preferences (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     notification_type text NOT NULL,
-    channel text NOT NULL,
+    channel text NOT NULL DEFAULT 'email',
     enabled boolean NOT NULL DEFAULT true,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE(user_id, notification_type, channel)
+    CONSTRAINT notification_preferences_user_type_channel_uniq
+        UNIQUE (user_id, notification_type, channel)
 );
+CREATE INDEX IF NOT EXISTS idx_notification_prefs_user
+    ON notification_preferences(user_id);
 
 CREATE TABLE IF NOT EXISTS notification_log (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id uuid REFERENCES users(id) ON DELETE SET NULL,
     notification_type text NOT NULL,
-    channel text NOT NULL,
-    status text NOT NULL,
-    provider_message_id text,
-    dedup_key text NOT NULL UNIQUE,
+    channel text NOT NULL DEFAULT 'email',
+    recipient text NOT NULL,
+    subject text NOT NULL,
+    status text NOT NULL DEFAULT 'sent'
+        CONSTRAINT notification_log_status_check
+        CHECK (status IN ('queued','sent','delivered','failed','bounced')),
+    dedup_key text,
+    error_message text,
     created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS idx_notification_log_org_created
+    ON notification_log(org_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_log_dedup_key
+    ON notification_log(dedup_key) WHERE dedup_key IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_notification_log_org_created ON notification_log(org_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_notification_log_user_created ON notification_log(user_id, created_at DESC);
+-- pymes_in_app_notifications: namespace `pymes_` mantenido por TableName GORM
+-- (la lib core/notifications/go también define `Notification.TenantID` en su
+-- struct, pero la persistencia local usa este schema con user_id + kind +
+-- chat_context para contexto AI).
+CREATE TABLE IF NOT EXISTS pymes_in_app_notifications (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title text NOT NULL,
+    body text NOT NULL,
+    kind text NOT NULL,
+    entity_type text NOT NULL DEFAULT '',
+    entity_id text NOT NULL DEFAULT '',
+    chat_context jsonb NOT NULL DEFAULT '{}'::jsonb,
+    read_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_pymes_in_app_notif_user_created
+    ON pymes_in_app_notifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pymes_in_app_notif_org_unread
+    ON pymes_in_app_notifications(org_id, read_at) WHERE read_at IS NULL;
+
+CREATE TRIGGER trg_notification_preferences_updated_at
+    BEFORE UPDATE ON notification_preferences
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();

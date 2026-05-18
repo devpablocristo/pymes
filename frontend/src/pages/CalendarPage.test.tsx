@@ -101,7 +101,7 @@ describe('CalendarPage', () => {
     });
 
     const branchContextValue: BranchContextValue = {
-      orgId: 'org-demo',
+      tenantId: 'tenant-demo',
       branches: [{ id: 'branch-central', name: 'Casa Central', active: true }],
       availableBranches: [{ id: 'branch-central', name: 'Casa Central', active: true }],
       selectedBranchId: 'branch-central',

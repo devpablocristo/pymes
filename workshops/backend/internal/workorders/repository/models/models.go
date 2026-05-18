@@ -4,18 +4,19 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
-// WorkOrderModel mapea workshops.work_orders (tabla unificada con polimorfismo target_type/target_id).
+// WorkOrderModel mapea workshops.work_orders.
 type WorkOrderModel struct {
 	ID       uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	OrgID    uuid.UUID  `gorm:"type:uuid;index;not null"`
+	OrgID uuid.UUID  `gorm:"type:uuid;index;not null"`
 	BranchID *uuid.UUID `gorm:"type:uuid;index"`
 	Number   string     `gorm:"not null"`
 
-	TargetType  string    `gorm:"not null"`
-	TargetID    uuid.UUID `gorm:"type:uuid;not null"`
-	TargetLabel string    `gorm:"not null;default:''"`
+	AssetType  string    `gorm:"not null"`
+	AssetID    uuid.UUID `gorm:"type:uuid;not null"`
+	AssetLabel string    `gorm:"not null;default:''"`
 
 	CustomerID   *uuid.UUID `gorm:"type:uuid"`
 	CustomerName string     `gorm:"not null;default:''"`
@@ -42,6 +43,9 @@ type WorkOrderModel struct {
 
 	Metadata []byte `gorm:"type:jsonb;not null;default:'{}'"`
 
+	IsFavorite bool           `gorm:"column:is_favorite;not null"`
+	Tags       pq.StringArray `gorm:"type:text[]"`
+
 	CreatedBy  string     `gorm:"not null;default:''"`
 	ArchivedAt *time.Time `gorm:"column:archived_at"`
 	CreatedAt  time.Time
@@ -53,7 +57,7 @@ func (WorkOrderModel) TableName() string { return "workshops.work_orders" }
 // WorkOrderItemModel mapea workshops.work_order_items.
 type WorkOrderItemModel struct {
 	ID          uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	OrgID       uuid.UUID  `gorm:"type:uuid;index;not null"`
+	OrgID    uuid.UUID  `gorm:"type:uuid;index;not null"`
 	WorkOrderID uuid.UUID  `gorm:"type:uuid;index;not null"`
 	ItemType    string     `gorm:"not null"`
 	ServiceID   *uuid.UUID `gorm:"type:uuid"`

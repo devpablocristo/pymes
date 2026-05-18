@@ -4,7 +4,7 @@ import type { TenantSettings } from './types';
 export type TeamSize = 'solo' | 'small' | 'medium' | 'large';
 export type SellsType = 'products' | 'services' | 'both' | 'unsure';
 export type PaymentMethod = 'cash' | 'transfer' | 'card' | 'mixed';
-export type VerticalType = 'none' | 'professionals' | 'workshops' | 'beauty' | 'restaurants';
+export type VerticalType = 'none' | 'professionals' | 'workshops' | 'beauty' | 'restaurants' | 'medical';
 export type SubVerticalType =
   | 'teachers'
   | 'consulting'
@@ -15,7 +15,8 @@ export type SubVerticalType =
   | 'aesthetics'
   | 'restaurant'
   | 'bar'
-  | 'cafe';
+  | 'cafe'
+  | 'occupational_health';
 
 export type TenantProfile = {
   businessName: string;
@@ -36,6 +37,7 @@ const SUB_VERTICAL_BY_VERTICAL: Partial<Record<VerticalType, readonly SubVertica
   workshops: ['auto_repair', 'bike_shop'],
   beauty: ['salon', 'barbershop', 'aesthetics'],
   restaurants: ['restaurant', 'bar', 'cafe'],
+  medical: ['occupational_health'],
 };
 
 const STORAGE_KEY = 'pymes:tenant_profile';
@@ -47,14 +49,11 @@ function normalizeTenantProfile(profile: TenantProfile | null): TenantProfile | 
   }
 
   const { subVertical: rawSubVertical, ...rest } = profile;
-  const rawVertical = profile.vertical as VerticalType | 'bike_shop';
-  const normalizedVertical: VerticalType = rawVertical === 'bike_shop' ? 'workshops' : rawVertical;
+  const normalizedVertical = profile.vertical;
   const normalizedSubVertical =
-    rawVertical === 'bike_shop'
-      ? 'bike_shop'
-      : rawSubVertical && SUB_VERTICAL_BY_VERTICAL[normalizedVertical]?.includes(rawSubVertical)
-        ? rawSubVertical
-        : undefined;
+    rawSubVertical && SUB_VERTICAL_BY_VERTICAL[normalizedVertical]?.includes(rawSubVertical)
+      ? rawSubVertical
+      : undefined;
 
   return {
     ...rest,
@@ -99,7 +98,7 @@ export function tenantProfileFromSettings(settings: TenantSettings): TenantProfi
   }
 
   const previousProfile = getTenantProfile();
-  const normalizedVertical = (vertical === 'bike_shop' ? 'workshops' : vertical) as VerticalType;
+  const normalizedVertical = vertical as VerticalType;
   const preservedSubVertical =
     previousProfile?.vertical === normalizedVertical &&
     previousProfile.subVertical &&

@@ -28,7 +28,7 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 func (r *Repository) CreateToken(ctx context.Context, t domain.Token) (domain.Token, error) {
 	row := models.CalendarExportTokenModel{
 		ID:        t.ID,
-		OrgID:     t.OrgID,
+		OrgID:  t.OrgID,
 		CreatedBy: t.CreatedBy,
 		Name:      t.Name,
 		TokenHash: t.TokenHash,
@@ -107,7 +107,7 @@ func (r *Repository) TouchLastUsed(ctx context.Context, id uuid.UUID, at time.Ti
 func toDomainToken(row models.CalendarExportTokenModel) domain.Token {
 	return domain.Token{
 		ID:         row.ID,
-		OrgID:      row.OrgID,
+		OrgID:   row.OrgID,
 		CreatedBy:  row.CreatedBy,
 		Name:       row.Name,
 		TokenHash:  row.TokenHash,

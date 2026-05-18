@@ -1,5 +1,4 @@
 import type { CrudPageConfig } from '../components/CrudPage';
-import { hasCrudModule } from './crudModuleCatalog';
 
 type CrudModule =
   | typeof import('./resourceConfigs')
@@ -8,6 +7,7 @@ type CrudModule =
   | typeof import('./resourceConfigs.governance')
   | typeof import('./resourceConfigs.control')
   | typeof import('./resourceConfigs.professionals')
+  | typeof import('./resourceConfigs.medical')
   | typeof import('./resourceConfigs.workshops')
   | typeof import('./resourceConfigs.restaurants');
 
@@ -18,6 +18,7 @@ type CrudLazyChunk =
   | 'governance'
   | 'control'
   | 'professionals'
+  | 'medical'
   | 'workshops'
   | 'restaurants'
   | 'common';
@@ -41,20 +42,21 @@ const OPERATIONS_CRUD_IDS = new Set<string>([
   'cashflow',
   'payments',
   'recurring',
+  'employees',
 ]);
 
 const GOVERNANCE_CRUD_IDS = new Set<string>([
   'procurementRequests',
-  'procurementPolicies',
   'accounts',
   'roles',
   'parties',
-  'employees',
 ]);
 
-const CONTROL_CRUD_IDS = new Set<string>(['attachments', 'audit', 'timeline', 'webhooks']);
+const CONTROL_CRUD_IDS = new Set<string>(['webhooks']);
 
-const PROFESSIONALS_CRUD_IDS = new Set<string>(['professionals', 'teachers', 'specialties', 'intakes', 'sessions']);
+const PROFESSIONALS_CRUD_IDS = new Set<string>(['professionals', 'specialties', 'intakes', 'sessions']);
+
+const MEDICAL_CRUD_IDS = new Set<string>(['occupationalHealthExams']);
 
 const WORKSHOPS_CRUD_IDS = new Set<string>(['workshopVehicles', 'carWorkOrders', 'bikeWorkOrders']);
 
@@ -66,6 +68,7 @@ function resolveCrudLazyChunk(resourceId: string): CrudLazyChunk {
   if (GOVERNANCE_CRUD_IDS.has(resourceId)) return 'governance';
   if (CONTROL_CRUD_IDS.has(resourceId)) return 'control';
   if (PROFESSIONALS_CRUD_IDS.has(resourceId)) return 'professionals';
+  if (MEDICAL_CRUD_IDS.has(resourceId)) return 'medical';
   if (WORKSHOPS_CRUD_IDS.has(resourceId)) return 'workshops';
   if (RESTAURANTS_CRUD_IDS.has(resourceId)) return 'restaurants';
   return 'common';
@@ -96,6 +99,9 @@ function loadCrudModule(resourceId: string): Promise<CrudModule> {
     case 'professionals':
       promise = import('./resourceConfigs.professionals');
       break;
+    case 'medical':
+      promise = import('./resourceConfigs.medical');
+      break;
     case 'workshops':
       promise = import('./resourceConfigs.workshops');
       break;
@@ -122,5 +128,5 @@ export async function loadLazyCrudPageConfig<TRecord extends { id: string } = { 
 }
 
 export async function hasLazyCrudResource(resourceId: string): Promise<boolean> {
-  return hasCrudModule(resourceId);
+  return (await loadLazyCrudPageConfig(resourceId)) != null;
 }

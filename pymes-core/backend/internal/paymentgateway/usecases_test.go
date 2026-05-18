@@ -52,10 +52,10 @@ type fakeRepo struct {
 	processSaleIn  *ProcessSalePaymentInput
 	processSaleErr error
 
-	markApprovedOrgID   uuid.UUID
-	markApprovedRefType string
-	markApprovedRefID   uuid.UUID
-	markApprovedErr     error
+	markApprovedTenantID uuid.UUID
+	markApprovedRefType  string
+	markApprovedRefID    uuid.UUID
+	markApprovedErr      error
 
 	storedWebhookEvent gatewaydomain.WebhookEvent
 	storeWebhookErr    error
@@ -182,7 +182,7 @@ func (f *fakeRepo) MarkPreferenceApproved(ctx context.Context, orgID uuid.UUID, 
 	if f.markApprovedErr != nil {
 		return f.markApprovedErr
 	}
-	f.markApprovedOrgID = orgID
+	f.markApprovedTenantID = orgID
 	f.markApprovedRefType = refType
 	f.markApprovedRefID = refID
 	return nil
@@ -319,7 +319,7 @@ func TestCreatePreference_SaleGrowth(t *testing.T) {
 		planCode:     "growth",
 		countMonthly: 0,
 		connection: gatewaydomain.PaymentGatewayConnection{
-			OrgID:          orgID,
+			OrgID:       orgID,
 			Provider:       providerMercadoPago,
 			ExternalUserID: "123",
 			AccessToken:    encAccess,
@@ -469,7 +469,7 @@ func TestProcessPendingWebhookEventsApprovedSale(t *testing.T) {
 		getByExternalErr: ErrNotFound,
 		listConnections: []gatewaydomain.PaymentGatewayConnection{
 			{
-				OrgID:          orgID,
+				OrgID:       orgID,
 				Provider:       providerMercadoPago,
 				ExternalUserID: "123",
 				AccessToken:    encAccess,

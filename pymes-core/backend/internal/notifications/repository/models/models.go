@@ -20,7 +20,7 @@ func (NotificationPreferenceModel) TableName() string { return "pymes_notificati
 
 type NotificationLogModel struct {
 	ID                uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID             uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID          uuid.UUID `gorm:"type:uuid;index;not null"`
 	UserID            uuid.UUID `gorm:"type:uuid;index;not null"`
 	NotificationType  string
 	Channel           string

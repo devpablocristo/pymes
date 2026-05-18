@@ -8,7 +8,7 @@ import (
 
 type Purchase struct {
 	ID            uuid.UUID      `json:"id"`
-	OrgID         uuid.UUID      `json:"org_id"`
+	OrgID      uuid.UUID      `json:"org_id"`
 	BranchID      *uuid.UUID     `json:"branch_id,omitempty"`
 	Number        string         `json:"number"`
 	SupplierID    *uuid.UUID     `json:"supplier_id,omitempty"`
@@ -19,13 +19,14 @@ type Purchase struct {
 	TaxTotal      float64        `json:"tax_total"`
 	Total         float64        `json:"total"`
 	Currency      string         `json:"currency"`
+	IsFavorite    bool           `json:"is_favorite"`
+	Tags          []string       `json:"tags"`
 	Notes         string         `json:"notes"`
 	ReceivedAt    *time.Time     `json:"received_at,omitempty"`
 	CreatedBy     string         `json:"created_by,omitempty"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
-	Tags          []string       `json:"tags,omitempty"`
-	Metadata      map[string]any `json:"metadata,omitempty"`
+	DeletedAt     *time.Time     `json:"deleted_at,omitempty"`
 	Items         []PurchaseItem `json:"items,omitempty"`
 }
 

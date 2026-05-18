@@ -16,9 +16,9 @@ import (
 // --- fakes ---
 
 type fakeRepo struct {
-	sessions    map[uuid.UUID]domain.TableSession
-	openErr     error
-	closeErr    error
+	sessions map[uuid.UUID]domain.TableSession
+	openErr  error
+	closeErr error
 }
 
 func newFakeRepo() *fakeRepo {
@@ -39,7 +39,7 @@ func (r *fakeRepo) OpenSession(_ context.Context, orgID, tableID uuid.UUID, gues
 	}
 	s := domain.TableSession{
 		ID:         uuid.New(),
-		OrgID:      orgID,
+		OrgID:   orgID,
 		TableID:    tableID,
 		GuestCount: guestCount,
 		PartyLabel: partyLabel,

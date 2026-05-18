@@ -15,9 +15,10 @@ type CreateQuoteRequest struct {
 	CustomerID   *string            `json:"customer_id"`
 	CustomerName string             `json:"customer_name"`
 	Items        []QuoteItemPayload `json:"items" binding:"required"`
+	IsFavorite   *bool              `json:"is_favorite"`
+	Tags         []string           `json:"tags,omitempty"`
 	Notes        string             `json:"notes"`
 	ValidUntil   *string            `json:"valid_until"`
-	Tags         []string           `json:"tags,omitempty"`
 	Metadata     map[string]any     `json:"metadata,omitempty"`
 }
 
@@ -25,10 +26,15 @@ type UpdateQuoteRequest struct {
 	CustomerID   *string             `json:"customer_id"`
 	CustomerName *string             `json:"customer_name"`
 	Items        *[]QuoteItemPayload `json:"items"`
+	IsFavorite   *bool               `json:"is_favorite"`
+	Tags         *[]string           `json:"tags,omitempty"`
 	Notes        *string             `json:"notes"`
 	ValidUntil   *string             `json:"valid_until"`
-	Tags         *[]string           `json:"tags"`
-	Metadata     *map[string]any     `json:"metadata"`
+	Metadata     *map[string]any     `json:"metadata,omitempty"`
+}
+
+type UpdateQuoteStatusRequest struct {
+	Status string `json:"status" binding:"required"`
 }
 
 type PatchQuoteRequest struct {
@@ -58,7 +64,7 @@ type QuoteItemResponse struct {
 
 type QuoteResponse struct {
 	ID           string              `json:"id"`
-	OrgID        string              `json:"org_id"`
+	OrgID     string              `json:"org_id"`
 	BranchID     string              `json:"branch_id,omitempty"`
 	Number       string              `json:"number"`
 	CustomerID   string              `json:"customer_id,omitempty"`
@@ -69,13 +75,14 @@ type QuoteResponse struct {
 	TaxTotal     float64             `json:"tax_total"`
 	Total        float64             `json:"total"`
 	Currency     string              `json:"currency"`
+	IsFavorite   bool                `json:"is_favorite"`
+	Tags         []string            `json:"tags,omitempty"`
 	Notes        string              `json:"notes"`
 	ValidUntil   string              `json:"valid_until,omitempty"`
 	CreatedBy    string              `json:"created_by"`
 	CreatedAt    string              `json:"created_at"`
 	UpdatedAt    string              `json:"updated_at"`
 	ArchivedAt   string              `json:"archived_at,omitempty"`
-	Tags         []string            `json:"tags,omitempty"`
 	Metadata     map[string]any      `json:"metadata,omitempty"`
 }
 

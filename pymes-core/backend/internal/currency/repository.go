@@ -42,7 +42,7 @@ func (r *Repository) ListLatest(ctx context.Context, orgID uuid.UUID, fromCurren
 func (r *Repository) Upsert(ctx context.Context, in currencydomain.ExchangeRate) (currencydomain.ExchangeRate, error) {
 	row := models.ExchangeRateModel{
 		ID:           in.ID,
-		OrgID:        in.OrgID,
+		OrgID:     in.OrgID,
 		FromCurrency: in.FromCurrency,
 		ToCurrency:   in.ToCurrency,
 		RateType:     in.RateType,
@@ -69,7 +69,7 @@ func (r *Repository) Upsert(ctx context.Context, in currencydomain.ExchangeRate)
 func toDomain(row models.ExchangeRateModel) currencydomain.ExchangeRate {
 	return currencydomain.ExchangeRate{
 		ID:           row.ID,
-		OrgID:        row.OrgID,
+		OrgID:     row.OrgID,
 		FromCurrency: row.FromCurrency,
 		ToCurrency:   row.ToCurrency,
 		RateType:     row.RateType,

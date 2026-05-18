@@ -17,7 +17,6 @@ ENV CGO_ENABLED=0 \
 WORKDIR /workspace
 
 COPY pymes /workspace/pymes
-
 WORKDIR /workspace/pymes/pymes-core/backend
 
 RUN go mod download

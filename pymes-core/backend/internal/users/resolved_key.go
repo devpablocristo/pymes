@@ -6,7 +6,7 @@ import "github.com/google/uuid"
 
 // ResolvedAPIKey is the result of resolving a raw API key (internal service use).
 type ResolvedAPIKey struct {
-	ID     uuid.UUID
-	OrgID  uuid.UUID
-	Scopes []string
+	ID       uuid.UUID
+	OrgID uuid.UUID
+	Scopes   []string
 }

@@ -10,28 +10,24 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	purchasesdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/purchases/usecases/domain"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/status"
 )
 
 type RepositoryPort interface {
 	List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
 	Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error)
 	Update(ctx context.Context, in UpdateInput) (purchasesdomain.Purchase, error)
 	UpdateStatus(ctx context.Context, in UpdateStatusInput) (purchasesdomain.Purchase, error)
-	PatchAnnotations(ctx context.Context, orgID, id uuid.UUID, patch PurchasePatchFields) (purchasesdomain.Purchase, error)
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 	GetSupplierName(ctx context.Context, orgID, supplierID uuid.UUID) (string, error)
 	GetCurrency(ctx context.Context, orgID uuid.UUID) string
 	GetTaxRate(ctx context.Context, orgID uuid.UUID) float64
-}
-
-// PurchasePatchFields campos parciales permitidos fuera del borrador (CRUD unificado).
-type PurchasePatchFields struct {
-	Tags          *[]string
-	Metadata      *map[string]any
-	Notes         *string
-	PaymentStatus *string
-	SupplierName  *string
 }
 
 type AuditPort interface {
@@ -67,41 +63,45 @@ func NewUsecases(repo RepositoryPort, audit AuditPort, opts ...Option) *Usecases
 }
 
 type CreateInput struct {
-	OrgID         uuid.UUID
+	OrgID      uuid.UUID
 	BranchID      *uuid.UUID
 	SupplierID    *uuid.UUID
 	SupplierName  string
 	Status        string
 	PaymentStatus string
+	IsFavorite    bool
+	Tags          []string
 	Notes         string
 	CreatedBy     string
-	Tags          []string
-	Metadata      map[string]any
 	Items         []purchasesdomain.PurchaseItem
 }
 
 type UpdateInput struct {
 	ID            uuid.UUID
-	OrgID         uuid.UUID
+	OrgID      uuid.UUID
 	BranchID      *uuid.UUID
 	SupplierID    *uuid.UUID
 	SupplierName  string
 	Status        string
 	PaymentStatus string
-	Notes         string
+	IsFavorite    bool
 	Tags          []string
-	Metadata      map[string]any
+	Notes         string
 	Items         []purchasesdomain.PurchaseItem
 }
 
 type UpdateStatusInput struct {
-	ID     uuid.UUID
-	OrgID  uuid.UUID
-	Status string
+	ID       uuid.UUID
+	OrgID uuid.UUID
+	Status   string
 }
 
 func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
 	return u.repo.List(ctx, orgID, branchID, strings.TrimSpace(status), limit)
+}
+
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
+	return u.repo.ListArchived(ctx, orgID, branchID, strings.TrimSpace(status), limit)
 }
 
 func (u *Usecases) Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error) {
@@ -144,39 +144,26 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 		}
 		return purchasesdomain.Purchase{}, err
 	}
-	if current.Status != "draft" {
-		return purchasesdomain.Purchase{}, domainerr.BusinessRule("only draft purchases can be updated")
+	if err := archive.IfArchived(current.DeletedAt, "purchase"); err != nil {
+		return purchasesdomain.Purchase{}, err
 	}
-	prepareInput := CreateInput{
-		OrgID:         in.OrgID,
+	prepared, err := u.prepareCreate(ctx, CreateInput{
+		OrgID:      in.OrgID,
 		BranchID:      in.BranchID,
 		SupplierID:    in.SupplierID,
 		SupplierName:  in.SupplierName,
 		Status:        in.Status,
 		PaymentStatus: in.PaymentStatus,
+		IsFavorite:    in.IsFavorite,
+		Tags:          in.Tags,
 		Notes:         in.Notes,
 		CreatedBy:     current.CreatedBy,
 		Items:         in.Items,
-		Tags:          in.Tags,
-		Metadata:      in.Metadata,
-	}
-	prepared, err := u.prepareCreate(ctx, prepareInput)
+	})
 	if err != nil {
 		return purchasesdomain.Purchase{}, err
 	}
-	out, err := u.repo.Update(ctx, UpdateInput{
-		ID:            in.ID,
-		OrgID:         in.OrgID,
-		BranchID:      prepared.BranchID,
-		SupplierID:    prepared.SupplierID,
-		SupplierName:  prepared.SupplierName,
-		Status:        prepared.Status,
-		PaymentStatus: prepared.PaymentStatus,
-		Notes:         prepared.Notes,
-		Tags:          prepared.Tags,
-		Metadata:      prepared.Metadata,
-		Items:         prepared.Items,
-	})
+	out, err := u.repo.Update(ctx, UpdateInput{ID: in.ID, OrgID: in.OrgID, BranchID: prepared.BranchID, SupplierID: prepared.SupplierID, SupplierName: prepared.SupplierName, Status: prepared.Status, PaymentStatus: prepared.PaymentStatus, IsFavorite: prepared.IsFavorite, Tags: prepared.Tags, Notes: prepared.Notes, Items: prepared.Items})
 	if err != nil {
 		return purchasesdomain.Purchase{}, err
 	}
@@ -192,38 +179,12 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 	return out, nil
 }
 
-func (u *Usecases) PatchAnnotations(ctx context.Context, orgID, id uuid.UUID, patch PurchasePatchFields, actor string) (purchasesdomain.Purchase, error) {
-	if patch.Tags == nil && patch.Metadata == nil && patch.Notes == nil && patch.PaymentStatus == nil && patch.SupplierName == nil {
-		return purchasesdomain.Purchase{}, domainerr.Validation("no patch fields")
-	}
-	normalized := patch
-	if patch.PaymentStatus != nil {
-		ps := strings.TrimSpace(strings.ToLower(*patch.PaymentStatus))
-		if ps == "" || (ps != "pending" && ps != "partial" && ps != "paid") {
-			return purchasesdomain.Purchase{}, domainerr.Validation("invalid payment_status")
-		}
-		normalized.PaymentStatus = &ps
-	}
-	if _, err := u.repo.GetByID(ctx, orgID, id); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", id.String())
-		}
-		return purchasesdomain.Purchase{}, err
-	}
-	out, err := u.repo.PatchAnnotations(ctx, orgID, id, normalized)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", id.String())
-		}
-		return purchasesdomain.Purchase{}, err
-	}
-	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "purchase.annotations_updated", "purchase", out.ID.String(), map[string]any{})
-	}
-	return out, nil
-}
-
 func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (purchasesdomain.Purchase, error) {
+	next := strings.TrimSpace(strings.ToLower(in.Status))
+	if next == "" {
+		return purchasesdomain.Purchase{}, domainerr.Validation("status is required")
+	}
+
 	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -231,17 +192,24 @@ func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor
 		}
 		return purchasesdomain.Purchase{}, err
 	}
-	nextStatus, err := normalizePurchaseStatus(in.Status, "")
-	if err != nil {
+	if err := archive.IfArchived(current.DeletedAt, "purchase"); err != nil {
 		return purchasesdomain.Purchase{}, err
 	}
-	if !canTransitionPurchaseStatus(current.Status, nextStatus) {
-		return purchasesdomain.Purchase{}, domainerr.BusinessRule("purchase status transition is not allowed")
+
+	// Same-status idempotente: no DB, no audit.
+	if current.Status == next {
+		return current, nil
 	}
+
+	// Validación de transición vía FSM canónico (ver fsm.go).
+	if err := purchaseStateMachine.Validate(current.Status, next); err != nil {
+		return purchasesdomain.Purchase{}, status.MapFSMError(current.Status, next, err)
+	}
+
 	out, err := u.repo.UpdateStatus(ctx, UpdateStatusInput{
 		ID:     in.ID,
 		OrgID:  in.OrgID,
-		Status: nextStatus,
+		Status: next,
 	})
 	if err != nil {
 		return purchasesdomain.Purchase{}, err
@@ -256,6 +224,45 @@ func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor
 		_ = u.webhooks.Enqueue(ctx, in.OrgID, "purchase.status_updated", map[string]any{"purchase_id": out.ID.String(), "supplier_id": nullableUUID(out.SupplierID), "status": out.Status})
 	}
 	return out, nil
+}
+
+func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFoundf("purchase", id.String())
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "purchase.archived", "purchase", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFoundf("purchase", id.String())
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "purchase.restored", "purchase", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFoundf("purchase", id.String())
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "purchase.deleted", "purchase", id.String(), map[string]any{})
+	}
+	return nil
 }
 
 func (u *Usecases) prepareCreate(ctx context.Context, in CreateInput) (CreateInput, error) {
@@ -311,29 +318,6 @@ func normalizePurchaseStatus(raw, defaultValue string) (string, error) {
 		return status, nil
 	default:
 		return "", domainerr.Validation("invalid status")
-	}
-}
-
-func canTransitionPurchaseStatus(from, to string) bool {
-	fromStatus, err := normalizePurchaseStatus(from, "")
-	if err != nil {
-		return false
-	}
-	toStatus, err := normalizePurchaseStatus(to, "")
-	if err != nil {
-		return false
-	}
-	switch fromStatus {
-	case "draft":
-		return toStatus == "draft" || toStatus == "partial" || toStatus == "received" || toStatus == "voided"
-	case "partial":
-		return toStatus == "draft" || toStatus == "partial" || toStatus == "received" || toStatus == "voided"
-	case "received":
-		return toStatus == "draft" || toStatus == "partial" || toStatus == "received" || toStatus == "voided"
-	case "voided":
-		return toStatus == "draft" || toStatus == "partial" || toStatus == "received" || toStatus == "voided"
-	default:
-		return false
 	}
 }
 

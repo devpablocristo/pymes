@@ -16,7 +16,7 @@ type apiKeyResolver struct {
 }
 
 type apiKeyModel struct {
-	ID    uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ID       uuid.UUID `gorm:"type:uuid;primaryKey"`
 	OrgID uuid.UUID `gorm:"type:uuid;index;not null"`
 }
 
@@ -50,8 +50,8 @@ func (r *apiKeyResolver) ResolveAPIKey(raw string) (auth.ResolvedKey, bool) {
 	sort.Strings(scopes)
 
 	return auth.ResolvedKey{
-		ID:     key.ID,
-		OrgID:  key.OrgID,
-		Scopes: scopes,
+		ID:       key.ID,
+		OrgID: key.OrgID,
+		Scopes:   scopes,
 	}, true
 }

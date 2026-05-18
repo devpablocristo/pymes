@@ -9,7 +9,7 @@ import (
 
 type Bicycle struct {
 	ID              uuid.UUID
-	OrgID           uuid.UUID
+	OrgID        uuid.UUID
 	CustomerID      *uuid.UUID
 	CustomerName    string
 	FrameNumber     string
@@ -21,6 +21,8 @@ type Bicycle struct {
 	Color           string
 	EbikeNotes      string
 	Notes           string
+	IsFavorite      bool
+	Tags            []string
 	ArchivedAt      *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time

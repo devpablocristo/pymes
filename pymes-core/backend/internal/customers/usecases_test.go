@@ -64,9 +64,9 @@ func TestCreateNormalizesPhone(t *testing.T) {
 
 	_, err := uc.Create(context.Background(), customerdomain.Customer{
 		OrgID: orgID,
-		Name:  "Cliente Demo",
-		Type:  "person",
-		Phone: "0381 555-1234",
+		Name:     "Cliente Demo",
+		Type:     "person",
+		Phone:    "0381 555-1234",
 	}, "tester")
 	if err != nil {
 		t.Fatalf("Create returned error: %v", err)
@@ -81,11 +81,11 @@ func TestUpdateNormalizesPhone(t *testing.T) {
 	customerID := uuid.New()
 	repo := &customersRepoStub{
 		current: customerdomain.Customer{
-			ID:    customerID,
+			ID:       customerID,
 			OrgID: orgID,
-			Name:  "Cliente Demo",
-			Type:  "person",
-			Phone: "3815550000",
+			Name:     "Cliente Demo",
+			Type:     "person",
+			Phone:    "3815550000",
 		},
 	}
 	uc := NewUsecases(repo, nil)

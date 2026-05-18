@@ -18,8 +18,8 @@ function translateError(message: string): string {
   switch (trimmed) {
     case '404 page not found':
       return 'La ruta no existe en el backend de profesionales.';
-    case 'organization not found':
-      return 'No se encontro la organizacion.';
+    case 'tenant not found':
+      return 'No se encontro el tenant.';
     default:
       return trimmed;
   }
@@ -33,6 +33,8 @@ function mapIntake(item: {
   customer_party_id?: string;
   service_id?: string;
   status: 'draft' | 'submitted' | 'reviewed';
+  is_favorite?: boolean;
+  tags?: string[];
   payload?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -46,6 +48,8 @@ function mapIntake(item: {
     service_id: item.service_id,
     status: item.status,
     notes: typeof item.payload?.notes === 'string' ? item.payload.notes : '',
+    is_favorite: item.is_favorite,
+    tags: item.tags,
     payload: item.payload,
     created_at: item.created_at,
     updated_at: item.updated_at,
@@ -54,14 +58,14 @@ function mapIntake(item: {
 
 const teachersRequest = createVerticalRequest({
   envVar: 'VITE_PROFESSIONALS_API_URL',
-  fallbackPorts: [8181, 8081],
+  devPorts: [8181, 8081],
   translateError,
 });
 
 // ── Teachers ──
 
-export async function getTeachers(): Promise<{ items: TeacherProfile[] }> {
-  return teachersRequest('/v1/teachers/professionals');
+export async function getTeachers(filters?: { archived?: boolean }): Promise<{ items: TeacherProfile[] }> {
+  return teachersRequest(`/v1/teachers/professionals${filters?.archived ? '/archived' : ''}`);
 }
 
 export async function createTeacher(data: {
@@ -72,6 +76,9 @@ export async function createTeacher(data: {
   is_public?: boolean;
   is_bookable?: boolean;
   accepts_new_clients?: boolean;
+  is_favorite?: boolean;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
 }): Promise<TeacherProfile> {
   return teachersRequest('/v1/teachers/professionals', { method: 'POST', body: data });
 }
@@ -89,15 +96,30 @@ export async function updateTeacher(
     is_public: boolean;
     is_bookable: boolean;
     accepts_new_clients: boolean;
+    is_favorite: boolean;
+    tags: string[];
+    metadata: Record<string, unknown>;
   }>,
 ): Promise<TeacherProfile> {
-  return teachersRequest(`/v1/teachers/professionals/${id}`, { method: 'PUT', body: data });
+  return teachersRequest(`/v1/teachers/professionals/${id}`, { method: 'PATCH', body: data });
+}
+
+export async function archiveTeacher(id: string): Promise<void> {
+  await teachersRequest(`/v1/teachers/professionals/${id}/archive`, { method: 'POST', body: {} });
+}
+
+export async function restoreTeacher(id: string): Promise<void> {
+  await teachersRequest(`/v1/teachers/professionals/${id}/restore`, { method: 'POST', body: {} });
+}
+
+export async function hardDeleteTeacher(id: string): Promise<void> {
+  await teachersRequest(`/v1/teachers/professionals/${id}/hard`, { method: 'DELETE' });
 }
 
 // ── Specialties ──
 
-export async function getTeacherSpecialties(): Promise<{ items: TeacherSpecialty[] }> {
-  return teachersRequest('/v1/teachers/specialties');
+export async function getTeacherSpecialties(filters?: { archived?: boolean }): Promise<{ items: TeacherSpecialty[] }> {
+  return teachersRequest(`/v1/teachers/specialties${filters?.archived ? '/archived' : ''}`);
 }
 
 export async function createTeacherSpecialty(data: {
@@ -105,15 +127,38 @@ export async function createTeacherSpecialty(data: {
   name: string;
   description: string;
   is_active?: boolean;
+  is_favorite?: boolean;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
 }): Promise<TeacherSpecialty> {
   return teachersRequest('/v1/teachers/specialties', { method: 'POST', body: data });
 }
 
 export async function updateTeacherSpecialty(
   id: string,
-  data: Partial<{ code: string; name: string; description: string; is_active: boolean }>,
+  data: Partial<{
+    code: string;
+    name: string;
+    description: string;
+    is_active: boolean;
+    is_favorite: boolean;
+    tags: string[];
+    metadata: Record<string, unknown>;
+  }>,
 ): Promise<TeacherSpecialty> {
-  return teachersRequest(`/v1/teachers/specialties/${id}`, { method: 'PUT', body: data });
+  return teachersRequest(`/v1/teachers/specialties/${id}`, { method: 'PATCH', body: data });
+}
+
+export async function archiveTeacherSpecialty(id: string): Promise<void> {
+  await teachersRequest(`/v1/teachers/specialties/${id}/archive`, { method: 'POST', body: {} });
+}
+
+export async function restoreTeacherSpecialty(id: string): Promise<void> {
+  await teachersRequest(`/v1/teachers/specialties/${id}/restore`, { method: 'POST', body: {} });
+}
+
+export async function hardDeleteTeacherSpecialty(id: string): Promise<void> {
+  await teachersRequest(`/v1/teachers/specialties/${id}/hard`, { method: 'DELETE' });
 }
 
 // ── Profile Services ──
@@ -128,7 +173,7 @@ export async function updateTeacherServices(id: string, links: TeacherServiceLin
 
 // ── Intakes ──
 
-export async function getTeacherIntakes(): Promise<{ items: TeacherIntake[] }> {
+export async function getTeacherIntakes(filters?: { archived?: boolean }): Promise<{ items: TeacherIntake[] }> {
   const response = await teachersRequest<{
     items?: Array<{
       id: string;
@@ -142,7 +187,7 @@ export async function getTeacherIntakes(): Promise<{ items: TeacherIntake[] }> {
       created_at: string;
       updated_at: string;
     }>;
-  }>('/v1/teachers/intakes');
+  }>(`/v1/teachers/intakes${filters?.archived ? '/archived' : ''}`);
   return { items: (response.items ?? []).map(mapIntake) };
 }
 
@@ -162,7 +207,12 @@ export async function getTeacherIntake(id: string): Promise<TeacherIntake> {
   return mapIntake(response);
 }
 
-export async function createTeacherIntake(data: { profile_id: string; notes: string }): Promise<TeacherIntake> {
+export async function createTeacherIntake(data: {
+  profile_id: string;
+  payload: Record<string, unknown>;
+  is_favorite?: boolean;
+  tags?: string[];
+}): Promise<TeacherIntake> {
   const response = await teachersRequest<{
     id: string;
     org_id?: string;
@@ -171,17 +221,31 @@ export async function createTeacherIntake(data: { profile_id: string; notes: str
     customer_party_id?: string;
     service_id?: string;
     status: 'draft' | 'submitted' | 'reviewed';
+    is_favorite?: boolean;
+    tags?: string[];
     payload?: Record<string, unknown>;
     created_at: string;
     updated_at: string;
   }>('/v1/teachers/intakes', {
     method: 'POST',
-    body: { profile_id: data.profile_id, payload: { notes: data.notes } },
+    body: {
+      profile_id: data.profile_id,
+      payload: data.payload,
+      is_favorite: data.is_favorite,
+      tags: data.tags,
+    },
   });
   return mapIntake(response);
 }
 
-export async function updateTeacherIntake(id: string, data: Partial<{ notes: string }>): Promise<TeacherIntake> {
+export async function updateTeacherIntake(
+  id: string,
+  data: Partial<{ payload: Record<string, unknown>; is_favorite: boolean; tags: string[] }>,
+): Promise<TeacherIntake> {
+  const body: Record<string, unknown> = {};
+  if (data.payload !== undefined) body.payload = data.payload;
+  if (data.is_favorite !== undefined) body.is_favorite = data.is_favorite;
+  if (data.tags !== undefined) body.tags = data.tags;
   const response = await teachersRequest<{
     id: string;
     org_id?: string;
@@ -190,12 +254,14 @@ export async function updateTeacherIntake(id: string, data: Partial<{ notes: str
     customer_party_id?: string;
     service_id?: string;
     status: 'draft' | 'submitted' | 'reviewed';
+    is_favorite?: boolean;
+    tags?: string[];
     payload?: Record<string, unknown>;
     created_at: string;
     updated_at: string;
   }>(`/v1/teachers/intakes/${id}`, {
-    method: 'PUT',
-    body: { payload: { notes: data.notes ?? '' } },
+    method: 'PATCH',
+    body,
   });
   return mapIntake(response);
 }
@@ -212,17 +278,31 @@ export async function submitTeacherIntake(id: string): Promise<TeacherIntake> {
   return mapIntake(response);
 }
 
+export async function archiveTeacherIntake(id: string): Promise<void> {
+  await teachersRequest(`/v1/teachers/intakes/${id}/archive`, { method: 'POST', body: {} });
+}
+
+export async function restoreTeacherIntake(id: string): Promise<void> {
+  await teachersRequest(`/v1/teachers/intakes/${id}/restore`, { method: 'POST', body: {} });
+}
+
+export async function hardDeleteTeacherIntake(id: string): Promise<void> {
+  await teachersRequest(`/v1/teachers/intakes/${id}/hard`, { method: 'DELETE' });
+}
+
 // ── Sessions ──
 
 export async function getTeacherSessions(filters?: {
   status?: string;
   profile_id?: string;
+  archived?: boolean;
 }): Promise<{ items: TeacherSession[] }> {
   const params = new URLSearchParams();
   if (filters?.status) params.set('status', filters.status);
   if (filters?.profile_id) params.set('profile_id', filters.profile_id);
   const qs = params.toString();
-  return teachersRequest(`/v1/teachers/sessions${qs ? `?${qs}` : ''}`);
+  const path = `/v1/teachers/sessions${filters?.archived ? '/archived' : ''}`;
+  return teachersRequest(`${path}${qs ? `?${qs}` : ''}`);
 }
 
 export async function createTeacherSession(data: {
@@ -232,12 +312,28 @@ export async function createTeacherSession(data: {
   service_id?: string;
   started_at: string;
   summary?: string;
+  metadata?: Record<string, unknown>;
 }): Promise<TeacherSession> {
   return teachersRequest('/v1/teachers/sessions', { method: 'POST', body: data });
 }
 
 export async function getTeacherSession(id: string): Promise<TeacherSession> {
   return teachersRequest(`/v1/teachers/sessions/${id}`);
+}
+
+export async function updateTeacherSession(
+  id: string,
+  data: Partial<{
+    booking_id: string;
+    profile_id: string;
+    customer_party_id: string | null;
+    service_id: string | null;
+    started_at: string;
+    summary: string;
+    metadata: Record<string, unknown>;
+  }>,
+): Promise<TeacherSession> {
+  return teachersRequest(`/v1/teachers/sessions/${id}`, { method: 'PATCH', body: data });
 }
 
 export async function completeTeacherSession(id: string): Promise<TeacherSession> {
@@ -249,4 +345,16 @@ export async function addTeacherSessionNote(
   data: { body: string; title?: string; note_type?: string },
 ): Promise<TeacherSessionNote> {
   return teachersRequest(`/v1/teachers/sessions/${id}/notes`, { method: 'POST', body: data });
+}
+
+export async function archiveTeacherSession(id: string): Promise<void> {
+  await teachersRequest(`/v1/teachers/sessions/${id}/archive`, { method: 'POST', body: {} });
+}
+
+export async function restoreTeacherSession(id: string): Promise<void> {
+  await teachersRequest(`/v1/teachers/sessions/${id}/restore`, { method: 'POST', body: {} });
+}
+
+export async function hardDeleteTeacherSession(id: string): Promise<void> {
+  await teachersRequest(`/v1/teachers/sessions/${id}/hard`, { method: 'DELETE' });
 }

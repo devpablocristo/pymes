@@ -1,0 +1,289 @@
+name: Deploy Verticales DEV (Cloud Run)
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - "infra/verticals.yml"
+      - "scripts/infra/**"
+      - "firebase.generated.json"
+      - "firebase.json"
+      - ".github/workflows/deploy-dev-verticals.yml"
+      - "workshops/backend/**"
+      - "professionals/backend/**"
+      - "beauty/backend/**"
+      - "restaurants/backend/**"
+      - "medical/backend/**"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Rama o ref a desplegar (default: develop)"
+        required: false
+        default: "develop"
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+concurrency:
+  group: pymes-deploy-dev-verticals
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref_name }}
+      - name: Validate registry and generated Firebase config
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user pyyaml
+          python3 scripts/infra/validate_verticals.py
+          python3 scripts/infra/generate_firebase.py --check
+
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref_name }}
+      - id: matrix
+        name: Generate deploy matrix
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user pyyaml
+          matrix="$(python3 scripts/infra/generate_vertical_matrix.py --mode deploy)"
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+          echo "$matrix"
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs:
+      - validate
+      - generate-matrix
+    environment: dev
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+    env:
+      GCP_REGION: us-central1
+      GCP_PROJECT_ID: pymes-dev-352318
+      ARTIFACT_REGISTRY: pymes
+      CLOUD_RUN_SERVICE_ACCOUNT: 884236221349-compute@developer.gserviceaccount.com
+      WIF_PROVIDER: projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
+      WIF_SERVICE_ACCOUNT: github-actions@pymes-dev-352318.iam.gserviceaccount.com
+      FIREBASE_HOSTING_SITE_ID: pymes-dev-352318
+      CLOUDSQL_INSTANCE: pymes-dev-352318:us-central1:pymes-dev-db
+      JWKS_URL: https://selected-tick-48.clerk.accounts.dev/.well-known/jwks.json
+      JWT_ISSUER: https://selected-tick-48.clerk.accounts.dev
+      SECRET_DATABASE_URL_NAME: DATABASE_URL
+      AUTH_ENABLE_JWT: "true"
+      AUTH_ALLOW_API_KEY: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref_name }}
+
+      - name: Auth GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker "${{ env.GCP_REGION }}-docker.pkg.dev" --quiet
+
+      - name: Resolve deploy SHA
+        run: echo "DEPLOY_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Stage vertical build context
+        run: |
+          set -euo pipefail
+          build_root="${RUNNER_TEMP}/pymes-vertical-${{ matrix.id }}-build"
+          rm -rf "$build_root"
+          mkdir -p "$build_root/pymes"
+          rsync -a \
+            --exclude '.git/' \
+            --exclude 'node_modules/' \
+            --exclude 'frontend/node_modules/' \
+            --exclude 'ai/.venv/' \
+            ./ "$build_root/pymes/"
+          echo "BUILD_ROOT=$build_root" >> "$GITHUB_ENV"
+
+      - name: Build and push image
+        run: |
+          set -euo pipefail
+          image_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY}/${{ matrix.service }}:${DEPLOY_SHA}"
+          docker build \
+            -f "${BUILD_ROOT}/pymes/${{ matrix.path }}/${{ matrix.dockerfile }}" \
+            -t "$image_uri" \
+            "$BUILD_ROOT"
+          docker push "$image_uri"
+          runtime_digest="$(docker buildx imagetools inspect "$image_uri" --format '{{json .Manifest}}' | python3 -c '
+          import json
+          import sys
+
+          manifest = json.load(sys.stdin)
+          digest = manifest.get("digest", "")
+          for item in manifest.get("manifests", []):
+              platform = item.get("platform", {})
+              if platform.get("os") == "linux" and platform.get("architecture") == "amd64":
+                  digest = item.get("digest", digest)
+                  break
+          print(digest)
+          ')"
+          if [[ -z "$runtime_digest" ]]; then
+            echo "::error::No se pudo resolver digest para $image_uri."
+            exit 1
+          fi
+          repo="${image_uri%:*}"
+          echo "IMAGE_URI=$image_uri" >> "$GITHUB_ENV"
+          echo "IMAGE_DIGEST=${repo}@${runtime_digest}" >> "$GITHUB_ENV"
+
+      - name: Resolve pymes-core URL
+        run: |
+          set -euo pipefail
+          core_service="${{ vars.CLOUD_RUN_SERVICE_BACKEND_DEV || 'pymes-core' }}"
+          core_url="$(gcloud run services describe "$core_service" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='value(status.url)')"
+          if [[ -z "$core_url" ]]; then
+            echo "::error::No se pudo resolver URL de pymes-core."
+            exit 1
+          fi
+          echo "PYMES_CORE_URL=$core_url" >> "$GITHUB_ENV"
+
+      - name: Resolve required GCP secrets
+        run: |
+          set -euo pipefail
+          if ! gcloud secrets versions access latest \
+            --secret="$SECRET_DATABASE_URL_NAME" \
+            --project="$GCP_PROJECT_ID" >/dev/null; then
+            echo "::error::No se pudo acceder al secret requerido $SECRET_DATABASE_URL_NAME."
+            exit 1
+          fi
+          echo "SECRET_FLAGS=DATABASE_URL=${SECRET_DATABASE_URL_NAME}:latest" >> "$GITHUB_ENV"
+
+      - name: Deploy to Cloud Run (DEV)
+        run: |
+          set -euo pipefail
+          frontend_url="https://${FIREBASE_HOSTING_SITE_ID}.web.app"
+          env_vars="ENVIRONMENT=dev,AUTH_ENABLE_JWT=${AUTH_ENABLE_JWT},AUTH_ALLOW_API_KEY=${AUTH_ALLOW_API_KEY},FRONTEND_URL=${frontend_url},PYMES_CORE_URL=${PYMES_CORE_URL}"
+          if [[ -n "${JWKS_URL}" ]]; then
+            env_vars="${env_vars},JWKS_URL=${JWKS_URL}"
+          fi
+          if [[ -n "${JWT_ISSUER}" ]]; then
+            env_vars="${env_vars},JWT_ISSUER=${JWT_ISSUER}"
+          fi
+          gcloud run deploy "${{ matrix.service }}" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --image="$IMAGE_URI" \
+            --service-account="$CLOUD_RUN_SERVICE_ACCOUNT" \
+            --add-cloudsql-instances="$CLOUDSQL_INSTANCE" \
+            --allow-unauthenticated \
+            --port=8080 \
+            --memory=512Mi \
+            --cpu=1 \
+            --min-instances=0 \
+            --max-instances=1 \
+            --timeout=300 \
+            --labels="app=pymes,component=vertical,vertical=${{ matrix.id }},environment=dev" \
+            --set-env-vars="${env_vars}" \
+            --update-secrets="${SECRET_FLAGS}"
+
+      - name: Resolve service URL
+        run: |
+          set -euo pipefail
+          service_url="$(gcloud run services describe "${{ matrix.service }}" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='value(status.url)')"
+          if [[ -z "$service_url" ]]; then
+            echo "::error::No se pudo resolver status.url de ${{ matrix.service }}."
+            exit 1
+          fi
+          echo "SERVICE_URL=$service_url" >> "$GITHUB_ENV"
+
+      - name: Guardrail latest revision + digest
+        run: |
+          set -euo pipefail
+          service_json="$(gcloud run services describe "${{ matrix.service }}" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='json')"
+          SERVICE_JSON="$service_json" python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          svc = json.loads(os.environ["SERVICE_JSON"])
+          conditions = {item.get("type"): item for item in svc.get("status", {}).get("conditions", [])}
+          if conditions.get("Ready", {}).get("status") != "True":
+              print("ERROR: Cloud Run service no esta Ready=True.")
+              sys.exit(1)
+          latest_created = svc.get("status", {}).get("latestCreatedRevisionName")
+          latest_ready = svc.get("status", {}).get("latestReadyRevisionName")
+          if latest_created != latest_ready:
+              print(f"ERROR: latestCreatedRevisionName ({latest_created}) != latestReadyRevisionName ({latest_ready}).")
+              sys.exit(1)
+          print(latest_ready)
+          PY
+          latest_ready="$(SERVICE_JSON="$service_json" python3 - <<'PY'
+          import json
+          import os
+
+          svc = json.loads(os.environ["SERVICE_JSON"])
+          print(svc.get("status", {}).get("latestReadyRevisionName", ""))
+          PY
+          )"
+          revision_image="$(gcloud run revisions describe "$latest_ready" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='value(spec.containers[0].image)')"
+          if [[ "$revision_image" != "$IMAGE_DIGEST" ]]; then
+            echo "::error::Imagen activa $revision_image no coincide con digest esperado $IMAGE_DIGEST."
+            exit 1
+          fi
+          echo "LATEST_READY_REVISION=$latest_ready" >> "$GITHUB_ENV"
+
+      - name: Smoke checks
+        run: |
+          set -euo pipefail
+          for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            if curl -fsS "${SERVICE_URL}${{ matrix.healthcheck }}" | grep -q '"status":"ready"'; then
+              {
+                echo "### Vertical ${{ matrix.id }}"
+                echo
+                echo "| field | value |"
+                echo "| --- | --- |"
+                echo "| service | ${{ matrix.service }} |"
+                echo "| url | ${SERVICE_URL} |"
+                echo "| revision | ${LATEST_READY_REVISION} |"
+                echo "| digest | ${IMAGE_DIGEST} |"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::${{ matrix.service }}${{ matrix.healthcheck }} no respondió ready."
+          exit 1

@@ -33,7 +33,7 @@ func (r *Repository) UpsertConnection(ctx context.Context, conn domain.Connectio
 	now := time.Now().UTC()
 	row := models.CalendarSyncConnectionModel{
 		ID:                    conn.ID,
-		OrgID:                 conn.OrgID,
+		OrgID:              conn.OrgID,
 		CreatedBy:             conn.CreatedBy,
 		Provider:              string(conn.Provider),
 		ProviderAccountEmail:  conn.ProviderAccountEmail,
@@ -136,7 +136,7 @@ func (r *Repository) RevokeConnection(ctx context.Context, orgID uuid.UUID, crea
 func (r *Repository) CreateOAuthState(ctx context.Context, st domain.OAuthState) error {
 	row := models.CalendarSyncOAuthStateModel{
 		State:     st.State,
-		OrgID:     st.OrgID,
+		OrgID:  st.OrgID,
 		CreatedBy: st.CreatedBy,
 		Provider:  string(st.Provider),
 		ExpiresAt: st.ExpiresAt,
@@ -181,7 +181,7 @@ func (r *Repository) PurgeExpiredOAuthStates(ctx context.Context) error {
 func toDomainConnection(row models.CalendarSyncConnectionModel) domain.Connection {
 	return domain.Connection{
 		ID:                    row.ID,
-		OrgID:                 row.OrgID,
+		OrgID:              row.OrgID,
 		CreatedBy:             row.CreatedBy,
 		Provider:              domain.Provider(row.Provider),
 		ProviderAccountEmail:  row.ProviderAccountEmail,
@@ -203,7 +203,7 @@ func toDomainConnection(row models.CalendarSyncConnectionModel) domain.Connectio
 func toDomainOAuthState(row models.CalendarSyncOAuthStateModel) domain.OAuthState {
 	return domain.OAuthState{
 		State:     row.State,
-		OrgID:     row.OrgID,
+		OrgID:  row.OrgID,
 		CreatedBy: row.CreatedBy,
 		Provider:  domain.Provider(row.Provider),
 		ExpiresAt: row.ExpiresAt,

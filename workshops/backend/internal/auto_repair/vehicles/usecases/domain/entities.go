@@ -8,7 +8,7 @@ import (
 
 type Vehicle struct {
 	ID           uuid.UUID
-	OrgID        uuid.UUID
+	OrgID     uuid.UUID
 	CustomerID   *uuid.UUID
 	CustomerName string
 	LicensePlate string
@@ -19,6 +19,8 @@ type Vehicle struct {
 	Kilometers   int
 	Color        string
 	Notes        string
+	IsFavorite   bool
+	Tags         []string
 	ArchivedAt   *time.Time
 	CreatedAt    time.Time
 	UpdatedAt    time.Time

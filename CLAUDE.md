@@ -163,6 +163,9 @@ Los **mappers** viven en el adapter que los necesita:
 - **No existen repositorios in-memory.**
 - Un solo archivo `repository.go` por módulo: interface + sentinel errors + implementación GORM. **Sin sufijos.**
 - Para tests: fakes/stubs dentro del `_test.go`, nunca como archivo separado.
+- **Identidad multi-tenant: tabla canónica `orgs`, columna FK `org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE`.** No usar `tenants` (no existe en el schema post-cutover) ni columnas `tenant_id`. Excepción: las tablas `tenant_settings` y `tenant_invitations` mantienen su nombre por convención `core/saas/go`, pero su FK también es `org_id`. Ver [`docs/DATABASE_INIT.md`](docs/DATABASE_INIT.md).
+- **Soft delete: `archived_at timestamptz NULL`**. Excepciones documentadas: `users.deleted_at` (semántica GDPR) y `sales.voided_at` (regulación contable).
+- **Migraciones nuevas**: numeración consecutiva en `pymes-core/backend/migrations/` (post-squash arrancamos desde 0018). Nunca modificar las 0001..0017 squashed. Toda migración nueva tiene su `.down.sql` reverso completo y `CREATE TABLE/INDEX IF NOT EXISTS`.
 
 ### 5.6 Naming por archivo
 
@@ -235,21 +238,27 @@ Los **mappers** viven en el adapter que los necesita:
 
 ---
 
-## 7. CRUD canónico (7 operaciones)
+## 7. CRUD canónico
 
-| Operación | Método | Path | Status |
-|-----------|--------|------|--------|
-| Create | `POST` | `/v1/{entities}` | 201 |
-| Read | `GET` | `/v1/{entities}/{id}` | 200 |
-| List | `GET` | `/v1/{entities}` | 200 |
-| Update | `PATCH` | `/v1/{entities}/{id}` | 200 |
-| Delete | `DELETE` | `/v1/{entities}/{id}` | 204 |
-| Archive | `POST` | `/v1/{entities}/{id}/archive` | 204 |
-| Restore | `POST` | `/v1/{entities}/{id}/restore` | 204 |
+Contrato HTTP compartido entre backend y frontend. Los segmentos de ruta vienen de la librería común **`modules/crud/paths`** (Go: `crudpaths.SegmentArchived`, `SegmentArchive`, `SegmentRestore`, `SegmentHard`; TS espejo: `modules/crud/ui/ts/src/restPaths.ts`) y son consumidos por el frontend vía `buildRestCrudDataSource` (`frontend/src/crud/restCrudDataSource.ts`). No redefinir estos literales en cada módulo.
 
-- DELETE = **hard delete** siempre. Archive = **soft delete**. Restore = limpia `archived_at`.
-- Archive/Restore son idempotentes.
-- List excluye archivados por default; `?archived=true` para incluirlos.
+| Operación | Método | Path | Status | Semántica |
+|-----------|--------|------|--------|-----------|
+| Create | `POST` | `/v1/{entities}` | 201 | — |
+| Read | `GET` | `/v1/{entities}/{id}` | 200 | — |
+| List | `GET` | `/v1/{entities}` | 200 | excluye archivados por default |
+| List archivados | `GET` | `/v1/{entities}/archived` | 200 | equivalente a `List?archived=true` |
+| Update | `PATCH` | `/v1/{entities}/{id}` | 200 | — |
+| Delete (soft) | `DELETE` | `/v1/{entities}/{id}` | 204 | **soft delete** — marca archivado |
+| Archive (alias soft) | `POST` | `/v1/{entities}/{id}/archive` | 204 | mismo efecto que `DELETE /:id`, idempotente |
+| Restore | `POST` | `/v1/{entities}/{id}/restore` | 204 | limpia la marca de archivado, idempotente |
+| Hard delete | `DELETE` | `/v1/{entities}/{id}/hard` | 204 | borrado físico irreversible |
+
+- `DELETE /:id` = **soft delete**. El hard delete siempre es explícito en `/:id/hard`.
+- `Archive` y `DELETE /:id` producen el mismo efecto; `Archive` existe como verbo explícito para el frontend.
+- `Archive` / `Restore` / `Delete (soft)` son idempotentes.
+- List admite `?archived=true` para incluir archivados; la sub-ruta `/archived` es un atajo canónico del frontend (misma semántica).
+- La columna de archivado puede llamarse `deleted_at` o `archived_at` según el módulo; conceptualmente es la marca de soft delete.
 
 ---
 
@@ -289,7 +298,7 @@ Los nombres de servicio NO llevan prefijo `pymes-`. El `COMPOSE_PROJECT_NAME` ya
 | Backend vertical | `prof-backend`, `work-backend`, `beauty-backend`, `restaurants-backend` | `pymes-prof-backend-1` |
 | DB | `postgres` | `pymes-postgres-1` |
 | Frontend | `frontend` | `pymes-frontend-1` |
-| AI | `ai` | `pymes-ai-1` |
+| AI / Chat | (sibling repo) `companion` | servido por Companion local en `:18085` |
 
 ### Reglas Docker
 
@@ -394,10 +403,10 @@ internal/customer_messaging/
 
 ### 12.5 Multi-tenant
 
-- Cada org tiene máximo 1 conexión (`whatsapp_connections.org_id` es PK)
+- Cada org tiene máximo 1 conexión (`whatsapp_connections.tenant_id` es PK)
 - Cada conexión tiene su propio `phone_number_id` + `access_token`
 - El flujo de conexión futuro será via Embedded Signup (popup Meta OAuth)
-- Los mensajes se registran con `org_id` para aislamiento total
+- Los mensajes se registran con `tenant_id` para aislamiento total
 
 ### 12.6 Compliance LATAM
 
@@ -421,3 +430,6 @@ internal/customer_messaging/
 - NUNCA decir "listo" sin haber buildado/testeado
 - NUNCA duplicar funcionalidad de pymes-core en una vertical
 - NUNCA importar dominio interno entre verticales — solo HTTP
+- NUNCA crear tablas con prefijo `tenant_*` ni columnas `tenant_id`. Identidad canónica: `orgs` + columna `org_id`. Excepción única: las tablas saas `tenant_settings` y `tenant_invitations` mantienen su nombre histórico (su FK ya es `org_id`).
+- NUNCA hacer queries SQL raw que referencien las tablas legacy `tenants`, `tenant_memberships`, `tenant_api_keys`, `tenant_usage_counters` — fueron renombradas en el cutover (PR #13) a `orgs`, `org_members`, `org_api_keys`, `org_usage_counters`. Si encontrás una referencia residual: bug, reportarlo.
+- NUNCA llamar `saasmigrations.MigrateUp` en bootstrap. El schema saas está copiado y versionado en `pymes-core/backend/migrations/0001_saas_identity.up.sql`. Si `core/saas/go` evoluciona, hay que adoptar el cambio explícitamente en pymes-core con una migración nueva.

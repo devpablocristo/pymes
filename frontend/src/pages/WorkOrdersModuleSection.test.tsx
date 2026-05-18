@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CrudPageConfig } from '../components/CrudPage';
@@ -30,7 +30,7 @@ describe('work orders configured section shell', () => {
     loadLazyCrudPageConfigMock.mockResolvedValue(buildWorkOrdersConfig());
   });
 
-  it('shows the shared CRUD view tabs in the section band', async () => {
+  it('does not render legacy CRUD view tabs in the section band', async () => {
     render(
       <MemoryRouter
         initialEntries={['/modules/carWorkOrders/list']}
@@ -62,9 +62,9 @@ describe('work orders configured section shell', () => {
     );
 
     expect(await screen.findByText('list-screen')).toBeInTheDocument();
-    const tabs = screen.getByRole('navigation', { name: 'Vistas de OT' });
-    expect(within(tabs).getByRole('link', { name: 'Lista' })).toBeInTheDocument();
-    expect(within(tabs).getByRole('link', { name: 'Galería' })).toBeInTheDocument();
-    expect(within(tabs).getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Vistas de OT' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Lista' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Galería' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Tablero' })).not.toBeInTheDocument();
   });
 });

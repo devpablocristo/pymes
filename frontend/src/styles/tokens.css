@@ -2,45 +2,46 @@
  * Design tokens — colores, tipo, espacio, sombras, tema oscuro.
  * Importado primero desde `styles.css`; no incluye reset ni componentes.
  */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ── Design tokens ── */
 :root {
   /* Ancho sidebar + offset del main */
-  --shell-sidebar-width: 240px;
+  --shell-sidebar-width: 270px;
 
-  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
-  --color-bg: #f4f6f9;
+  --color-bg: #f0f5f9;
   --color-surface: #ffffff;
   --color-surface-hover: #f8fafc;
-  --color-border: #e2e8f0;
+  --color-border: #e6ecf2;
   --color-border-subtle: #eef2f7;
 
-  --color-sidebar: #0f172a;
-  --color-sidebar-hover: #1e293b;
-  --color-sidebar-active: #334155;
-  --color-sidebar-text: #94a3b8;
-  --color-sidebar-text-active: #f1f5f9;
+  --color-sidebar: #ffffff;
+  --color-sidebar-hover: #f0f5f9;
+  --color-sidebar-active: #e6f4ff;
+  --color-sidebar-text: #5a6a85;
+  --color-sidebar-text-active: #0085db;
+  --color-sidebar-border: #e6ecf2;
 
-  --color-text: #1e293b;
-  --color-text-secondary: #64748b;
-  --color-text-muted: #94a3b8;
+  --color-text: #2a3547;
+  --color-text-secondary: #5a6a85;
+  --color-text-muted: #8898aa;
 
-  --color-primary: #3b82f6;
-  --color-primary-hover: #2563eb;
-  --color-primary-subtle: #eff6ff;
+  --color-primary: #0085db;
+  --color-primary-hover: #006abf;
+  --color-primary-subtle: #e6f4ff;
 
-  --color-success: #10b981;
-  --color-success-subtle: #ecfdf5;
-  --color-warning: #f59e0b;
-  --color-warning-subtle: #fffbeb;
-  --color-alert-warning-text: #92400e;
-  --color-alert-success-text: #065f46;
-  --color-danger: #ef4444;
-  --color-danger-subtle: #fef2f2;
-  --color-danger-hover: #dc2626;
+  --color-success: #4bd08b;
+  --color-success-subtle: #edfaf4;
+  --color-warning: #f8c076;
+  --color-warning-subtle: #fff8ee;
+  --color-alert-warning-text: #7c5200;
+  --color-alert-success-text: #1a6a3a;
+  --color-danger: #fb977d;
+  --color-danger-subtle: #fff2ee;
+  --color-danger-hover: #e8745e;
 
   --color-purple: #8b5cf6;
   --color-purple-subtle: #f5f3ff;
@@ -59,24 +60,26 @@
   --color-dev-error-pre-bg: #1e293b;
   --color-dev-error-pre-fg: #f87171;
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-btn: 30px;
+  --radius-badge: 50px;
 
-  /* Sombras — escala de elevación z1→z24 (inspirada en TQ/Material) */
-  --shadow-z1: 0px 7px 14px -6px rgba(0, 0, 0, 0.07);
-  --shadow-z4: 0 4px 8px -2px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
-  --shadow-z8: 0 8px 16px 0 rgba(0, 0, 0, 0.08);
-  --shadow-z12: 0 12px 24px 0 rgba(0, 0, 0, 0.08), 0 6px 12px 0 rgba(0, 0, 0, 0.04);
-  --shadow-z16: 0 0 3px 0 rgba(0, 0, 0, 0.06), 0 14px 28px -5px rgba(0, 0, 0, 0.1);
-  --shadow-z20: 0 0 3px 0 rgba(0, 0, 0, 0.06), 0 18px 36px -5px rgba(0, 0, 0, 0.12);
-  --shadow-z24: 0 0 6px 0 rgba(0, 0, 0, 0.06), 0 21px 44px 0 rgba(0, 0, 0, 0.14);
+  /* Sombras — escala de elevación z1→z24 (inspirada en Spike/TQ) */
+  --shadow-z1: 0px 2px 6px rgba(37, 83, 185, 0.1);
+  --shadow-z4: 0 4px 12px rgba(37, 83, 185, 0.12);
+  --shadow-z8: 0 8px 24px rgba(37, 83, 185, 0.12);
+  --shadow-z12: 0 12px 32px rgba(37, 83, 185, 0.14), 0 4px 8px rgba(37, 83, 185, 0.06);
+  --shadow-z16: 0 0 4px rgba(37, 83, 185, 0.08), 0 14px 28px -5px rgba(37, 83, 185, 0.18);
+  --shadow-z20: 0 0 4px rgba(37, 83, 185, 0.08), 0 18px 36px -5px rgba(37, 83, 185, 0.22);
+  --shadow-z24: 0 0 8px rgba(37, 83, 185, 0.08), 0 21px 44px rgba(37, 83, 185, 0.2);
 
   /* Sombras coloreadas (hover, focus, acento) */
-  --shadow-primary: 0px 8px 16px -4px rgba(59, 130, 246, 0.25);
-  --shadow-success: 0px 8px 16px -4px rgba(16, 185, 129, 0.25);
-  --shadow-warning: 0px 8px 16px -4px rgba(245, 158, 11, 0.25);
-  --shadow-danger: 0px 8px 16px -4px rgba(239, 68, 68, 0.25);
+  --shadow-primary: 0px 8px 16px -4px rgba(0, 133, 219, 0.35);
+  --shadow-success: 0px 8px 16px -4px rgba(75, 208, 139, 0.35);
+  --shadow-warning: 0px 8px 16px -4px rgba(248, 192, 118, 0.35);
+  --shadow-danger: 0px 8px 16px -4px rgba(251, 151, 125, 0.35);
 
   /* Sombra interna sutil (inputs focus, cards activas) */
   --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.04);

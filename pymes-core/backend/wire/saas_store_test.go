@@ -5,86 +5,87 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
-func TestFindOrgIDByExternalIDAutoProvisionsClerkStyleOrg(t *testing.T) {
+func TestResolveTenantIDByExternalRefDoesNotAutoProvisionClerkStyleOrg(t *testing.T) {
 	db := newTestSaaSStoreDB(t)
 	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
 
-	orgID, ok, err := store.FindOrgIDByExternalID(context.Background(), "org_demo")
+	orgID, ok, err := store.ResolveTenantIDByExternalRef(context.Background(), "org_demo")
 	if err != nil {
-		t.Fatalf("FindOrgIDByExternalID() error = %v", err)
-	}
-	if !ok {
-		t.Fatal("FindOrgIDByExternalID() ok = false, want true")
-	}
-	if _, err := uuid.Parse(orgID); err != nil {
-		t.Fatalf("FindOrgIDByExternalID() returned invalid UUID %q: %v", orgID, err)
-	}
-
-	var orgCount int64
-	if err := db.Model(&pymesOrgRow{}).Where("external_id = ?", "org_demo").Count(&orgCount).Error; err != nil {
-		t.Fatalf("count orgs: %v", err)
-	}
-	if orgCount != 1 {
-		t.Fatalf("org count = %d, want 1", orgCount)
-	}
-
-	var settingsCount int64
-	if err := db.Model(&pymesTenantSettingsRow{}).Where("org_id = ?", orgID).Count(&settingsCount).Error; err != nil {
-		t.Fatalf("count tenant_settings: %v", err)
-	}
-	if settingsCount != 1 {
-		t.Fatalf("tenant_settings count = %d, want 1", settingsCount)
-	}
-}
-
-func TestFindOrgIDByExternalIDDoesNotAutoProvisionUnknownRef(t *testing.T) {
-	db := newTestSaaSStoreDB(t)
-	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
-
-	orgID, ok, err := store.FindOrgIDByExternalID(context.Background(), "tenant_demo")
-	if err != nil {
-		t.Fatalf("FindOrgIDByExternalID() error = %v", err)
+		t.Fatalf("ResolveTenantIDByExternalRef() error = %v", err)
 	}
 	if ok {
-		t.Fatalf("FindOrgIDByExternalID() ok = true, want false (orgID=%q)", orgID)
+		t.Fatalf("ResolveTenantIDByExternalRef() ok = true, want false (orgID=%q)", orgID)
 	}
 	if orgID != "" {
-		t.Fatalf("FindOrgIDByExternalID() orgID = %q, want empty", orgID)
+		t.Fatalf("ResolveTenantIDByExternalRef() orgID = %q, want empty", orgID)
 	}
 
 	var orgCount int64
-	if err := db.Model(&pymesOrgRow{}).Count(&orgCount).Error; err != nil {
-		t.Fatalf("count orgs: %v", err)
+	if err := db.Model(&pymesTenantRow{}).Where("external_id = ?", "org_demo").Count(&orgCount).Error; err != nil {
+		t.Fatalf("count tenants: %v", err)
 	}
 	if orgCount != 0 {
 		t.Fatalf("org count = %d, want 0", orgCount)
 	}
 }
 
-func TestFindOrgIDByExternalIDResolvesExistingExternalRef(t *testing.T) {
+func TestResolveTenantIDByExternalRefDoesNotAutoProvisionUnknownRef(t *testing.T) {
 	db := newTestSaaSStoreDB(t)
 	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
 
-	expectedID, err := store.UpsertOrg(context.Background(), "org_existing", "Existing Org")
+	orgID, ok, err := store.ResolveTenantIDByExternalRef(context.Background(), "tenant_demo")
 	if err != nil {
-		t.Fatalf("UpsertOrg() error = %v", err)
+		t.Fatalf("ResolveTenantIDByExternalRef() error = %v", err)
+	}
+	if ok {
+		t.Fatalf("ResolveTenantIDByExternalRef() ok = true, want false (orgID=%q)", orgID)
+	}
+	if orgID != "" {
+		t.Fatalf("ResolveTenantIDByExternalRef() orgID = %q, want empty", orgID)
 	}
 
-	orgID, ok, err := store.FindOrgIDByExternalID(context.Background(), "org_existing")
+	var orgCount int64
+	if err := db.Model(&pymesTenantRow{}).Count(&orgCount).Error; err != nil {
+		t.Fatalf("count tenants: %v", err)
+	}
+	if orgCount != 0 {
+		t.Fatalf("org count = %d, want 0", orgCount)
+	}
+}
+
+func TestResolveTenantIDByExternalRefResolvesExistingExternalRef(t *testing.T) {
+	db := newTestSaaSStoreDB(t)
+	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
+
+	expectedID := uuid.NewString()
+	now := time.Now().UTC()
+	if err := db.Create(&pymesTenantRow{
+		ID:         uuid.MustParse(expectedID),
+		ExternalID: stringPtr("org_existing"),
+		ClerkOrgID: stringPtr("org_existing"),
+		Name:       "Existing Tenant",
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}).Error; err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+
+	orgID, ok, err := store.ResolveTenantIDByExternalRef(context.Background(), "org_existing")
 	if err != nil {
-		t.Fatalf("FindOrgIDByExternalID() error = %v", err)
+		t.Fatalf("ResolveTenantIDByExternalRef() error = %v", err)
 	}
 	if !ok {
-		t.Fatal("FindOrgIDByExternalID() ok = false, want true")
+		t.Fatal("ResolveTenantIDByExternalRef() ok = false, want true")
 	}
 	if orgID != expectedID {
-		t.Fatalf("FindOrgIDByExternalID() orgID = %q, want %q", orgID, expectedID)
+		t.Fatalf("ResolveTenantIDByExternalRef() orgID = %q, want %q", orgID, expectedID)
 	}
 }
 
@@ -95,7 +96,15 @@ func newTestSaaSStoreDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("gorm.Open() error = %v", err)
 	}
-	if err := db.AutoMigrate(&pymesOrgRow{}, &pymesTenantSettingsRow{}); err != nil {
+	if err := db.AutoMigrate(
+		&pymesTenantRow{},
+		&pymesUserRow{},
+		&pymesTenantMembershipRow{},
+		&pymesTenantInvitationRow{},
+		&pymesTenantSettingsRow{},
+		&pymesTenantAPIKeyRow{},
+		&pymesTenantAPIKeyScopeRow{},
+	); err != nil {
 		t.Fatalf("AutoMigrate() error = %v", err)
 	}
 	return db

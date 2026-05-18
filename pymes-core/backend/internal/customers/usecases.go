@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	customerdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/customers/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
@@ -89,15 +90,16 @@ func (u *Usecases) Create(ctx context.Context, in customerdomain.Customer, actor
 }
 
 type UpdateInput struct {
-	Type     *string
-	Name     *string
-	TaxID    *string
-	Email    *string
-	Phone    *string
-	Address  *customerdomain.Address
-	Notes    *string
-	Tags     *[]string
-	Metadata *map[string]any
+	Type       *string
+	Name       *string
+	TaxID      *string
+	Email      *string
+	Phone      *string
+	Address    *customerdomain.Address
+	Notes      *string
+	IsFavorite *bool
+	Tags       *[]string
+	Metadata   *map[string]any
 }
 
 func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (customerdomain.Customer, error) {
@@ -106,6 +108,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return customerdomain.Customer{}, fmt.Errorf("customer not found: %w", httperrors.ErrNotFound)
 		}
+		return customerdomain.Customer{}, err
+	}
+	if err := archive.IfArchived(current.DeletedAt, "customer"); err != nil {
 		return customerdomain.Customer{}, err
 	}
 	if in.Type != nil {
@@ -128,6 +133,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	if in.Notes != nil {
 		current.Notes = strings.TrimSpace(*in.Notes)
+	}
+	if in.IsFavorite != nil {
+		current.IsFavorite = *in.IsFavorite
 	}
 	if in.Tags != nil {
 		current.Tags = append([]string(nil), (*in.Tags)...)

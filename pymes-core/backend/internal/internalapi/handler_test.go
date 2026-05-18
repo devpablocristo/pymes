@@ -27,16 +27,16 @@ func (s stubAPIKeys) ResolveAPIKey(string) (users.ResolvedAPIKey, bool) {
 }
 
 type stubNotificationInbox struct {
-	lastOrgID string
-	lastActor string
-	lastInput inappnotifications.CreateInput
-	lastEvent inappnotifications.ApprovalEvent
-	affected  int
-	out       coredomain.Notification
+	lastTenantID string
+	lastActor    string
+	lastInput    inappnotifications.CreateInput
+	lastEvent    inappnotifications.ApprovalEvent
+	affected     int
+	out          coredomain.Notification
 }
 
 func (s *stubNotificationInbox) CreateForActor(_ context.Context, orgIDStr, actor string, input inappnotifications.CreateInput) (coredomain.Notification, error) {
-	s.lastOrgID = orgIDStr
+	s.lastTenantID = orgIDStr
 	s.lastActor = actor
 	s.lastInput = input
 	if s.out.ID == "" {
@@ -73,9 +73,9 @@ func TestResolveAPIKey(t *testing.T) {
 		apiKeys: stubAPIKeys{
 			ok: true,
 			key: users.ResolvedAPIKey{
-				ID:     uuid.MustParse("00000000-0000-0000-0000-000000000210"),
-				OrgID:  uuid.MustParse("00000000-0000-0000-0000-000000000220"),
-				Scopes: []string{"admin:console:read"},
+				ID:       uuid.MustParse("00000000-0000-0000-0000-000000000210"),
+				OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000220"),
+				Scopes:   []string{"admin:console:read"},
 			},
 		},
 	}
@@ -97,9 +97,9 @@ func TestResolveAPIKey(t *testing.T) {
 	}
 
 	var got struct {
-		ID     string   `json:"id"`
-		OrgID  string   `json:"org_id"`
-		Scopes []string `json:"scopes"`
+		ID       string   `json:"id"`
+		OrgID string   `json:"org_id"`
+		Scopes   []string `json:"scopes"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &got); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
@@ -128,7 +128,7 @@ func TestCreateInAppNotification(t *testing.T) {
 
 	body, err := json.Marshal(map[string]any{
 		"id":           "insight:sales_collections:month",
-		"org_id":       "00000000-0000-0000-0000-000000000220",
+		"org_id":    "00000000-0000-0000-0000-000000000220",
 		"actor":        "user-ext-1",
 		"title":        "Insight disponible",
 		"body":         "Hay una novedad en ventas.",
@@ -149,8 +149,8 @@ func TestCreateInAppNotification(t *testing.T) {
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("expected status %d, got %d body=%s", http.StatusCreated, recorder.Code, recorder.Body.String())
 	}
-	if inbox.lastOrgID != "00000000-0000-0000-0000-000000000220" {
-		t.Fatalf("unexpected org id %q", inbox.lastOrgID)
+	if inbox.lastTenantID != "00000000-0000-0000-0000-000000000220" {
+		t.Fatalf("unexpected org id %q", inbox.lastTenantID)
 	}
 	if inbox.lastActor != "user-ext-1" {
 		t.Fatalf("unexpected actor %q", inbox.lastActor)
@@ -171,7 +171,7 @@ func TestCreateInAppNotification(t *testing.T) {
 	}
 }
 
-func TestReviewCallback(t *testing.T) {
+func TestGovernanceCallback(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)
 
@@ -179,12 +179,12 @@ func TestReviewCallback(t *testing.T) {
 	inbox := &stubNotificationInbox{affected: 2}
 	handler := &Handler{notificationInbox: inbox}
 	group := router.Group("/v1/internal/v1")
-	handler.RegisterReviewCallbackRoutes(group)
+	handler.RegisterGovernanceCallbackRoutes(group)
 
 	body, err := json.Marshal(map[string]any{
 		"event":       "approval_resolved",
 		"approval_id": "appr-1",
-		"org_id":      "00000000-0000-0000-0000-000000000220",
+		"org_id":   "00000000-0000-0000-0000-000000000220",
 		"request_id":  "req-1",
 		"decision":    "approved",
 		"decided_by":  "admin@co",
@@ -193,7 +193,7 @@ func TestReviewCallback(t *testing.T) {
 		t.Fatalf("marshal request: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/internal/v1/review-callback", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/v1/internal/v1/governance-callback", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, req)

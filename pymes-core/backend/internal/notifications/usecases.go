@@ -134,7 +134,7 @@ func (u *Usecases) sendToUser(ctx context.Context, orgID uuid.UUID, userID uuid.
 
 	u.repo.CreateLog(domain.Log{
 		ID:               uuid.New(),
-		OrgID:            orgID,
+		OrgID:         orgID,
 		UserID:           userID,
 		NotificationType: notifType,
 		Channel:          "email",
@@ -156,7 +156,7 @@ func templateFor(notifType string, data map[string]string) (subject string, text
 		})
 	case "plan_upgraded":
 		subject = "Plan actualizado"
-		textBody = "Tu organizacion actualizo su plan."
+		textBody = "Tu tenant actualizo su plan."
 		htmlBody, _ = renderBaseTemplate(templateData{
 			Title:   "Plan actualizado",
 			Message: textBody,

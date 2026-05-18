@@ -10,6 +10,6 @@ func (c *Client) CreateSale(ctx context.Context, payload map[string]any) (map[st
 	return pymescoreops.CreateSale(ctx, c.Client, payload)
 }
 
-func (c *Client) CreateSalePaymentLink(ctx context.Context, orgID, saleID string) (map[string]any, error) {
-	return pymescoreops.CreateSalePaymentLink(ctx, c.Client, orgID, saleID)
+func (c *Client) CreateSalePaymentLink(ctx context.Context, tenantID, saleID string) (map[string]any, error) {
+	return pymescoreops.CreateSalePaymentLink(ctx, c.Client, tenantID, saleID)
 }

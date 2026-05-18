@@ -8,7 +8,7 @@ import (
 
 type ProfessionalProfile struct {
 	ID                uuid.UUID
-	OrgID             uuid.UUID
+	OrgID          uuid.UUID
 	PartyID           uuid.UUID
 	PublicSlug        string
 	Bio               string
@@ -16,15 +16,18 @@ type ProfessionalProfile struct {
 	IsPublic          bool
 	IsBookable        bool
 	AcceptsNewClients bool
+	IsFavorite        bool
+	Tags              []string
 	Metadata          map[string]any
 	Specialties       []Specialty
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	DeletedAt         *time.Time
 }
 
 type Specialty struct {
 	ID          uuid.UUID
-	OrgID       uuid.UUID
+	OrgID    uuid.UUID
 	Code        string
 	Name        string
 	Description string

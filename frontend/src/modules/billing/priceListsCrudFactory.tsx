@@ -12,7 +12,13 @@ import {
   parseJSONArray,
   stringifyJSON,
 } from '../../crud/resourceConfigs.shared';
-import { buildStandardCrudViewModes } from '../crud';
+import {
+  buildInternalNotesField,
+  buildStandardCrudViewModes,
+  buildStandardInternalFields,
+  formatTagCsv,
+  parseTagCsv,
+} from '../crud';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 
 export type PriceListRecord = {
@@ -22,6 +28,8 @@ export type PriceListRecord = {
   is_default: boolean;
   markup?: number;
   is_active: boolean;
+  is_favorite?: boolean;
+  tags?: string[];
   items?: Array<{ product_id?: string; service_id?: string; price: number }>;
 };
 
@@ -47,6 +55,7 @@ export function createPriceListsCrudConfig(): CrudPageConfig<PriceListRecord> {
     label: 'lista de precios',
     labelPlural: 'listas de precios',
     labelPluralCap: 'Listas de precios',
+    supportsArchived: true,
     columns: [
       {
         key: 'name',
@@ -73,10 +82,11 @@ export function createPriceListsCrudConfig(): CrudPageConfig<PriceListRecord> {
     ],
     formFields: [
       { key: 'name', label: 'Nombre', required: true, placeholder: 'Mayorista 2026' },
-      { key: 'description', label: 'Descripcion', fullWidth: true },
+      buildInternalNotesField(),
       { key: 'markup', label: 'Markup', type: 'number', placeholder: '0' },
       { key: 'is_default', label: 'Lista default', type: 'checkbox' },
       { key: 'is_active', label: 'Activa', type: 'checkbox' },
+      ...buildStandardInternalFields({ tagsPlaceholder: 'mayorista, promo, temporada', includeNotes: false }),
       {
         key: 'items',
         label: 'Items',
@@ -88,18 +98,22 @@ export function createPriceListsCrudConfig(): CrudPageConfig<PriceListRecord> {
     searchText: (row) => [row.name, row.description].filter(Boolean).join(' '),
     toFormValues: (row) => ({
       name: row.name ?? '',
-      description: row.description ?? '',
+      notes: row.description ?? '',
       markup: row.markup?.toString() ?? '0',
       is_default: row.is_default ?? false,
       is_active: row.is_active ?? true,
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
       items: stringifyJSON(row.items ?? []),
     }),
     toBody: (values) => ({
       name: asString(values.name),
-      description: asOptionalString(values.description),
+      description: asOptionalString(values.notes),
       markup: asNumber(values.markup),
       is_default: asBoolean(values.is_default),
       is_active: asBoolean(values.is_active),
+      is_favorite: asBoolean(values.is_favorite),
+      tags: parseTagCsv(values.tags),
       items: parsePriceListItems(values.items),
     }),
     isValid: (values) => asString(values.name).trim().length >= 2,

@@ -20,7 +20,7 @@ export function AppShell({
   searchPlaceholder,
   skipLinkLabel,
 }: PropsWithChildren<{
-  brandTitle: string;
+  brandTitle: ReactNode;
   brandSubtitle: string;
   sections: AppShellNavSection[];
   footerContent?: ReactNode;
@@ -32,7 +32,7 @@ export function AppShell({
 
   return (
     <PageShellFrame
-      brandTitle={brandTitle}
+      brandTitle={brandTitle as unknown as string}
       brandSubtitle={brandSubtitle}
       sections={sections}
       footerContent={footerContent}

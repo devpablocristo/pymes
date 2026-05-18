@@ -8,10 +8,25 @@ source "$ROOT_DIR/scripts/seeds/lib.sh"
 ensure_seed_dbs_ready
 
 run_pymes_sql_inline "
--- Preservar bootstrap del tenant: orgs/users/members/settings/api keys.
--- Solo se limpian tablas de CRUD/demo. org_members.party_id referencia
+-- Preservar bootstrap del tenant: filas base en tenants/users/memberships/settings/api keys.
+-- Solo se limpian tablas de CRUD/demo. tenant_memberships.party_id referencia
 -- parties, por eso se desacopla antes del clear.
-UPDATE org_members
+DO \$\$
+DECLARE
+    v_table text;
+BEGIN
+    FOR v_table IN
+        SELECT table_name
+        FROM information_schema.columns
+        WHERE table_schema = 'restaurant'
+          AND column_name = 'org_id'
+        ORDER BY table_name
+    LOOP
+        EXECUTE format('ALTER TABLE restaurant.%I RENAME COLUMN org_id TO tenant_id', v_table);
+    END LOOP;
+END \$\$;
+
+UPDATE tenant_memberships
    SET party_id = NULL
  WHERE party_id IS NOT NULL;
 
@@ -29,11 +44,11 @@ BEGIN
         JOIN pg_namespace nsp ON nsp.oid = cls.relnamespace
         WHERE cls.relkind = 'r'
           AND (
-            nsp.nspname IN ('workshops', 'professionals', 'restaurant')
+            nsp.nspname IN ('workshops', 'professionals', 'restaurant', 'medical')
             OR (
                 nsp.nspname = 'public'
                 AND (
-                    (cls.relname LIKE 'scheduling\_%' ESCAPE '\' AND cls.relname <> 'scheduling_branches')
+                    cls.relname LIKE 'scheduling\_%' ESCAPE '\'
                     OR cls.relname IN (
                         'parties',
                         'pymes_in_app_notifications',
@@ -44,6 +59,8 @@ BEGIN
                         'whatsapp_opt_ins',
                         'payment_preferences',
                         'ai_conversations',
+                        'employees',
+                        'invoices',
                         'credit_notes',
                         'returns',
                         'payments',
@@ -84,7 +101,7 @@ BEGIN
     SELECT string_agg(DISTINCT fqtn, ', ' ORDER BY fqtn)
       INTO tables_to_truncate
     FROM clear_graph
-    WHERE fqtn NOT IN ('public.org_members', 'public.parties');
+    WHERE fqtn NOT IN ('public.tenant_memberships', 'public.parties');
 
     IF tables_to_truncate IS NOT NULL THEN
         EXECUTE 'TRUNCATE TABLE ' || tables_to_truncate || ' RESTART IDENTITY';
@@ -104,7 +121,7 @@ SELECT
     true,
     now(),
     now()
-FROM orgs o
+FROM tenants o
 WHERE NOT EXISTS (
     SELECT 1
     FROM scheduling_branches sb
@@ -112,7 +129,22 @@ WHERE NOT EXISTS (
 );
 "
 
-run_review_sql_inline "
+run_governance_sql_inline "
+BEGIN;
+
+-- request_events es append-only (migración Nexus governance); TRUNCATE dispara BEFORE TRUNCATE.
+DO \$\$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'request_events'
+    ) THEN
+        EXECUTE 'ALTER TABLE public.request_events DISABLE TRIGGER USER';
+    END IF;
+END \$\$;
+
 DO \$\$
 DECLARE
     tables_to_truncate text;
@@ -127,4 +159,18 @@ BEGIN
         EXECUTE 'TRUNCATE TABLE ' || tables_to_truncate || ' RESTART IDENTITY CASCADE';
     END IF;
 END \$\$;
+
+DO \$\$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'request_events'
+    ) THEN
+        EXECUTE 'ALTER TABLE public.request_events ENABLE TRIGGER USER';
+    END IF;
+END \$\$;
+
+COMMIT;
 "

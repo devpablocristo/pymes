@@ -1,9 +1,15 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, KeyboardEvent } from 'react';
+
+import { CrudEntityMediaCarousel } from './CrudEntityMediaCarousel';
+import { isDisplayableCrudImageSrc } from './crudLinkedEntityImageUrls';
 
 export type CrudGalleryCard<T extends { id: string }> = {
   title: (item: T) => string;
   subtitle?: (item: T) => string;
   meta?: (item: T) => string;
+  /** URLs para el mismo carrusel que el modal CRUD (varias por ítem). */
+  imageUrls?: (item: T) => string[] | undefined;
+  /** URL simple opcional; si hay `imageUrls`, tiene prioridad. */
   imageSrc?: (item: T) => string | undefined;
   imageAlt?: (item: T) => string;
 };
@@ -50,10 +56,22 @@ const cardStyle: CSSProperties = {
   color: 'inherit',
 };
 
+function handleCardKeyDown(event: KeyboardEvent<HTMLDivElement>, onActivate: () => void) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  onActivate();
+}
+
 const imageWrapStyle: CSSProperties = {
   width: '100%',
   aspectRatio: '1 / 1',
   background: 'var(--color-border-subtle)',
+  display: 'block',
+};
+
+const carouselSlotStyle: CSSProperties = {
+  width: '100%',
+  height: '100%',
   display: 'block',
 };
 
@@ -121,34 +139,42 @@ export function CrudGallerySurface<T extends { id: string }>({
         const title = card.title(item);
         const subtitle = card.subtitle?.(item);
         const meta = card.meta?.(item);
-        const imageSrc = card.imageSrc?.(item)?.trim() || PLACEHOLDER_IMAGE;
+        const fromList = card.imageUrls?.(item)?.filter(isDisplayableCrudImageSrc) ?? [];
+        const singleImage = card.imageSrc?.(item)?.trim();
+        const displayUrls =
+          fromList.length > 0 ? fromList : singleImage && isDisplayableCrudImageSrc(singleImage) ? [singleImage] : [];
         const imageAlt = card.imageAlt?.(item) ?? title;
         return (
-          <button
-            type="button"
+          <div
             key={item.id}
             style={cardStyle}
             onClick={() => onSelect(item)}
             role="listitem"
+            tabIndex={0}
             aria-label={title}
+            onKeyDown={(event) => handleCardKeyDown(event, () => onSelect(item))}
           >
             <span style={imageWrapStyle}>
-              <img
-                src={imageSrc}
-                alt={imageAlt}
-                style={imageStyle}
-                loading="lazy"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = PLACEHOLDER_IMAGE;
-                }}
-              />
+              {displayUrls.length > 0 ? (
+                <span style={carouselSlotStyle}>
+                  <CrudEntityMediaCarousel
+                    urls={displayUrls}
+                    variant="read"
+                    compact
+                    containInteractiveEvents
+                    ariaLabel={imageAlt}
+                  />
+                </span>
+              ) : (
+                <img src={PLACEHOLDER_IMAGE} alt={imageAlt} style={imageStyle} loading="lazy" />
+              )}
             </span>
             <span style={bodyStyle}>
               <span style={titleStyle} title={title}>{compactText(title, 26)}</span>
               {subtitle ? <span style={subtitleStyle}>{compactText(subtitle, 24)}</span> : null}
               {meta ? <span style={metaStyle}>{compactText(meta, 18)}</span> : null}
             </span>
-          </button>
+          </div>
         );
       })}
     </div>

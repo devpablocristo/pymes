@@ -28,7 +28,7 @@ type usecasesPort interface {
 	Approve(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.ProcurementRequest, error)
 	Reject(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.ProcurementRequest, error)
 
-	ListPoliciesForOrg(ctx context.Context, orgID uuid.UUID) ([]domain.ProcurementPolicy, error)
+	ListPoliciesForTenant(ctx context.Context, orgID uuid.UUID) ([]domain.ProcurementPolicy, error)
 	GetPolicy(ctx context.Context, orgID, id uuid.UUID) (domain.ProcurementPolicy, error)
 	CreatePolicy(ctx context.Context, in PolicyCreateInput) (domain.ProcurementPolicy, error)
 	UpdatePolicy(ctx context.Context, in PolicyUpdateInput) (domain.ProcurementPolicy, error)
@@ -67,7 +67,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, ok := handlers.ParseAuthOrgID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -86,19 +86,19 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) Create(c *gin.Context) {
-	orgID, ok := handlers.ParseAuthOrgID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
 	var body dto.CreateRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		handlers.WriteValidation(c, "invalid body")
 		return
 	}
 	lines := toDomainLines(body.Lines)
 	created, err := h.uc.Create(c.Request.Context(), CreateInput{
-		OrgID:          orgID,
+		OrgID:       orgID,
 		Actor:          auth.Actor,
 		Title:          body.Title,
 		Description:    body.Description,
@@ -115,7 +115,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -128,19 +128,19 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
 	var body dto.UpdateRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		handlers.WriteValidation(c, "invalid body")
 		return
 	}
 	lines := toDomainLines(body.Lines)
 	updated, err := h.uc.Update(c.Request.Context(), UpdateInput{
-		OrgID:          orgID,
+		OrgID:       orgID,
 		ID:             id,
 		Actor:          auth.Actor,
 		Title:          body.Title,
@@ -158,7 +158,7 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -171,7 +171,7 @@ func (h *Handler) Delete(c *gin.Context) {
 }
 
 func (h *Handler) Archive(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -184,7 +184,7 @@ func (h *Handler) Archive(c *gin.Context) {
 }
 
 func (h *Handler) Restore(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -197,7 +197,7 @@ func (h *Handler) Restore(c *gin.Context) {
 }
 
 func (h *Handler) Submit(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -211,7 +211,7 @@ func (h *Handler) Submit(c *gin.Context) {
 }
 
 func (h *Handler) Approve(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -225,7 +225,7 @@ func (h *Handler) Approve(c *gin.Context) {
 }
 
 func (h *Handler) Reject(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -239,11 +239,11 @@ func (h *Handler) Reject(c *gin.Context) {
 }
 
 func (h *Handler) ListPolicies(c *gin.Context) {
-	orgID, ok := handlers.ParseAuthOrgID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
-	items, err := h.uc.ListPoliciesForOrg(c.Request.Context(), orgID)
+	items, err := h.uc.ListPoliciesForTenant(c.Request.Context(), orgID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -256,7 +256,7 @@ func (h *Handler) ListPolicies(c *gin.Context) {
 }
 
 func (h *Handler) GetPolicy(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -269,18 +269,18 @@ func (h *Handler) GetPolicy(c *gin.Context) {
 }
 
 func (h *Handler) CreatePolicy(c *gin.Context) {
-	orgID, ok := handlers.ParseAuthOrgID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
 	var body dto.CreatePolicyRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		handlers.WriteValidation(c, "invalid body")
 		return
 	}
 	created, err := h.uc.CreatePolicy(c.Request.Context(), PolicyCreateInput{
-		OrgID:        orgID,
+		OrgID:     orgID,
 		Actor:        auth.Actor,
 		Name:         body.Name,
 		Expression:   body.Expression,
@@ -299,18 +299,18 @@ func (h *Handler) CreatePolicy(c *gin.Context) {
 }
 
 func (h *Handler) UpdatePolicy(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
 	var body dto.UpdatePolicyRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		handlers.WriteValidation(c, "invalid body")
 		return
 	}
 	updated, err := h.uc.UpdatePolicy(c.Request.Context(), PolicyUpdateInput{
-		OrgID:        orgID,
+		OrgID:     orgID,
 		ID:           id,
 		Actor:        auth.Actor,
 		Name:         body.Name,
@@ -330,7 +330,7 @@ func (h *Handler) UpdatePolicy(c *gin.Context) {
 }
 
 func (h *Handler) DeletePolicy(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -345,7 +345,7 @@ func (h *Handler) DeletePolicy(c *gin.Context) {
 func toPolicyResponse(p domain.ProcurementPolicy) dto.PolicyResponse {
 	return dto.PolicyResponse{
 		ID:           p.ID,
-		OrgID:        p.OrgID,
+		OrgID:     p.OrgID,
 		Name:         p.Name,
 		Expression:   p.Expression,
 		Effect:       p.Effect,
@@ -390,7 +390,7 @@ func toResponse(r domain.ProcurementRequest) dto.RequestResponse {
 	}
 	return dto.RequestResponse{
 		ID:             r.ID,
-		OrgID:          r.OrgID,
+		OrgID:       r.OrgID,
 		RequesterActor: r.RequesterActor,
 		Title:          r.Title,
 		Description:    r.Description,

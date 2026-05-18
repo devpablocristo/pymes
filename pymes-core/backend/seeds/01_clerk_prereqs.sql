@@ -1,75 +1,88 @@
 -- Bootstrap autónomo del tenant demo local.
--- Si la org/usuario no existen, los crea; si ya existen, los normaliza.
--- El placeholder __SEED_ORG_ID__ se resuelve antes de ejecutar el SQL.
+-- Si el tenant/usuario no existen, los crea; si ya existen, los normaliza.
+-- El placeholder __SEED_TENANT_ID__ se resuelve antes de ejecutar el SQL.
 
 DO $$
 DECLARE
-    v_org uuid := '__SEED_ORG_ID__';
+    v_tenant uuid := '__SEED_TENANT_ID__';
+    v_owner uuid;
     v_user uuid;
 BEGIN
     INSERT INTO orgs (id, external_id, name, slug, created_at, updated_at)
     VALUES (
-        v_org,
-        '__SEED_ORG_EXTERNAL_ID__',
-        '__SEED_ORG_NAME__',
-        '__SEED_ORG_SLUG__',
+        v_tenant,
+        NULLIF('__SEED_TENANT_EXTERNAL_ID__', ''),
+        '__SEED_TENANT_NAME__',
+        '__SEED_TENANT_SLUG__',
         now(),
         now()
     )
-    ON CONFLICT (external_id) DO UPDATE
+    ON CONFLICT (id) DO UPDATE
         SET name = EXCLUDED.name,
             slug = EXCLUDED.slug,
+            external_id = COALESCE(EXCLUDED.external_id, orgs.external_id),
             updated_at = now();
 
-    SELECT id INTO v_user
+    SELECT id INTO v_owner
     FROM users
-    WHERE external_id = 'user_local_admin'
+    WHERE external_id = '__SEED_OWNER_EXTERNAL_ID__'
     LIMIT 1;
 
-    IF v_user IS NULL THEN
+    IF v_owner IS NULL THEN
         INSERT INTO users (
             id, external_id, email, name, avatar_url, phone,
             given_name, family_name, created_at, updated_at
         )
         VALUES (
-            '00000000-0000-0000-0000-000000000002',
-            'user_local_admin',
-            'admin@local.dev',
-            'Local Admin',
+            gen_random_uuid(),
+            '__SEED_OWNER_EXTERNAL_ID__',
+            '__SEED_OWNER_EMAIL__',
+            trim('__SEED_OWNER_GIVEN_NAME__' || ' ' || '__SEED_OWNER_FAMILY_NAME__'),
             '',
-            '+5493810000000',
-            'Local',
-            'Admin',
+            '',
+            '__SEED_OWNER_GIVEN_NAME__',
+            '__SEED_OWNER_FAMILY_NAME__',
             now(),
             now()
         )
-        RETURNING id INTO v_user;
+        RETURNING id INTO v_owner;
     ELSE
         UPDATE users
-           SET email = 'admin@local.dev',
-               name = 'Local Admin',
+           SET email = '__SEED_OWNER_EMAIL__',
+               name = trim('__SEED_OWNER_GIVEN_NAME__' || ' ' || '__SEED_OWNER_FAMILY_NAME__'),
                avatar_url = '',
-               phone = '+5493810000000',
-               given_name = 'Local',
-               family_name = 'Admin',
+               given_name = '__SEED_OWNER_GIVEN_NAME__',
+               family_name = '__SEED_OWNER_FAMILY_NAME__',
                deleted_at = NULL,
                updated_at = now()
-         WHERE id = v_user;
+         WHERE id = v_owner;
     END IF;
 
-    INSERT INTO org_members (org_id, user_id, role, created_at)
-    VALUES (v_org, v_user, 'admin', now())
-    ON CONFLICT (org_id, user_id) DO UPDATE
-        SET role = EXCLUDED.role;
+    UPDATE org_members
+       SET status = 'removed',
+           removed_at = COALESCE(removed_at, now()),
+           updated_at = now()
+     WHERE org_id = v_tenant
+       AND role = 'owner'
+       AND status = 'active'
+       AND user_id <> v_owner;
+
+    INSERT INTO org_members (org_id, user_id, role, status, removed_at, created_at, updated_at)
+    VALUES (v_tenant, v_owner, 'owner', 'active', NULL, now(), now())
+    ON CONFLICT (org_id, user_id) WHERE status = 'active' DO UPDATE
+        SET role = 'owner',
+            status = 'active',
+            removed_at = NULL,
+            updated_at = now();
 
     INSERT INTO tenant_settings (org_id, plan_code)
-    VALUES (v_org, 'starter')
+    VALUES (v_tenant, 'starter')
     ON CONFLICT (org_id) DO NOTHING;
 
     INSERT INTO org_api_keys (id, org_id, name, api_key_hash, key_prefix, created_by)
     VALUES (
         '00000000-0000-0000-0000-000000000004',
-        v_org,
+        v_tenant,
         'local-dev-key',
         '91678ad136f46807fd001e50281fcc842e4b40388a83a85c5ea069c4383e739a',
         'psk_local_adm',

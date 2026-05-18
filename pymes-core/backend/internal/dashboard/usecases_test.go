@@ -107,7 +107,7 @@ func TestGetWidgetDataReturnsTopServices(t *testing.T) {
 
 	out, err := uc.GetWidgetData(context.Background(), dashboarddomain.Viewer{
 		OrgID: uuid.New(),
-		Role:  "admin",
+		Role:     "admin",
 	}, "home", "top-services")
 	if err != nil {
 		t.Fatalf("GetWidgetData() error = %v", err)
@@ -142,7 +142,7 @@ func TestGetWidgetDataRejectsWidgetHiddenByRole(t *testing.T) {
 
 	_, err := uc.GetWidgetData(context.Background(), dashboarddomain.Viewer{
 		OrgID: uuid.New(),
-		Role:  "member",
+		Role:     "member",
 	}, "home", "billing-status")
 	if !errors.Is(err, httperrors.ErrNotFound) {
 		t.Fatalf("GetWidgetData() error = %v; want ErrNotFound", err)
@@ -194,8 +194,8 @@ func TestGetWidgetDataAllowsScopedViewerWithoutRole(t *testing.T) {
 	uc := NewUsecases(repo)
 
 	out, err := uc.GetWidgetData(context.Background(), dashboarddomain.Viewer{
-		OrgID:  uuid.New(),
-		Scopes: []string{"admin:console:read"},
+		OrgID: uuid.New(),
+		Scopes:   []string{"admin:console:read"},
 	}, "home", "top-services")
 	if err != nil {
 		t.Fatalf("GetWidgetData() error = %v", err)
@@ -227,7 +227,7 @@ func TestGetWidgetDataForwardsViewerBranchID(t *testing.T) {
 	branchID := uuid.New()
 
 	if _, err := uc.GetWidgetData(context.Background(), dashboarddomain.Viewer{
-		OrgID:    uuid.New(),
+		OrgID: uuid.New(),
 		BranchID: &branchID,
 		Role:     "admin",
 	}, "home", "top-services"); err != nil {

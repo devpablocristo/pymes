@@ -2,25 +2,84 @@
 # Verificación preferida: targets `*-docker-*`; `build` y `test` quedan como respaldo nativo.
 .PHONY: \
 	up down ps logs \
-	staticcheck ruff lint \
-	seed seed-clear modules-check cleanup-pablo e2e-review-notifications \
+	go-compile staticcheck ruff lint \
+	audit audit-baseline audit-crud audit-crud-json audit-crud-strict audit-debt audit-governance frontend-typecheck ai-test \
+	seed seed-clear seed-clear-verify seed-verify seed-reset modules-check cleanup-pablo e2e-governance-notifications \
 	build-docker-frontend test-docker-frontend lint-docker-frontend test-docker-core test-docker-workshops \
 	build test test-frontend-e2e
 
 GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=https://proxy.golang.org,direct
-DC = docker compose --project-directory $(CURDIR) -f $(CURDIR)/docker-compose.yml
+GO_PACKAGES = ./pymes-core/backend/... ./pymes-core/shared/... ./workshops/backend/... ./professionals/backend/... ./restaurants/backend/... ./beauty/backend/... ./medical/backend/...
+# Repo hermano `local-infra`. Override por CLI: `make up LOCAL_INFRA_DIR=/ruta/al/local-infra`.
+#
+# GNU Make importa variables del shell; `?=´ respeta el entorno y un export viejo (p. ej. ruta de otra
+# máquina como /home/pablo/...) rompe `make up`. Si LOCAL_INFRA_DIR viene del entorno pero esa ruta
+# no existe, lo ignoramos y usamos ../local-infra portable.
+LOCAL_INFRA_DEFAULT := $(abspath $(CURDIR)/../local-infra)
+ifeq ($(origin LOCAL_INFRA_DIR),environment)
+  ifneq ($(strip $(LOCAL_INFRA_DIR)),)
+    ifeq ($(wildcard $(LOCAL_INFRA_DIR)/.),)
+      override LOCAL_INFRA_DIR := $(LOCAL_INFRA_DEFAULT)
+    endif
+  else
+    override LOCAL_INFRA_DIR := $(LOCAL_INFRA_DEFAULT)
+  endif
+endif
+ifndef LOCAL_INFRA_DIR
+  LOCAL_INFRA_DIR := $(LOCAL_INFRA_DEFAULT)
+endif
+
+# Compose padre: `local-infra` del ecosistema si existe; si no, overlay mínimo del repo (paridad con CI / sin checkout extra).
+LOCAL_INFRA_COMPOSE := $(LOCAL_INFRA_DIR)/docker-compose.yml
+ifeq ($(wildcard $(LOCAL_INFRA_COMPOSE)),)
+BASE_COMPOSE := $(abspath $(CURDIR)/.github/ci-infra/docker-compose.yml)
+else
+BASE_COMPOSE := $(abspath $(LOCAL_INFRA_COMPOSE))
+endif
+DC = docker compose --project-directory $(CURDIR) -f $(BASE_COMPOSE) -f $(CURDIR)/docker-compose.yml
 
 # Calidad
 
+# Compilacion rapida de todos los backends Go del monorepo, sin caer en frontend/node_modules.
+go-compile:
+	$(GO_PRIVATE) go test $(GO_PACKAGES) -run '^$$'
+
 # Análisis estático Go (código muerto U1000, imports duplicados, etc.); versión alineada con go.mod
 staticcheck:
-	$(GO_PRIVATE) go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
+	$(GO_PRIVATE) go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 $(GO_PACKAGES)
 # Lint Python del servicio AI (ruff en ai/src); requiere `pip install -r ai/requirements-dev.txt` o ruff en PATH
 ruff:
 	cd ai && (test -x .venv/bin/ruff && .venv/bin/ruff check src || ruff check src || python3 -m ruff check src)
 
 # Go staticcheck + ruff AI
 lint: staticcheck ruff
+
+# Auditorias de saneamiento arquitectural: no cambian comportamiento productivo.
+audit: audit-crud audit-debt audit-governance
+
+# Baseline reproducible antes de refactors estructurales.
+audit-baseline: go-compile audit frontend-typecheck ruff ai-test
+
+audit-crud:
+	@python3 scripts/audit/crud_contract.py
+
+audit-crud-json:
+	@python3 scripts/audit/crud_contract.py --format json
+
+audit-crud-strict:
+	@python3 scripts/audit/crud_contract.py --strict
+
+audit-debt:
+	@python3 scripts/audit/debt_scan.py
+
+audit-governance:
+	@bash scripts/audit/governance_boundary.sh
+
+frontend-typecheck:
+	cd frontend && npm run typecheck
+
+ai-test:
+	cd ai && (test -x .venv/bin/pytest && .venv/bin/pytest -q || pytest -q)
 
 # Seeds y utilidades
 
@@ -33,10 +92,25 @@ seed:
 seed-clear:
 	bash scripts/seeds/clear.sh
 
+# Verifica que seed-clear haya dejado vacias las pantallas operativas sin borrar bootstrap.
+seed-clear-verify:
+	bash scripts/seeds/verify.sh --cleared
+
+# Verifica que los seeds de pantallas operativas tengan al menos 10 registros visibles.
+seed-verify:
+	bash scripts/seeds/verify.sh
+
+# Flujo completo y repetible: limpiar, cargar y verificar.
+seed-reset:
+	bash scripts/seeds/clear.sh
+	bash scripts/seeds/verify.sh --cleared
+	bash scripts/seeds/load.sh
+	bash scripts/seeds/verify.sh
+
 # E2E del notification center gobernado por Review: request -> inbox -> approve/reject -> cleanup.
-# Uso: `make e2e-review-notifications` o `make e2e-review-notifications DECISION=reject`
-e2e-review-notifications:
-	bash scripts/e2e-review-notifications.sh "$(DECISION)"
+# Uso: `make e2e-governance-notifications` o `make e2e-governance-notifications DECISION=reject`
+e2e-governance-notifications:
+	bash scripts/e2e-governance-notifications.sh "$(DECISION)"
 
 # Limpieza del árbol padre (p.ej. ~/Projects/Pablo): caches Python, vacíos, binarios Go sueltos bajo backend/cmd, dirs vacíos.
 # Simular: make cleanup-pablo DRY_RUN=1
@@ -50,9 +124,28 @@ modules-check:
 
 # Stack local
 
-# Levanta stack local (infra compartida + Review + cp-backend + 4 verticales Go + frontend + AI)
+# Levanta Ollama compartido del ecosistema local (opcional si existe el compose en LOCAL_INFRA_DIR)
+llm-up:
+	@if [ -f "$(LOCAL_INFRA_DIR)/docker-compose.ollama.yml" ]; then \
+		docker compose --project-directory "$(LOCAL_INFRA_DIR)" -f "$(LOCAL_INFRA_DIR)/docker-compose.ollama.yml" up -d; \
+	else \
+		echo "Skipping llm-up: $(LOCAL_INFRA_DIR)/docker-compose.ollama.yml not found (clone local-infra alongside pymes or set LOCAL_INFRA_DIR)."; \
+	fi
+
+# Asegura el modelo LLM local por defecto en el Ollama compartido
+llm-pull:
+	@if [ -f "$(LOCAL_INFRA_DIR)/docker-compose.ollama.yml" ] && [ -f "$(LOCAL_INFRA_DIR)/scripts/pull-ollama-model.sh" ]; then \
+		bash "$(LOCAL_INFRA_DIR)/scripts/pull-ollama-model.sh" gemma4:e4b; \
+	else \
+		echo "Skipping llm-pull: no Ollama stack under LOCAL_INFRA_DIR=$(LOCAL_INFRA_DIR)."; \
+	fi
+
+# Stack local (compose Pymes). Nexus governance corre en el compose del repo ../nexus.
+# Levantá Nexus antes con `make up` (o `docker compose up`) en ese repo.
 up:
-	$(DC) build review cp-backend prof-backend work-backend beauty-backend restaurants-backend frontend ai
+	@$(MAKE) llm-up
+	@$(MAKE) llm-pull
+	$(DC) build cp-backend prof-backend work-backend beauty-backend restaurants-backend medical-backend frontend ai
 	$(DC) up -d --no-build
 
 # Baja y elimina contenedores de la red del proyecto

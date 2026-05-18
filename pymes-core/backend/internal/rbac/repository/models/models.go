@@ -8,7 +8,7 @@ import (
 
 type RoleModel struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID       uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID    uuid.UUID `gorm:"type:uuid;index;not null"`
 	Name        string    `gorm:"not null"`
 	Description string
 	IsSystem    bool
@@ -29,7 +29,7 @@ func (RolePermissionModel) TableName() string { return "role_permissions" }
 
 type UserRoleModel struct {
 	UserID     uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID      uuid.UUID `gorm:"type:uuid;primaryKey;index;not null"`
+	OrgID   uuid.UUID `gorm:"type:uuid;primaryKey;index;not null"`
 	RoleID     uuid.UUID `gorm:"type:uuid;not null"`
 	AssignedBy string
 	AssignedAt time.Time

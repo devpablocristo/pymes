@@ -44,6 +44,10 @@ func InitializeApp() *app.App {
 	cpClient := pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
 	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpClient.Client)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
+	tenantSlugBinding := auth.RequireTenantSlugBinding(
+		verticalwire.NewCoreTenantRefResolver(cpClient.Client),
+		verticalwire.NewTenantMembershipResolver(db),
+	)
 	auditLog := verticalaudit.NewLogger(logger)
 
 	vehiclesRepo := vehicles.NewRepository(db)
@@ -64,15 +68,11 @@ func InitializeApp() *app.App {
 		autoRepairWoExt.New(vehiclesUC),
 		bikeShopWoExt.New(bicyclesUC),
 	)
-	workOrdersCompatHandler := unifiedworkorders.NewHandler(workOrdersBaseUC)
 	autoRepairWoUC := autoRepairWorkOrders.NewUsecases(workOrdersBaseUC)
 	autoRepairWoHandler := autoRepairWorkOrders.NewHandler(autoRepairWoUC)
 	bikeShopWoUC := bikeShopWorkOrders.NewUsecases(workOrdersBaseUC)
 	bikeShopWoHandler := bikeShopWorkOrders.NewHandler(bikeShopWoUC)
 
-	// Rutas de compatibilidad sobre el endpoint unificado heredado.
-	woOrchestrationCompatUC := woorchestration.NewUsecases(cpClient, workOrdersBaseUC, auditLog)
-	woOrchestrationCompatHandler := orchestrationhandler.NewHandler(woOrchestrationCompatUC)
 	autoRepairWoOrchestrationUC := woorchestration.NewUsecases(cpClient, autoRepairWoUC, auditLog)
 	autoRepairWoOrchestrationHandler := orchestrationhandler.NewHandler(autoRepairWoOrchestrationUC)
 	bikeShopWoOrchestrationUC := woorchestration.NewUsecases(cpClient, bikeShopWoUC, auditLog)
@@ -82,7 +82,10 @@ func InitializeApp() *app.App {
 
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(ginmw.NewCORS(ginmw.CORSConfig{Origins: []string{cfg.FrontendURL}}))
+	router.Use(ginmw.NewCORS(ginmw.CORSConfig{
+		Origins:      []string{cfg.FrontendURL},
+		AllowHeaders: []string{auth.TenantSlugHeader},
+	}))
 	ginmw.RegisterHealthEndpoints(router, func(ctx context.Context) error { return store.Ping(ctx, db) })
 
 	v1 := router.Group("/v1")
@@ -91,7 +94,7 @@ func InitializeApp() *app.App {
 	publicHandler.RegisterRoutes(publicGroup)
 
 	authGroup := v1.Group("")
-	authGroup.Use(authMiddleware.RequireAuth())
+	authGroup.Use(authMiddleware.RequireAuth(), tenantSlugBinding)
 
 	// auto_repair conserva módulos propios y reutiliza la base común de work orders.
 	autoRepairGroup := authGroup.Group("/auto-repair")
@@ -106,10 +109,6 @@ func InitializeApp() *app.App {
 	bikeShopWoHandler.RegisterRoutes(bikeShopGroup)
 	bikeShopWoOrchestrationHandler.RegisterBookingRoutes(bikeShopGroup)
 	bikeShopWoOrchestrationHandler.RegisterWorkOrderRoutes(bikeShopGroup)
-
-	// Compatibilidad heredada: endpoint unificado /v1/work-orders.
-	workOrdersCompatHandler.RegisterRoutes(authGroup)
-	woOrchestrationCompatHandler.RegisterRoutes(authGroup)
 
 	return &app.App{Router: router}
 }

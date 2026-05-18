@@ -7,7 +7,7 @@ import (
 )
 
 type PaymentGatewayConnectionModel struct {
-	OrgID                 uuid.UUID `gorm:"type:uuid;primaryKey"`
+	OrgID              uuid.UUID `gorm:"type:uuid;primaryKey"`
 	Provider              string    `gorm:"not null;default:mercadopago"`
 	ExternalUserID        string    `gorm:"not null"`
 	AccessTokenEncrypted  string    `gorm:"not null"`
@@ -22,7 +22,7 @@ func (PaymentGatewayConnectionModel) TableName() string { return "payment_gatewa
 
 type PaymentPreferenceModel struct {
 	ID              uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID           uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID        uuid.UUID `gorm:"type:uuid;index;not null"`
 	Provider        string    `gorm:"not null;default:mercadopago"`
 	ExternalID      string    `gorm:"not null;default:''"`
 	ReferenceType   string    `gorm:"not null"`

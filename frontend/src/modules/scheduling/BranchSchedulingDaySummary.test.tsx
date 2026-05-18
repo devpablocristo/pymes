@@ -8,7 +8,7 @@ import { BranchSchedulingDaySummary } from './BranchSchedulingDaySummary';
 function buildBranch(id: string, name: string): Branch {
   return {
     id,
-    org_id: 'org-demo',
+    org_id: 'tenant-demo',
     code: id,
     name,
     timezone: 'America/Argentina/Tucuman',
@@ -21,7 +21,7 @@ function buildBranch(id: string, name: string): Branch {
 
 function buildBranchContextValue(overrides: Partial<BranchContextValue> = {}): BranchContextValue {
   return {
-    orgId: 'org-demo',
+    tenantId: 'tenant-demo',
     branches: [
       buildBranch('branch-a', 'Casa Central'),
       buildBranch('branch-b', 'Sucursal Norte'),

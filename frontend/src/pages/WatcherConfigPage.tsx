@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { useSearch } from '@devpablocristo/modules-search';
-import { listWatchers, updateWatcher, type WatcherResponse } from '../lib/reviewApi';
+import { listWatchers, updateWatcher, type WatcherResponse } from '../lib/governanceApi';
 import { queryKeys } from '../lib/queryKeys';
 import './WatcherConfigPage.css';
 
@@ -84,7 +84,7 @@ export default function WatcherConfigPage() {
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const queryClient = useQueryClient();
   const watchersQuery = useQuery({
-    queryKey: queryKeys.review.watchers,
+    queryKey: queryKeys.governance.watchers,
     queryFn: listWatchers,
     retry: false,
   });
@@ -126,7 +126,7 @@ export default function WatcherConfigPage() {
     },
     onSuccess: async () => {
       setStatusMsg({ text: 'Configuracion guardada', type: 'success' });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.review.watchers });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.governance.watchers });
     },
     onError: () => {
       setStatusMsg({ text: 'Error al guardar', type: 'error' });

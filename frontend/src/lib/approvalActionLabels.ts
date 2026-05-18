@@ -1,4 +1,4 @@
-/** Etiquetas para tipos de acción del flujo de review / aprobaciones. */
+/** Etiquetas para tipos de acción del flujo de governance / aprobaciones. */
 export const APPROVAL_ACTION_LABELS: Record<string, string> = {
   'scheduling.book': 'Agendar turno',
   'scheduling.reschedule': 'Reagendar turno',

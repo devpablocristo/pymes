@@ -9,7 +9,7 @@ import (
 
 type ProductModel struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID       uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID    uuid.UUID `gorm:"type:uuid;index;not null"`
 	Type        string    `gorm:"not null"`
 	SKU         string
 	Name        string `gorm:"not null"`
@@ -23,6 +23,7 @@ type ProductModel struct {
 	ImageURLs   pq.StringArray `gorm:"type:text[];column:image_urls;not null;default:'{}'"`
 	TrackStock  bool
 	IsActive    bool           `gorm:"column:is_active;not null"`
+	IsFavorite  bool           `gorm:"column:is_favorite;not null"`
 	Tags        pq.StringArray `gorm:"type:text[]"`
 	Metadata    []byte         `gorm:"type:jsonb"`
 	CreatedAt   time.Time

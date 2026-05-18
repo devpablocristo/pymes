@@ -16,10 +16,20 @@ type RepositoryPort interface {
 	Add(in domain.LogInput) domain.Entry
 	List(orgID uuid.UUID, limit int) []domain.Entry
 	ExportCSV(orgID uuid.UUID) (string, error)
+	Verify(orgID uuid.UUID) domain.VerifyResult
 }
 
 type Usecases struct {
 	repo RepositoryPort
+}
+
+func (u *Usecases) Verify(ctx context.Context, orgID string) (domain.VerifyResult, error) {
+	_ = ctx
+	id, err := uuid.Parse(orgID)
+	if err != nil {
+		return domain.VerifyResult{}, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
+	}
+	return u.repo.Verify(id), nil
 }
 
 func NewUsecases(repo RepositoryPort) *Usecases {
@@ -35,9 +45,9 @@ func (u *Usecases) Log(ctx context.Context, orgID string, actor, action, resourc
 	u.repo.Add(domain.LogInput{
 		OrgID: id,
 		Actor: domain.ActorRef{
-			Legacy: actor,
-			Type:   "user",
-			Label:  actor,
+			Raw:   actor,
+			Type:  "user",
+			Label: actor,
 		},
 		Action:       action,
 		ResourceType: resourceType,

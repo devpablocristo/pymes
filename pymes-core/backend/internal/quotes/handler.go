@@ -27,7 +27,7 @@ type usecasesPort interface {
 	Create(ctx context.Context, in CreateQuoteInput) (quotedomain.Quote, error)
 	GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error)
 	Update(ctx context.Context, in UpdateQuoteInput) (quotedomain.Quote, error)
-	PatchAnnotations(ctx context.Context, orgID, quoteID uuid.UUID, patch QuotePatchFields, actor string) (quotedomain.Quote, error)
+	UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (quotedomain.Quote, error)
 	Archive(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error
 	Restore(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error
 	HardDelete(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error
@@ -51,9 +51,16 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET(quotesBasePath+"/"+crudpaths.SegmentArchived, rbac.RequirePermission("quotes", "read"), h.ListArchived)
 	auth.POST(quotesBasePath, rbac.RequirePermission("quotes", "create"), h.Create)
 	auth.GET(quotesItemPath, rbac.RequirePermission("quotes", "read"), h.Get)
-	auth.PUT(quotesItemPath, rbac.RequirePermission("quotes", "update"), h.Update)
-	auth.PATCH(quotesItemPath, rbac.RequirePermission("quotes", "update"), h.Patch)
+	auth.PATCH(quotesItemPath, rbac.RequirePermission("quotes", "update"), h.Update)
+	handlers.RegisterStatusEndpoint(
+		auth, rbac, "quotes", "update", quotesBasePath,
+		func(ctx context.Context, orgID, id uuid.UUID, next, actor string) (quotedomain.Quote, error) {
+			return h.uc.UpdateStatus(ctx, UpdateStatusInput{OrgID: orgID, ID: id, Status: next}, actor)
+		},
+		func(q quotedomain.Quote) any { return toQuoteResponse(q) },
+	)
 	auth.DELETE(quotesItemPath, rbac.RequirePermission("quotes", "delete"), h.Delete)
+	auth.POST(quotesItemPath+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("quotes", "update"), h.Archive)
 	auth.POST(quotesItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("quotes", "delete"), h.Restore)
 	auth.DELETE(quotesItemPath+"/"+crudpaths.SegmentHard, rbac.RequirePermission("quotes", "delete"), h.HardDelete)
 	auth.POST(quotesItemPath+"/send", rbac.RequirePermission("quotes", "update"), h.Send)
@@ -66,7 +73,7 @@ func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 
@@ -80,7 +87,7 @@ func (h *Handler) List(c *gin.Context) {
 	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return
 		}
 		branchID = &id
@@ -88,24 +95,24 @@ func (h *Handler) List(c *gin.Context) {
 	if v := strings.TrimSpace(c.Query("customer_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid customer_id"})
+			handlers.WriteValidation(c, "invalid customer_id")
 			return
 		}
 		customerID = &id
 	}
 	from, err := parseDatePtr(c.Query("from"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid from"})
+		handlers.WriteValidation(c, "invalid from")
 		return
 	}
 	to, err := parseDatePtr(c.Query("to"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid to"})
+		handlers.WriteValidation(c, "invalid to")
 		return
 	}
 
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		OrgID:      orgID,
+		OrgID:   orgID,
 		BranchID:   branchID,
 		Limit:      limit,
 		After:      after,
@@ -136,14 +143,14 @@ func (h *Handler) ListArchived(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	var branchID *uuid.UUID
 	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return
 		}
 		branchID = &id
@@ -168,51 +175,55 @@ func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 
 	var req dto.CreateQuoteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	customerID, err := parseOptionalUUID(req.CustomerID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid customer_id"})
+		handlers.WriteValidation(c, "invalid customer_id")
 		return
 	}
 	var branchID *uuid.UUID
 	if req.BranchID != nil && strings.TrimSpace(*req.BranchID) != "" {
 		id, err := uuid.Parse(strings.TrimSpace(*req.BranchID))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return
 		}
 		branchID = &id
 	}
 	validUntil, err := parseOptionalDate(req.ValidUntil)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid valid_until"})
+		handlers.WriteValidation(c, "invalid valid_until")
 		return
 	}
 	items, err := parseItemInputs(req.Items)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 
+	isFavorite := false
+	if req.IsFavorite != nil {
+		isFavorite = *req.IsFavorite
+	}
 	out, err := h.uc.Create(c.Request.Context(), CreateQuoteInput{
-		OrgID:        orgID,
+		OrgID:     orgID,
 		BranchID:     branchID,
 		CustomerID:   customerID,
 		CustomerName: req.CustomerName,
 		Items:        items,
+		IsFavorite:   isFavorite,
+		Tags:         req.Tags,
 		Notes:        req.Notes,
 		ValidUntil:   validUntil,
 		CreatedBy:    a.Actor,
-		Tags:         req.Tags,
-		Metadata:     req.Metadata,
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -225,12 +236,12 @@ func (h *Handler) Get(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	quoteID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	out, err := h.uc.GetByID(c.Request.Context(), orgID, quoteID)
@@ -245,18 +256,18 @@ func (h *Handler) Update(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	quoteID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 
 	var req dto.UpdateQuoteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 
@@ -264,7 +275,7 @@ func (h *Handler) Update(c *gin.Context) {
 	if req.CustomerID != nil {
 		parsed, err := parseOptionalUUID(req.CustomerID)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid customer_id"})
+			handlers.WriteValidation(c, "invalid customer_id")
 			return
 		}
 		customerID = &parsed
@@ -273,7 +284,7 @@ func (h *Handler) Update(c *gin.Context) {
 	if req.ValidUntil != nil {
 		parsed, err := parseOptionalDate(req.ValidUntil)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid valid_until"})
+			handlers.WriteValidation(c, "invalid valid_until")
 			return
 		}
 		validUntil = &parsed
@@ -282,59 +293,24 @@ func (h *Handler) Update(c *gin.Context) {
 	if req.Items != nil {
 		parsed, err := parseItemInputs(*req.Items)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+			handlers.WriteValidation(c, "invalid request body")
 			return
 		}
 		items = &parsed
 	}
 
 	out, err := h.uc.Update(c.Request.Context(), UpdateQuoteInput{
-		OrgID:        orgID,
+		OrgID:     orgID,
 		ID:           quoteID,
 		CustomerID:   customerID,
 		CustomerName: req.CustomerName,
 		Items:        items,
+		IsFavorite:   req.IsFavorite,
+		Tags:         req.Tags,
 		Notes:        req.Notes,
 		ValidUntil:   validUntil,
-		Tags:         req.Tags,
-		Metadata:     req.Metadata,
 		Actor:        a.Actor,
 	})
-	if err != nil {
-		httperrors.Respond(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, toQuoteResponse(out))
-}
-
-func (h *Handler) Patch(c *gin.Context) {
-	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
-		return
-	}
-	quoteID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-	var req dto.PatchQuoteRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
-		return
-	}
-	patch := QuotePatchFields{
-		Tags:         req.Tags,
-		Metadata:     req.Metadata,
-		Notes:        req.Notes,
-		CustomerName: req.CustomerName,
-	}
-	if patch.Tags == nil && patch.Metadata == nil && patch.Notes == nil && patch.CustomerName == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "no patch fields"})
-		return
-	}
-	out, err := h.uc.PatchAnnotations(c.Request.Context(), orgID, quoteID, patch, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -346,12 +322,12 @@ func (h *Handler) Delete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	quoteID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 
@@ -362,16 +338,20 @@ func (h *Handler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+func (h *Handler) Archive(c *gin.Context) {
+	h.Delete(c)
+}
+
 func (h *Handler) Restore(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	quoteID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	if err := h.uc.Restore(c.Request.Context(), orgID, quoteID, a.Actor); err != nil {
@@ -385,12 +365,12 @@ func (h *Handler) HardDelete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	quoteID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	if err := h.uc.HardDelete(c.Request.Context(), orgID, quoteID, a.Actor); err != nil {
@@ -416,12 +396,12 @@ func (h *Handler) transition(c *gin.Context, action string) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	quoteID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 
@@ -445,17 +425,17 @@ func (h *Handler) ToSale(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	quoteID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	var req dto.ToSaleRequest
 	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	saleOut, err := h.uc.ToSale(c.Request.Context(), orgID, quoteID, req.PaymentMethod, req.Notes, a.Actor)
@@ -472,9 +452,13 @@ func (h *Handler) ToSale(c *gin.Context) {
 }
 
 func toQuoteResponse(in quotedomain.Quote) dto.QuoteResponse {
+	tags := in.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	resp := dto.QuoteResponse{
 		ID:           in.ID.String(),
-		OrgID:        in.OrgID.String(),
+		OrgID:     in.OrgID.String(),
 		Number:       in.Number,
 		CustomerName: in.CustomerName,
 		Status:       in.Status,
@@ -483,17 +467,12 @@ func toQuoteResponse(in quotedomain.Quote) dto.QuoteResponse {
 		TaxTotal:     in.TaxTotal,
 		Total:        in.Total,
 		Currency:     in.Currency,
+		IsFavorite:   in.IsFavorite,
+		Tags:         tags,
 		Notes:        in.Notes,
 		CreatedBy:    in.CreatedBy,
 		CreatedAt:    in.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:    in.UpdatedAt.UTC().Format(time.RFC3339),
-		Tags:         append([]string(nil), in.Tags...),
-		Metadata:     map[string]any{},
-	}
-	if in.Metadata != nil {
-		for k, v := range in.Metadata {
-			resp.Metadata[k] = v
-		}
 	}
 	if in.BranchID != nil {
 		resp.BranchID = in.BranchID.String()

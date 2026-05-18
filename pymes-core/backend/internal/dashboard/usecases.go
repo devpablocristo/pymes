@@ -37,7 +37,7 @@ func (u *Usecases) GetWidgetData(ctx context.Context, viewer dashboarddomain.Vie
 		return nil, err
 	}
 	if viewer.OrgID == uuid.Nil {
-		return nil, fmt.Errorf("org_id is required: %w", httperrors.ErrBadInput)
+		return nil, fmt.Errorf("tenant_id is required: %w", httperrors.ErrBadInput)
 	}
 
 	switch widget.WidgetKey {

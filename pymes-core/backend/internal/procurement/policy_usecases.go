@@ -2,69 +2,88 @@ package procurement
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
-	kerneldomain "github.com/devpablocristo/core/governance/go/kernel/usecases/domain"
 	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/core/governance/go/governanceclient"
 
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement/repository/models"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement/usecases/domain"
 )
 
-// PolicyCreateInput crea una política CEL por organización.
+// PolicyCreateInput crea una política CEL por tenant.
 type PolicyCreateInput struct {
-	OrgID          uuid.UUID
-	Actor          string
-	Name           string
-	Expression     string
-	Effect         string
-	Priority       int
-	Mode           string
-	Enabled        bool
-	ActionFilter   string
-	SystemFilter   string
+	OrgID     uuid.UUID
+	Actor        string
+	Name         string
+	Expression   string
+	Effect       string
+	Priority     int
+	Mode         string
+	Enabled      bool
+	ActionFilter string
+	SystemFilter string
 }
 
 // PolicyUpdateInput actualiza una política existente.
 type PolicyUpdateInput struct {
-	OrgID          uuid.UUID
-	ID             uuid.UUID
-	Actor          string
-	Name           string
-	Expression     string
-	Effect         string
-	Priority       int
-	Mode           string
-	Enabled        bool
-	ActionFilter   string
-	SystemFilter   string
+	OrgID     uuid.UUID
+	ID           uuid.UUID
+	Actor        string
+	Name         string
+	Expression   string
+	Effect       string
+	Priority     int
+	Mode         string
+	Enabled      bool
+	ActionFilter string
+	SystemFilter string
 }
 
-func (u *Usecases) ListPoliciesForOrg(ctx context.Context, orgID uuid.UUID) ([]domain.ProcurementPolicy, error) {
-	rows, err := u.repo.ListPolicies(ctx, orgID)
+// ListPoliciesForTenant lista las policies de procurement del tenant: proxy a
+// Nexus, sin almacenamiento local en Pymes.
+func (u *Usecases) ListPoliciesForTenant(ctx context.Context, orgID uuid.UUID) ([]domain.ProcurementPolicy, error) {
+	st, raw, err := u.governance.ListPoliciesForTenant(ctx, orgID.String())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("nexus list policies: %w", err)
 	}
-	out := make([]domain.ProcurementPolicy, 0, len(rows))
-	for _, m := range rows {
-		out = append(out, procurementPolicyModelToDomain(m))
+	if st >= 400 {
+		return nil, fmt.Errorf("nexus list policies: status %d body %s", st, governanceclient.ParseErrorBody(raw))
+	}
+	var envelope struct {
+		Data []governanceclient.PolicyResponse `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil, fmt.Errorf("decode list policies: %w", err)
+	}
+	out := make([]domain.ProcurementPolicy, 0, len(envelope.Data))
+	for _, p := range envelope.Data {
+		out = append(out, nexusPolicyToDomain(p, orgID))
 	}
 	return out, nil
 }
 
 func (u *Usecases) GetPolicy(ctx context.Context, orgID, id uuid.UUID) (domain.ProcurementPolicy, error) {
-	p, err := u.repo.GetPolicyByID(ctx, orgID, id)
+	st, raw, err := u.governance.GetPolicyForTenant(ctx, orgID.String(), id.String())
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return domain.ProcurementPolicy{}, domainerr.NotFoundf("procurement_policy", id.String())
-		}
-		return domain.ProcurementPolicy{}, err
+		return domain.ProcurementPolicy{}, fmt.Errorf("nexus get policy: %w", err)
 	}
-	return p, nil
+	if st == http.StatusNotFound {
+		return domain.ProcurementPolicy{}, domainerr.NotFoundf("procurement_policy", id.String())
+	}
+	if st >= 400 {
+		return domain.ProcurementPolicy{}, fmt.Errorf("nexus get policy: status %d body %s", st, governanceclient.ParseErrorBody(raw))
+	}
+	var p governanceclient.PolicyResponse
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return domain.ProcurementPolicy{}, fmt.Errorf("decode policy: %w", err)
+	}
+	return nexusPolicyToDomain(p, orgID), nil
 }
 
 func (u *Usecases) CreatePolicy(ctx context.Context, in PolicyCreateInput) (domain.ProcurementPolicy, error) {
@@ -75,32 +94,24 @@ func (u *Usecases) CreatePolicy(ctx context.Context, in PolicyCreateInput) (doma
 	if actor == "" {
 		return domain.ProcurementPolicy{}, domainerr.Validation("actor is required")
 	}
-	mode := strings.TrimSpace(in.Mode)
-	if mode == "" {
-		mode = string(kerneldomain.PolicyModeEnforce)
-	}
+	mode := normalizePolicyMode(in.Mode)
 	if err := validatePolicyFields(in.Name, in.Expression, in.Effect, mode); err != nil {
 		return domain.ProcurementPolicy{}, err
 	}
-	now := time.Now()
-	p := domain.ProcurementPolicy{
-		ID:           uuid.New(),
-		OrgID:        in.OrgID,
-		Name:         strings.TrimSpace(in.Name),
-		Expression:   strings.TrimSpace(in.Expression),
-		Effect:       strings.TrimSpace(in.Effect),
-		Priority:     in.Priority,
-		Mode:         mode,
-		Enabled:      in.Enabled,
-		ActionFilter: defaultString(strings.TrimSpace(in.ActionFilter), "procurement.submit"),
-		SystemFilter: defaultString(strings.TrimSpace(in.SystemFilter), "pymes"),
-		CreatedAt:    now,
-		UpdatedAt:    now,
-	}
-	out, err := u.repo.SavePolicy(ctx, p)
+	body := nexusPolicyCreateBody(in, mode)
+
+	st, raw, err := u.governance.CreatePolicyForTenant(ctx, in.OrgID.String(), body)
 	if err != nil {
-		return domain.ProcurementPolicy{}, err
+		return domain.ProcurementPolicy{}, fmt.Errorf("nexus create policy: %w", err)
 	}
+	if st >= 400 {
+		return domain.ProcurementPolicy{}, fmt.Errorf("nexus create policy: status %d body %s", st, governanceclient.ParseErrorBody(raw))
+	}
+	var p governanceclient.PolicyResponse
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return domain.ProcurementPolicy{}, fmt.Errorf("decode created policy: %w", err)
+	}
+	out := nexusPolicyToDomain(p, in.OrgID)
 	u.logPolicyAudit(ctx, in.OrgID, actor, "procurement_policy.created", out.ID.String(), map[string]any{"name": out.Name})
 	u.emitWebhook(ctx, in.OrgID, "procurement_policy.created", map[string]any{
 		"procurement_policy_id": out.ID.String(),
@@ -110,37 +121,31 @@ func (u *Usecases) CreatePolicy(ctx context.Context, in PolicyCreateInput) (doma
 }
 
 func (u *Usecases) UpdatePolicy(ctx context.Context, in PolicyUpdateInput) (domain.ProcurementPolicy, error) {
-	cur, err := u.repo.GetPolicyByID(ctx, in.OrgID, in.ID)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return domain.ProcurementPolicy{}, domainerr.NotFoundf("procurement_policy", in.ID.String())
-		}
-		return domain.ProcurementPolicy{}, err
-	}
 	actor := strings.TrimSpace(in.Actor)
 	if actor == "" {
 		return domain.ProcurementPolicy{}, domainerr.Validation("actor is required")
 	}
-	mode := strings.TrimSpace(in.Mode)
-	if mode == "" {
-		mode = string(kerneldomain.PolicyModeEnforce)
-	}
+	mode := normalizePolicyMode(in.Mode)
 	if err := validatePolicyFields(in.Name, in.Expression, in.Effect, mode); err != nil {
 		return domain.ProcurementPolicy{}, err
 	}
-	cur.Name = strings.TrimSpace(in.Name)
-	cur.Expression = strings.TrimSpace(in.Expression)
-	cur.Effect = strings.TrimSpace(in.Effect)
-	cur.Priority = in.Priority
-	cur.Mode = mode
-	cur.Enabled = in.Enabled
-	cur.ActionFilter = defaultString(strings.TrimSpace(in.ActionFilter), "procurement.submit")
-	cur.SystemFilter = defaultString(strings.TrimSpace(in.SystemFilter), "pymes")
-	cur.UpdatedAt = time.Now()
-	out, err := u.repo.SavePolicy(ctx, cur)
+	body := nexusPolicyUpdateBody(in, mode)
+
+	st, raw, err := u.governance.UpdatePolicyForTenant(ctx, in.OrgID.String(), in.ID.String(), body)
 	if err != nil {
-		return domain.ProcurementPolicy{}, err
+		return domain.ProcurementPolicy{}, fmt.Errorf("nexus update policy: %w", err)
 	}
+	if st == http.StatusNotFound {
+		return domain.ProcurementPolicy{}, domainerr.NotFoundf("procurement_policy", in.ID.String())
+	}
+	if st >= 400 {
+		return domain.ProcurementPolicy{}, fmt.Errorf("nexus update policy: status %d body %s", st, governanceclient.ParseErrorBody(raw))
+	}
+	var p governanceclient.PolicyResponse
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return domain.ProcurementPolicy{}, fmt.Errorf("decode updated policy: %w", err)
+	}
+	out := nexusPolicyToDomain(p, in.OrgID)
 	u.logPolicyAudit(ctx, in.OrgID, actor, "procurement_policy.updated", out.ID.String(), map[string]any{"name": out.Name})
 	u.emitWebhook(ctx, in.OrgID, "procurement_policy.updated", map[string]any{
 		"procurement_policy_id": out.ID.String(),
@@ -153,11 +158,15 @@ func (u *Usecases) DeletePolicy(ctx context.Context, orgID, id uuid.UUID, actor 
 	if strings.TrimSpace(actor) == "" {
 		return domainerr.Validation("actor is required")
 	}
-	if err := u.repo.DeletePolicy(ctx, orgID, id); err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return domainerr.NotFoundf("procurement_policy", id.String())
-		}
-		return err
+	st, err := u.governance.DeletePolicyForTenant(ctx, orgID.String(), id.String())
+	if err != nil {
+		return fmt.Errorf("nexus delete policy: %w", err)
+	}
+	if st == http.StatusNotFound {
+		return domainerr.NotFoundf("procurement_policy", id.String())
+	}
+	if st >= 400 {
+		return fmt.Errorf("nexus delete policy: status %d", st)
 	}
 	u.logPolicyAudit(ctx, orgID, actor, "procurement_policy.deleted", id.String(), nil)
 	u.emitWebhook(ctx, orgID, "procurement_policy.deleted", map[string]any{"procurement_policy_id": id.String()})
@@ -171,35 +180,32 @@ func validatePolicyFields(name, expression, effect, mode string) error {
 	if strings.TrimSpace(expression) == "" {
 		return domainerr.Validation("expression is required")
 	}
-	e := strings.TrimSpace(effect)
-	switch kerneldomain.Decision(e) {
-	case kerneldomain.DecisionAllow, kerneldomain.DecisionDeny, kerneldomain.DecisionRequireApproval:
+	switch strings.TrimSpace(effect) {
+	case governanceclient.PolicyEffectAllow,
+		governanceclient.PolicyEffectDeny,
+		governanceclient.PolicyEffectRequireApproval:
 	default:
 		return domainerr.Validation("invalid effect")
 	}
-	m := strings.TrimSpace(mode)
-	switch kerneldomain.PolicyMode(m) {
-	case kerneldomain.PolicyModeEnforce, kerneldomain.PolicyModeShadow:
+	switch mode {
+	case governanceclient.PolicyModeEnforced, governanceclient.PolicyModeShadow:
 	default:
 		return domainerr.Validation("invalid mode")
 	}
 	return nil
 }
 
-func procurementPolicyModelToDomain(m models.ProcurementPolicy) domain.ProcurementPolicy {
-	return domain.ProcurementPolicy{
-		ID:           m.ID,
-		OrgID:        m.OrgID,
-		Name:         m.Name,
-		Expression:   m.Expression,
-		Effect:       m.Effect,
-		Priority:     m.Priority,
-		Mode:         m.Mode,
-		Enabled:      m.Enabled,
-		ActionFilter: m.ActionFilter,
-		SystemFilter: m.SystemFilter,
-		CreatedAt:    m.CreatedAt,
-		UpdatedAt:    m.UpdatedAt,
+// normalizePolicyMode acepta los strings que la UI Pymes envía hoy
+// ("enforce", "shadow", vacío) y los traduce al wire format canónico de
+// Nexus ("enforced" / "shadow"). Compat hacia atrás del UI legacy.
+func normalizePolicyMode(raw string) string {
+	switch strings.TrimSpace(strings.ToLower(raw)) {
+	case "", "enforce", "enforced":
+		return governanceclient.PolicyModeEnforced
+	case "shadow":
+		return governanceclient.PolicyModeShadow
+	default:
+		return strings.TrimSpace(raw)
 	}
 }
 
@@ -208,4 +214,68 @@ func (u *Usecases) logPolicyAudit(ctx context.Context, orgID uuid.UUID, actor, a
 		return
 	}
 	u.audit.Log(ctx, orgID.String(), actor, action, "procurement_policy", resourceID, payload)
+}
+
+// nexusPolicyToDomain mapea el shape público de Nexus a la representación
+// que la UI de Pymes consume. CreatedAt/UpdatedAt vienen como RFC3339.
+func nexusPolicyToDomain(p governanceclient.PolicyResponse, orgID uuid.UUID) domain.ProcurementPolicy {
+	id, _ := uuid.Parse(p.ID)
+	created, _ := time.Parse(time.RFC3339, p.CreatedAt)
+	updated, _ := time.Parse(time.RFC3339, p.UpdatedAt)
+	actionFilter := ""
+	if p.ActionType != nil {
+		actionFilter = *p.ActionType
+	}
+	systemFilter := ""
+	if p.TargetSystem != nil {
+		systemFilter = *p.TargetSystem
+	}
+	return domain.ProcurementPolicy{
+		ID:           id,
+		OrgID:     orgID,
+		Name:         p.Name,
+		Expression:   p.Expression,
+		Effect:       p.Effect,
+		Priority:     p.Priority,
+		Mode:         p.Mode,
+		Enabled:      p.Enabled,
+		ActionFilter: actionFilter,
+		SystemFilter: systemFilter,
+		CreatedAt:    created,
+		UpdatedAt:    updated,
+	}
+}
+
+func nexusPolicyCreateBody(in PolicyCreateInput, mode string) governanceclient.CreatePolicyRequest {
+	actionType := defaultString(strings.TrimSpace(in.ActionFilter), "procurement.submit")
+	system := defaultString(strings.TrimSpace(in.SystemFilter), "pymes")
+	return governanceclient.CreatePolicyRequest{
+		Name:         strings.TrimSpace(in.Name),
+		Description:  "",
+		ActionType:   &actionType,
+		TargetSystem: &system,
+		Expression:   strings.TrimSpace(in.Expression),
+		Effect:       strings.TrimSpace(in.Effect),
+		Priority:     in.Priority,
+		Mode:         mode,
+		Enabled:      in.Enabled,
+	}
+}
+
+func nexusPolicyUpdateBody(in PolicyUpdateInput, mode string) governanceclient.UpdatePolicyRequest {
+	name := strings.TrimSpace(in.Name)
+	expr := strings.TrimSpace(in.Expression)
+	effect := strings.TrimSpace(in.Effect)
+	actionType := defaultString(strings.TrimSpace(in.ActionFilter), "procurement.submit")
+	system := defaultString(strings.TrimSpace(in.SystemFilter), "pymes")
+	return governanceclient.UpdatePolicyRequest{
+		Name:         &name,
+		Expression:   &expr,
+		Effect:       &effect,
+		Priority:     &in.Priority,
+		Mode:         &mode,
+		Enabled:      &in.Enabled,
+		ActionType:   &actionType,
+		TargetSystem: &system,
+	}
 }

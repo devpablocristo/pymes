@@ -6,10 +6,10 @@ import (
 	"github.com/google/uuid"
 )
 
-// ProcurementPolicy regla CEL por organización (mapea a kernel.Policy al evaluar).
+// ProcurementPolicy regla CEL por tenant (mapea a kernel.Policy al evaluar).
 type ProcurementPolicy struct {
 	ID           uuid.UUID
-	OrgID        uuid.UUID
+	OrgID     uuid.UUID
 	Name         string
 	Expression   string
 	Effect       string

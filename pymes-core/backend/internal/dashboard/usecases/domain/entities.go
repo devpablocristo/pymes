@@ -7,11 +7,11 @@ import (
 )
 
 type Viewer struct {
-	OrgID  uuid.UUID
+	OrgID uuid.UUID
 	BranchID *uuid.UUID
-	Actor  string
-	Role   string
-	Scopes []string
+	Actor    string
+	Role     string
+	Scopes   []string
 }
 
 type WidgetDefinition struct {

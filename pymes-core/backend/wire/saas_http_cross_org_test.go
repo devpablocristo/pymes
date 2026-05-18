@@ -5,16 +5,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	kerneldomain "github.com/devpablocristo/core/saas/go/kernel/usecases/domain"
-	saasmiddleware "github.com/devpablocristo/core/saas/go/middleware"
 )
 
 type crossOrgJWTVerifier struct{}
 
-func (crossOrgJWTVerifier) Verify(_ context.Context, _ string) (kerneldomain.Principal, error) {
-	return kerneldomain.Principal{
-		TenantID:   "org-a",
+func (crossOrgJWTVerifier) Verify(_ context.Context, _ string) (tenantPrincipal, error) {
+	return tenantPrincipal{
+		OrgID:   "org-a",
 		Actor:      "user-1",
 		Role:       "admin",
 		Scopes:     []string{"admin:console:write"},
@@ -26,12 +23,12 @@ func TestHandleListMembers_DeniesCrossOrgAccess(t *testing.T) {
 	t.Parallel()
 
 	mux := http.NewServeMux()
-	authMW := saasmiddleware.NewAuthMiddleware(crossOrgJWTVerifier{}, nil)
-	registerProtected(mux, authMW, "GET /orgs/{org_id}/members", func(w http.ResponseWriter, r *http.Request) {
+	authMW := newTenantAuthMiddleware(crossOrgJWTVerifier{}, nil)
+	registerProtected(mux, authMW, "GET /tenants/{org_id}/members", func(w http.ResponseWriter, r *http.Request) {
 		handleListMembers(w, r, nil)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/orgs/org-b/members", nil)
+	req := httptest.NewRequest(http.MethodGet, "/tenants/org-b/members", nil)
 	req.Header.Set("Authorization", "Bearer test")
 	rec := httptest.NewRecorder()
 
@@ -46,12 +43,12 @@ func TestHandleListAPIKeys_DeniesAPIKeyCaller(t *testing.T) {
 	t.Parallel()
 
 	mux := http.NewServeMux()
-	authMW := saasmiddleware.NewAuthMiddleware(nil, sessionStubAPIKeyVerifier{})
-	registerProtected(mux, authMW, "GET /orgs/{org_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
+	authMW := newTenantAuthMiddleware(nil, sessionStubAPIKeyVerifier{})
+	registerProtected(mux, authMW, "GET /tenants/{org_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
 		handleListAPIKeys(w, r, nil)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/orgs/org-uuid/api-keys", nil)
+	req := httptest.NewRequest(http.MethodGet, "/tenants/org-uuid/api-keys", nil)
 	req.Header.Set("X-API-KEY", "psk_test")
 	rec := httptest.NewRecorder()
 

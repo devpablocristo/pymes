@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createCreditNotesCrudConfig,
   createInvoicesCrudConfig,
@@ -15,9 +15,21 @@ import {
 } from './billingHelpers';
 import type { InvoiceRecord } from './invoicesDemo';
 
+const { apiRequestMock } = vi.hoisted(() => ({
+  apiRequestMock: vi.fn(),
+}));
+
+vi.mock('../../lib/api', () => ({
+  apiRequest: apiRequestMock,
+  createSalePayment: vi.fn(),
+  downloadAPIFile: vi.fn(),
+  listSalePayments: vi.fn(),
+}));
+
 describe('billingHelpers', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    apiRequestMock.mockReset();
   });
 
   it('parses priced commercial line items', () => {
@@ -61,6 +73,8 @@ describe('billingHelpers', () => {
 
     expect(config.basePath).toBe('/v1/quotes');
     expect(config.labelPluralCap).toBe('Presupuestos');
+    // Espejo del FSM Go (quotes/fsm.go). Incluye `expired` (terminal),
+    // ausente en la versión anterior con buildFullyConnected.
     expect(config.stateMachine).toMatchObject({
       field: 'status',
       states: [
@@ -68,12 +82,14 @@ describe('billingHelpers', () => {
         { value: 'sent', label: 'Enviado', columnId: 'sent', badgeVariant: 'info' },
         { value: 'accepted', label: 'Aceptado', columnId: 'accepted', badgeVariant: 'success' },
         { value: 'rejected', label: 'Rechazado', columnId: 'rejected', badgeVariant: 'danger' },
+        { value: 'expired', label: 'Vencido', columnId: 'expired', badgeVariant: 'warning' },
       ],
       columns: [
         { id: 'draft', label: 'Borrador', defaultState: 'draft' },
         { id: 'sent', label: 'Enviado', defaultState: 'sent' },
         { id: 'accepted', label: 'Aceptado', defaultState: 'accepted' },
         { id: 'rejected', label: 'Rechazado', defaultState: 'rejected' },
+        { id: 'expired', label: 'Vencido', defaultState: 'expired' },
       ],
     });
     expect(config.editorModal).toMatchObject({
@@ -114,6 +130,8 @@ describe('billingHelpers', () => {
           unit_price: 1000,
         },
       ],
+      is_favorite: false,
+      tags: [],
       notes: 'ok',
     });
   });
@@ -155,13 +173,16 @@ describe('billingHelpers', () => {
       },
       { key: 'discount', label: 'Descuento (%)', type: 'number' },
       { key: 'tax', label: 'Impuesto (%)', type: 'number' },
+      { key: 'is_favorite', label: 'Agregar a favoritos', type: 'checkbox' },
+      { key: 'tags', label: 'Etiquetas internas', placeholder: 'factura, urgente, prioritario' },
+    ]);
+    expect(config.editorModal?.blocks).toEqual([
       {
-        key: 'items',
-        label: 'Detalle',
-        type: 'textarea',
-        fullWidth: true,
-        required: true,
-        placeholder: '[{"description":"Servicio","qty":1,"unit":"unidad","unitPrice":1000}]',
+        id: 'items',
+        kind: 'lineItems',
+        field: 'items',
+        sectionId: 'items',
+        visible: expect.any(Function),
       },
     ]);
     expect(config.toFormValues?.({
@@ -184,6 +205,8 @@ describe('billingHelpers', () => {
       discount: '0',
       tax: '21',
       items: '[{"id":"1","description":"Servicio","qty":1,"unit":"unidad","unitPrice":1000}]',
+      is_favorite: false,
+      tags: '',
     });
     expect(config.isValid?.({ customer: 'Cliente Demo', items: '[{"description":"Servicio"}]' })).toBe(true);
     expect(config.isValid?.({ customer: '', items: '' })).toBe(false);
@@ -195,23 +218,23 @@ describe('billingHelpers', () => {
 
     expect(config.basePath).toBe('/v1/sales');
     expect(config.labelPluralCap).toBe('Ventas');
+    // Order y set espejo del FSM Go (sales/fsm.go). `cancelled` se eliminó:
+    // no estaba en el FSM canónico ni en el CHECK constraint de la DB.
     expect(config.stateMachine).toMatchObject({
       field: 'status',
       states: [
         { value: 'draft', label: 'Borrador', columnId: 'draft', badgeVariant: 'default' },
+        { value: 'pending', label: 'Pendiente', columnId: 'pending', badgeVariant: 'warning' },
         { value: 'completed', label: 'Completada', columnId: 'completed', badgeVariant: 'success' },
         { value: 'paid', label: 'Pagada', columnId: 'paid', badgeVariant: 'success' },
-        { value: 'pending', label: 'Pendiente', columnId: 'pending', badgeVariant: 'warning' },
         { value: 'voided', label: 'Anulada', columnId: 'voided', badgeVariant: 'danger' },
-        { value: 'cancelled', label: 'Cancelada', columnId: 'cancelled', badgeVariant: 'danger' },
       ],
       columns: [
         { id: 'draft', label: 'Borrador', defaultState: 'draft' },
+        { id: 'pending', label: 'Pendiente', defaultState: 'pending' },
         { id: 'completed', label: 'Completada', defaultState: 'completed' },
         { id: 'paid', label: 'Pagada', defaultState: 'paid' },
-        { id: 'pending', label: 'Pendiente', defaultState: 'pending' },
         { id: 'voided', label: 'Anulada', defaultState: 'voided' },
-        { id: 'cancelled', label: 'Cancelada', defaultState: 'cancelled' },
       ],
     });
     expect(config.editorModal).toMatchObject({
@@ -255,6 +278,8 @@ describe('billingHelpers', () => {
           unit_price: 1000,
         },
       ],
+      is_favorite: false,
+      tags: [],
       notes: 'ok',
     });
   });
@@ -264,7 +289,7 @@ describe('billingHelpers', () => {
 
     expect(config.labelPluralCap).toBe('Notas de crédito');
     expect(config.emptyState).toBe('No hay notas de crédito emitidas.');
-    expect(config.allowEdit).toBe(true);
+    expect(config.allowEdit).toBe(false);
     expect(config.stateMachine).toMatchObject({
       field: 'status',
       states: [
@@ -307,6 +332,7 @@ describe('billingHelpers', () => {
 
     expect(config.basePath).toBe('/v1/purchases');
     expect(config.labelPluralCap).toBe('Compras');
+    expect(config.allowEdit).toBe(true);
     expect(config.viewModes?.map((mode) => mode.id)).toEqual(['list', 'gallery', 'kanban']);
     expect(config.viewModes?.map((mode) => mode.path)).toEqual(['list', 'gallery', 'board']);
     expect(config.stateMachine).toMatchObject({
@@ -397,6 +423,16 @@ describe('billingHelpers', () => {
       key: 'total',
       label: 'Total',
     });
+    expect(config.formFields.find((field) => field.key === 'is_favorite')).toEqual({
+      key: 'is_favorite',
+      label: 'Agregar a favoritos',
+      type: 'checkbox',
+    });
+    expect(config.formFields.find((field) => field.key === 'tags')).toEqual({
+      key: 'tags',
+      label: 'Etiquetas internas',
+      placeholder: 'insumos, urgente, importado',
+    });
     expect(config.formFields.find((field) => field.key === 'received_at')).toEqual({
       key: 'received_at',
       label: 'Fecha de recepción',
@@ -407,6 +443,8 @@ describe('billingHelpers', () => {
         supplier_name: 'Proveedor',
         status: 'draft',
         payment_status: 'pending',
+        is_favorite: true,
+        tags: 'insumos, urgente',
         items: '[{"description":"Insumo","quantity":1,"unit_cost":1000}]',
         notes: 'ok',
       }),
@@ -416,6 +454,8 @@ describe('billingHelpers', () => {
       supplier_name: 'Proveedor',
       status: 'draft',
       payment_status: 'pending',
+      is_favorite: true,
+      tags: ['insumos', 'urgente'],
       items: [
         {
           description: 'Insumo',
@@ -427,6 +467,72 @@ describe('billingHelpers', () => {
         },
       ],
       notes: 'ok',
+    });
+    expect(config.toFormValues?.({
+      id: '1',
+      number: 'COMP-1',
+      supplier_name: 'Proveedor',
+      status: 'draft',
+      payment_status: 'pending',
+      total: 1000,
+      currency: 'ARS',
+      is_favorite: true,
+      tags: ['insumos', 'urgente'],
+      notes: 'ok',
+    } as PurchaseRecord)).toMatchObject({
+      is_favorite: true,
+      tags: 'insumos, urgente',
+    });
+  });
+
+  it('updates purchases with PUT against the purchase endpoint', async () => {
+    window.localStorage.setItem('pymes-ui:branch-selection:active', 'branch-active');
+    apiRequestMock.mockResolvedValueOnce({});
+    const config = createPurchasesCrudConfig<PurchaseRecord>({ renderList: () => <></> });
+
+    await config.dataSource?.update?.(
+      {
+        id: 'purchase-1',
+        number: 'OC-1',
+        supplier_name: 'Proveedor',
+        status: 'received',
+        payment_status: 'pending',
+        total: 1000,
+      } as PurchaseRecord,
+      {
+        supplier_id: 'supplier-1',
+        supplier_name: 'Proveedor',
+        status: 'received',
+        payment_status: 'paid',
+        is_favorite: true,
+        tags: 'insumos, urgente',
+        items: '[{"description":"Insumo","quantity":2,"unit_cost":500}]',
+        notes: 'ok',
+      },
+    );
+
+    expect(apiRequestMock).toHaveBeenCalledWith('/v1/purchases/purchase-1', {
+      method: 'PATCH',
+      body: {
+        branch_id: 'branch-active',
+        supplier_id: 'supplier-1',
+        supplier_name: 'Proveedor',
+        status: 'received',
+        payment_status: 'paid',
+        is_favorite: true,
+        tags: ['insumos', 'urgente'],
+        items: [
+          {
+            description: 'Insumo',
+            product_id: undefined,
+            quantity: 2,
+            service_id: undefined,
+            tax_rate: undefined,
+            unit_cost: 500,
+          },
+        ],
+        notes: 'ok',
+      },
     });
   });
 });

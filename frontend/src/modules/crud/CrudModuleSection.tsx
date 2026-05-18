@@ -2,6 +2,7 @@ import { Outlet, matchPath, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { HeaderMenuItemsProvider } from '../../components/HeaderMenuContext';
 import { CrudViewModeSwitch } from './CrudViewModeSwitch';
+import { ViewModeTabsCtx } from './ViewModeTabsCtx';
 import '../../pages/WorkOrdersModuleSection.css';
 
 type Props = {
@@ -39,12 +40,14 @@ export function CrudModuleSection(props: Props) {
   const menuItems = resolvedActionLink ? [{ label: resolvedActionLink.label, href: resolvedActionLink.to }] : [];
 
   return (
-    <HeaderMenuItemsProvider items={menuItems}>
-      <div className="wo-mod-orders">
-        <CrudViewModeSwitch {...props} />
-        {props.children}
-        <Outlet />
-      </div>
-    </HeaderMenuItemsProvider>
+    <ViewModeTabsCtx.Provider value={props.modes}>
+      <HeaderMenuItemsProvider items={menuItems}>
+        <div className="wo-mod-orders">
+          {isActionHidden ? null : <CrudViewModeSwitch {...props} />}
+          {props.children}
+          <Outlet />
+        </div>
+      </HeaderMenuItemsProvider>
+    </ViewModeTabsCtx.Provider>
   );
 }

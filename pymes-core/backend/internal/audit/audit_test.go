@@ -3,11 +3,11 @@ package audit
 import (
 	"context"
 	"encoding/json"
-	"strings"
-	"testing"
 	"github.com/devpablocristo/core/security/go/hashutil"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit/usecases/domain"
 	"github.com/google/uuid"
+	"strings"
+	"testing"
 )
 
 type mockAuditRepo struct {
@@ -24,8 +24,8 @@ func (m *mockAuditRepo) Add(in domain.LogInput) domain.Entry {
 
 	entry := domain.Entry{
 		ID:           uuid.New(),
-		OrgID:        in.OrgID,
-		Actor:        in.Actor.Legacy,
+		OrgID:     in.OrgID,
+		Actor:        in.Actor.Raw,
 		ActorType:    in.Actor.Type,
 		ActorID:      in.Actor.ID,
 		ActorLabel:   in.Actor.Label,
@@ -55,6 +55,10 @@ func (m *mockAuditRepo) List(orgID uuid.UUID, limit int) []domain.Entry {
 
 func (m *mockAuditRepo) ExportCSV(orgID uuid.UUID) (string, error) {
 	return "id,action\n", nil
+}
+
+func (m *mockAuditRepo) Verify(orgID uuid.UUID) domain.VerifyResult {
+	return domain.VerifyResult{OrgID: orgID, Verified: true, CheckedRows: len(m.entries), Message: "ok"}
 }
 
 func TestAuditLog(t *testing.T) {
@@ -87,7 +91,7 @@ func TestAuditLog_InvalidOrgID(t *testing.T) {
 
 	uc.Log(context.Background(), "bad-uuid", "actor", "action", "type", "id", nil)
 	if len(repo.entries) != 0 {
-		t.Error("should not log with invalid org_id")
+		t.Error("should not log with invalid tenant_id")
 	}
 }
 
@@ -115,7 +119,7 @@ func TestAuditList_InvalidOrgID(t *testing.T) {
 
 	_, err := uc.List(context.Background(), "bad", 10)
 	if err == nil {
-		t.Error("expected error for invalid org_id")
+		t.Error("expected error for invalid tenant_id")
 	}
 }
 
@@ -193,10 +197,10 @@ func TestAuditLogWithActor_Service(t *testing.T) {
 	uc.LogWithActor(context.Background(), domain.LogInput{
 		OrgID: orgID,
 		Actor: domain.ActorRef{
-			Legacy: "mercadopago_webhook",
-			Type:   "service",
-			ID:     &serviceID,
-			Label:  "Mercado Pago webhook",
+			Raw:   "mercadopago_webhook",
+			Type:  "service",
+			ID:    &serviceID,
+			Label: "Mercado Pago webhook",
 		},
 		Action:       "payment_gateway.payment.approved",
 		ResourceType: "sale",

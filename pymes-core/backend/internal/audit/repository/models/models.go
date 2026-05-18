@@ -8,7 +8,7 @@ import (
 
 type AuditLogModel struct {
 	ID           uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID        uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID     uuid.UUID `gorm:"type:uuid;index;not null"`
 	Actor        string
 	ActorType    string     `gorm:"not null;default:user"`
 	ActorID      *uuid.UUID `gorm:"type:uuid"`
@@ -19,6 +19,8 @@ type AuditLogModel struct {
 	Payload      []byte `gorm:"type:jsonb"`
 	PrevHash     string
 	Hash         string
+	HashVersion  int    `gorm:"not null;default:1"`
+	PayloadHash  string `gorm:"not null;default:''"`
 	CreatedAt    time.Time
 }
 

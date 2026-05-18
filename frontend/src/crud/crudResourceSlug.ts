@@ -11,7 +11,6 @@ const CAMEL_TO_SLUG: Record<string, string> = {
   creditNotes: 'credit-notes',
   priceLists: 'price-lists',
   procurementRequests: 'procurement-requests',
-  procurementPolicies: 'procurement-policies',
 };
 
 const SLUG_TO_CAMEL: Record<string, string> = Object.fromEntries(

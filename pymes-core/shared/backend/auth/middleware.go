@@ -3,21 +3,32 @@ package auth
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	authn "github.com/devpablocristo/core/authn/go"
 	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ctxkeys "github.com/devpablocristo/core/security/go/contextkeys"
 )
 
 // AuthMiddleware re-exporta el tipo de core.
 type AuthMiddleware = ginmw.AuthMiddleware
 
-// AuthContext re-exporta el tipo de core.
-type AuthContext = ginmw.AuthContext
+// AuthContext es el contexto de autenticacion de Pymes.
+type AuthContext struct {
+	OrgID   string
+	Actor      string
+	Role       string
+	Scopes     []string
+	AuthMethod string
+}
 
-// APIKeyResolver interfaz legacy para resolver API keys por hash.
+const TenantSlugHeader = "X-Pymes-Tenant-Slug"
+
+// APIKeyResolver resuelve API keys por hash.
 // Los verticales implementan esto vía verticalwire.NewAPIKeyResolver.
 type APIKeyResolver interface {
 	ResolveAPIKey(raw string) (ResolvedKey, bool)
@@ -25,9 +36,9 @@ type APIKeyResolver interface {
 
 // ResolvedKey identidad resuelta desde una API key.
 type ResolvedKey struct {
-	ID     uuid.UUID
-	OrgID  uuid.UUID
-	Scopes []string
+	ID       uuid.UUID
+	OrgID uuid.UUID
+	Scopes   []string
 }
 
 // jwtAdapter adapta IdentityResolver a authn.Authenticator.
@@ -53,7 +64,7 @@ func (a *jwtAdapter) Authenticate(ctx context.Context, cred authn.Credential) (*
 	}, nil
 }
 
-// apiKeyAdapter adapta APIKeyResolver legacy a authn.Authenticator.
+// apiKeyAdapter adapta APIKeyResolver a authn.Authenticator.
 type apiKeyAdapter struct {
 	resolver APIKeyResolver
 }
@@ -89,13 +100,92 @@ func NewAuthMiddleware(identity *IdentityResolver, keyResolver APIKeyResolver, a
 	return ginmw.NewAuthMiddleware(jwtAuth, apiKeyAuth)
 }
 
-// GetAuthContext extrae el contexto de autenticación. Delega a core.
-func GetAuthContext(c *gin.Context) AuthContext {
-	return ginmw.GetAuthContext(c)
+// RequireTenantSlugBinding fuerza que el slug de consola matchee el tenant autenticado.
+// Las API keys service-to-service pueden omitirlo; si lo envían, también debe coincidir.
+func RequireTenantSlugBinding(resolver OrgRefResolver, membershipResolvers ...TenantMembershipResolver) gin.HandlerFunc {
+	var membershipResolver TenantMembershipResolver
+	if len(membershipResolvers) > 0 {
+		membershipResolver = membershipResolvers[0]
+	}
+	return func(c *gin.Context) {
+		authCtx := GetAuthContext(c)
+		slug := strings.TrimSpace(c.GetHeader(TenantSlugHeader))
+		authMethod := strings.TrimSpace(authCtx.AuthMethod)
+		if slug == "" {
+			if authMethod == "api_key" {
+				c.Next()
+				return
+			}
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"code":    "tenant_slug_required",
+				"message": "tenant slug header is required",
+			})
+			return
+		}
+		if resolver == nil {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"code":    "tenant_mismatch",
+				"message": "tenant slug is not valid for this session",
+			})
+			return
+		}
+		resolvedOrgID, err := resolver.ResolveOrgID(c.Request.Context(), slug)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"code":    "tenant_mismatch",
+				"message": "tenant slug is not valid for this session",
+			})
+			return
+		}
+		if !strings.EqualFold(strings.TrimSpace(authCtx.OrgID), strings.TrimSpace(resolvedOrgID)) {
+			if authMethod == "jwt" && membershipResolver != nil {
+				role, ok, membershipErr := membershipResolver.FindActiveMembershipRole(c.Request.Context(), resolvedOrgID, authCtx.Actor)
+				if membershipErr != nil {
+					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+						"code":    "tenant_mismatch",
+						"message": "tenant slug is not valid for this session",
+					})
+					return
+				}
+				if ok {
+					c.Set(ctxkeys.CtxKeyOrgID, strings.TrimSpace(resolvedOrgID))
+					c.Set(ctxkeys.CtxKeyRole, strings.TrimSpace(role))
+					c.Next()
+					return
+				}
+			}
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"code":    "tenant_mismatch",
+				"message": "tenant slug is not valid for this session",
+			})
+			return
+		}
+		c.Next()
+	}
 }
 
-// ParseAuthOrgID extrae y parsea el org_id del auth context.
-func ParseAuthOrgID(c *gin.Context) (uuid.UUID, bool) {
+// GetAuthContext extrae el contexto de autenticación. Delega a core.
+func GetAuthContext(c *gin.Context) AuthContext {
+	raw := ginmw.GetAuthContext(c)
+	orgID := raw.OrgID
+	if orgID == "" {
+		if v, ok := c.Get(ctxkeys.CtxKeyTenantID); ok {
+			if s, ok := v.(string); ok {
+				orgID = s
+			}
+		}
+	}
+	return AuthContext{
+		OrgID:   orgID,
+		Actor:      raw.Actor,
+		Role:       raw.Role,
+		Scopes:     raw.Scopes,
+		AuthMethod: raw.AuthMethod,
+	}
+}
+
+// ParseAuthTenantID extrae y parsea el tenant_id del auth context.
+func ParseAuthTenantID(c *gin.Context) (uuid.UUID, bool) {
 	auth := GetAuthContext(c)
 	orgID, err := uuid.Parse(auth.OrgID)
 	if err != nil {

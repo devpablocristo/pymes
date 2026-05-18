@@ -11,100 +11,100 @@ import (
 )
 
 type TenantSettings struct {
-	OrgID                    uuid.UUID      `json:"org_id"`
-	PlanCode                 string         `json:"plan_code"`
-	HardLimits               map[string]any `json:"hard_limits"`
-	BillingStatus            string         `json:"billing_status"`
-	StripeCustomerID         string         `json:"stripe_customer_id,omitempty"`
-	StripeSubscriptionID     string         `json:"stripe_subscription_id,omitempty"`
-	Currency                 string         `json:"currency"`
-	SupportedCurrencies      []string       `json:"supported_currencies"`
-	TaxRate                  float64        `json:"tax_rate"`
-	QuotePrefix              string         `json:"quote_prefix"`
-	SalePrefix               string         `json:"sale_prefix"`
-	NextQuoteNumber          int            `json:"next_quote_number"`
-	NextSaleNumber           int            `json:"next_sale_number"`
-	AllowNegativeStock       bool           `json:"allow_negative_stock"`
-	PurchasePrefix           string         `json:"purchase_prefix"`
-	NextPurchaseNumber       int            `json:"next_purchase_number"`
-	ReturnPrefix             string         `json:"return_prefix"`
-	CreditNotePrefix         string         `json:"credit_note_prefix"`
-	NextReturnNumber         int            `json:"next_return_number"`
-	NextCreditNoteNumber     int            `json:"next_credit_note_number"`
-	BusinessName             string         `json:"business_name"`
-	BusinessTaxID            string         `json:"business_tax_id"`
-	BusinessAddress          string         `json:"business_address"`
-	BusinessPhone            string         `json:"business_phone"`
-	BusinessEmail            string         `json:"business_email"`
-	TeamSize                 string         `json:"team_size"`
-	Sells                    string         `json:"sells"`
-	ClientLabel              string         `json:"client_label"`
-	UsesBilling              bool           `json:"uses_billing"`
-	PaymentMethod            string         `json:"payment_method"`
-	Vertical                 string         `json:"vertical"`
-	OnboardingCompletedAt    *time.Time     `json:"onboarding_completed_at,omitempty"`
-	WAQuoteTemplate          string         `json:"wa_quote_template"`
-	WAReceiptTemplate        string         `json:"wa_receipt_template"`
-	WADefaultCountryCode     string         `json:"wa_default_country_code"`
-	SchedulingEnabled        bool           `json:"scheduling_enabled"`
+	OrgID                uuid.UUID      `json:"org_id"`
+	PlanCode                string         `json:"plan_code"`
+	HardLimits              map[string]any `json:"hard_limits"`
+	BillingStatus           string         `json:"billing_status"`
+	StripeCustomerID        string         `json:"stripe_customer_id,omitempty"`
+	StripeSubscriptionID    string         `json:"stripe_subscription_id,omitempty"`
+	Currency                string         `json:"currency"`
+	SupportedCurrencies     []string       `json:"supported_currencies"`
+	TaxRate                 float64        `json:"tax_rate"`
+	QuotePrefix             string         `json:"quote_prefix"`
+	SalePrefix              string         `json:"sale_prefix"`
+	NextQuoteNumber         int            `json:"next_quote_number"`
+	NextSaleNumber          int            `json:"next_sale_number"`
+	AllowNegativeStock      bool           `json:"allow_negative_stock"`
+	PurchasePrefix          string         `json:"purchase_prefix"`
+	NextPurchaseNumber      int            `json:"next_purchase_number"`
+	ReturnPrefix            string         `json:"return_prefix"`
+	CreditNotePrefix        string         `json:"credit_note_prefix"`
+	NextReturnNumber        int            `json:"next_return_number"`
+	NextCreditNoteNumber    int            `json:"next_credit_note_number"`
+	BusinessName            string         `json:"business_name"`
+	BusinessTaxID           string         `json:"business_tax_id"`
+	BusinessAddress         string         `json:"business_address"`
+	BusinessPhone           string         `json:"business_phone"`
+	BusinessEmail           string         `json:"business_email"`
+	TeamSize                string         `json:"team_size"`
+	Sells                   string         `json:"sells"`
+	ClientLabel             string         `json:"client_label"`
+	UsesBilling             bool           `json:"uses_billing"`
+	PaymentMethod           string         `json:"payment_method"`
+	Vertical                string         `json:"vertical"`
+	OnboardingCompletedAt   *time.Time     `json:"onboarding_completed_at,omitempty"`
+	WAQuoteTemplate         string         `json:"wa_quote_template"`
+	WAReceiptTemplate       string         `json:"wa_receipt_template"`
+	WADefaultCountryCode    string         `json:"wa_default_country_code"`
+	SchedulingEnabled       bool           `json:"scheduling_enabled"`
 	SchedulingLabel         string         `json:"scheduling_label"`
 	SchedulingReminderHours int            `json:"scheduling_reminder_hours"`
-	SecondaryCurrency        string         `json:"secondary_currency"`
-	DefaultRateType          string         `json:"default_rate_type"`
-	AutoFetchRates           bool           `json:"auto_fetch_rates"`
-	ShowDualPrices           bool           `json:"show_dual_prices"`
-	BankHolder               string         `json:"bank_holder"`
-	BankCBU                  string         `json:"bank_cbu"`
-	BankAlias                string         `json:"bank_alias"`
-	BankName                 string         `json:"bank_name"`
-	ShowQRInPDF              bool           `json:"show_qr_in_pdf"`
-	WAPaymentTemplate        string         `json:"wa_payment_template"`
-	WAPaymentLinkTemplate    string         `json:"wa_payment_link_template"`
-	UpdatedBy                *string        `json:"updated_by,omitempty"`
-	UpdatedAt                time.Time      `json:"updated_at"`
+	SecondaryCurrency       string         `json:"secondary_currency"`
+	DefaultRateType         string         `json:"default_rate_type"`
+	AutoFetchRates          bool           `json:"auto_fetch_rates"`
+	ShowDualPrices          bool           `json:"show_dual_prices"`
+	BankHolder              string         `json:"bank_holder"`
+	BankCBU                 string         `json:"bank_cbu"`
+	BankAlias               string         `json:"bank_alias"`
+	BankName                string         `json:"bank_name"`
+	ShowQRInPDF             bool           `json:"show_qr_in_pdf"`
+	WAPaymentTemplate       string         `json:"wa_payment_template"`
+	WAPaymentLinkTemplate   string         `json:"wa_payment_link_template"`
+	UpdatedBy               *string        `json:"updated_by,omitempty"`
+	UpdatedAt               time.Time      `json:"updated_at"`
 }
 
 type TenantSettingsPatch struct {
-	PlanCode                 *string        `json:"plan_code,omitempty"`
-	HardLimits               map[string]any `json:"hard_limits,omitempty"`
-	Currency                 *string        `json:"currency,omitempty"`
-	SupportedCurrencies      *[]string      `json:"supported_currencies,omitempty"`
-	TaxRate                  *float64       `json:"tax_rate,omitempty"`
-	QuotePrefix              *string        `json:"quote_prefix,omitempty"`
-	SalePrefix               *string        `json:"sale_prefix,omitempty"`
-	AllowNegativeStock       *bool          `json:"allow_negative_stock,omitempty"`
-	PurchasePrefix           *string        `json:"purchase_prefix,omitempty"`
-	ReturnPrefix             *string        `json:"return_prefix,omitempty"`
-	CreditNotePrefix         *string        `json:"credit_note_prefix,omitempty"`
-	BusinessName             *string        `json:"business_name,omitempty"`
-	BusinessTaxID            *string        `json:"business_tax_id,omitempty"`
-	BusinessAddress          *string        `json:"business_address,omitempty"`
-	BusinessPhone            *string        `json:"business_phone,omitempty"`
-	BusinessEmail            *string        `json:"business_email,omitempty"`
-	TeamSize                 *string        `json:"team_size,omitempty"`
-	Sells                    *string        `json:"sells,omitempty"`
-	ClientLabel              *string        `json:"client_label,omitempty"`
-	UsesBilling              *bool          `json:"uses_billing,omitempty"`
-	PaymentMethod            *string        `json:"payment_method,omitempty"`
-	Vertical                 *string        `json:"vertical,omitempty"`
-	OnboardingCompletedAt    **time.Time    `json:"onboarding_completed_at,omitempty"`
-	WAQuoteTemplate          *string        `json:"wa_quote_template,omitempty"`
-	WAReceiptTemplate        *string        `json:"wa_receipt_template,omitempty"`
-	WADefaultCountryCode     *string        `json:"wa_default_country_code,omitempty"`
-	SchedulingEnabled        *bool          `json:"scheduling_enabled,omitempty"`
+	PlanCode                *string        `json:"plan_code,omitempty"`
+	HardLimits              map[string]any `json:"hard_limits,omitempty"`
+	Currency                *string        `json:"currency,omitempty"`
+	SupportedCurrencies     *[]string      `json:"supported_currencies,omitempty"`
+	TaxRate                 *float64       `json:"tax_rate,omitempty"`
+	QuotePrefix             *string        `json:"quote_prefix,omitempty"`
+	SalePrefix              *string        `json:"sale_prefix,omitempty"`
+	AllowNegativeStock      *bool          `json:"allow_negative_stock,omitempty"`
+	PurchasePrefix          *string        `json:"purchase_prefix,omitempty"`
+	ReturnPrefix            *string        `json:"return_prefix,omitempty"`
+	CreditNotePrefix        *string        `json:"credit_note_prefix,omitempty"`
+	BusinessName            *string        `json:"business_name,omitempty"`
+	BusinessTaxID           *string        `json:"business_tax_id,omitempty"`
+	BusinessAddress         *string        `json:"business_address,omitempty"`
+	BusinessPhone           *string        `json:"business_phone,omitempty"`
+	BusinessEmail           *string        `json:"business_email,omitempty"`
+	TeamSize                *string        `json:"team_size,omitempty"`
+	Sells                   *string        `json:"sells,omitempty"`
+	ClientLabel             *string        `json:"client_label,omitempty"`
+	UsesBilling             *bool          `json:"uses_billing,omitempty"`
+	PaymentMethod           *string        `json:"payment_method,omitempty"`
+	Vertical                *string        `json:"vertical,omitempty"`
+	OnboardingCompletedAt   **time.Time    `json:"onboarding_completed_at,omitempty"`
+	WAQuoteTemplate         *string        `json:"wa_quote_template,omitempty"`
+	WAReceiptTemplate       *string        `json:"wa_receipt_template,omitempty"`
+	WADefaultCountryCode    *string        `json:"wa_default_country_code,omitempty"`
+	SchedulingEnabled       *bool          `json:"scheduling_enabled,omitempty"`
 	SchedulingLabel         *string        `json:"scheduling_label,omitempty"`
 	SchedulingReminderHours *int           `json:"scheduling_reminder_hours,omitempty"`
-	SecondaryCurrency        *string        `json:"secondary_currency,omitempty"`
-	DefaultRateType          *string        `json:"default_rate_type,omitempty"`
-	AutoFetchRates           *bool          `json:"auto_fetch_rates,omitempty"`
-	ShowDualPrices           *bool          `json:"show_dual_prices,omitempty"`
-	BankHolder               *string        `json:"bank_holder,omitempty"`
-	BankCBU                  *string        `json:"bank_cbu,omitempty"`
-	BankAlias                *string        `json:"bank_alias,omitempty"`
-	BankName                 *string        `json:"bank_name,omitempty"`
-	ShowQRInPDF              *bool          `json:"show_qr_in_pdf,omitempty"`
-	WAPaymentTemplate        *string        `json:"wa_payment_template,omitempty"`
-	WAPaymentLinkTemplate    *string        `json:"wa_payment_link_template,omitempty"`
+	SecondaryCurrency       *string        `json:"secondary_currency,omitempty"`
+	DefaultRateType         *string        `json:"default_rate_type,omitempty"`
+	AutoFetchRates          *bool          `json:"auto_fetch_rates,omitempty"`
+	ShowDualPrices          *bool          `json:"show_dual_prices,omitempty"`
+	BankHolder              *string        `json:"bank_holder,omitempty"`
+	BankCBU                 *string        `json:"bank_cbu,omitempty"`
+	BankAlias               *string        `json:"bank_alias,omitempty"`
+	BankName                *string        `json:"bank_name,omitempty"`
+	ShowQRInPDF             *bool          `json:"show_qr_in_pdf,omitempty"`
+	WAPaymentTemplate       *string        `json:"wa_payment_template,omitempty"`
+	WAPaymentLinkTemplate   *string        `json:"wa_payment_link_template,omitempty"`
 }
 
 var validVerticals = map[string]struct{}{
@@ -113,6 +113,7 @@ var validVerticals = map[string]struct{}{
 	"workshops":     {},
 	"beauty":        {},
 	"restaurants":   {},
+	"medical":       {},
 }
 
 var validTeamSizes = map[string]struct{}{
@@ -208,7 +209,7 @@ func NormalizeSupportedCurrencies(raw []string) ([]string, error) {
 
 type ActivityEvent struct {
 	ID           uuid.UUID      `json:"id"`
-	OrgID        uuid.UUID      `json:"org_id"`
+	OrgID     uuid.UUID      `json:"org_id"`
 	Actor        string         `json:"actor,omitempty"`
 	Action       string         `json:"action"`
 	ResourceType string         `json:"resource_type"`

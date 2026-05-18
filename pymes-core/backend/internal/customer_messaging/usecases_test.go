@@ -251,7 +251,7 @@ func TestHandleInboundWebhook(t *testing.T) {
 	t.Parallel()
 	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	repo := &testRepo{conn: Connection{
-		OrgID:         orgID,
+		OrgID:      orgID,
 		PhoneNumberID: "123456789",
 		AccessToken:   "plain-token",
 		IsActive:      true,
@@ -326,7 +326,7 @@ func TestSendText(t *testing.T) {
 	partyID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	repo := &testRepo{
 		domainConn: domain.Connection{
-			OrgID:         orgID,
+			OrgID:      orgID,
 			PhoneNumberID: "123456789",
 			AccessToken:   "plain-token",
 			IsActive:      true,
@@ -334,19 +334,19 @@ func TestSendText(t *testing.T) {
 		partyPhone: "+5491112345678",
 		partyName:  "Juan",
 		optIns: []domain.OptIn{{
-			OrgID:   orgID,
-			PartyID: partyID,
-			Status:  domain.OptInStatusOptedIn,
+			OrgID: orgID,
+			PartyID:  partyID,
+			Status:   domain.OptInStatusOptedIn,
 		}},
 	}
 	metaClient := &testMetaClient{}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, metaClient, nil, "", "")
 
 	msg, err := uc.SendText(context.Background(), domain.SendTextRequest{
-		OrgID:   orgID,
-		PartyID: partyID,
-		Body:    "Hola Juan, tu pedido está listo",
-		Actor:   "admin",
+		OrgID: orgID,
+		PartyID:  partyID,
+		Body:     "Hola Juan, tu pedido está listo",
+		Actor:    "admin",
 	})
 	if err != nil {
 		t.Fatalf("SendText() error = %v", err)
@@ -368,7 +368,7 @@ func TestSendTextRequiresOptIn(t *testing.T) {
 	partyID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	repo := &testRepo{
 		domainConn: domain.Connection{
-			OrgID:         orgID,
+			OrgID:      orgID,
 			PhoneNumberID: "123456789",
 			AccessToken:   "plain-token",
 			IsActive:      true,
@@ -381,10 +381,10 @@ func TestSendTextRequiresOptIn(t *testing.T) {
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, metaClient, nil, "", "")
 
 	_, err := uc.SendText(context.Background(), domain.SendTextRequest{
-		OrgID:   orgID,
-		PartyID: partyID,
-		Body:    "Hola",
-		Actor:   "admin",
+		OrgID: orgID,
+		PartyID:  partyID,
+		Body:     "Hola",
+		Actor:    "admin",
 	})
 	if err == nil {
 		t.Fatal("SendText() error = nil, want business rule when opt-in missing")

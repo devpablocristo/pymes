@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/workshops"
@@ -17,23 +18,23 @@ import (
 )
 
 // ListParams agrupa filtros de listado.
-// TargetType opcional permite a una vertical pedir solo "vehicle" o solo "bicycle".
+// AssetType opcional permite a una vertical pedir solo "vehicle" o solo "bicycle".
 type ListParams struct {
-	OrgID      uuid.UUID
-	BranchID   *uuid.UUID
-	Limit      int
-	After      *uuid.UUID
-	Search     string
-	Status     string
-	TargetType string
+	OrgID  uuid.UUID
+	BranchID  *uuid.UUID
+	Limit     int
+	After     *uuid.UUID
+	Search    string
+	Status    string
+	AssetType string
 }
 
-// UpdateInput agrupa los campos parcheables. TargetID/TargetLabel pueden cambiar
-// si se reasigna la OT a otro asset (mover a otro vehículo/bici).
+// UpdateInput agrupa los campos parcheables. AssetID/AssetLabel pueden cambiar
+// si se reasigna la OT a otro asset.
 type UpdateInput struct {
 	BranchID      *string
-	TargetID      *string
-	TargetLabel   *string
+	AssetID       *string
+	AssetLabel    *string
 	CustomerID    *string
 	CustomerName  *string
 	BookingID     *string
@@ -46,13 +47,15 @@ type UpdateInput struct {
 	PromisedAt    *time.Time
 	ReadyAt       **time.Time
 	DeliveredAt   **time.Time
+	IsFavorite    *bool
+	Tags          *[]string
 	Items         *[]domain.WorkOrderItem
 }
 
 // RepositoryPort define el contrato del adapter de persistencia.
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, targetType string) ([]domain.WorkOrder, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error)
 	Create(ctx context.Context, in domain.WorkOrder) (domain.WorkOrder, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error)
 	Update(ctx context.Context, in domain.WorkOrder) (domain.WorkOrder, error)
@@ -107,8 +110,8 @@ func (u *Usecases) List(ctx context.Context, p ListParams) ([]domain.WorkOrder, 
 	return u.repo.List(ctx, p)
 }
 
-func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, targetType string) ([]domain.WorkOrder, error) {
-	return u.repo.ListArchived(ctx, orgID, branchID, targetType)
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error) {
+	return u.repo.ListArchived(ctx, orgID, branchID, assetType)
 }
 
 func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error) {
@@ -140,7 +143,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.WorkOrder, actor string
 		in.Metadata = map[string]any{}
 	}
 
-	hook := u.hooks.lookup(in.TargetType)
+	hook := u.hooks.lookup(in.AssetType)
 	if err := hook.BeforeCreate(ctx, &in); err != nil {
 		return domain.WorkOrder{}, err
 	}
@@ -156,8 +159,8 @@ func (u *Usecases) Create(ctx context.Context, in domain.WorkOrder, actor string
 	}
 	if u.audit != nil {
 		u.audit.Log(ctx, out.OrgID.String(), actor, "work_order.created", "work_order", out.ID.String(), map[string]any{
-			"number":      out.Number,
-			"target_type": out.TargetType,
+			"number":     out.Number,
+			"asset_type": out.AssetType,
 		})
 	}
 	return out, nil
@@ -175,25 +178,25 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		}
 		return domain.WorkOrder{}, err
 	}
-	if current.ArchivedAt != nil {
-		return domain.WorkOrder{}, fmt.Errorf("work order is archived: %w", httperrors.ErrBadInput)
+	if err := archive.IfArchived(current.ArchivedAt, "work order"); err != nil {
+		return domain.WorkOrder{}, err
 	}
 
 	prevCanon := normalizeWorkOrderStatus(current.Status)
 	next := current
 
-	if in.TargetID != nil {
-		parsed, err := uuid.Parse(strings.TrimSpace(*in.TargetID))
+	if in.AssetID != nil {
+		parsed, err := uuid.Parse(strings.TrimSpace(*in.AssetID))
 		if err != nil {
-			return domain.WorkOrder{}, fmt.Errorf("target_id is invalid: %w", httperrors.ErrBadInput)
+			return domain.WorkOrder{}, fmt.Errorf("asset_id is invalid: %w", httperrors.ErrBadInput)
 		}
-		next.TargetID = parsed
+		next.AssetID = parsed
 	}
 	if in.BranchID != nil {
 		next.BranchID = vertvalues.ParseOptionalUUID(*in.BranchID)
 	}
-	if in.TargetLabel != nil {
-		next.TargetLabel = strings.TrimSpace(*in.TargetLabel)
+	if in.AssetLabel != nil {
+		next.AssetLabel = strings.TrimSpace(*in.AssetLabel)
 	}
 	if in.CustomerID != nil {
 		next.CustomerID = vertvalues.ParseOptionalUUID(*in.CustomerID)
@@ -238,8 +241,14 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if in.Items != nil {
 		next.Items = *in.Items
 	}
+	if in.IsFavorite != nil {
+		next.IsFavorite = *in.IsFavorite
+	}
+	if in.Tags != nil {
+		next.Tags = *in.Tags
+	}
 
-	hook := u.hooks.lookup(next.TargetType)
+	hook := u.hooks.lookup(next.AssetType)
 	if err := hook.BeforeUpdate(ctx, &current, &next); err != nil {
 		return domain.WorkOrder{}, err
 	}
@@ -271,9 +280,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	u.maybeNotifyReadyForPickup(ctx, orgID, actor, prevCanon, &out, hook)
 	if u.audit != nil {
 		u.audit.Log(ctx, out.OrgID.String(), actor, "work_order.updated", "work_order", out.ID.String(), map[string]any{
-			"number":      out.Number,
-			"status":      out.Status,
-			"target_type": out.TargetType,
+			"number":     out.Number,
+			"status":     out.Status,
+			"asset_type": out.AssetType,
 		})
 	}
 	return out, nil
@@ -291,8 +300,8 @@ func (u *Usecases) SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, qu
 		}
 		return domain.WorkOrder{}, err
 	}
-	if current.ArchivedAt != nil {
-		return domain.WorkOrder{}, fmt.Errorf("work order is archived: %w", httperrors.ErrBadInput)
+	if err := archive.IfArchived(current.ArchivedAt, "work order"); err != nil {
+		return domain.WorkOrder{}, err
 	}
 	out, err := u.repo.SaveIntegrations(ctx, orgID, id, quoteID, saleID, status)
 	if err != nil {
@@ -401,8 +410,8 @@ func (u *Usecases) maybeNotifyReadyForPickup(ctx context.Context, orgID uuid.UUI
 
 func normalizeWorkOrder(in *domain.WorkOrder) error {
 	in.Number = strings.ToUpper(strings.TrimSpace(in.Number))
-	in.TargetType = strings.ToLower(strings.TrimSpace(in.TargetType))
-	in.TargetLabel = strings.TrimSpace(in.TargetLabel)
+	in.AssetType = strings.ToLower(strings.TrimSpace(in.AssetType))
+	in.AssetLabel = strings.TrimSpace(in.AssetLabel)
 	in.CustomerName = strings.TrimSpace(in.CustomerName)
 	in.Status = normalizeWorkOrderStatus(in.Status)
 	in.RequestedWork = strings.TrimSpace(in.RequestedWork)
@@ -413,11 +422,11 @@ func normalizeWorkOrder(in *domain.WorkOrder) error {
 	if in.Currency == "" {
 		in.Currency = "ARS"
 	}
-	if in.TargetType == "" {
-		return fmt.Errorf("target_type is required: %w", httperrors.ErrBadInput)
+	if in.AssetType == "" {
+		return fmt.Errorf("asset_type is required: %w", httperrors.ErrBadInput)
 	}
-	if in.TargetID == uuid.Nil {
-		return fmt.Errorf("target_id is required: %w", httperrors.ErrBadInput)
+	if in.AssetID == uuid.Nil {
+		return fmt.Errorf("asset_id is required: %w", httperrors.ErrBadInput)
 	}
 	if in.Number == "" {
 		return fmt.Errorf("number is required: %w", httperrors.ErrBadInput)

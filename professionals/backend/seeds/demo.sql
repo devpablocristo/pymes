@@ -1,72 +1,224 @@
--- Demo professionals: perfil, especialidades, intake y sesión.
--- Depende de 02_core_business (cliente c1 como customer_party).
+-- Demo professionals: 10 perfiles, especialidades, intakes y sesiones.
+-- Depende de los clientes de pymes-core/seeds.
 
 DO $$
 DECLARE
-    v_org uuid := '__SEED_ORG_ID__';
-    c1 uuid;
-    prof_party uuid;
-    prof_profile uuid;
-    spec1 uuid;
-    spec2 uuid;
-    intake1 uuid;
-    sess1 uuid;
+    v_tenant uuid := '__SEED_TENANT_ID__';
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_tenant) THEN
         RETURN;
     END IF;
 
-    c1 := uuid_generate_v5(v_org, 'pymes-seed/v1/customer/1');
-    prof_party := uuid_generate_v5(v_org, 'pymes-seed/v1/professional/party/1');
-    prof_profile := uuid_generate_v5(v_org, 'pymes-seed/v1/professional/profile/1');
-    spec1 := uuid_generate_v5(v_org, 'pymes-seed/v1/professional/specialty/clinical');
-    spec2 := uuid_generate_v5(v_org, 'pymes-seed/v1/professional/specialty/pediatrics');
-    intake1 := uuid_generate_v5(v_org, 'pymes-seed/v1/professional/intake/1');
-    sess1 := uuid_generate_v5(v_org, 'pymes-seed/v1/professional/session/1');
-
-    -- Party del profesional
-    INSERT INTO parties (id, org_id, party_type, display_name, email, phone, address, tax_id, notes, tags, metadata, created_at, updated_at, deleted_at)
-    VALUES (prof_party, v_org, 'person', 'Dra. Demo Profesional', 'profesional@local.dev', '+54-11-3000-0001', '{}'::jsonb, NULL, 'seed', ARRAY['demo'], jsonb_build_object('vertical', 'professionals'), now(), now(), NULL)
-    ON CONFLICT (id) DO NOTHING;
+    INSERT INTO parties (
+        id, org_id, party_type, display_name, email, phone, address,
+        tax_id, notes, tags, metadata, created_at, updated_at, deleted_at, is_favorite
+    )
+    SELECT
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/party/' || gs::text),
+        v_tenant,
+        'person',
+        (ARRAY[
+            'Dra. Demo Profesional', 'Dr. Martin Ruiz', 'Lic. Ana Torres', 'Dra. Paula Rivas',
+            'Lic. Diego Molina', 'Dra. Sofia Castro', 'Lic. Laura Perez', 'Dr. Nicolas Vera',
+            'Dra. Camila Ortiz', 'Lic. Tomas Silva'
+        ])[gs],
+        'profesional' || gs::text || '@local.dev',
+        '+54-11-3000-' || lpad(gs::text, 4, '0'),
+        '{}'::jsonb,
+        NULL,
+        'seed professional',
+        ARRAY['demo', 'professional'],
+        jsonb_build_object('vertical', 'professionals', 'source', 'seed'),
+        now() - make_interval(days => 20 - gs),
+        now(),
+        NULL,
+        gs IN (1, 6)
+    FROM generate_series(1, 10) AS gs
+    ON CONFLICT (id) DO UPDATE
+        SET display_name = EXCLUDED.display_name,
+            email = EXCLUDED.email,
+            phone = EXCLUDED.phone,
+            notes = EXCLUDED.notes,
+            tags = EXCLUDED.tags,
+            metadata = EXCLUDED.metadata,
+            updated_at = now(),
+            deleted_at = NULL,
+            is_favorite = EXCLUDED.is_favorite;
 
     INSERT INTO party_persons (party_id, first_name, last_name)
-    VALUES (prof_party, 'Demo', 'Profesional')
-    ON CONFLICT (party_id) DO NOTHING;
+    SELECT
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/party/' || gs::text),
+        split_part(full_name, ' ', 1),
+        substring(full_name from position(' ' in full_name) + 1)
+    FROM (
+        SELECT gs, (ARRAY[
+            'Demo Profesional', 'Martin Ruiz', 'Ana Torres', 'Paula Rivas',
+            'Diego Molina', 'Sofia Castro', 'Laura Perez', 'Nicolas Vera',
+            'Camila Ortiz', 'Tomas Silva'
+        ])[gs] AS full_name
+        FROM generate_series(1, 10) AS gs
+    ) src
+    ON CONFLICT (party_id) DO UPDATE
+        SET first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name;
 
     INSERT INTO party_roles (id, party_id, org_id, role, is_active, price_list_id, metadata, created_at)
-    VALUES (gen_random_uuid(), prof_party, v_org, 'professional', true, NULL::uuid, '{}'::jsonb, now())
-    ON CONFLICT (party_id, org_id, role) DO UPDATE SET is_active = EXCLUDED.is_active;
+    SELECT
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/role/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/party/' || gs::text),
+        v_tenant,
+        'professional',
+        true,
+        NULL::uuid,
+        jsonb_build_object('source', 'seed'),
+        now()
+    FROM generate_series(1, 10) AS gs
+    ON CONFLICT (party_id, org_id, role) DO UPDATE
+        SET is_active = EXCLUDED.is_active,
+            metadata = EXCLUDED.metadata;
 
-    -- Perfil profesional
-    INSERT INTO professionals.professional_profiles (id, org_id, party_id, public_slug, bio, headline, is_public, is_bookable, accepts_new_clients, metadata)
-    VALUES (prof_profile, v_org, prof_party, 'demo-profesional', 'Perfil semilla', 'Profesional demo', true, true, true, '{}'::jsonb)
-    ON CONFLICT (id) DO NOTHING;
+    INSERT INTO professionals.professional_profiles (
+        id, org_id, party_id, public_slug, bio, headline,
+        is_public, is_bookable, accepts_new_clients, is_favorite, tags, metadata, updated_at
+    )
+    SELECT
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/profile/' || gs::text),
+        v_tenant,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/party/' || gs::text),
+        'demo-profesional-' || lpad(gs::text, 2, '0'),
+        'Perfil profesional seed ' || gs::text,
+        (ARRAY[
+            'Clinica general', 'Traumatologia', 'Psicologia adultos', 'Pediatria',
+            'Nutricion', 'Kinesiologia', 'Fonoaudiologia', 'Odontologia',
+            'Dermatologia', 'Coaching ejecutivo'
+        ])[gs],
+        true,
+        gs <> 9,
+        gs <> 8,
+        gs IN (1, 4),
+        ARRAY['demo', 'professional'],
+        jsonb_build_object('source', 'seed'),
+        now()
+    FROM generate_series(1, 10) AS gs
+    ON CONFLICT (id) DO UPDATE
+        SET party_id = EXCLUDED.party_id,
+            public_slug = EXCLUDED.public_slug,
+            bio = EXCLUDED.bio,
+            headline = EXCLUDED.headline,
+            is_public = EXCLUDED.is_public,
+            is_bookable = EXCLUDED.is_bookable,
+            accepts_new_clients = EXCLUDED.accepts_new_clients,
+            is_favorite = EXCLUDED.is_favorite,
+            tags = EXCLUDED.tags,
+            metadata = EXCLUDED.metadata,
+            updated_at = now();
 
-    -- Especialidades
-    INSERT INTO professionals.specialties (id, org_id, code, name, description, is_active)
-    VALUES
-        (spec1, v_org, 'CLINICAL', 'Clínica general', 'Consultas clínicas', true),
-        (spec2, v_org, 'PEDIATRICS', 'Pediatría', 'Atención infantil', true)
-    ON CONFLICT (org_id, code) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description, is_active = EXCLUDED.is_active;
+    INSERT INTO professionals.specialties (
+        id, org_id, code, name, description, is_active, is_favorite, tags, metadata, updated_at
+    )
+    SELECT
+        CASE gs
+            WHEN 1 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/specialty/clinical')
+            WHEN 2 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/specialty/pediatrics')
+            ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/specialty/' || gs::text)
+        END,
+        v_tenant,
+        (ARRAY['CLINICAL','PEDIATRICS','SPEC-003','SPEC-004','SPEC-005','SPEC-006','SPEC-007','SPEC-008','SPEC-009','SPEC-010'])[gs],
+        (ARRAY[
+            'Clinica general', 'Traumatologia', 'Psicologia', 'Pediatria', 'Nutricion',
+            'Kinesiologia', 'Fonoaudiologia', 'Odontologia', 'Dermatologia', 'Coaching'
+        ])[gs],
+        'Especialidad seed ' || gs::text,
+        gs <> 10,
+        gs IN (1, 3),
+        ARRAY['demo', 'specialty'],
+        jsonb_build_object('source', 'seed'),
+        now()
+    FROM generate_series(1, 10) AS gs
+    ON CONFLICT (org_id, code) DO UPDATE
+        SET name = EXCLUDED.name,
+            description = EXCLUDED.description,
+            is_active = EXCLUDED.is_active,
+            is_favorite = EXCLUDED.is_favorite,
+            tags = EXCLUDED.tags,
+            metadata = EXCLUDED.metadata,
+            updated_at = now();
 
     INSERT INTO professionals.professional_specialties (id, org_id, profile_id, specialty_id)
-    VALUES
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/professional/profile-specialty/1'), v_org, prof_profile, spec1),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/professional/profile-specialty/2'), v_org, prof_profile, spec2)
-    ON CONFLICT (org_id, profile_id, specialty_id) DO NOTHING;
+    SELECT
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/profile-specialty/' || gs::text),
+        v_tenant,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/profile/' || gs::text),
+        CASE gs
+            WHEN 1 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/specialty/clinical')
+            WHEN 2 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/specialty/pediatrics')
+            ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/specialty/' || gs::text)
+        END
+    FROM generate_series(1, 10) AS gs
+    ON CONFLICT (id) DO UPDATE
+        SET org_id = EXCLUDED.org_id,
+            profile_id = EXCLUDED.profile_id,
+            specialty_id = EXCLUDED.specialty_id;
 
-    -- Intake (formulario previo a la sesión)
-    INSERT INTO professionals.intakes (id, org_id, booking_id, profile_id, customer_party_id, service_id, status, payload)
-    VALUES (intake1, v_org, NULL, prof_profile, c1, NULL, 'submitted', jsonb_build_object('reason', 'Chequeo anual', 'allergies', 'Ninguna'))
-    ON CONFLICT (id) DO NOTHING;
-
-    -- Sesión
-    INSERT INTO professionals.sessions (id, org_id, booking_id, profile_id, customer_party_id, service_id, status, started_at, ended_at, summary, metadata)
-    VALUES (
-        sess1, v_org, uuid_generate_v5(v_org, 'pymes-seed/v1/professional/booking/1'),
-        prof_profile, c1, NULL, 'completed',
-        now() - interval '1 day', now() - interval '1 day' + interval '45 minutes',
-        'Sesión demo finalizada', '{}'::jsonb
+    INSERT INTO professionals.intakes (
+        id, org_id, booking_id, profile_id, customer_party_id, service_id,
+        status, payload, is_favorite, tags, updated_at
     )
-    ON CONFLICT (org_id, booking_id) DO NOTHING;
+    SELECT
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/intake/' || gs::text),
+        v_tenant,
+        NULL::uuid,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/profile/' || (((gs - 1) % 10) + 1)::text),
+        CASE
+            WHEN gs <= 3 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/customer/' || gs::text)
+            ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text)
+        END,
+        NULL::uuid,
+        (ARRAY['draft','submitted','reviewed','submitted','draft','submitted','reviewed','submitted','draft','submitted'])[gs],
+        jsonb_build_object('reason', 'Consulta seed ' || gs::text, 'source', 'seed'),
+        gs IN (2, 6),
+        ARRAY['demo', 'intake'],
+        now()
+    FROM generate_series(1, 10) AS gs
+    ON CONFLICT (id) DO UPDATE
+        SET profile_id = EXCLUDED.profile_id,
+            customer_party_id = EXCLUDED.customer_party_id,
+            service_id = EXCLUDED.service_id,
+            status = EXCLUDED.status,
+            payload = EXCLUDED.payload,
+            is_favorite = EXCLUDED.is_favorite,
+            tags = EXCLUDED.tags,
+            updated_at = now();
+
+    INSERT INTO professionals.sessions (
+        id, org_id, booking_id, profile_id, customer_party_id, service_id,
+        status, started_at, ended_at, summary, metadata, updated_at
+    )
+    SELECT
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/session/' || gs::text),
+        v_tenant,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/booking/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/profile/' || (((gs - 1) % 10) + 1)::text),
+        CASE
+            WHEN gs <= 3 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/customer/' || gs::text)
+            ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text)
+        END,
+        NULL::uuid,
+        (ARRAY['completed','scheduled','completed','cancelled','completed','scheduled','completed','completed','scheduled','completed'])[gs],
+        now() - ((11 - gs) || ' days')::interval,
+        CASE WHEN gs IN (2, 6, 9) THEN NULL ELSE now() - ((11 - gs) || ' days')::interval + '45 minutes'::interval END,
+        'Sesion profesional seed ' || gs::text,
+        jsonb_build_object('source', 'seed'),
+        now()
+    FROM generate_series(1, 10) AS gs
+    ON CONFLICT (org_id, booking_id) DO UPDATE
+        SET profile_id = EXCLUDED.profile_id,
+            customer_party_id = EXCLUDED.customer_party_id,
+            service_id = EXCLUDED.service_id,
+            status = EXCLUDED.status,
+            started_at = EXCLUDED.started_at,
+            ended_at = EXCLUDED.ended_at,
+            summary = EXCLUDED.summary,
+            metadata = EXCLUDED.metadata,
+            updated_at = now();
 END $$;

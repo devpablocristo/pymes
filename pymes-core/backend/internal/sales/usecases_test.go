@@ -17,6 +17,8 @@ type mockRepo struct {
 	createFn            func(ctx context.Context, in CreateInput) (saledomain.Sale, error)
 	getByIDFn           func(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
 	voidFn              func(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
+	updateStatusFn      func(ctx context.Context, in UpdateStatusInput) (saledomain.Sale, error)
+	updateStatusCalled  int
 }
 
 func (m *mockRepo) List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error) {
@@ -28,8 +30,18 @@ func (m *mockRepo) Create(ctx context.Context, in CreateInput) (saledomain.Sale,
 func (m *mockRepo) GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
 	return m.getByIDFn(ctx, orgID, saleID)
 }
+func (m *mockRepo) Update(ctx context.Context, in UpdateInput) (saledomain.Sale, error) {
+	return saledomain.Sale{ID: in.ID, OrgID: in.OrgID}, nil
+}
 func (m *mockRepo) Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
 	return m.voidFn(ctx, orgID, saleID)
+}
+func (m *mockRepo) UpdateStatus(ctx context.Context, in UpdateStatusInput) (saledomain.Sale, error) {
+	m.updateStatusCalled++
+	if m.updateStatusFn != nil {
+		return m.updateStatusFn(ctx, in)
+	}
+	return saledomain.Sale{ID: in.ID, OrgID: in.OrgID, Status: in.Status}, nil
 }
 func (m *mockRepo) PatchSale(context.Context, uuid.UUID, uuid.UUID, SalePatchFields) (saledomain.Sale, error) {
 	return saledomain.Sale{}, nil
@@ -129,7 +141,7 @@ func TestCreateSale_AppliesStockAndCashflow(t *testing.T) {
 			}
 			return saledomain.Sale{
 				ID:            saleID,
-				OrgID:         in.OrgID,
+				OrgID:      in.OrgID,
 				BranchID:      in.BranchID,
 				Status:        "completed",
 				PaymentMethod: "cash",
@@ -157,7 +169,7 @@ func TestCreateSale_AppliesStockAndCashflow(t *testing.T) {
 	uc := NewUsecases(repo, inv, cash, audit)
 
 	_, err := uc.Create(context.Background(), CreateSaleInput{
-		OrgID:         orgID,
+		OrgID:      orgID,
 		BranchID:      &branchID,
 		PaymentMethod: "cash",
 		Items: []CreateSaleItemInput{
@@ -213,7 +225,7 @@ func TestVoidSale_ReversesStockAndCashflow(t *testing.T) {
 			getByIDCalls++
 			return saledomain.Sale{
 				ID:            inSaleID,
-				OrgID:         orgID,
+				OrgID:      orgID,
 				BranchID:      &branchID,
 				Status:        "completed",
 				PaymentMethod: "transfer",
@@ -227,7 +239,7 @@ func TestVoidSale_ReversesStockAndCashflow(t *testing.T) {
 		voidFn: func(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
 			return saledomain.Sale{
 				ID:            saleID,
-				OrgID:         orgID,
+				OrgID:      orgID,
 				Status:        "voided",
 				PaymentMethod: "transfer",
 				Total:         500,

@@ -1,46 +1,22 @@
+// Package handlers — RBAC middleware now lives in platform/http/gin/go (v0.2.0+).
+// Local types are kept as aliases so existing call sites in pymes-core do not
+// need to import ginmw directly. New code should prefer the canonical import:
+// github.com/devpablocristo/platform/http/gin/go.
 package handlers
 
 import (
-	"context"
-	"net/http"
-	"strings"
-
-	"github.com/gin-gonic/gin"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 )
 
-type PermissionChecker interface {
-	HasPermission(ctx context.Context, orgID, actor, role string, scopes []string, authMethod, resource, action string) bool
-}
+// PermissionChecker re-exports the agnostic interface from platform/http/gin/go.
+// Existing pymes implementations (e.g. rbac.UseCases) satisfy this interface
+// structurally via the same method signature.
+type PermissionChecker = ginmw.PermissionChecker
 
-type RBACMiddleware struct {
-	checker PermissionChecker
-}
+// RBACMiddleware re-exports the agnostic middleware from platform/http/gin/go.
+type RBACMiddleware = ginmw.RBACMiddleware
 
+// NewRBACMiddleware wires the platform middleware.
 func NewRBACMiddleware(checker PermissionChecker) *RBACMiddleware {
-	return &RBACMiddleware{checker: checker}
-}
-
-func (m *RBACMiddleware) RequirePermission(resource, action string) gin.HandlerFunc {
-	resource = strings.TrimSpace(resource)
-	action = strings.TrimSpace(action)
-	return func(c *gin.Context) {
-		if m == nil || m.checker == nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"code": "INTERNAL", "message": "rbac_not_configured"})
-			return
-		}
-		authCtx := GetAuthContext(c)
-		if authCtx.OrgID == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"code": "UNAUTHORIZED", "message": "unauthorized"})
-			return
-		}
-		if m.checker.HasPermission(c.Request.Context(), authCtx.OrgID, authCtx.Actor, authCtx.Role, authCtx.Scopes, authCtx.AuthMethod, resource, action) {
-			c.Next()
-			return
-		}
-		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
-			"code":     "FORBIDDEN",
-			"message":  "forbidden",
-			"required": resource + ":" + action,
-		})
-	}
+	return ginmw.NewRBACMiddleware(checker)
 }

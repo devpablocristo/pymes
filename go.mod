@@ -14,7 +14,7 @@ require (
 	github.com/devpablocristo/platform/features/crud/archive/go v0.1.0
 	github.com/devpablocristo/platform/features/crud/paths/go v0.1.0
 	github.com/devpablocristo/platform/features/scheduling/go v0.1.0
-	github.com/devpablocristo/platform/http/gin/go v0.1.0
+	github.com/devpablocristo/platform/http/gin/go v0.2.1
 	github.com/devpablocristo/platform/http/go v0.1.0
 	github.com/devpablocristo/platform/kernels/governance/go v0.1.0
 	github.com/devpablocristo/platform/kernels/saas/go v0.1.0

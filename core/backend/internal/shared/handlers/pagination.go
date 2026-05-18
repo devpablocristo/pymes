@@ -1,19 +1,27 @@
+// Package handlers — pagination helpers split between this package and
+// platform/http/gin/go (v0.2.0+):
+//
+//   - ParseAfterUUIDQuery / WriteListResponse / WriteOffsetListResponse are
+//     re-exported from ginmw (identical semantics, no pymes-specific deps).
+//   - ParseLimitQuery is kept here because its signature uses pymes' shared
+//     pagination.Config (configurable default + max, distinct from platform's
+//     default/max int pair). New code should prefer ginmw.ParseLimitQuery if
+//     it doesn't need Config.
 package handlers
 
 import (
-	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/devpablocristo/platform/http/go/pagination"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-// ParseLimitQuery lee el query param `key` y aplica pagination.NormalizeLimit.
-// Valores no numéricos o <=0 se normalizan al default de config (mismo criterio tolerante
-// que strconv.Atoi ignorado + capa de repositorio).
-// Si el param no está en la URL, se usa defaultWhenMissing como string (p.ej. "20"), igual que Gin DefaultQuery.
+// ParseLimitQuery reads the `key` query param and normalizes via
+// pagination.NormalizeLimit. Non-numeric / non-positive values fall through
+// to the config default (lenient parsing to match repository behavior).
 func ParseLimitQuery(c *gin.Context, key string, defaultWhenMissing string, config pagination.Config) int {
 	raw := queryRawOrDefault(c, key, defaultWhenMissing)
 	return pagination.NormalizeLimit(tolerantAtoi(raw), config)
@@ -38,30 +46,17 @@ func tolerantAtoi(raw string) int {
 	return n
 }
 
-// ParseAfterUUIDQuery parsea el cursor `after` como UUID. Vacío → (nil, true).
-// Presente e inválido → 400 {"error":"invalid after"} y (nil, false).
+// ParseAfterUUIDQuery delegates to platform.
 func ParseAfterUUIDQuery(c *gin.Context) (*uuid.UUID, bool) {
-	v := strings.TrimSpace(c.Query("after"))
-	if v == "" {
-		return nil, true
-	}
-	id, err := uuid.Parse(v)
-	if err != nil {
-		WriteValidation(c, "invalid after")
-		return nil, false
-	}
-	return &id, true
+	return ginmw.ParseAfterUUIDQuery(c)
 }
 
+// WriteListResponse delegates to platform.
 func WriteListResponse(c *gin.Context, items any, total int64, hasMore bool, nextCursor string) {
-	c.JSON(http.StatusOK, gin.H{
-		"items":       items,
-		"total":       total,
-		"has_more":    hasMore,
-		"next_cursor": nextCursor,
-	})
+	ginmw.WriteListResponse(c, items, total, hasMore, nextCursor)
 }
 
+// WriteOffsetListResponse delegates to platform.
 func WriteOffsetListResponse(c *gin.Context, items any, limit int, total int) {
-	WriteListResponse(c, items, int64(total), total > limit, "")
+	ginmw.WriteOffsetListResponse(c, items, limit, total)
 }

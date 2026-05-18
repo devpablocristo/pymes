@@ -77,8 +77,8 @@ github.com/devpablocristo/platform/features/crud/paths/go v0.1.0 h1:ed+PWcR1EcJO
 github.com/devpablocristo/platform/features/crud/paths/go v0.1.0/go.mod h1:P4EADb74DZOL+Y4W3cCeaZb1NM4DeHhoOeQy2ya2CuI=
 github.com/devpablocristo/platform/features/scheduling/go v0.1.0 h1:FD7BWke+nB7LZuayS/+erHQxMIpecEP8FK22Fp28Aqg=
 github.com/devpablocristo/platform/features/scheduling/go v0.1.0/go.mod h1:S6B3cY5OsA6AcRrsDVFBOavtdnxvNOzeOSH4NjFpiKk=
-github.com/devpablocristo/platform/http/gin/go v0.1.0 h1:6DcKNLPRIbe8AwOHPhECDeo30Fjj7ahs5SE5mufRtCY=
-github.com/devpablocristo/platform/http/gin/go v0.1.0/go.mod h1:Ni+Hek8a+klpqFlW1gt92bmnXFguSPLQLeAzBNKHm1U=
+github.com/devpablocristo/platform/http/gin/go v0.2.1 h1:fxfBbwXeGw5u4wuprnki1viB/M2TrUjANfB0M93JGP4=
+github.com/devpablocristo/platform/http/gin/go v0.2.1/go.mod h1:Ni+Hek8a+klpqFlW1gt92bmnXFguSPLQLeAzBNKHm1U=
 github.com/devpablocristo/platform/http/go v0.1.0 h1:YQGApnAJx2+62HrLZ5G5Uf0Kq5phhV4JF6Be0IRZ//o=
 github.com/devpablocristo/platform/http/go v0.1.0/go.mod h1:qinUKdGJ51xbKMLYWF96bSGu8JSRAbWPsAqTusrg5tk=
 github.com/devpablocristo/platform/jobs/go v0.1.0 h1:3jMfKluabIgMlbJOK+46b1mSI5amBfMX9Jnp15Bkyp8=

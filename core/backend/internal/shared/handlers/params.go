@@ -1,12 +1,16 @@
+// Package handlers — Pymes-specific param parsers. The generic UUID parsing
+// is delegated to platform/http/gin/go; this file keeps the helpers that
+// resolve the *tenant* through sharedauth (pymes-internal concept) and
+// compound helpers that combine them.
 package handlers
 
 import (
-	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	sharedauth "github.com/devpablocristo/pymes/core/shared/backend/auth"
 )
 
@@ -58,6 +62,7 @@ func ParseEntityRef(c *gin.Context, entityParam string, idParam string) (uuid.UU
 	return orgID, entity, id, true
 }
 
+// WriteValidation delegates to platform — identical 400 envelope.
 func WriteValidation(c *gin.Context, message string) {
-	c.JSON(http.StatusBadRequest, gin.H{"code": "VALIDATION", "message": message})
+	ginmw.WriteValidation(c, message)
 }

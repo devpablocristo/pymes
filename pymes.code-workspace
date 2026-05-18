@@ -1,7 +1,12 @@
 {
   "folders": [
       {
+          "name": "pymes (monorepo)",
           "path": "."
+      },
+      {
+          "name": "pymes-app (Expo)",
+          "path": "pymes-app"
       }
   ],
   "settings": {

@@ -35,6 +35,14 @@ frontend/.deps/
 .firebase/
 **/e2e-real/.auth/
 
+# pymes-app (Expo)
+pymes-app/.expo/
+pymes-app/ios/Pods/
+pymes-app/ios/build/
+pymes-app/android/.gradle/
+pymes-app/android/build/
+pymes-app/android/app/build/
+
 # Dumps de clientes y CSVs temporales de migración
 *.sql
 !**/migrations/**/*.sql

@@ -1,5 +1,5 @@
 -- 0001_professionals.up.sql (vertical Professionals — squashed)
--- Schema isolado en `professionals.*` con FK a orgs(id) en pymes-core.
+-- Schema isolado en `professionals.*` con FK a orgs(id) en core.
 -- Consolida: 0001..0008 actuales (post `0008_complete_tenant_schema_rename`).
 
 CREATE SCHEMA IF NOT EXISTS professionals;

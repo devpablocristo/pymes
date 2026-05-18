@@ -8,11 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/devpablocristo/pymes/beauty/backend/internal/shared/pymescore"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalgin"
 )
 
-// coreServicesPort expone el catálogo público de servicios servido por pymes-core.
+// coreServicesPort expone el catálogo público de servicios servido por core.
 type coreServicesPort interface {
 	ListPublicServices(ctx context.Context, tenantRef, vertical, segment, search string) ([]pymescore.CoreService, error)
 }

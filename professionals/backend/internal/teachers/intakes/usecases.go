@@ -10,7 +10,7 @@ import (
 
 	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 )
 
 type ListParams struct {

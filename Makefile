@@ -3,13 +3,13 @@
 .PHONY: \
 	up down ps logs \
 	go-compile staticcheck ruff lint \
-	audit audit-baseline audit-crud audit-crud-json audit-crud-strict audit-debt audit-governance frontend-typecheck ai-test \
+	audit audit-baseline audit-crud audit-crud-json audit-crud-strict audit-debt audit-governance ui-typecheck ai-test \
 	seed seed-clear seed-clear-verify seed-verify seed-reset modules-check cleanup-pablo e2e-governance-notifications \
-	build-docker-frontend test-docker-frontend lint-docker-frontend test-docker-core test-docker-workshops \
-	build test test-frontend-e2e
+	build-docker-ui test-docker-ui lint-docker-ui test-docker-core test-docker-workshops \
+	build test test-ui-e2e
 
 GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=https://proxy.golang.org,direct
-GO_PACKAGES = ./pymes-core/backend/... ./pymes-core/shared/... ./workshops/backend/... ./professionals/backend/... ./restaurants/backend/... ./beauty/backend/... ./medical/backend/...
+GO_PACKAGES = ./core/backend/... ./core/shared/... ./workshops/backend/... ./professionals/backend/... ./restaurants/backend/... ./beauty/backend/... ./medical/backend/...
 # Repo hermano `local-infra`. Override por CLI: `make up LOCAL_INFRA_DIR=/ruta/al/local-infra`.
 #
 # GNU Make importa variables del shell; `?=´ respeta el entorno y un export viejo (p. ej. ruta de otra
@@ -40,7 +40,7 @@ DC = docker compose --project-directory $(CURDIR) -f $(BASE_COMPOSE) -f $(CURDIR
 
 # Calidad
 
-# Compilacion rapida de todos los backends Go del monorepo, sin caer en frontend/node_modules.
+# Compilacion rapida de todos los backends Go del monorepo, sin caer en ui/node_modules.
 go-compile:
 	$(GO_PRIVATE) go test $(GO_PACKAGES) -run '^$$'
 
@@ -58,7 +58,7 @@ lint: staticcheck ruff
 audit: audit-crud audit-debt audit-governance
 
 # Baseline reproducible antes de refactors estructurales.
-audit-baseline: go-compile audit frontend-typecheck ruff ai-test
+audit-baseline: go-compile audit ui-typecheck ruff ai-test
 
 audit-crud:
 	@python3 scripts/audit/crud_contract.py
@@ -75,8 +75,8 @@ audit-debt:
 audit-governance:
 	@bash scripts/audit/governance_boundary.sh
 
-frontend-typecheck:
-	cd frontend && npm run typecheck
+ui-typecheck:
+	cd ui && npm run typecheck
 
 ai-test:
 	cd ai && (test -x .venv/bin/pytest && .venv/bin/pytest -q || pytest -q)
@@ -145,7 +145,7 @@ llm-pull:
 up:
 	@$(MAKE) llm-up
 	@$(MAKE) llm-pull
-	$(DC) build cp-backend prof-backend work-backend beauty-backend restaurants-backend medical-backend frontend ai
+	$(DC) build cp-backend prof-backend work-backend beauty-backend restaurants-backend medical-backend ui ai
 	$(DC) up -d --no-build
 
 # Baja y elimina contenedores de la red del proyecto
@@ -164,14 +164,14 @@ logs:
 
 # --- Docker-first: requiere contenedores en marcha (`make up`) ---
 
-build-docker-frontend:
-	$(DC) exec -T frontend npm run build
+build-docker-ui:
+	$(DC) exec -T ui npm run build
 
-test-docker-frontend:
-	$(DC) exec -T frontend npm test
+test-docker-ui:
+	$(DC) exec -T ui npm test
 
-lint-docker-frontend:
-	$(DC) exec -T frontend npm run lint
+lint-docker-ui:
+	$(DC) exec -T ui npm run lint
 
 test-docker-core:
 	$(DC) exec -T cp-backend go test ./...
@@ -183,25 +183,25 @@ test-docker-workshops:
 
 # Compila backends Go + build del frontend + chequeo básico del servicio AI (nativo en host)
 build:
-	cd pymes-core/backend && $(GO_PRIVATE) go build ./...
+	cd core/backend && $(GO_PRIVATE) go build ./...
 	cd professionals/backend && $(GO_PRIVATE) go build ./...
 	cd workshops/backend && $(GO_PRIVATE) go build ./...
 	cd beauty/backend && $(GO_PRIVATE) go build ./...
 	cd restaurants/backend && $(GO_PRIVATE) go build ./...
-	cd frontend && npm run build
+	cd ui && npm run build
 	cd ai && _pc=$$(mktemp -d) && export PYTHONPYCACHEPREFIX=$$_pc && (test -x .venv/bin/python && .venv/bin/python -m compileall -q src || python3 -m compileall -q src); _e=$$?; rm -rf $$_pc; exit $$_e
 
-# Tests (Go en pymes-core + professionals + workshops + beauty + restaurants + frontend + AI)
+# Tests (Go en core + professionals + workshops + beauty + restaurants + ui + AI)
 test:
-	cd pymes-core/backend && $(GO_PRIVATE) go test ./...
+	cd core/backend && $(GO_PRIVATE) go test ./...
 	cd professionals/backend && $(GO_PRIVATE) go test ./...
 	cd workshops/backend && $(GO_PRIVATE) go test ./...
 	cd beauty/backend && $(GO_PRIVATE) go test ./...
 	cd restaurants/backend && $(GO_PRIVATE) go test ./...
-	cd frontend && npm test
+	cd ui && npm test
 	@$(MAKE) ruff
 	cd ai && (test -x .venv/bin/pytest && .venv/bin/pytest -q || pytest -q)
 
-# E2E frontend (Playwright / Chromium)
-test-frontend-e2e:
-	cd frontend && npm run test:e2e
+# E2E UI (Playwright / Chromium)
+test-ui-e2e:
+	cd ui && npm run test:e2e

@@ -1,5 +1,5 @@
 -- Demo taller bike_shop: 10 bicicletas y 10 OT.
--- Depende de los clientes de pymes-core/seeds.
+-- Depende de los clientes de core/seeds.
 
 DO $$
 DECLARE

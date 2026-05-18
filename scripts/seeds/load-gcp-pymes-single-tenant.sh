@@ -18,7 +18,7 @@
 #   export PYMES_SEED_DEMO_TENANT_SLUG='bicimax'
 #   ./scripts/seeds/load-gcp-pymes-single-tenant.sh
 #
-# Por defecto: solo seeds de pymes-core (Cloud Run GCP no crea esquema workshops.*).
+# Por defecto: solo seeds de core (Cloud Run GCP no crea esquema workshops.*).
 # Incluir seeds workshops (tablas workshops.*): solo si ese esquema existe en la BD
 # (p. ej. migraste también el backend workshops contra esta misma DB).
 #   export PYMES_GCP_INCLUDE_WORKSHOPS_SEEDS=1
@@ -159,11 +159,11 @@ echo "→ BD destino (solo URI local vía proxy si aplica); proyecto GCP declara
 echo "→ Tenant externo: $SEED_TENANT_EXTERNAL_ID | UUID seed: $TARGET_TENANT_UUID | slug: $SEED_TENANT_SLUG"
 
 files=(
-  "pymes-core/backend/seeds/01_clerk_prereqs.sql"
-  "pymes-core/backend/seeds/02_core_business.sql"
-  "pymes-core/backend/seeds/03_rbac.sql"
-  "pymes-core/backend/seeds/04_full_demo.sql"
-  "pymes-core/backend/seeds/05_scheduling_demo.sql"
+  "core/backend/seeds/01_clerk_prereqs.sql"
+  "core/backend/seeds/02_core_business.sql"
+  "core/backend/seeds/03_rbac.sql"
+  "core/backend/seeds/04_full_demo.sql"
+  "core/backend/seeds/05_scheduling_demo.sql"
 )
 if [[ "${PYMES_GCP_INCLUDE_WORKSHOPS_SEEDS:-}" == "1" ]]; then
   files+=(

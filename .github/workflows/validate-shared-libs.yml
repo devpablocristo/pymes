@@ -1,7 +1,7 @@
 name: validate-shared-libs
 
 # Valida que las últimas versiones publicadas de @devpablocristo/* no rompan
-# el build de frontend ni el go.mod de pymes-core. Corre diariamente como
+# el build de ui ni el go.mod de core. Corre diariamente como
 # early-warning ante breaking changes en core/modules. Parte del audit
 # core+modules 2026-05-15 (MP-05).
 
@@ -14,11 +14,11 @@ permissions:
   contents: read
 
 jobs:
-  frontend-typecheck:
+  ui-typecheck:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: frontend
+        working-directory: ui
     steps:
       - uses: actions/checkout@v6
 

@@ -1,4 +1,4 @@
-// Package orchestration exposes HTTP bridges from professionals to pymes-core workflows.
+// Package orchestration exposes HTTP bridges from professionals to core workflows.
 package orchestration
 
 import (
@@ -8,9 +8,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
+	"github.com/devpablocristo/pymes/core/shared/backend/auth"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalgin"
 )
 
 type usecasesPort interface {

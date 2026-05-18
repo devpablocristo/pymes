@@ -25,26 +25,26 @@ check_zero() {
 check_zero \
   "no embedded governance packages" \
   'core/governance/go/(decision|policy|risk|approval|kernel)' \
-  pymes-core workshops professionals restaurants beauty medical ai frontend scripts .github Makefile \
+  core workshops professionals restaurants beauty medical ai ui scripts .github Makefile \
   --glob '!**/node_modules/**' --glob '!**/__pycache__/**'
 
 check_zero \
   "no local governance engine/evaluator" \
   'decision\.Engine|policy\.Evaluator|risk\.Evaluate|approval\.RequirementFor' \
-  pymes-core workshops professionals restaurants beauty medical \
+  core workshops professionals restaurants beauty medical \
   --glob '*.go'
 
 check_zero \
   "no old Pymes policy list naming" \
   'ListPoliciesForOrg' \
-  pymes-core/backend/internal/procurement \
+  core/backend/internal/procurement \
   --glob '*.go'
 
 tmp="$(mktemp)"
-if rg -n 'WithOrgID|X-Org-ID|org_id == tenant_id' pymes-core scripts .github Makefile \
+if rg -n 'WithOrgID|X-Org-ID|org_id == tenant_id' core scripts .github Makefile \
   --glob '!**/__pycache__/**' \
-  --glob '!pymes-core/backend/internal/governanceproxy/client.go' \
-  --glob '!pymes-core/backend/internal/governanceproxy/client_test.go' \
+  --glob '!core/backend/internal/governanceproxy/client.go' \
+  --glob '!core/backend/internal/governanceproxy/client_test.go' \
   --glob '!scripts/migrate_procurement_policies_to_nexus.sh' \
   --glob '!scripts/audit/governance_boundary.sh' >"$tmp"; then
   echo "FAIL Nexus tenant-scope wire naming leaked outside explicit adapters" >&2

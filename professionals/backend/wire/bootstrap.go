@@ -22,11 +22,11 @@ import (
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/sessions"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties"
 	"github.com/devpablocristo/pymes/professionals/backend/migrations"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalaudit"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalwire"
+	"github.com/devpablocristo/pymes/core/shared/backend/app"
+	"github.com/devpablocristo/pymes/core/shared/backend/auth"
+	"github.com/devpablocristo/pymes/core/shared/backend/store"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalaudit"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalwire"
 )
 
 func InitializeApp() *app.App {
@@ -117,7 +117,7 @@ func setupLogger() zerolog.Logger {
 	return logger.With().Timestamp().Logger()
 }
 
-// cpOrgResolver resolves org slugs via the pymes-core client.
+// cpOrgResolver resolves org slugs via the core client.
 type cpOrgResolver struct {
 	client *pymescore.Client
 }

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# wooko-diff.sh — comparar archivo por archivo el frontend actual con
-# el fork visual de Wooko (wooko.com/pymes/frontend/) durante la migración UI.
+# wooko-diff.sh — comparar archivo por archivo la ui actual con
+# el fork visual de Wooko (wooko.com/pymes/ui/) durante la migración UI.
 #
 # Uso:
-#   scripts/wooko-diff.sh <ruta-relativa-a-frontend/>
+#   scripts/wooko-diff.sh <ruta-relativa-a-ui/>
 #
 # Ejemplos:
 #   scripts/wooko-diff.sh src/styles/tokens.css
@@ -16,15 +16,15 @@
 set -euo pipefail
 
 if [ "$#" -lt 1 ]; then
-  echo "uso: scripts/wooko-diff.sh <ruta-relativa-a-frontend/>" >&2
+  echo "uso: scripts/wooko-diff.sh <ruta-relativa-a-ui/>" >&2
   echo "ej:  scripts/wooko-diff.sh src/styles/tokens.css" >&2
   exit 2
 fi
 
 # Resolvé root del repo (asume el script ubicado en scripts/).
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ACTUAL="$ROOT/frontend/$1"
-WOOKO="$ROOT/wooko.com/pymes/frontend/$1"
+ACTUAL="$ROOT/ui/$1"
+WOOKO="$ROOT/wooko.com/pymes/ui/$1"
 
 if [ ! -e "$ACTUAL" ] && [ ! -e "$WOOKO" ]; then
   echo "ninguna versión existe en:" >&2

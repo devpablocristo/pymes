@@ -47,18 +47,18 @@ jobs:
           print(f"deploy matrix contains {len(matrix['include'])} verticals")
           PY
 
-  pymes-core-backend:
+  core-backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Verify pymes-core backend
+      - name: Verify core backend
         run: |
-          go vet ./pymes-core/backend/...
-          go test ./pymes-core/backend/...
-          go build ./pymes-core/backend/...
+          go vet ./core/backend/...
+          go test ./core/backend/...
+          go build ./core/backend/...
 
   professionals-backend:
     runs-on: ubuntu-latest
@@ -125,20 +125,20 @@ jobs:
           go test ./medical/backend/...
           go build ./medical/backend/...
 
-  frontend:
+  ui:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     defaults:
       run:
-        working-directory: frontend
+        working-directory: ui
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20.19.0'
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: ui/package-lock.json
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -163,7 +163,7 @@ jobs:
           VITE_MEDICAL_API_URL: ${{ secrets.VITE_MEDICAL_API_URL_DEV }}
         run: npm run build
 
-      # Hosting DEV: solo en merge/push a `develop` vía `.github/workflows/deploy-dev-frontend.yml`
+      # Hosting DEV: solo en merge/push a `develop` vía `.github/workflows/deploy-dev-ui.yml`
       # (WIF + smoke). No desplegar DEV desde pushes a `main`.
 
   audits:
@@ -185,7 +185,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build production backend image
-        run: docker build -f pymes-core/backend/Dockerfile.prod -t pymes-core-prod-ci ..
+        run: docker build -f core/backend/Dockerfile.prod -t core-prod-ci ..
       # pymes-ai image builds eliminados: el chat lo sirve Companion (sibling
       # repo, su propio CI/deploy). Ver modular-swinging-hummingbird Fase 4.
 
@@ -214,7 +214,7 @@ jobs:
     # El E2E real (Docker + callback Nexus→cp-backend) solo en workflow_dispatch: en PR compartidos no es estable.
     # El job sigue ejecutándose en pull_request con un paso no-op para que los checks requeridos no queden "Skipped".
     needs:
-      - pymes-core-backend
+      - core-backend
     permissions:
       contents: read
     steps:
@@ -305,7 +305,7 @@ jobs:
           # El E2E sólo necesita la org semilla. Los seeds de verticales requieren
           # que esos backends hayan aplicado sus propias migraciones, cosa que no
           # pasa acá porque la stack de E2E sólo levanta Nexus governance + cp-backend de Pymes.
-          # Cargamos únicamente los seeds que dependen de pymes-core.
+          # Cargamos únicamente los seeds que dependen de core.
           source scripts/seeds/lib.sh
           ensure_seed_dbs_ready
           require_seed_tenant_external_id
@@ -316,8 +316,8 @@ jobs:
           export TARGET_TENANT_UUID SEED_TENANT_EXTERNAL_ID SEED_TENANT_NAME SEED_TENANT_SLUG
 
           for sql_file in \
-            "pymes-core/backend/seeds/01_clerk_prereqs.sql" \
-            "pymes-core/backend/seeds/03_rbac.sql"
+            "core/backend/seeds/01_clerk_prereqs.sql" \
+            "core/backend/seeds/03_rbac.sql"
           do
             run_pymes_sql_file "$sql_file"
           done

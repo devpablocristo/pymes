@@ -171,11 +171,11 @@ SEED_TENANT_SLUG="$PYMES_SEED_DEMO_TENANT_SLUG"
 export TARGET_TENANT_UUID SEED_TENANT_EXTERNAL_ID SEED_TENANT_NAME SEED_TENANT_SLUG
 
 files=(
-  "pymes-core/backend/seeds/01_clerk_prereqs.sql"
-  "pymes-core/backend/seeds/02_core_business.sql"
-  "pymes-core/backend/seeds/03_rbac.sql"
-  "pymes-core/backend/seeds/04_full_demo.sql"
-  "pymes-core/backend/seeds/05_scheduling_demo.sql"
+  "core/backend/seeds/01_clerk_prereqs.sql"
+  "core/backend/seeds/02_core_business.sql"
+  "core/backend/seeds/03_rbac.sql"
+  "core/backend/seeds/04_full_demo.sql"
+  "core/backend/seeds/05_scheduling_demo.sql"
 )
 
 if [[ "$PYMES_GCP_INCLUDE_MEDICAL_SEEDS" == "1" ]]; then

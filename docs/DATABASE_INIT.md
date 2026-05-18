@@ -9,8 +9,8 @@
 ## 1. Resumen
 
 - **Una sola tabla canónica de identidad: `orgs`.** No hay más `tenants`. Toda relación multi-tenant referencia `orgs(id) ON DELETE CASCADE` con columna `org_id`.
-- **Schema bootstrap atómico**: 17 migraciones en `pymes-core/backend/migrations/` (0001..0017) + 1 vertical squash por backend que tenga (`professionals/`, `workshops/`, `beauty/`, `restaurants/`, `medical/`).
-- **Sin interleaving**: pymes-core corre completo, luego el módulo `scheduling` (lib externa). Los verticales corren cuando arranca su backend respectivo.
+- **Schema bootstrap atómico**: 17 migraciones en `core/backend/migrations/` (0001..0017) + 1 vertical squash por backend que tenga (`professionals/`, `workshops/`, `beauty/`, `restaurants/`, `medical/`).
+- **Sin interleaving**: core corre completo, luego el módulo `scheduling` (lib externa). Los verticales corren cuando arranca su backend respectivo.
 - **Reproducible**: `docker compose down -v && make up` produce el schema exacto, sin drift, en cualquier máquina con docker + go.
 
 ## 2. Orden de ejecución
@@ -19,7 +19,7 @@
 docker compose up
    ├─ postgres:16-alpine                          (volumen vacío en arranque limpio)
    ├─ cp-backend  ───────► migrations.Run()
-   │                          ├─ pymes-core 0001..0017  (37 archivos: up + down + .md design docs)
+   │                          ├─ core 0001..0017  (37 archivos: up + down + .md design docs)
    │                          └─ scheduling 0001..N    (lib externa, FK a orgs/parties/services ya creadas)
    ├─ prof-backend ─────► professionals.Run()
    │                          └─ professionals 0001        (squashed: schema professionals.*)
@@ -35,9 +35,9 @@ docker compose up
 
 ### Por qué este orden
 
-- **`orgs` antes que todo**: la lib `core/saas/go` ya no se invoca como migrador separado (su schema vive copiado y versionado en `pymes-core/0001_saas_identity.up.sql`). Eso elimina el drift cross-source que hacía fallar bootstrap.
-- **`scheduling` después de pymes-core**: usa FK a `orgs(id)`, `parties(id)`, `services(id)`. Antes del squash había interleaving porque `scheduling/0003` necesitaba `services` y `pymes-core/0041` necesitaba `scheduling_branches` — ahora `services` se crea en `pymes-core/0005`, antes de cualquier scheduling.
-- **Verticales independientes**: cada uno corre su propia migración tras la salud de pymes-core (verifican via internal API). Sin orden estricto entre verticales.
+- **`orgs` antes que todo**: la lib `core/saas/go` ya no se invoca como migrador separado (su schema vive copiado y versionado en `core/0001_saas_identity.up.sql`). Eso elimina el drift cross-source que hacía fallar bootstrap.
+- **`scheduling` después de core**: usa FK a `orgs(id)`, `parties(id)`, `services(id)`. Antes del squash había interleaving porque `scheduling/0003` necesitaba `services` y `core/0041` necesitaba `scheduling_branches` — ahora `services` se crea en `core/0005`, antes de cualquier scheduling.
+- **Verticales independientes**: cada uno corre su propia migración tras la salud de core (verifican via internal API). Sin orden estricto entre verticales.
 
 ### Identidad canónica (qué tablas crea `0001_saas_identity.up.sql`)
 
@@ -111,7 +111,7 @@ scripts/migrations-validate.sh
 Casi siempre quiere decir que hay código Go corriendo queries que aún tienen `tenant_id` hardcodeado. Buscar:
 
 ```bash
-grep -rn "tenant_id" --include="*.go" pymes-core/backend professionals/backend workshops/backend beauty/backend restaurants/backend medical/backend \
+grep -rn "tenant_id" --include="*.go" core/backend professionals/backend workshops/backend beauty/backend restaurants/backend medical/backend \
   | grep -v _archive \
   | grep -vE "ParseAuthTenantID|CtxKeyTenantID|TenantSettings|tenant_settings|tenant_invitations|tenant_slug|X-Pymes-Tenant-ID"
 ```
@@ -123,12 +123,12 @@ Las menciones que quedan en el repo después del cutover son **excepciones docum
 Mirar primero `_archive/` del backend afectado: ahí están las 78+ migraciones legacy. Si una columna se perdió, fue intencional (squash quitó deuda) o un bug del squash.
 
 ```bash
-ls pymes-core/backend/migrations/_archive/ | grep <nombre_columna>
+ls core/backend/migrations/_archive/ | grep <nombre_columna>
 # o
-git log --all -- pymes-core/backend/migrations/_archive/0042_split_products_services.up.sql
+git log --all -- core/backend/migrations/_archive/0042_split_products_services.up.sql
 ```
 
-Si es legítimo agregar la columna de vuelta: NO modificar 0001..0017. Crear `pymes-core/backend/migrations/0018_<nombre>.up.sql` (numeración nueva) con `IF NOT EXISTS` + reverso completo en `.down.sql`.
+Si es legítimo agregar la columna de vuelta: NO modificar 0001..0017. Crear `core/backend/migrations/0018_<nombre>.up.sql` (numeración nueva) con `IF NOT EXISTS` + reverso completo en `.down.sql`.
 
 ## 5. Garantías y limitaciones
 
@@ -146,9 +146,9 @@ Si es legítimo agregar la columna de vuelta: NO modificar 0001..0017. Crear `py
 
 ## 6. Apéndice: archivos clave
 
-- `pymes-core/backend/migrations/0001_saas_identity.up.sql` — identidad canónica.
-- `pymes-core/backend/migrations/runner.go` — orden lineal sin interleaving.
-- `pymes-core/backend/wire/bootstrap.go` — invoca `migrations.Run()`. NO llama `saasmigrations.MigrateUp` (eliminado en cutover).
-- `pymes-core/backend/migrations/_archive/` — 78 migraciones legacy preservadas para arqueología.
+- `core/backend/migrations/0001_saas_identity.up.sql` — identidad canónica.
+- `core/backend/migrations/runner.go` — orden lineal sin interleaving.
+- `core/backend/wire/bootstrap.go` — invoca `migrations.Run()`. NO llama `saasmigrations.MigrateUp` (eliminado en cutover).
+- `core/backend/migrations/_archive/` — 78 migraciones legacy preservadas para arqueología.
 - `scripts/migrations-validate.sh` — wrapper que levanta postgres efímero y diffea contra `_reference_schema.sql`.
 - `docs/MIGRATIONS_AUDIT.md` — inventario pre-squash, motivación del refactor.

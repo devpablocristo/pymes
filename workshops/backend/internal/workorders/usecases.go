@@ -11,8 +11,8 @@ import (
 	"gorm.io/gorm"
 
 	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/core/shared/backend/vertvalues"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/workshops"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/workorders/usecases/domain"
 )
@@ -77,7 +77,7 @@ type controlPlanePort interface {
 	GetProduct(ctx context.Context, orgID, productID string) (map[string]any, error)
 }
 
-// whatsAppNotifier envía texto vía API interna de pymes-core (opt-in y reglas en el core).
+// whatsAppNotifier envía texto vía API interna de core (opt-in y reglas en el core).
 type whatsAppNotifier interface {
 	SendInternalWhatsAppText(ctx context.Context, orgID string, partyID uuid.UUID, body string) error
 }

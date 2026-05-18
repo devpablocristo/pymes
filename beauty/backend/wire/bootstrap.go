@@ -14,10 +14,10 @@ import (
 	"github.com/devpablocristo/pymes/beauty/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/beauty/backend/internal/shared/pymescore"
 	"github.com/devpablocristo/pymes/beauty/backend/migrations"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalwire"
+	"github.com/devpablocristo/pymes/core/shared/backend/app"
+	"github.com/devpablocristo/pymes/core/shared/backend/auth"
+	"github.com/devpablocristo/pymes/core/shared/backend/store"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalwire"
 )
 
 func InitializeApp() *app.App {

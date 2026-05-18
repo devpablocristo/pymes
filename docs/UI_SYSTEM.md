@@ -1,10 +1,10 @@
 # UI System — Pymes
 
-Documento de referencia del design system que vive en `frontend/src/`. Resultado de la migración Wooko → Pymes (rama `ui-enano`, ver `.claude/plans/tengo-un-bug-en-melodic-river.md` para detalle por fase).
+Documento de referencia del design system que vive en `ui/src/`. Resultado de la migración Wooko → Pymes (rama `ui-enano`, ver `.claude/plans/tengo-un-bug-en-melodic-river.md` para detalle por fase).
 
 ## TL;DR
 
-- **Tokens**: CSS variables en `frontend/src/styles/tokens.css`. Light + dark, namespace `pymes-ui`, storage key `pymes:theme`.
+- **Tokens**: CSS variables en `ui/src/styles/tokens.css`. Light + dark, namespace `pymes-ui`, storage key `pymes:theme`.
 - **Fuentes**: Plus Jakarta Sans (body) + JetBrains Mono (mono), cargadas via `@fontsource/*`.
 - **Iconos**: `@tabler/icons-react` (npm, tree-shakeable). El sidebar mantiene su set de SVG inline custom (`ShellIcons.tsx`) por decisión de producto previo.
 - **Layout**: shell card flotante (sidebar margenes 16/radius 18/shadow z1). Topbar azul + barra blanca de acciones.
@@ -13,7 +13,7 @@ Documento de referencia del design system que vive en `frontend/src/`. Resultado
 
 ## Tokens
 
-Definidos en `frontend/src/styles/tokens.css`. Para usar en componentes nuevos: referenciar siempre la variable, nunca el literal.
+Definidos en `ui/src/styles/tokens.css`. Para usar en componentes nuevos: referenciar siempre la variable, nunca el literal.
 
 ### Colores
 
@@ -87,7 +87,7 @@ Bundler procesa los archivos como CSS separado — no hay render-blocking ni dep
 - Activación: clic en el botón con icono ☾/☀ del footer del sidebar (`<ThemeToggle />`).
 - Persistencia: `localStorage('pymes-ui:pymes:theme')`.
 - Fallback inicial: `prefers-color-scheme`.
-- Implementación: el theme manager (`@devpablocristo/core-browser/theme`, instanciado en `frontend/src/lib/theme.ts`) setea `data-theme="light|dark"` en `<html>`.
+- Implementación: el theme manager (`@devpablocristo/core-browser/theme`, instanciado en `ui/src/lib/theme.ts`) setea `data-theme="light|dark"` en `<html>`.
 - El sidebar respeta los tokens dark via override explícito en `shell-sidebar.css` (`background: var(--color-sidebar) !important`) — la lib externa hardcodeaba blanco.
 
 Para forzar el tema desde DevTools:
@@ -162,7 +162,7 @@ import { NotificationsDropdown } from '../components/NotificationsDropdown';
 ## Estructura de archivos CSS
 
 ```
-frontend/src/
+ui/src/
   styles.css                       # entry point: importa los demás
   styles/
     tokens.css                     # variables CSS (light + dark)
@@ -231,7 +231,7 @@ Si encontrás un componente roto post-migración:
    ```
 3. Si el TSX divergió y el CSS de Wooko apunta a un DOM que el actual no tiene, revertí solo ese CSS al estado pre-swap:
    ```bash
-   git show <commit-anterior>:frontend/src/pages/X.css > frontend/src/pages/X.css
+   git show <commit-anterior>:ui/src/pages/X.css > ui/src/pages/X.css
    ```
 4. NO copiar TSX de Wooko sin verificar imports — la mayoría depende de hooks/types que ya no existen.
 
@@ -239,5 +239,5 @@ Si encontrás un componente roto post-migración:
 
 - Plan canónico: `.claude/plans/tengo-un-bug-en-melodic-river.md`
 - Helper diff: `scripts/wooko-diff.sh`
-- Theme manager: `@devpablocristo/core-browser/theme` (instancia en `frontend/src/lib/theme.ts`)
-- I18n keys del toggle: `shell.theme.light` / `shell.theme.dark` en `frontend/src/lib/i18n/messages/shell.ts`
+- Theme manager: `@devpablocristo/core-browser/theme` (instancia en `ui/src/lib/theme.ts`)
+- I18n keys del toggle: `shell.theme.light` / `shell.theme.dark` en `ui/src/lib/i18n/messages/shell.ts`

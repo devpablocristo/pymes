@@ -64,37 +64,37 @@ class CrudResource:
 
 
 RESOURCES: tuple[CrudResource, ...] = (
-    CrudResource("customers", "core", "pymes-core/backend/internal/customers/handler.go", "/customers", ("customers",)),
-    CrudResource("suppliers", "core", "pymes-core/backend/internal/suppliers/handler.go", "/suppliers", ("suppliers",)),
-    CrudResource("products", "core", "pymes-core/backend/internal/products/handler.go", "/products", ("products",)),
-    CrudResource("services", "core", "pymes-core/backend/internal/services/handler.go", "/services", ("services",)),
-    CrudResource("quotes", "core", "pymes-core/backend/internal/quotes/handler.go", "/quotes", ("quotes",)),
+    CrudResource("customers", "core", "core/backend/internal/customers/handler.go", "/customers", ("customers",)),
+    CrudResource("suppliers", "core", "core/backend/internal/suppliers/handler.go", "/suppliers", ("suppliers",)),
+    CrudResource("products", "core", "core/backend/internal/products/handler.go", "/products", ("products",)),
+    CrudResource("services", "core", "core/backend/internal/services/handler.go", "/services", ("services",)),
+    CrudResource("quotes", "core", "core/backend/internal/quotes/handler.go", "/quotes", ("quotes",)),
     CrudResource(
         "sales",
         "core",
-        "pymes-core/backend/internal/sales/handler.go",
+        "core/backend/internal/sales/handler.go",
         "/sales",
         ("sales",),
         ("List", "Create", "Get", "Update"),
         "void replaces archive semantics",
     ),
-    CrudResource("purchases", "core", "pymes-core/backend/internal/purchases/handler.go", "/purchases", ("purchases",)),
-    CrudResource("invoices", "core", "pymes-core/backend/internal/invoices/handler.go", "/invoices", ("invoices",)),
-    CrudResource("employees", "core", "pymes-core/backend/internal/employees/handler.go", "/employees", ("employees",)),
+    CrudResource("purchases", "core", "core/backend/internal/purchases/handler.go", "/purchases", ("purchases",)),
+    CrudResource("invoices", "core", "core/backend/internal/invoices/handler.go", "/invoices", ("invoices",)),
+    CrudResource("employees", "core", "core/backend/internal/employees/handler.go", "/employees", ("employees",)),
     CrudResource(
         "inventory",
         "core",
-        "pymes-core/backend/internal/inventory/handler.go",
+        "core/backend/internal/inventory/handler.go",
         "/inventory",
         ("inventory",),
         ("List", "Adjust", "ListMovements", "LowStock"),
         "stock view with adjustment/movement actions, not entity CRUD",
     ),
-    CrudResource("cashflow", "core", "pymes-core/backend/internal/cashflow/handler.go", "/cashflow", ("cashflow",)),
+    CrudResource("cashflow", "core", "core/backend/internal/cashflow/handler.go", "/cashflow", ("cashflow",)),
     CrudResource(
         "returns",
         "core",
-        "pymes-core/backend/internal/returns/handler.go",
+        "core/backend/internal/returns/handler.go",
         "/returns",
         ("returns",),
         ("List", "ListArchived", "Get", "Update", "Delete", "Archive", "Restore", "HardDelete"),
@@ -103,7 +103,7 @@ RESOURCES: tuple[CrudResource, ...] = (
     CrudResource(
         "credit-notes",
         "core",
-        "pymes-core/backend/internal/returns/handler.go",
+        "core/backend/internal/returns/handler.go",
         "/credit-notes",
         ("creditNotes",),
         ("ListCreditNotes", "CreateCreditNote", "GetCreditNote"),
@@ -112,14 +112,14 @@ RESOURCES: tuple[CrudResource, ...] = (
     CrudResource(
         "recurring",
         "core",
-        "pymes-core/backend/internal/recurring/handler.go",
+        "core/backend/internal/recurring/handler.go",
         "/recurring-expenses",
         ("recurring",),
     ),
     CrudResource(
         "payments",
         "core",
-        "pymes-core/backend/internal/payments/handler.go",
+        "core/backend/internal/payments/handler.go",
         "/payments",
         ("payments",),
         ("List", "Get", "Update", "Delete", "Archive", "Restore", "HardDelete"),
@@ -314,7 +314,7 @@ def expected_routes(resource: CrudResource) -> list[dict[str, str]]:
 
 def load_frontend_resource_ids() -> set[str]:
     ids: set[str] = set()
-    for path in (ROOT / "frontend/src/crud").glob("resourceConfigs*.tsx"):
+    for path in (ROOT / "ui/src/crud").glob("resourceConfigs*.tsx"):
         text = path.read_text(encoding="utf-8")
         for match in re.finditer(r"^\s*([A-Za-z][A-Za-z0-9_]*)\s*:", text, re.MULTILINE):
             ids.add(match.group(1))

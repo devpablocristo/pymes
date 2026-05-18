@@ -5,8 +5,8 @@
           "path": "."
       },
       {
-          "name": "pymes-app (Expo)",
-          "path": "pymes-app"
+          "name": "mobile (Expo)",
+          "path": "mobile"
       }
   ],
   "settings": {

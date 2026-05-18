@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Limpia estado "dirty" de golang-migrate para pymes-core en la BD configurada en Secret Manager.
+# Limpia estado "dirty" de golang-migrate para core en la BD configurada en Secret Manager.
 # Pensado para dev (datos prescindibles). Solo toca la base indicada en DATABASE_URL (ej. .../pymes).
 #
 # Requisitos: gcloud autenticado, Cloud SQL Client IAM sobre la instancia del secreto,
 # curl/psql, y cloud-sql-proxy en PATH o en CLOUD_SQL_PROXY_BIN.
 #
 # Uso:
-#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh status
-#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh check-clean
-#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh rewind-to 40
-#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh repair-known-dev-dirty
+#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-core-migration-dirty-gcp.sh status
+#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-core-migration-dirty-gcp.sh check-clean
+#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-core-migration-dirty-gcp.sh rewind-to 40
+#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-core-migration-dirty-gcp.sh repair-known-dev-dirty
 #
 # rewind-to N: deja la tabla de migraciones en versión N sin dirty (el próximo arranque del backend
 # reaplicará N+1...). Si la migración N+1 quedó a medias, puede fallar hasta hacer DROP SCHEMA

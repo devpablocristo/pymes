@@ -1,0 +1,15 @@
+FROM node:20.19.0-alpine
+
+WORKDIR /workspace/pymes/ui
+
+COPY pymes/ui/package.json pymes/ui/package-lock.json* ./
+RUN npm ci
+
+COPY pymes/ui/ /workspace/pymes/ui/
+
+COPY pymes/ui/docker-entrypoint-dev.sh /usr/local/bin/docker-entrypoint-dev.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint-dev.sh
+
+EXPOSE 5173
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint-dev.sh"]

@@ -10,9 +10,9 @@ import (
 
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/handler/dto"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/usecases/domain"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
+	"github.com/devpablocristo/pymes/core/shared/backend/auth"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalgin"
 )
 
 type usecasesPort interface {

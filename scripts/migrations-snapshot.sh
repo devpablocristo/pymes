@@ -1,5 +1,5 @@
 #!/bin/sh
-# migrations-snapshot.sh — exporta el schema final de pymes-core (post-migraciones)
+# migrations-snapshot.sh — exporta el schema final de core (post-migraciones)
 # como baseline de referencia para drift checks.
 #
 # Uso:
@@ -11,7 +11,7 @@
 
 set -e
 
-OUTPUT="${1:-pymes-core/backend/migrations/_squashed/_reference_schema.sql}"
+OUTPUT="${1:-core/backend/migrations/_squashed/_reference_schema.sql}"
 SERVICE="postgres"
 DB="${PGDATABASE:-pymes}"
 USER="${PGUSER:-postgres}"

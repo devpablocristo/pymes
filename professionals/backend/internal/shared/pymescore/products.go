@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-// ListProducts queries the pymes-core product catalog.
+// ListProducts queries the core product catalog.
 func (c *Client) ListProducts(ctx context.Context, tenantID string, query string, limit int) (map[string]any, error) {
 	params := url.Values{}
 	if query != "" {

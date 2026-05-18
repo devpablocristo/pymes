@@ -6,7 +6,7 @@
 
 | Documento | Descripción |
 |-----------|-------------|
-| [Vertical medicina laboral (PRD)](vertical-medicina-laboral-prd.md) | Alcance, módulos, reutilización desde `pymes-core`, IA y fases para una versión nueva (sin copiar sistemas externos). |
+| [Vertical medicina laboral (PRD)](vertical-medicina-laboral-prd.md) | Alcance, módulos, reutilización desde `core`, IA y fases para una versión nueva (sin copiar sistemas externos). |
 
 ## Arquitectura
 

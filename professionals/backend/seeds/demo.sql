@@ -1,5 +1,5 @@
 -- Demo professionals: 10 perfiles, especialidades, intakes y sesiones.
--- Depende de los clientes de pymes-core/seeds.
+-- Depende de los clientes de core/seeds.
 
 DO $$
 DECLARE

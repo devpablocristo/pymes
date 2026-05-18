@@ -1,4 +1,4 @@
 // Package quotes embebe el dominio quotes en la vertical medical.
-// Base: github.com/devpablocristo/pymes/pymes-core/backend/internal/quotes
+// Base: github.com/devpablocristo/pymes/core/backend/internal/quotes
 // Estado: embebido tal cual desde core, sin overrides a nivel vertical.
 package quotes

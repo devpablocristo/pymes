@@ -2,7 +2,7 @@
 
 ## Capabilities
 
-`pymes-core` publica el contrato canonico en `/v1/agent/*`. `ai/` y MCP deben consumir ese catalogo en vez de duplicar tools hardcodeadas.
+`core` publica el contrato canonico en `/v1/agent/*`. `ai/` y MCP deben consumir ese catalogo en vez de duplicar tools hardcodeadas.
 
 ## Idempotencia
 

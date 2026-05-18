@@ -1,5 +1,5 @@
 -- 0001_restaurants.up.sql (vertical Restaurants — squashed)
--- Schema isolado en `restaurant.*` con FK a orgs(id) en pymes-core.
+-- Schema isolado en `restaurant.*` con FK a orgs(id) en core.
 -- Consolida: 0001..0004 actuales (post `0004_dining_archive` con deleted_at).
 
 CREATE SCHEMA IF NOT EXISTS restaurant;

@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/restaurants/backend/internal/dining/tables/usecases/domain"
 )
 

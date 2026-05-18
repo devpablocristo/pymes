@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	domain "github.com/devpablocristo/pymes/medical/backend/internal/occupational_health/exams/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 )
 
 const (

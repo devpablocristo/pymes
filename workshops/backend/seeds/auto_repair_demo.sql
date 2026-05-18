@@ -1,5 +1,5 @@
 -- Demo taller auto_repair: 10 vehiculos y 10 ordenes.
--- Cliente/producto: mismas claves uuid v5 que pymes-core/seeds.
+-- Cliente/producto: mismas claves uuid v5 que core/seeds.
 
 DO $$
 DECLARE

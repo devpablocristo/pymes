@@ -3,7 +3,7 @@ package pymescore
 import (
 	"context"
 
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescoreops"
+	"github.com/devpablocristo/pymes/core/shared/backend/pymescoreops"
 )
 
 func (c *Client) GetBusinessInfo(ctx context.Context, tenantRef string) (map[string]any, error) {

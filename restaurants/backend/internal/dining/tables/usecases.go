@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/restaurants/backend/internal/dining/tables/usecases/domain"
 )
 

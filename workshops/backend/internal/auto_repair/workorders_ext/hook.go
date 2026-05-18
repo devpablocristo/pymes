@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 	vehiclesdomain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles/usecases/domain"
 	workorders "github.com/devpablocristo/pymes/workshops/backend/internal/workorders"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/workorders/usecases/domain"

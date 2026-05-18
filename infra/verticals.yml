@@ -2,9 +2,9 @@ version: 1
 
 platform:
   firebase:
-    public: frontend/dist
+    public: ui/dist
     region: us-central1
-    core_service: pymes-core
+    core_service: core
     ignore:
       - firebase.generated.json
       - firebase.json

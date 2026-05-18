@@ -8,7 +8,7 @@ import (
 
 	"github.com/devpablocristo/core/concurrency/go/fsm"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 )
 
 // WorkOrderFSM define las transiciones válidas para órdenes de trabajo.

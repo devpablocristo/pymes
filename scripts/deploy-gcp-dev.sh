@@ -120,25 +120,25 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
 # chat lo sirve Companion (repo hermano); este script ya no construye ni
 # deploya el servicio pymes-ai.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BACKEND_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/pymes/pymes-core:dev"
+BACKEND_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/pymes/core:dev"
 
 # Backend: necesita parent dir con core/ hermano
 log "staging backend context"
 BACKEND_CTX="$(mktemp -d)"
 trap 'rm -rf "$BACKEND_CTX"' EXIT
-rsync -a --exclude '.git/' --exclude 'node_modules/' --exclude 'frontend/' \
+rsync -a --exclude '.git/' --exclude 'node_modules/' --exclude 'ui/' \
       --exclude 'ai/' --exclude 'dist/' --exclude '.terraform/' --exclude 'tmp/' \
       "$REPO_ROOT/" "$BACKEND_CTX/pymes/"
 rsync -a --exclude '.git/' "$(cd "$REPO_ROOT/.." && pwd)/core/scheduling/" "$BACKEND_CTX/core/scheduling/"
 
 log "building backend image"
 ( cd "$BACKEND_CTX" && gcloud builds submit . \
-    --config pymes/pymes-core/backend/cloudbuild.yaml \
+    --config pymes/core/backend/cloudbuild.yaml \
     --substitutions="_IMAGE=${BACKEND_IMAGE}" \
     --project="$PROJECT_ID" )
 
 # Primer deploy: backend URL placeholder, luego lo actualizamos
-TMP_BACKEND_URL="https://pymes-core-${PROJECT_NUMBER}.${REGION}.run.app"
+TMP_BACKEND_URL="https://core-${PROJECT_NUMBER}.${REGION}.run.app"
 
 # ── 6. Deploy Cloud Run backend ──
 log "deploy backend (Cloud Run)"
@@ -154,7 +154,7 @@ BACKEND_SECRET_VARS="DATABASE_URL=DATABASE_URL:latest,CLERK_SECRET_KEY=CLERK_SEC
 if [[ -n "$GOVERNANCE_API_KEY_EFFECTIVE" ]]; then
   BACKEND_SECRET_VARS="${BACKEND_SECRET_VARS},GOVERNANCE_API_KEY=GOVERNANCE_API_KEY:latest"
 fi
-gcloud run deploy pymes-core --image="$BACKEND_IMAGE" --region="$REGION" \
+gcloud run deploy core --image="$BACKEND_IMAGE" --region="$REGION" \
   --platform=managed --allow-unauthenticated \
   --add-cloudsql-instances="$CONN" \
   --set-env-vars="$BACKEND_ENV_VARS" \
@@ -162,7 +162,7 @@ gcloud run deploy pymes-core --image="$BACKEND_IMAGE" --region="$REGION" \
   --min-instances=0 --max-instances=3 --memory=512Mi --cpu=1 --timeout=300 \
   --project="$PROJECT_ID"
 
-BACKEND_URL=$(gcloud run services describe pymes-core --region="$REGION" --project="$PROJECT_ID" --format="value(status.url)")
+BACKEND_URL=$(gcloud run services describe core --region="$REGION" --project="$PROJECT_ID" --format="value(status.url)")
 
 CLERK_ENABLED=false
 
@@ -182,9 +182,9 @@ fi
 log "asegurando proyecto Firebase"
 npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" projects:addfirebase "$PROJECT_ID" --non-interactive >/dev/null 2>&1 || true
 
-log "building frontend static bundle"
+log "building ui static bundle"
 (
-  cd "$REPO_ROOT/frontend"
+  cd "$REPO_ROOT/ui"
   export VITE_API_URL="/"
   export VITE_COMPANION_BASE_URL="/"
   export VITE_CLERK_PUBLISHABLE_KEY="$FRONTEND_CLERK_PUBLISHABLE_KEY"
@@ -201,7 +201,7 @@ npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" deploy \
 FRONT_URL="https://${PROJECT_ID}.web.app"
 
 # Actualizar backend con FRONTEND_URL real (CORS)
-gcloud run services update pymes-core --region="$REGION" --project="$PROJECT_ID" \
+gcloud run services update core --region="$REGION" --project="$PROJECT_ID" \
   --update-env-vars="FRONTEND_URL=${FRONT_URL}" >/dev/null
 
 log "LISTO"

@@ -1,6 +1,6 @@
 # Operacion De Agentes
 
-Pymes soporta dos superficies: humanos en consola y agentes por contratos seguros. La fuente de verdad de negocio es `pymes-core`; `ai/` orquesta conversaciones y tools; Nexus Review gobierna aprobaciones.
+Pymes soporta dos superficies: humanos en consola y agentes por contratos seguros. La fuente de verdad de negocio es `core`; `ai/` orquesta conversaciones y tools; Nexus Review gobierna aprobaciones.
 
 ## Contrato canonico
 

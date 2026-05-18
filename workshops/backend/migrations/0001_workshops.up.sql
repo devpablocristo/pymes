@@ -1,5 +1,5 @@
 -- 0001_workshops.up.sql (vertical Workshops — squashed)
--- Schema isolado en `workshops.*` con FK a orgs(id) en pymes-core.
+-- Schema isolado en `workshops.*` con FK a orgs(id) en core.
 -- Consolida: 0001..0022 actuales (tras restore-bicycles + customer-assets +
 -- work-orders v2 + 0022_complete_tenant_schema_rename).
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 	bicyclesdomain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles/usecases/domain"
 	workordersdomain "github.com/devpablocristo/pymes/workshops/backend/internal/workorders/usecases/domain"
 )

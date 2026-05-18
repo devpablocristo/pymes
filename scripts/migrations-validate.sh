@@ -1,12 +1,12 @@
 #!/bin/sh
-# migrations-validate.sh — valida que las migraciones de pymes-core levantan
+# migrations-validate.sh — valida que las migraciones de core levantan
 # desde DB vacía y producen el schema esperado (vs baseline _reference_schema.sql).
 #
 # Pasos:
 #   1. Levanta un postgres efímero en un contenedor temporal (puerto 55432).
 #   2. Conecta el backend cp-backend (en modo compile only) para correr migrations.Run().
 #   3. Hace pg_dump --schema-only del resultado.
-#   4. Compara contra pymes-core/backend/migrations/_squashed/_reference_schema.sql.
+#   4. Compara contra core/backend/migrations/_squashed/_reference_schema.sql.
 #   5. Limpia el contenedor temporal.
 #
 # Falla con exit 1 si hay drift.
@@ -18,7 +18,7 @@
 
 set -e
 
-REF_SCHEMA="pymes-core/backend/migrations/_squashed/_reference_schema.sql"
+REF_SCHEMA="core/backend/migrations/_squashed/_reference_schema.sql"
 TMP_DUMP="/tmp/migrations-validate-$$.sql"
 TMP_CONTAINER="pymes-migrations-validate-$$"
 DB_NAME="pymes_validate"
@@ -56,9 +56,9 @@ for i in $(seq 1 30); do
     sleep 1
 done
 
-echo "2) Corriendo migraciones de pymes-core (vía go test util)..."
+echo "2) Corriendo migraciones de core (vía go test util)..."
 DATABASE_URL="postgres://$DB_USER:$DB_PASS@localhost:$HOST_PORT/$DB_NAME?sslmode=disable" \
-    go test -run '^TestMigrationsBootstrap$' ./pymes-core/backend/migrations/... \
+    go test -run '^TestMigrationsBootstrap$' ./core/backend/migrations/... \
     -count=1 -timeout 5m
 
 echo "3) Snapshot del resultado..."

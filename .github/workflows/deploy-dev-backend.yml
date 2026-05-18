@@ -30,8 +30,8 @@ jobs:
       GCP_REGION: us-central1
       GCP_PROJECT_ID: pymes-dev-352318
       ARTIFACT_REGISTRY: pymes
-      IMAGE_NAME: pymes-core
-      SERVICE_NAME: pymes-core
+      IMAGE_NAME: core
+      SERVICE_NAME: core
       CLOUD_RUN_SERVICE_ACCOUNT: 884236221349-compute@developer.gserviceaccount.com
       WIF_PROVIDER: projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
       WIF_SERVICE_ACCOUNT: github-actions@pymes-dev-352318.iam.gserviceaccount.com
@@ -122,13 +122,13 @@ jobs:
             https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.18.3/cloud-sql-proxy.linux.amd64
           chmod +x /tmp/cloud-sql-proxy
 
-      - name: Preflight pymes-core migrations
+      - name: Preflight core migrations
         env:
           PROJECT_ID: ${{ env.GCP_PROJECT_ID }}
           CLOUD_SQL_PROXY_BIN: /tmp/cloud-sql-proxy
         run: |
-          scripts/fix-pymes-core-migration-dirty-gcp.sh repair-known-dev-dirty
-          scripts/fix-pymes-core-migration-dirty-gcp.sh check-clean
+          scripts/fix-core-migration-dirty-gcp.sh repair-known-dev-dirty
+          scripts/fix-core-migration-dirty-gcp.sh check-clean
 
       - name: Stage backend build context
         run: |
@@ -139,7 +139,7 @@ jobs:
           rsync -a \
             --exclude '.git/' \
             --exclude 'node_modules/' \
-            --exclude 'frontend/node_modules/' \
+            --exclude 'ui/node_modules/' \
             --exclude 'ai/.venv/' \
             ./ "$build_root/pymes/"
           echo "BUILD_ROOT=$build_root" >> "$GITHUB_ENV"
@@ -148,7 +148,7 @@ jobs:
         run: |
           set -euo pipefail
           image_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY}/${IMAGE_NAME}:${DEPLOY_SHA}"
-          docker build -f "${BUILD_ROOT}/pymes/pymes-core/backend/Dockerfile.prod" -t "$image_uri" "$BUILD_ROOT"
+          docker build -f "${BUILD_ROOT}/pymes/core/backend/Dockerfile.prod" -t "$image_uri" "$BUILD_ROOT"
           docker push "$image_uri"
           echo "IMAGE_URI=$image_uri" >> "$GITHUB_ENV"
           digest="$(gcloud artifacts docker images describe "$image_uri" --format='value(image_summary.fully_qualified_digest)')"

@@ -8,19 +8,19 @@
 
 | Backend | Total | Idempotentes | Con .down completo | Sin / trivial |
 |---|---|---|---|---|
-| pymes-core | 78 | 12 | 74 | 4 |
+| core | 78 | 12 | 74 | 4 |
 | professionals | 8 | 1 | 8 | 0 |
 | workshops | 22 | 3 | 22 | 0 |
 | beauty | 5 | 0 | 5 | 0 |
 | restaurants | 4 | 0 | 4 | 0 |
-| seeds (pymes-core) | 6 | 6 | 6 | 0 |
+| seeds (core) | 6 | 6 | 6 | 0 |
 | `core/saas/go` (lib externa) | 2 | 0 | 0 | 2 |
 | **TOTAL** | **125** | **22** | **119** | **6** |
 
 **Hallazgos clave**:
 - **103 / 125 migraciones (82,4 %)** no son completamente idempotentes (re-run failure si DB está parcialmente migrada).
 - **6 migraciones** sin `.down.sql` o con down trivial (no reversible).
-- **Drift cross-source crítico**: 5 tablas creadas tanto por `pymes-core/0001..0003` como por `core/saas/go/0001` con schemas distintos (`users`, `tenant_settings`, `admin_activity_events`, `notification_log`, `notification_preferences`).
+- **Drift cross-source crítico**: 5 tablas creadas tanto por `core/0001..0003` como por `core/saas/go/0001` con schemas distintos (`users`, `tenant_settings`, `admin_activity_events`, `notification_log`, `notification_preferences`).
 - **0 RLS policies** declaradas en todas las migraciones (multi-tenant isolation depende del filtrado en Go).
 - **0 triggers / functions** definidos (`updated_at` se maneja en runtime Go, sin garantía consistencia).
 - **0 transacciones explícitas** (`BEGIN; ... COMMIT;`) — golang-migrate envuelve cada archivo, pero ALTERs múltiples no quedan atómicas.
@@ -32,84 +32,84 @@
 
 | # | Backend | File | Propósito | Tablas creadas | Tablas alteradas | Idx/cstr | Idempotente | .down completo |
 |---|---|---|---|---|---|---|---|---|
-| 1 | pymes-core | `0001_base_schema.up.sql` | base schema (legacy tenants) | admin_activity_events, audit_log, tenant_api_keys, tenant_api_key_scopes, tenant_memberships, tenants, tenant_settings, tenant_usage_counters, users | — | 23 | parcial | sí |
-| 2 | pymes-core | `0002_billing.up.sql` | billing fields | — | tenant_settings | 4 | parcial | sí |
-| 3 | pymes-core | `0003_notifications.up.sql` | notifications | notification_log, notification_preferences | — | 6 | parcial | sí |
-| 4 | pymes-core | `0004_local_seed.up.sql` | local seed | — | — | 0 | no | sí |
-| 5 | pymes-core | `0005_core_business.up.sql` | core business (sales/customers/...) | cash_movements, customers, products, quote_items, quotes, sale_items, sales, stock_levels, stock_movements, suppliers | — | 39 | parcial | sí |
-| 6 | pymes-core | `0006_tenant_business_settings.up.sql` | tenant business settings | — | tenant_settings | 0 | parcial | sí |
-| 7 | pymes-core | `0007_core_seed.up.sql` | core seed | — | — | 0 | no | sí |
-| 8 | pymes-core | `0008_sales_voided_at.up.sql` | sales soft-void | — | sales | 0 | parcial | sí |
-| 9 | pymes-core | `0009_audit_log_fk.up.sql` | audit log FK | — | audit_log | 1 | no | sí |
-| 10 | pymes-core | `0010_transversal_core.up.sql` | transversal core (accounts/payments/quotes/...) | account_movements, accounts, appointments, appointment_slots, credit_notes, payments, price_list_items, price_lists, purchase_items, purchases, recurring_expenses, return_items, returns | customers, products, quote_items, quotes, sale_items, sales | 40 | parcial | sí |
-| 11 | pymes-core | `0011_transversal_infra.up.sql` | transversal infra (RBAC/scheduler/webhooks) | attachments, dashboard_configs, exchange_rates, role_permissions, roles, scheduler_runs, timeline_entries, user_roles, webhook_deliveries, webhook_endpoints | — | 24 | parcial | sí |
-| 12 | pymes-core | `0012_tenant_settings_ext.up.sql` | tenant settings ext | — | tenant_settings | 0 | parcial | sí |
-| 13 | pymes-core | `0013_rbac_seed.up.sql` | RBAC seed | — | — | 0 | no | sí |
-| 14 | pymes-core | `0014_ai_tables.up.sql` | AI tables | ai_conversations, ai_dossiers, ai_usage_daily | — | 6 | parcial | sí |
-| 15 | pymes-core | `0015_whatsapp_connections.up.sql` | whatsapp connections | whatsapp_connections | — | 2 | parcial | sí |
-| 16 | pymes-core | `0016_payment_gateway.up.sql` | payment gateway | payment_gateway_connections, payment_gateway_webhooks | payments, tenant_settings | 6 | parcial | sí |
-| 17 | pymes-core | `0017_party_model.up.sql` | party model unificado | parties, party_agents, party_organizations, party_classifications, party_contacts | accounts, ai_conversations, appointments, customers, payments, products, quotes, sales, suppliers | 43 | sí | sí |
-| 18 | pymes-core | `0018_prompt02_upgrade.up.sql` | prompt02 upgrade | webhook_outbox | — | 2 | parcial | sí |
-| 19 | pymes-core | `0019_payment_gateway_events.up.sql` | payment gateway events | payment_gateway_events | — | 3 | parcial | sí |
-| 20 | pymes-core | `0020_ai_agent_events.up.sql` | AI agent events | ai_agent_events | — | 4 | parcial | sí |
-| 21 | pymes-core | `0021_dashboard_personalizable.up.sql` | dashboard personalizable | dashboard_default_layouts, dashboard_layouts | — | 10 | parcial | sí |
-| 22 | pymes-core | `0022_party_model_reconcile.up.sql` | party model reconcile | parties, party_agents, party_organizations | ai_conversations, audit_log, payment_gateway_events, payments, sales | 23 | sí | **no (`SELECT 1`)** |
-| 23 | pymes-core | `0023_saas_core_schema_align.up.sql` | saas core schema align | — | tenant_api_key_scopes, tenant_api_keys, users | 0 | parcial | sí |
-| 24 | pymes-core | `0024_whatsapp_full.up.sql` | whatsapp full | whatsapp_messages, whatsapp_opt_outs | whatsapp_connections | 10 | parcial | **no (file ausente)** |
-| 25 | pymes-core | `0025_procurement_requests.up.sql` | procurement requests | procurement_policies, procurement_requests, procurement_request_items | — | 8 | sí | sí |
-| 26 | pymes-core | `0026_procurement_policies_rbac.up.sql` | procurement policies RBAC | — | — | 0 | sí | sí |
-| 27 | pymes-core | `0027_users_phone.up.sql` | users phone | — | users | 0 | parcial | sí |
-| 28 | pymes-core | `0028_users_name_parts.up.sql` | users name parts | — | users | 0 | parcial | sí |
-| 29 | pymes-core | `0029_tenant_supported_currencies.up.sql` | tenant supported currencies | — | tenant_settings | 0 | sí | sí |
-| 30 | pymes-core | `0030_transversal_modules_seed.up.sql` | transversal modules seed | — | — | 0 | no | sí |
-| 31 | pymes-core | `0031_drop_legacy_party_views.up.sql` | drop legacy party views | — | — | 0 | parcial | sí |
-| 32 | pymes-core | `0032_ai_conversations_review_columns.up.sql` | AI conversations review | — | ai_conversations | 2 | parcial | sí |
-| 33 | pymes-core | `0033_archive_support.up.sql` | archive support | — | appointments, quotes | 2 | parcial | sí |
-| 34 | pymes-core | `0034_in_app_notifications.up.sql` | in-app notifications | in_app_notifications | — | 3 | parcial | sí |
-| 35 | pymes-core | `0035_namespace_pymes_in_app_notifications.up.sql` | namespace in-app | — | in_app_notifications | 0 | parcial | sí |
-| 36 | pymes-core | `0036_namespace_pymes_notifications.up.sql` | rename notification_log → pymes_notification_log | — | notification_log, notification_preferences | 0 | parcial | sí |
-| 37 | pymes-core | `0037_namespace_pymes_notifications_constraints.up.sql` | rename constraints | — | notification_log, notification_preferences | 0 | parcial (rota en DB fresca) | sí |
-| 38 | pymes-core | `0038_whatsapp_campaigns.up.sql` | whatsapp campaigns | whatsapp_campaign_recipients, whatsapp_campaigns | — | 6 | parcial | **no (file ausente)** |
-| 39 | pymes-core | `0039_whatsapp_conversations.up.sql` | whatsapp conversations | whatsapp_conversations | whatsapp_messages | 5 | parcial | **no (file ausente)** |
-| 40 | pymes-core | `0040_tenant_onboarding_profile.up.sql` | tenant onboarding profile | — | tenant_settings | 0 | parcial | sí |
-| 41 | pymes-core | `0041_migrate_appointments_to_scheduling.up.sql` | migrate appointments | — | tenant_settings | 0 | parcial | sí |
-| 42 | pymes-core | `0042_split_products_services.up.sql` | split products/services | catalog_services, service_price_lists, services | purchase_items, quote_items, sale_items, sales | 8 | parcial | sí |
-| 43 | pymes-core | `0043_rename_service_tables.up.sql` | rename service tables | — | services | 0 | parcial | sí |
-| 44 | pymes-core | `0044_dashboard_services_widget.up.sql` | dashboard services widget | — | — | 0 | no | sí |
-| 45 | pymes-core | `0045_active_products_are_products.up.sql` | active products | — | products | 1 | no | sí |
-| 46 | pymes-core | `0046_accounts_type_party_unique.up.sql` | accounts type party UNIQUE | — | — | 2 | parcial | sí |
-| 47 | pymes-core | `0047_drop_legacy_dashboard_layouts.up.sql` | drop legacy dashboard | — | — | 0 | parcial | sí |
-| 48 | pymes-core | `0048_drop_legacy_dashboard_catalog_and_preferences.up.sql` | drop legacy dashboard prefs | — | — | 0 | parcial | sí |
-| 49 | pymes-core | `0049_products_services_is_active.up.sql` | products/services is_active | — | products, services | 0 | parcial | sí |
-| 50 | pymes-core | `0050_drop_superseded_appointments.up.sql` | drop appointments | — | tenant_settings | 0 | parcial | **no (file ausente)** |
-| 51 | pymes-core | `0051_english_role_names.up.sql` | rename role names | — | — | 0 | no | sí |
-| 52 | pymes-core | `0052_products_image_url.up.sql` | products image_url | — | products | 0 | parcial | sí |
-| 53 | pymes-core | `0053_credit_notes_optional_return.up.sql` | credit notes optional return | — | credit_notes | 0 | no | sí |
-| 54 | pymes-core | `0054_calendar_export_tokens.up.sql` | calendar export tokens | calendar_export_tokens | — | 4 | parcial | sí |
-| 55 | pymes-core | `0055_calendar_sync_connections.up.sql` | calendar sync connections | calendar_sync_connections, calendar_sync_errors | — | 4 | parcial | sí |
-| 56 | pymes-core | `0056_products_image_urls.up.sql` | products image_urls (jsonb) | — | products | 0 | parcial | sí |
-| 57 | pymes-core | `0057_business_insight_candidates.up.sql` | business insights | pymes_business_insight_candidates | — | 4 | parcial | sí |
-| 58 | pymes-core | `0058_sales_branch.up.sql` | sales branch | — | sales | 1 | parcial | sí |
-| 59 | pymes-core | `0059_quotes_branch.up.sql` | quotes branch | — | quotes | 1 | parcial | sí |
-| 60 | pymes-core | `0060_purchases_branch.up.sql` | purchases branch | — | purchases | 1 | parcial | sí |
-| 61 | pymes-core | `0061_quotes_purchases_tags_metadata.up.sql` | tags/metadata | — | purchases, quotes | 0 | parcial | sí |
-| 62 | pymes-core | `0062_sales_tags_metadata.up.sql` | sales tags/metadata | — | sales | 0 | parcial | sí |
-| 63 | pymes-core | `0063_favorites.up.sql` | favorites | — | parties, products, services | 0 | parcial | sí |
-| 64 | pymes-core | `0064_purchases_internal_fields.up.sql` | purchases internal fields | — | purchases | 0 | parcial | sí |
-| 65 | pymes-core | `0065_purchases_deleted_at.up.sql` | purchases deleted_at | — | purchases | 1 | parcial | sí |
-| 66 | pymes-core | `0066_internal_fields_commercial.up.sql` | internal fields commercial | — | price_lists, quotes, recurring_expenses | 0 | parcial | sí |
-| 67 | pymes-core | `0067_price_lists_recurring_deleted_at.up.sql` | deleted_at | — | price_lists, recurring_expenses | 2 | parcial | sí |
-| 68 | pymes-core | `0068_transactional_internal_fields.up.sql` | transactional internal fields | — | cash_movements, payments, return_items, returns | 3 | parcial | sí |
-| 69 | pymes-core | `0069_invoices.up.sql` | invoices | invoice_line_items, invoices | — | 7 | parcial | sí |
-| 70 | pymes-core | `0070_employees.up.sql` | employees | employees | — | 5 | parcial | sí |
-| 71 | pymes-core | `0071_agent_readiness.up.sql` | agent readiness | agent_confirmations, agent_idempotency_keys | audit_log, payments | 10 | parcial | sí |
-| 72 | pymes-core | `0072_inventory_branch.up.sql` | inventory branch | — | stock_levels, stock_movements | 6 | parcial | sí |
-| 73 | pymes-core | `0073_cashflow_branch.up.sql` | cashflow branch | — | cash_movements, sales | 2 | parcial | sí |
-| 74 | pymes-core | `0074_employees_metadata.up.sql` | employees metadata | — | employees | 0 | parcial | sí |
-| 75 | pymes-core | `0075_tenant_access_model.up.sql` | tenant access model | tenant_invitations | org_api_key_scopes, org_api_keys, users | 10 | sí | sí |
-| 76 | pymes-core | `0076_drop_procurement_policies.up.sql` | drop procurement policies | — | — | 0 | parcial | sí |
-| 77 | pymes-core | `0077_complete_tenant_schema_rename.up.sql` | tenant → org rename | — | org_api_key_scopes, org_api_keys, users, tenants, tenant_memberships, notification_preferences, notification_log | 6 | sí | sí |
-| 78 | pymes-core | `0078_webhook_events_clerk.up.sql` | webhook events clerk | webhook_events_clerk | — | 6 | parcial | sí |
+| 1 | core | `0001_base_schema.up.sql` | base schema (legacy tenants) | admin_activity_events, audit_log, tenant_api_keys, tenant_api_key_scopes, tenant_memberships, tenants, tenant_settings, tenant_usage_counters, users | — | 23 | parcial | sí |
+| 2 | core | `0002_billing.up.sql` | billing fields | — | tenant_settings | 4 | parcial | sí |
+| 3 | core | `0003_notifications.up.sql` | notifications | notification_log, notification_preferences | — | 6 | parcial | sí |
+| 4 | core | `0004_local_seed.up.sql` | local seed | — | — | 0 | no | sí |
+| 5 | core | `0005_core_business.up.sql` | core business (sales/customers/...) | cash_movements, customers, products, quote_items, quotes, sale_items, sales, stock_levels, stock_movements, suppliers | — | 39 | parcial | sí |
+| 6 | core | `0006_tenant_business_settings.up.sql` | tenant business settings | — | tenant_settings | 0 | parcial | sí |
+| 7 | core | `0007_core_seed.up.sql` | core seed | — | — | 0 | no | sí |
+| 8 | core | `0008_sales_voided_at.up.sql` | sales soft-void | — | sales | 0 | parcial | sí |
+| 9 | core | `0009_audit_log_fk.up.sql` | audit log FK | — | audit_log | 1 | no | sí |
+| 10 | core | `0010_transversal_core.up.sql` | transversal core (accounts/payments/quotes/...) | account_movements, accounts, appointments, appointment_slots, credit_notes, payments, price_list_items, price_lists, purchase_items, purchases, recurring_expenses, return_items, returns | customers, products, quote_items, quotes, sale_items, sales | 40 | parcial | sí |
+| 11 | core | `0011_transversal_infra.up.sql` | transversal infra (RBAC/scheduler/webhooks) | attachments, dashboard_configs, exchange_rates, role_permissions, roles, scheduler_runs, timeline_entries, user_roles, webhook_deliveries, webhook_endpoints | — | 24 | parcial | sí |
+| 12 | core | `0012_tenant_settings_ext.up.sql` | tenant settings ext | — | tenant_settings | 0 | parcial | sí |
+| 13 | core | `0013_rbac_seed.up.sql` | RBAC seed | — | — | 0 | no | sí |
+| 14 | core | `0014_ai_tables.up.sql` | AI tables | ai_conversations, ai_dossiers, ai_usage_daily | — | 6 | parcial | sí |
+| 15 | core | `0015_whatsapp_connections.up.sql` | whatsapp connections | whatsapp_connections | — | 2 | parcial | sí |
+| 16 | core | `0016_payment_gateway.up.sql` | payment gateway | payment_gateway_connections, payment_gateway_webhooks | payments, tenant_settings | 6 | parcial | sí |
+| 17 | core | `0017_party_model.up.sql` | party model unificado | parties, party_agents, party_organizations, party_classifications, party_contacts | accounts, ai_conversations, appointments, customers, payments, products, quotes, sales, suppliers | 43 | sí | sí |
+| 18 | core | `0018_prompt02_upgrade.up.sql` | prompt02 upgrade | webhook_outbox | — | 2 | parcial | sí |
+| 19 | core | `0019_payment_gateway_events.up.sql` | payment gateway events | payment_gateway_events | — | 3 | parcial | sí |
+| 20 | core | `0020_ai_agent_events.up.sql` | AI agent events | ai_agent_events | — | 4 | parcial | sí |
+| 21 | core | `0021_dashboard_personalizable.up.sql` | dashboard personalizable | dashboard_default_layouts, dashboard_layouts | — | 10 | parcial | sí |
+| 22 | core | `0022_party_model_reconcile.up.sql` | party model reconcile | parties, party_agents, party_organizations | ai_conversations, audit_log, payment_gateway_events, payments, sales | 23 | sí | **no (`SELECT 1`)** |
+| 23 | core | `0023_saas_core_schema_align.up.sql` | saas core schema align | — | tenant_api_key_scopes, tenant_api_keys, users | 0 | parcial | sí |
+| 24 | core | `0024_whatsapp_full.up.sql` | whatsapp full | whatsapp_messages, whatsapp_opt_outs | whatsapp_connections | 10 | parcial | **no (file ausente)** |
+| 25 | core | `0025_procurement_requests.up.sql` | procurement requests | procurement_policies, procurement_requests, procurement_request_items | — | 8 | sí | sí |
+| 26 | core | `0026_procurement_policies_rbac.up.sql` | procurement policies RBAC | — | — | 0 | sí | sí |
+| 27 | core | `0027_users_phone.up.sql` | users phone | — | users | 0 | parcial | sí |
+| 28 | core | `0028_users_name_parts.up.sql` | users name parts | — | users | 0 | parcial | sí |
+| 29 | core | `0029_tenant_supported_currencies.up.sql` | tenant supported currencies | — | tenant_settings | 0 | sí | sí |
+| 30 | core | `0030_transversal_modules_seed.up.sql` | transversal modules seed | — | — | 0 | no | sí |
+| 31 | core | `0031_drop_legacy_party_views.up.sql` | drop legacy party views | — | — | 0 | parcial | sí |
+| 32 | core | `0032_ai_conversations_review_columns.up.sql` | AI conversations review | — | ai_conversations | 2 | parcial | sí |
+| 33 | core | `0033_archive_support.up.sql` | archive support | — | appointments, quotes | 2 | parcial | sí |
+| 34 | core | `0034_in_app_notifications.up.sql` | in-app notifications | in_app_notifications | — | 3 | parcial | sí |
+| 35 | core | `0035_namespace_pymes_in_app_notifications.up.sql` | namespace in-app | — | in_app_notifications | 0 | parcial | sí |
+| 36 | core | `0036_namespace_pymes_notifications.up.sql` | rename notification_log → pymes_notification_log | — | notification_log, notification_preferences | 0 | parcial | sí |
+| 37 | core | `0037_namespace_pymes_notifications_constraints.up.sql` | rename constraints | — | notification_log, notification_preferences | 0 | parcial (rota en DB fresca) | sí |
+| 38 | core | `0038_whatsapp_campaigns.up.sql` | whatsapp campaigns | whatsapp_campaign_recipients, whatsapp_campaigns | — | 6 | parcial | **no (file ausente)** |
+| 39 | core | `0039_whatsapp_conversations.up.sql` | whatsapp conversations | whatsapp_conversations | whatsapp_messages | 5 | parcial | **no (file ausente)** |
+| 40 | core | `0040_tenant_onboarding_profile.up.sql` | tenant onboarding profile | — | tenant_settings | 0 | parcial | sí |
+| 41 | core | `0041_migrate_appointments_to_scheduling.up.sql` | migrate appointments | — | tenant_settings | 0 | parcial | sí |
+| 42 | core | `0042_split_products_services.up.sql` | split products/services | catalog_services, service_price_lists, services | purchase_items, quote_items, sale_items, sales | 8 | parcial | sí |
+| 43 | core | `0043_rename_service_tables.up.sql` | rename service tables | — | services | 0 | parcial | sí |
+| 44 | core | `0044_dashboard_services_widget.up.sql` | dashboard services widget | — | — | 0 | no | sí |
+| 45 | core | `0045_active_products_are_products.up.sql` | active products | — | products | 1 | no | sí |
+| 46 | core | `0046_accounts_type_party_unique.up.sql` | accounts type party UNIQUE | — | — | 2 | parcial | sí |
+| 47 | core | `0047_drop_legacy_dashboard_layouts.up.sql` | drop legacy dashboard | — | — | 0 | parcial | sí |
+| 48 | core | `0048_drop_legacy_dashboard_catalog_and_preferences.up.sql` | drop legacy dashboard prefs | — | — | 0 | parcial | sí |
+| 49 | core | `0049_products_services_is_active.up.sql` | products/services is_active | — | products, services | 0 | parcial | sí |
+| 50 | core | `0050_drop_superseded_appointments.up.sql` | drop appointments | — | tenant_settings | 0 | parcial | **no (file ausente)** |
+| 51 | core | `0051_english_role_names.up.sql` | rename role names | — | — | 0 | no | sí |
+| 52 | core | `0052_products_image_url.up.sql` | products image_url | — | products | 0 | parcial | sí |
+| 53 | core | `0053_credit_notes_optional_return.up.sql` | credit notes optional return | — | credit_notes | 0 | no | sí |
+| 54 | core | `0054_calendar_export_tokens.up.sql` | calendar export tokens | calendar_export_tokens | — | 4 | parcial | sí |
+| 55 | core | `0055_calendar_sync_connections.up.sql` | calendar sync connections | calendar_sync_connections, calendar_sync_errors | — | 4 | parcial | sí |
+| 56 | core | `0056_products_image_urls.up.sql` | products image_urls (jsonb) | — | products | 0 | parcial | sí |
+| 57 | core | `0057_business_insight_candidates.up.sql` | business insights | pymes_business_insight_candidates | — | 4 | parcial | sí |
+| 58 | core | `0058_sales_branch.up.sql` | sales branch | — | sales | 1 | parcial | sí |
+| 59 | core | `0059_quotes_branch.up.sql` | quotes branch | — | quotes | 1 | parcial | sí |
+| 60 | core | `0060_purchases_branch.up.sql` | purchases branch | — | purchases | 1 | parcial | sí |
+| 61 | core | `0061_quotes_purchases_tags_metadata.up.sql` | tags/metadata | — | purchases, quotes | 0 | parcial | sí |
+| 62 | core | `0062_sales_tags_metadata.up.sql` | sales tags/metadata | — | sales | 0 | parcial | sí |
+| 63 | core | `0063_favorites.up.sql` | favorites | — | parties, products, services | 0 | parcial | sí |
+| 64 | core | `0064_purchases_internal_fields.up.sql` | purchases internal fields | — | purchases | 0 | parcial | sí |
+| 65 | core | `0065_purchases_deleted_at.up.sql` | purchases deleted_at | — | purchases | 1 | parcial | sí |
+| 66 | core | `0066_internal_fields_commercial.up.sql` | internal fields commercial | — | price_lists, quotes, recurring_expenses | 0 | parcial | sí |
+| 67 | core | `0067_price_lists_recurring_deleted_at.up.sql` | deleted_at | — | price_lists, recurring_expenses | 2 | parcial | sí |
+| 68 | core | `0068_transactional_internal_fields.up.sql` | transactional internal fields | — | cash_movements, payments, return_items, returns | 3 | parcial | sí |
+| 69 | core | `0069_invoices.up.sql` | invoices | invoice_line_items, invoices | — | 7 | parcial | sí |
+| 70 | core | `0070_employees.up.sql` | employees | employees | — | 5 | parcial | sí |
+| 71 | core | `0071_agent_readiness.up.sql` | agent readiness | agent_confirmations, agent_idempotency_keys | audit_log, payments | 10 | parcial | sí |
+| 72 | core | `0072_inventory_branch.up.sql` | inventory branch | — | stock_levels, stock_movements | 6 | parcial | sí |
+| 73 | core | `0073_cashflow_branch.up.sql` | cashflow branch | — | cash_movements, sales | 2 | parcial | sí |
+| 74 | core | `0074_employees_metadata.up.sql` | employees metadata | — | employees | 0 | parcial | sí |
+| 75 | core | `0075_tenant_access_model.up.sql` | tenant access model | tenant_invitations | org_api_key_scopes, org_api_keys, users | 10 | sí | sí |
+| 76 | core | `0076_drop_procurement_policies.up.sql` | drop procurement policies | — | — | 0 | parcial | sí |
+| 77 | core | `0077_complete_tenant_schema_rename.up.sql` | tenant → org rename | — | org_api_key_scopes, org_api_keys, users, tenants, tenant_memberships, notification_preferences, notification_log | 6 | sí | sí |
+| 78 | core | `0078_webhook_events_clerk.up.sql` | webhook events clerk | webhook_events_clerk | — | 6 | parcial | sí |
 | 79 | prof | `0001_professionals_schema.up.sql` | professionals schema | (7 tablas en schema professionals) | — | 19 | parcial | sí (**`DROP SCHEMA CASCADE` — incompleto**) |
 | 80 | prof | `0002_service_id_adoption.up.sql` | service_id adoption | — | (varias en schema professionals) | 3 | parcial | sí |
 | 81 | prof | `0003_drop_legacy_product_refs.up.sql` | drop legacy product refs | — | (schema professionals) | 1 | parcial | sí |
@@ -166,27 +166,27 @@
 
 | Tabla | Backend | Migración creadora | Nota |
 |---|---|---|---|
-| **users** | pymes-core, saas-lib | 0001_base_schema.up.sql + 0001_saas_core.up.sql | **DRIFT** — schemas distintos (ver §4) |
-| **tenant_settings** | pymes-core, saas-lib | 0001_base_schema.up.sql + 0001_saas_core.up.sql | **DRIFT** — PK distinta + columnas distintas |
-| **admin_activity_events** | pymes-core, saas-lib | 0001_base_schema.up.sql + 0001_saas_core.up.sql | **DRIFT** — `tenant_id` vs `org_id` + payload distinto |
-| **notification_log** | pymes-core (luego renombrado) + saas-lib | 0003_notifications.up.sql + 0001_saas_core.up.sql | **DRIFT** — pymes lo renombra a `pymes_notification_log` en 0036 |
-| **notification_preferences** | pymes-core (luego renombrado) + saas-lib | 0003_notifications.up.sql + 0001_saas_core.up.sql | **DRIFT** — pymes lo renombra a `pymes_notification_preferences` en 0036 |
-| **in_app_notifications** | pymes-core, saas-lib | 0034_in_app_notifications.up.sql + 0001_saas_core.up.sql | Pymes lo renombra a `pymes_in_app_notifications` en 0035 |
-| **tenants** | pymes-core | 0001_base_schema.up.sql | Renombrada a `orgs` en 0077; squash la elimina |
-| **tenant_memberships** | pymes-core | 0001_base_schema.up.sql | Renombrada a `org_members` en 0077 |
-| **tenant_api_keys** | pymes-core | 0001_base_schema.up.sql | Renombrada a `org_api_keys` en 0075 |
-| **tenant_api_key_scopes** | pymes-core | 0001_base_schema.up.sql | Renombrada a `org_api_key_scopes` en 0075 |
-| **tenant_usage_counters** | pymes-core | 0001_base_schema.up.sql | Será reemplazada por `org_usage_counters` (saas) |
+| **users** | core, saas-lib | 0001_base_schema.up.sql + 0001_saas_core.up.sql | **DRIFT** — schemas distintos (ver §4) |
+| **tenant_settings** | core, saas-lib | 0001_base_schema.up.sql + 0001_saas_core.up.sql | **DRIFT** — PK distinta + columnas distintas |
+| **admin_activity_events** | core, saas-lib | 0001_base_schema.up.sql + 0001_saas_core.up.sql | **DRIFT** — `tenant_id` vs `org_id` + payload distinto |
+| **notification_log** | core (luego renombrado) + saas-lib | 0003_notifications.up.sql + 0001_saas_core.up.sql | **DRIFT** — pymes lo renombra a `pymes_notification_log` en 0036 |
+| **notification_preferences** | core (luego renombrado) + saas-lib | 0003_notifications.up.sql + 0001_saas_core.up.sql | **DRIFT** — pymes lo renombra a `pymes_notification_preferences` en 0036 |
+| **in_app_notifications** | core, saas-lib | 0034_in_app_notifications.up.sql + 0001_saas_core.up.sql | Pymes lo renombra a `pymes_in_app_notifications` en 0035 |
+| **tenants** | core | 0001_base_schema.up.sql | Renombrada a `orgs` en 0077; squash la elimina |
+| **tenant_memberships** | core | 0001_base_schema.up.sql | Renombrada a `org_members` en 0077 |
+| **tenant_api_keys** | core | 0001_base_schema.up.sql | Renombrada a `org_api_keys` en 0075 |
+| **tenant_api_key_scopes** | core | 0001_base_schema.up.sql | Renombrada a `org_api_key_scopes` en 0075 |
+| **tenant_usage_counters** | core | 0001_base_schema.up.sql | Será reemplazada por `org_usage_counters` (saas) |
 | **orgs** | saas-lib | 0001_saas_core.up.sql | Identidad ganadora del squash |
 | **org_members** | saas-lib | 0001_saas_core.up.sql | Identidad ganadora del squash |
 | **org_api_keys / scopes** | saas-lib | 0001_saas_core.up.sql | Identidad ganadora |
 | **org_usage_counters** | saas-lib | 0001_saas_core.up.sql | Identidad ganadora |
-| customers | pymes-core | 0005_core_business.up.sql | Convertida a party (role) en 0017_party_model |
-| suppliers | pymes-core | 0005_core_business.up.sql | Convertida a party (role) en 0017 |
-| appointments | pymes-core | 0010_transversal_core.up.sql | Migrada a scheduling module en 0041; dropped en 0050 |
-| dashboard_layouts | pymes-core | 0021_dashboard_personalizable.up.sql | Drop en 0047 |
-| catalog_services | pymes-core | 0042_split_products_services.up.sql | Renamed a `services` en 0043 |
-| procurement_policies | pymes-core | 0025_procurement_requests.up.sql | Drop en 0076 |
+| customers | core | 0005_core_business.up.sql | Convertida a party (role) en 0017_party_model |
+| suppliers | core | 0005_core_business.up.sql | Convertida a party (role) en 0017 |
+| appointments | core | 0010_transversal_core.up.sql | Migrada a scheduling module en 0041; dropped en 0050 |
+| dashboard_layouts | core | 0021_dashboard_personalizable.up.sql | Drop en 0047 |
+| catalog_services | core | 0042_split_products_services.up.sql | Renamed a `services` en 0043 |
+| procurement_policies | core | 0025_procurement_requests.up.sql | Drop en 0076 |
 | salon_services | beauty | (legacy) | Drop en 0004 |
 | staff_members | beauty | (legacy) | Drop en 0005 |
 
@@ -194,11 +194,11 @@ Resto de tablas creadas una sola vez (no listadas para brevedad).
 
 ---
 
-## 4. Drift cross-source crítico (saas vs pymes-core)
+## 4. Drift cross-source crítico (saas vs core)
 
 ### 4.1 `users`
 
-| Columna | pymes-core/0001 | saas-lib/0001 |
+| Columna | core/0001 | saas-lib/0001 |
 |---|---|---|
 | `id` | `uuid PK DEFAULT gen_random_uuid()` | `uuid PK DEFAULT gen_random_uuid()` |
 | `external_id` | `text UNIQUE NOT NULL` | `text NOT NULL UNIQUE` |
@@ -210,7 +210,7 @@ Resto de tablas creadas una sola vez (no listadas para brevedad).
 
 ### 4.2 `tenant_settings`
 
-| Columna | pymes-core/0001 | saas-lib/0001 |
+| Columna | core/0001 | saas-lib/0001 |
 |---|---|---|
 | **PK** | **`tenant_id` → `tenants(id)`** | **`org_id` → `orgs(id)`** |
 | `plan_code` | `text NOT NULL DEFAULT 'starter'` | igual |
@@ -227,7 +227,7 @@ Resto de tablas creadas una sola vez (no listadas para brevedad).
 
 ### 4.3 `admin_activity_events`
 
-| Columna | pymes-core/0001 | saas-lib/0001 |
+| Columna | core/0001 | saas-lib/0001 |
 |---|---|---|
 | `id` | `uuid PK DEFAULT gen_random_uuid()` | `uuid PK` (sin default) |
 | **owner FK** | **`tenant_id → tenants`** | **`org_id → orgs`** |
@@ -240,7 +240,7 @@ Resto de tablas creadas una sola vez (no listadas para brevedad).
 
 ### 4.4 `notification_log`
 
-| Columna | pymes-core/0003 | saas-lib/0001 |
+| Columna | core/0003 | saas-lib/0001 |
 |---|---|---|
 | `id` | `uuid PK DEFAULT gen_random_uuid()` | igual |
 | **owner FK** | **`tenant_id NOT NULL → tenants`** | **`org_id NOT NULL → orgs`** |
@@ -257,12 +257,12 @@ Resto de tablas creadas una sola vez (no listadas para brevedad).
 
 ### 4.5 `notification_preferences`
 
-| Columna | pymes-core/0003 | saas-lib/0001 |
+| Columna | core/0003 | saas-lib/0001 |
 |---|---|---|
 | `channel` | `text NOT NULL` (sin default) | `text NOT NULL DEFAULT 'email'` |
 | Resto | iguales | iguales |
 
-**Resolución 0036/0037**: pymes-core renombra `notification_log` → `pymes_notification_log` y `notification_preferences` → `pymes_notification_preferences` para evitar la colisión con saas. Pero NO hace lo mismo con `users`, `tenant_settings`, `admin_activity_events` — esas tres siguen colisionando. Por eso `CREATE TABLE IF NOT EXISTS` produce comportamiento dependiente del orden de ejecución.
+**Resolución 0036/0037**: core renombra `notification_log` → `pymes_notification_log` y `notification_preferences` → `pymes_notification_preferences` para evitar la colisión con saas. Pero NO hace lo mismo con `users`, `tenant_settings`, `admin_activity_events` — esas tres siguen colisionando. Por eso `CREATE TABLE IF NOT EXISTS` produce comportamiento dependiente del orden de ejecución.
 
 ---
 
@@ -270,11 +270,11 @@ Resto de tablas creadas una sola vez (no listadas para brevedad).
 
 | # | File | Razón |
 |---|---|---|
-| 22 | pymes-core `0022_party_model_reconcile.down.sql` | `SELECT 1;` (no-op) |
-| 24 | pymes-core `0024_whatsapp_full.down.sql` | archivo ausente |
-| 38 | pymes-core `0038_whatsapp_campaigns.down.sql` | archivo ausente |
-| 39 | pymes-core `0039_whatsapp_conversations.down.sql` | archivo ausente |
-| 50 | pymes-core `0050_drop_superseded_appointments.down.sql` | archivo ausente |
+| 22 | core `0022_party_model_reconcile.down.sql` | `SELECT 1;` (no-op) |
+| 24 | core `0024_whatsapp_full.down.sql` | archivo ausente |
+| 38 | core `0038_whatsapp_campaigns.down.sql` | archivo ausente |
+| 39 | core `0039_whatsapp_conversations.down.sql` | archivo ausente |
+| 50 | core `0050_drop_superseded_appointments.down.sql` | archivo ausente |
 | 79 | prof `0001_professionals_schema.down.sql` | `DROP SCHEMA CASCADE` (no-op por tabla, pierde datos) |
 | 89 | work `0003_auto_repair_seed.down.sql` | `SELECT 1;` (no-op) |
 | 124 | saas-lib `0001_saas_core.down.sql` | archivo ausente |
@@ -341,8 +341,8 @@ Operaciones en estos archivos pueden fallar si la DB ya tiene estado parcial:
 
 | Extensión | Origen | Propósito |
 |---|---|---|
-| `pgcrypto` | pymes-core/0001 + saas-lib/0001 | `gen_random_uuid()` |
-| `uuid-ossp` | pymes-core/0001 | `uuid_generate_v4()` (legacy, solo declarada — ningún archivo la usa) |
+| `pgcrypto` | core/0001 + saas-lib/0001 | `gen_random_uuid()` |
+| `uuid-ossp` | core/0001 | `uuid_generate_v4()` (legacy, solo declarada — ningún archivo la usa) |
 | `btree_gist` | scheduling lib (modules/scheduling/go) | exclusion constraint en `scheduling_bookings.no_overlap` |
 
 > El squash declara solo `pgcrypto` y `btree_gist`. `uuid-ossp` se elimina (no se usa).
@@ -377,7 +377,7 @@ Ejemplos: `quote_items.product_id REFERENCES products(id)`, `sale_items.product_
 
 ### 9.4 Mezcla de UUID generators
 
-- `uuid_generate_v4()`: declarada en pymes-core/0001 pero no usada.
+- `uuid_generate_v4()`: declarada en core/0001 pero no usada.
 - `gen_random_uuid()`: usada universalmente.
 
 **El squash usa solo `gen_random_uuid()`** (de `pgcrypto`). Drop `uuid-ossp`.
@@ -405,7 +405,7 @@ Ejemplos: `quote_items.product_id REFERENCES products(id)`, `sale_items.product_
 | Tabla | Backend que la usa | Estructura |
 |---|---|---|
 | `schema_migrations` | golang-migrate default (varios) | `(version bigint, dirty bool)` |
-| `pymes_core_schema_migrations` | pymes-core (runner.go) | `(version bigint, dirty bool)` |
+| `pymes_core_schema_migrations` | core (runner.go) | `(version bigint, dirty bool)` |
 | `schema_migrations_professionals` | professionals (gorm gormdb) | `(version text)` — heterogéneo |
 | `schema_migrations_beauty` | beauty (gorm gormdb) | `(version text)` |
 | `saas_core_schema_migrations` | saas-go-lib (custom) | `(scope text, version text, applied_at, PRIMARY KEY(scope, version))` |
@@ -422,7 +422,7 @@ CREATE TABLE schema_migrations (
 );
 ```
 
-Cada componente (pymes-core, scheduling, professionals, workshops, beauty, restaurants) usa su `scope` propio. Patrón portado de `core/saas/go/migrations/migrations.go`.
+Cada componente (core, scheduling, professionals, workshops, beauty, restaurants) usa su `scope` propio. Patrón portado de `core/saas/go/migrations/migrations.go`.
 
 ---
 
@@ -434,7 +434,7 @@ Resumen del cronograma:
 - **Fase A** (este documento): inventario congelado ✅
 - **Fase B**: scaffolding (scripts/migrations-validate.sh, scripts/migrations-snapshot.sh, dir _squashed/) ✅ — PR #12
 - **Fase C**: snapshot del schema actual (pg_dump baseline) ✅ — PR #12
-- **Fase D**: diseñar nuevas migraciones 0001..0017 de pymes-core ✅ — PR #12
+- **Fase D**: diseñar nuevas migraciones 0001..0017 de core ✅ — PR #12
 - **Fase E**: convenciones SQL (trigger updated_at) ✅ — PR #12
 - **Fase F**: squash de 4 verticales ✅ — PR #12
 - **Fase G**: runner único + cleanup de bootstrap.go ✅ — PR #13
@@ -451,12 +451,12 @@ Tras el merge de PR #12 (squash design) + PR #13 (cutover + refactor Go), el sch
 
 | Métrica | Pre-squash | Post-squash | Cambio |
 |---|---|---|---|
-| Migraciones pymes-core en root | 78 | 17 | -61 |
+| Migraciones core en root | 78 | 17 | -61 |
 | Migraciones verticales en root | 39 | 6 (4 squashed + 2 medical no squasheadas) | -33 |
 | Tablas total en `public` | ~110 | 102 | -8 (tablas legacy eliminadas) |
 | Columnas con nombre `tenant_id` | ~115 | **0** | -100 % |
 | Tablas con nombre `tenant_*` | 8 | 2 (`tenant_settings`, `tenant_invitations`) | -75 % |
 | Drift cross-source | 5 tablas | **0** | resuelto |
-| `saasmigrations.MigrateUp` invocado en runtime | sí | no (schema copiado en pymes-core/0001) | regla 13 |
+| `saasmigrations.MigrateUp` invocado en runtime | sí | no (schema copiado en core/0001) | regla 13 |
 
 Para el flujo operativo de DB virgen, comandos de debug y convenciones obligatorias, ver [`DATABASE_INIT.md`](DATABASE_INIT.md).

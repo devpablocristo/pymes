@@ -1,21 +1,21 @@
-// Package pymescore provides an HTTP client for calling the pymes-core internal API.
+// Package pymescore provides an HTTP client for calling the core internal API.
 package pymescore
 
 import (
 	"context"
 
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescorehttp"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescoreops"
+	"github.com/devpablocristo/pymes/core/shared/backend/pymescorehttp"
+	"github.com/devpablocristo/pymes/core/shared/backend/pymescoreops"
 )
 
 type AvailabilityParams = pymescoreops.AvailabilityParams
 
-// Client communicates with the pymes-core backend over HTTP.
+// Client communicates with the core backend over HTTP.
 type Client struct {
 	*pymescorehttp.Client
 }
 
-// NewClient creates a Client pointing at the given pymes-core base URL.
+// NewClient creates a Client pointing at the given core base URL.
 func NewClient(baseURL, token string) *Client {
 	return &Client{Client: pymescorehttp.New(baseURL, token)}
 }

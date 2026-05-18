@@ -123,7 +123,7 @@ jobs:
           rsync -a \
             --exclude '.git/' \
             --exclude 'node_modules/' \
-            --exclude 'frontend/node_modules/' \
+            --exclude 'ui/node_modules/' \
             --exclude 'ai/.venv/' \
             ./ "$build_root/pymes/"
           echo "BUILD_ROOT=$build_root" >> "$GITHUB_ENV"
@@ -158,16 +158,16 @@ jobs:
           echo "IMAGE_URI=$image_uri" >> "$GITHUB_ENV"
           echo "IMAGE_DIGEST=${repo}@${runtime_digest}" >> "$GITHUB_ENV"
 
-      - name: Resolve pymes-core URL
+      - name: Resolve core URL
         run: |
           set -euo pipefail
-          core_service="${{ vars.CLOUD_RUN_SERVICE_BACKEND_DEV || 'pymes-core' }}"
+          core_service="${{ vars.CLOUD_RUN_SERVICE_BACKEND_DEV || 'core' }}"
           core_url="$(gcloud run services describe "$core_service" \
             --project="$GCP_PROJECT_ID" \
             --region="$GCP_REGION" \
             --format='value(status.url)')"
           if [[ -z "$core_url" ]]; then
-            echo "::error::No se pudo resolver URL de pymes-core."
+            echo "::error::No se pudo resolver URL de core."
             exit 1
           fi
           echo "PYMES_CORE_URL=$core_url" >> "$GITHUB_ENV"

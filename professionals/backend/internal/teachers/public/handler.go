@@ -1,4 +1,4 @@
-// Package public exposes public professionals routes and bridges to pymes-core where needed.
+// Package public exposes public professionals routes and bridges to core where needed.
 package public
 
 import (
@@ -14,8 +14,8 @@ import (
 	corepublic "github.com/devpablocristo/pymes/professionals/backend/internal/shared/pymescore"
 	profdomain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/usecases/domain"
 	sldomain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalgin"
 )
 
 type profilePort interface {
@@ -78,7 +78,7 @@ func (h *Handler) resolveTenantID(c *gin.Context) (uuid.UUID, bool) {
 		return orgID, true
 	}
 
-	// Then try slug resolution via pymes-core
+	// Then try slug resolution via core
 	if h.tenants != nil {
 		orgID, err := h.tenants.ResolveOrgID(c.Request.Context(), tenantSlug)
 		if err != nil {

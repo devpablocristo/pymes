@@ -3,18 +3,18 @@
 ## 1. Contexto
 
 Plataforma SaaS multi-vertical para PyMEs latinoamericanas. Monorepo con:
-- `pymes-core/` — base transversal (backend Go + shared)
+- `core/` — base transversal (backend Go + shared)
 - `professionals/` — vertical docentes/profesionales (backend Go)
 - `workshops/` — vertical talleres mecánicos (backend Go)
 - `beauty/` — vertical belleza / salón (equipo, menú de servicios; backend Go)
 - `restaurants/` — vertical bares / restaurantes (zonas, mesas, sesiones de mesa; backend Go)
-- `frontend/` — consola React unificada
+- `ui/` — consola React unificada
 - `ai/` — servicio FastAPI con Gemini
-- `pymes-app/` — app móvil Expo (React Native, Expo Router v6, Clerk auth, Zustand)
+- `mobile/` — app móvil Expo (React Native, Expo Router v6, Clerk auth, Zustand)
 
-Código reutilizable: librería **`core`** (`github.com/devpablocristo/core/...`) para lo agnóstico; **`pymes-core/shared/`** para lo transversal del producto; lo atado al dominio de un servicio en el **`internal/`** de ese backend (no hay carpeta `pkgs/` en este repo).
+Código reutilizable: librería externa **`github.com/devpablocristo/core/...`** (checkout típico en `../core`) para lo agnóstico; **`core/shared/`** del monorepo para lo transversal del producto; lo atado al dominio de un servicio en el **`internal/`** de ese backend (no hay carpeta `pkgs/` en este repo).
 
-Documentación canónica del monorepo: **`docs/README.md`** (índice), **`docs/AUTH.md`** (identidad y acceso), **`docs/CLERK_LOCAL.md`** (Clerk en Docker, org y JWT), **`docs/PYMES_CORE.md`** (backend transversal), **`docs/CORE_INTEGRATION.md`** (librerías `core`), **`pymes-core/docs/FRAUD_PREVENTION.md`** (auditoría, cobros, RBAC / anti-fraude).
+Documentación canónica del monorepo: **`docs/README.md`** (índice), **`docs/AUTH.md`** (identidad y acceso), **`docs/CLERK_LOCAL.md`** (Clerk en Docker, org y JWT), **`docs/PYMES_CORE.md`** (backend transversal), **`docs/CORE_INTEGRATION.md`** (librerías `core`), **`core/docs/FRAUD_PREVENTION.md`** (auditoría, cobros, RBAC / anti-fraude).
 
 ---
 
@@ -86,13 +86,14 @@ Todo lo que es **código interno** debe estar en inglés sin excepciones:
 │   │   └── runner.go
 │   ├── Dockerfile
 │   └── go.mod
-pymes-core/
+core/
 ├── backend/                        # base transversal
 ├── shared/                         # runtime y utilidades compartidas entre verticales
 │   ├── backend/                    # Go: auth, config, middleware
 │   └── ai/                         # Python: AI runtime
 ├── infra/aws/                      # Terraform por cloud (hermanos: gcp/, azure/...)
-frontend/                           # consola React unificada
+ui/                                 # consola React unificada
+mobile/                             # app móvil Expo (React Native)
 ai/                                 # servicio FastAPI
 professionals/                      # vertical (backend + infra/aws)
 workshops/                          # vertical (backend + infra/aws)
@@ -152,10 +153,10 @@ Los **mappers** viven en el adapter que los necesita:
 | Ubicación | Qué contiene | Criterio |
 |-----------|-------------|----------|
 | Librería **`core`** (`github.com/devpablocristo/core/...`) | Primitivas agnósticas (authn, saas, governance, helpers HTTP, etc.) | Portable entre productos; versionada fuera de este repo |
-| `pymes-core/shared/` | Código transversal del producto | Específico de Pymes, usado por varios verticales o capas |
+| `core/shared/` | Código transversal del producto | Específico de Pymes, usado por varios verticales o capas |
 | `internal/{modulo}/` del servicio owner | Dominio y adapters del módulo | Acoplado al negocio de ese backend; no se fuerza a `shared` ni a `core` |
 
-`pymes-core/shared/` no sustituye la librería `core`: cada uno tiene su criterio (ver reglas `library-placement`).
+`core/shared/` no sustituye la librería `core`: cada uno tiene su criterio (ver reglas `library-placement`).
 
 ### 5.5 Persistencia
 
@@ -165,7 +166,7 @@ Los **mappers** viven en el adapter que los necesita:
 - Para tests: fakes/stubs dentro del `_test.go`, nunca como archivo separado.
 - **Identidad multi-tenant: tabla canónica `orgs`, columna FK `org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE`.** No usar `tenants` (no existe en el schema post-cutover) ni columnas `tenant_id`. Excepción: las tablas `tenant_settings` y `tenant_invitations` mantienen su nombre por convención `core/saas/go`, pero su FK también es `org_id`. Ver [`docs/DATABASE_INIT.md`](docs/DATABASE_INIT.md).
 - **Soft delete: `archived_at timestamptz NULL`**. Excepciones documentadas: `users.deleted_at` (semántica GDPR) y `sales.voided_at` (regulación contable).
-- **Migraciones nuevas**: numeración consecutiva en `pymes-core/backend/migrations/` (post-squash arrancamos desde 0018). Nunca modificar las 0001..0017 squashed. Toda migración nueva tiene su `.down.sql` reverso completo y `CREATE TABLE/INDEX IF NOT EXISTS`.
+- **Migraciones nuevas**: numeración consecutiva en `core/backend/migrations/` (post-squash arrancamos desde 0018). Nunca modificar las 0001..0017 squashed. Toda migración nueva tiene su `.down.sql` reverso completo y `CREATE TABLE/INDEX IF NOT EXISTS`.
 
 ### 5.6 Naming por archivo
 
@@ -219,15 +220,15 @@ Los **mappers** viven en el adapter que los necesita:
 
 ---
 
-## 6. Verticales sobre pymes-core
+## 6. Verticales sobre core
 
-- `pymes-core` es la base transversal obligatoria del producto.
-- **Si algo aplica a más de un vertical, va en pymes-core.** No duplicar.
+- `core` es la base transversal obligatoria del producto.
+- **Si algo aplica a más de un vertical, va en core.** No duplicar.
 - Las verticales solo contienen funcionalidad exclusiva de su dominio.
-- Si una vertical consume capacidades de otra o de pymes-core, la integración es por HTTP.
+- Si una vertical consume capacidades de otra o de core, la integración es por HTTP.
 - Una vertical no importa handlers, usecases, repositories ni dominio interno de otra.
 - No se permite duplicar en una vertical: auth, API keys, tenant/org, party model, customers, products, appointments, quotes, sales, payments, WhatsApp, billing, admin, ni la base común de AI.
-- Todo prompt o diseño de vertical debe declarar: `reutiliza desde pymes-core` y `crea nuevo en la vertical`.
+- Todo prompt o diseño de vertical debe declarar: `reutiliza desde core` y `crea nuevo en la vertical`.
 
 ### 6.1 Selección de vertical
 
@@ -240,7 +241,7 @@ Los **mappers** viven en el adapter que los necesita:
 
 ## 7. CRUD canónico
 
-Contrato HTTP compartido entre backend y frontend. Los segmentos de ruta vienen de la librería común **`modules/crud/paths`** (Go: `crudpaths.SegmentArchived`, `SegmentArchive`, `SegmentRestore`, `SegmentHard`; TS espejo: `modules/crud/ui/ts/src/restPaths.ts`) y son consumidos por el frontend vía `buildRestCrudDataSource` (`frontend/src/crud/restCrudDataSource.ts`). No redefinir estos literales en cada módulo.
+Contrato HTTP compartido entre backend y frontend. Los segmentos de ruta vienen de la librería común **`modules/crud/paths`** (Go: `crudpaths.SegmentArchived`, `SegmentArchive`, `SegmentRestore`, `SegmentHard`; TS espejo: `modules/crud/ui/ts/src/restPaths.ts`) y son consumidos por el frontend vía `buildRestCrudDataSource` (`ui/src/crud/restCrudDataSource.ts`). No redefinir estos literales en cada módulo.
 
 | Operación | Método | Path | Status | Semántica |
 |-----------|--------|------|--------|-----------|
@@ -269,7 +270,7 @@ Contrato HTTP compartido entre backend y frontend. Los segmentos de ruta vienen 
 - Sentinel errors en `repository.go`: `ErrNotFound`, `ErrAlreadyExists`, `ErrArchived`.
 - API keys obligatorias. Fail si no están configuradas.
 - Health endpoints (`/healthz`, `/readyz`) fuera de auth.
-- **Fraude / robos internos / trazabilidad de dinero:** documentación canónica en **[`pymes-core/docs/FRAUD_PREVENTION.md`](pymes-core/docs/FRAUD_PREVENTION.md)** (auditoría, evento `payment.created`, RBAC, export CSV, backlog). Cualquier cambio en cobros, `audit_log` o permisos de rutas sensibles debe mantener ese documento al día; está enlazado desde [`docs/README.md`](docs/README.md) y [`docs/PYMES_CORE.md`](docs/PYMES_CORE.md).
+- **Fraude / robos internos / trazabilidad de dinero:** documentación canónica en **[`core/docs/FRAUD_PREVENTION.md`](core/docs/FRAUD_PREVENTION.md)** (auditoría, evento `payment.created`, RBAC, export CSV, backlog). Cualquier cambio en cobros, `audit_log` o permisos de rutas sensibles debe mantener ese documento al día; está enlazado desde [`docs/README.md`](docs/README.md) y [`docs/PYMES_CORE.md`](docs/PYMES_CORE.md).
 
 ---
 
@@ -297,7 +298,7 @@ Los nombres de servicio NO llevan prefijo `pymes-`. El `COMPOSE_PROJECT_NAME` ya
 | Backend Go | `cp-backend` | `pymes-cp-backend-1` |
 | Backend vertical | `prof-backend`, `work-backend`, `beauty-backend`, `restaurants-backend` | `pymes-prof-backend-1` |
 | DB | `postgres` | `pymes-postgres-1` |
-| Frontend | `frontend` | `pymes-frontend-1` |
+| UI | `ui` | `pymes-ui-1` |
 | AI / Chat | (sibling repo) `companion` | servido por Companion local en `:18085` |
 
 ### Reglas Docker
@@ -313,8 +314,8 @@ Los nombres de servicio NO llevan prefijo `pymes-`. El `COMPOSE_PROJECT_NAME` ya
 
 ### Nombres prohibidos
 
-- NUNCA `web/`, `frontend/`, `ui/` → el frontend ya se llama `frontend/`
-- NUNCA `api/`, `server/` → usar nombre del producto (`pymes-core/`, `professionals/`, `workshops/`, `beauty/`, `restaurants/`)
+- NUNCA `web/`, `frontend/` → la consola React ya se llama `ui/`
+- NUNCA `api/`, `server/` → usar nombre del producto (`core/`, `professionals/`, `workshops/`, `beauty/`, `restaurants/`)
 - NUNCA `postgres:16` sin `-alpine`
 
 ---
@@ -331,7 +332,7 @@ Los nombres de servicio NO llevan prefijo `pymes-`. El `COMPOSE_PROJECT_NAME` ya
 
 ### 12.1 Arquitectura
 
-La mensajería con clientes vive en `pymes-core/backend/internal/customer_messaging/`. El adapter proveedor de Meta vive en `pymes-core/backend/internal/customer_messaging/channels/whatsapp/`. No va en `core/saas/go` porque sigue siendo específico del producto pymes.
+La mensajería con clientes vive en `core/backend/internal/customer_messaging/`. El adapter proveedor de Meta vive en `core/backend/internal/customer_messaging/channels/whatsapp/`. No va en `core/saas/go` porque sigue siendo específico del producto pymes.
 
 ```
 internal/customer_messaging/
@@ -428,8 +429,8 @@ internal/customer_messaging/
 - NUNCA repositorios in-memory como artefacto de producción
 - NUNCA sufijos en archivos si solo hay una implementación
 - NUNCA decir "listo" sin haber buildado/testeado
-- NUNCA duplicar funcionalidad de pymes-core en una vertical
+- NUNCA duplicar funcionalidad de core en una vertical
 - NUNCA importar dominio interno entre verticales — solo HTTP
 - NUNCA crear tablas con prefijo `tenant_*` ni columnas `tenant_id`. Identidad canónica: `orgs` + columna `org_id`. Excepción única: las tablas saas `tenant_settings` y `tenant_invitations` mantienen su nombre histórico (su FK ya es `org_id`).
 - NUNCA hacer queries SQL raw que referencien las tablas legacy `tenants`, `tenant_memberships`, `tenant_api_keys`, `tenant_usage_counters` — fueron renombradas en el cutover (PR #13) a `orgs`, `org_members`, `org_api_keys`, `org_usage_counters`. Si encontrás una referencia residual: bug, reportarlo.
-- NUNCA llamar `saasmigrations.MigrateUp` en bootstrap. El schema saas está copiado y versionado en `pymes-core/backend/migrations/0001_saas_identity.up.sql`. Si `core/saas/go` evoluciona, hay que adoptar el cambio explícitamente en pymes-core con una migración nueva.
+- NUNCA llamar `saasmigrations.MigrateUp` en bootstrap. El schema saas está copiado y versionado en `core/backend/migrations/0001_saas_identity.up.sql`. Si `core/saas/go` evoluciona, hay que adoptar el cambio explícitamente en core con una migración nueva.

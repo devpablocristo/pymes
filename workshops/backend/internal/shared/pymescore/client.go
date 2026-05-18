@@ -1,10 +1,10 @@
 package pymescore
 
 import (
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescorehttp"
+	"github.com/devpablocristo/pymes/core/shared/backend/pymescorehttp"
 )
 
-// Client wraps the shared HTTP client for pymes-core internal API.
+// Client wraps the shared HTTP client for core internal API.
 type Client struct {
 	*pymescorehttp.Client
 }

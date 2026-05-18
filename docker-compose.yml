@@ -29,12 +29,12 @@ services:
     restart: unless-stopped
     build:
       context: ..
-      dockerfile: pymes/pymes-core/backend/Dockerfile.dev
+      dockerfile: pymes/core/backend/Dockerfile.dev
     ports:
       - "8100:8080"
     volumes:
-      - ./pymes-core/backend:/workspace/pymes/pymes-core/backend
-      - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - ./core/backend:/workspace/pymes/core/backend
+      - ./core/shared/backend:/workspace/pymes/core/shared/backend
       - cp_backend_go_mod:/go/pkg/mod
       - cp_backend_go_build:/root/.cache/go-build
     env_file:
@@ -54,7 +54,7 @@ services:
       # backend para procesarse server-side via FAPI y luego redirigir al frontend.
       PUBLIC_BASE_URL: http://localhost:8100
       PAYMENT_GATEWAY_MODE: demo
-      # Aplica SQL embebido en pymes-core/backend/seeds/ tras migrar (org local, demo comercial, etc.)
+      # Aplica SQL embebido en core/backend/seeds/ tras migrar (org local, demo comercial, etc.)
       PYMES_SEED_DEMO: "false"
       # Tomado de .env (`PYMES_SEED_DEMO_ORG_EXTERNAL_ID`). Debe ser el `external_id` de la org en `tenants` (p. ej. org_... de Clerk).
       # Vacío: cp-backend no recibe org de seed explícita (útil si solo usás org local embebida en seeds).
@@ -75,23 +75,23 @@ services:
         condition: service_started
 
   # `context: ..` se mantiene para reutilizar el mismo layout de build de los servicios.
-  frontend:
+  ui:
     restart: unless-stopped
     build:
       context: ..
-      dockerfile: pymes/frontend/Dockerfile.dev
+      dockerfile: pymes/ui/Dockerfile.dev
     ports:
       - "5180:5173"
     volumes:
-      - ./frontend/package.json:/workspace/pymes/frontend/package.json
-      - ./frontend/package-lock.json:/workspace/pymes/frontend/package-lock.json
-      - ./frontend/src:/workspace/pymes/frontend/src
-      - ./frontend/public:/workspace/pymes/frontend/public
-      - ./frontend/index.html:/workspace/pymes/frontend/index.html
-      - ./frontend/vite.config.ts:/workspace/pymes/frontend/vite.config.ts
-      - ./frontend/tsconfig.json:/workspace/pymes/frontend/tsconfig.json
-      - ./frontend/eslint.config.js:/workspace/pymes/frontend/eslint.config.js
-      - ./frontend/vendor:/workspace/pymes/frontend/vendor
+      - ./ui/package.json:/workspace/pymes/ui/package.json
+      - ./ui/package-lock.json:/workspace/pymes/ui/package-lock.json
+      - ./ui/src:/workspace/pymes/ui/src
+      - ./ui/public:/workspace/pymes/ui/public
+      - ./ui/index.html:/workspace/pymes/ui/index.html
+      - ./ui/vite.config.ts:/workspace/pymes/ui/vite.config.ts
+      - ./ui/tsconfig.json:/workspace/pymes/ui/tsconfig.json
+      - ./ui/eslint.config.js:/workspace/pymes/ui/eslint.config.js
+      - ./ui/vendor:/workspace/pymes/ui/vendor
     env_file:
       - path: .env
         required: false
@@ -130,7 +130,7 @@ services:
       - "8181:8081"
     volumes:
       - ./professionals/backend:/workspace/pymes/professionals/backend
-      - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - ./core/shared/backend:/workspace/pymes/core/shared/backend
       - prof_backend_go_mod:/go/pkg/mod
       - prof_backend_go_build:/root/.cache/go-build
     env_file:
@@ -160,7 +160,7 @@ services:
       - "8282:8082"
     volumes:
       - ./workshops/backend:/workspace/pymes/workshops/backend
-      - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - ./core/shared/backend:/workspace/pymes/core/shared/backend
       - work_backend_go_mod:/go/pkg/mod
       - work_backend_go_build:/root/.cache/go-build
     env_file:
@@ -192,7 +192,7 @@ services:
       - "8383:8083"
     volumes:
       - ./beauty/backend:/workspace/pymes/beauty/backend
-      - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - ./core/shared/backend:/workspace/pymes/core/shared/backend
       - beauty_backend_go_mod:/go/pkg/mod
       - beauty_backend_go_build:/root/.cache/go-build
     env_file:
@@ -222,7 +222,7 @@ services:
       - "8484:8084"
     volumes:
       - ./restaurants/backend:/workspace/pymes/restaurants/backend
-      - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - ./core/shared/backend:/workspace/pymes/core/shared/backend
       - restaurants_backend_go_mod:/go/pkg/mod
       - restaurants_backend_go_build:/root/.cache/go-build
     env_file:
@@ -252,7 +252,7 @@ services:
       - "8585:8085"
     volumes:
       - ./medical/backend:/workspace/pymes/medical/backend
-      - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - ./core/shared/backend:/workspace/pymes/core/shared/backend
       - medical_backend_go_mod:/go/pkg/mod
       - medical_backend_go_build:/root/.cache/go-build
     env_file:

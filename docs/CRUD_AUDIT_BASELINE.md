@@ -12,7 +12,7 @@ Este documento resume la primera version ejecutable de la auditoria CRUD usada p
 
 - Rutas registradas en handlers Go visibles.
 - Metodos canonicos del handler: list, archived, create, get, update, delete, archive, restore y hard delete.
-- IDs de recursos frontend declarados en `frontend/src/crud/resourceConfigs*.tsx`.
+- IDs de recursos frontend declarados en `ui/src/crud/resourceConfigs*.tsx`.
 - Drift de errores por respuestas `gin.H{"error": ...}`.
 - Shape de listas con `items`, `total`, `has_more` y `next_cursor`.
 

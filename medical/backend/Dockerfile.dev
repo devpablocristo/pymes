@@ -17,7 +17,7 @@ WORKDIR /workspace/pymes/medical/backend
 RUN go mod download
 
 COPY pymes/medical/backend /workspace/pymes/medical/backend
-COPY pymes/pymes-core/shared/backend /workspace/pymes/pymes-core/shared/backend
+COPY pymes/core/shared/backend /workspace/pymes/core/shared/backend
 
 EXPOSE 8085
 

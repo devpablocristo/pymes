@@ -7,7 +7,7 @@ Documento de referencia para diseñar e implementar una **versión nueva** dentr
 ## 1. Objetivo
 
 - Ofrecer a clientes PyME y prestadores una **consola** para gestionar **trabajadores**, **turnos**, **exámenes y prestaciones**, **ausentismos**, **accidentes** e **historia clínica laboral**, con **permisos por rol**, **trazabilidad** y **capacidades de IA** acopladas al servicio `ai/` (FastAPI).
-- Integrarse con las reglas del repo: **hexagonal en Go**, **sin duplicar** lo que ya cubre `pymes-core`, **UI en español**, **código en inglés**.
+- Integrarse con las reglas del repo: **hexagonal en Go**, **sin duplicar** lo que ya cubre `core`, **UI en español**, **código en inglés**.
 
 ---
 
@@ -39,7 +39,7 @@ Agrupación lógica para priorizar MVP vs fases posteriores.
 
 | Función | Notas |
 |---------|--------|
-| Reservar turnos | Alta de cita; puede alinearse con **appointments** de `pymes-core` si el contrato encaja. |
+| Reservar turnos | Alta de cita; puede alinearse con **appointments** de `core` si el contrato encaja. |
 | Listar turnos | Consultas y filtros. |
 | Control de turnos | Operativa del día (presente, cancelado, etc.). |
 | Configurar turnos | Reglas, agendas, recursos (profesionales, boxes). |
@@ -55,8 +55,8 @@ Agrupación lógica para priorizar MVP vs fases posteriores.
 
 | Función | Notas |
 |---------|--------|
-| Datos personales / contraseña | Preferentemente **reutilizar** flujos de identidad y ajustes de `pymes-core` / frontend común. |
-| Ayuda | FAQs, novedades; **auditoría** y **contabilidad** como informes o integraciones — no duplicar billing de `pymes-core` sin análisis explícito. |
+| Datos personales / contraseña | Preferentemente **reutilizar** flujos de identidad y ajustes de `core` / frontend común. |
+| Ayuda | FAQs, novedades; **auditoría** y **contabilidad** como informes o integraciones — no duplicar billing de `core` sin análisis explícito. |
 
 ### 3.5 Navegación tipo “módulos grandes”
 
@@ -67,7 +67,7 @@ Agrupación lógica para priorizar MVP vs fases posteriores.
 
 ---
 
-## 4. Reutilización desde `pymes-core` vs código nuevo
+## 4. Reutilización desde `core` vs código nuevo
 
 Cada implementación debe listar explícitamente (convención del repo):
 
@@ -76,13 +76,13 @@ Cada implementación debe listar explícitamente (convención del repo):
 - Autenticación, organización / tenant, bootstrap de org y **RBAC** según documentación vigente.
 - **Citas / appointments** si el modelo coincide con turnos (validar con dominio).
 - **Clientes / terceros** si “empresa contratante” encaja en el party model existente.
-- **Facturación / cobros** solo si el vertical no redefine cobro propio; revisar `pymes-core` y documentación de fraude/auditoría.
+- **Facturación / cobros** solo si el vertical no redefine cobro propio; revisar `core` y documentación de fraude/auditoría.
 - **IA**: invocación vía servicio `ai/` con políticas de datos y logs.
 
 ### 4.2 Nuevo en el vertical (delta de dominio)
 
 - Entidades y reglas de: trabajador en contexto laboral, examen ocupacional, ausentismo, accidente, prestación, HC laboral, solicitudes, nomencladores médico-laborales.
-- Pantallas y rutas del vertical en `frontend/` cuando `TenantProfile.vertical` incluya este vertical (requiere **extensión del producto**: nuevo valor de vertical acordado con el equipo).
+- Pantallas y rutas del vertical en `ui/` cuando `TenantProfile.vertical` incluya este vertical (requiere **extensión del producto**: nuevo valor de vertical acordado con el equipo).
 
 ---
 
@@ -125,4 +125,4 @@ Capacidades orientativas (sujetas a cumplimiento y consentimiento):
 
 - Reglas del monorepo: `CLAUDE.md`.
 - Verticales sin duplicación: `.cursor/rules/verticals-no-duplication.mdc`.
-- Anti-fraude / auditoría (cuando toque dinero o datos sensibles): `pymes-core/docs/FRAUD_PREVENTION.md` (si existe en el checkout).
+- Anti-fraude / auditoría (cuando toque dinero o datos sensibles): `core/docs/FRAUD_PREVENTION.md` (si existe en el checkout).

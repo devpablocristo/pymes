@@ -10,10 +10,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
+	"github.com/devpablocristo/pymes/core/shared/backend/auth"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalgin"
+	"github.com/devpablocristo/pymes/core/shared/backend/vertvalues"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles/handler/dto"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles/usecases/domain"
 )

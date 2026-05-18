@@ -13,10 +13,10 @@ import (
 
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes/handler/dto"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes/usecases/domain"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
+	"github.com/devpablocristo/pymes/core/shared/backend/auth"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalgin"
+	"github.com/devpablocristo/pymes/core/shared/backend/vertvalues"
 )
 
 type usecasesPort interface {

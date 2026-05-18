@@ -1,7 +1,7 @@
 package pymescore
 
 import (
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescorehttp"
+	"github.com/devpablocristo/pymes/core/shared/backend/pymescorehttp"
 )
 
 type Client struct {

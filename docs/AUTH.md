@@ -2,7 +2,7 @@
 
 ## Humanos
 
-La consola usa Clerk/JWT y `pymes-core` copia el principal autenticado al contexto Gin con:
+La consola usa Clerk/JWT y `core` copia el principal autenticado al contexto Gin con:
 
 - `tenant_id`
 - `actor`
@@ -14,7 +14,7 @@ RBAC se evalua por resource/action. Roles privilegiados y scopes administrativos
 
 ## API keys
 
-Los agentes externos usan API keys por organizacion. Para API keys, `pymes-core` exige scopes exactos como `sales:create`, `quotes:create`, `inventory:read` o comodines autorizados.
+Los agentes externos usan API keys por organizacion. Para API keys, `core` exige scopes exactos como `sales:create`, `quotes:create`, `inventory:read` o comodines autorizados.
 
 ## Firma externa
 

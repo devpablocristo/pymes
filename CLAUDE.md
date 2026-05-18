@@ -10,6 +10,7 @@ Plataforma SaaS multi-vertical para PyMEs latinoamericanas. Monorepo con:
 - `restaurants/` — vertical bares / restaurantes (zonas, mesas, sesiones de mesa; backend Go)
 - `frontend/` — consola React unificada
 - `ai/` — servicio FastAPI con Gemini
+- `pymes-app/` — app móvil Expo (React Native, Expo Router v6, Clerk auth, Zustand)
 
 Código reutilizable: librería **`core`** (`github.com/devpablocristo/core/...`) para lo agnóstico; **`pymes-core/shared/`** para lo transversal del producto; lo atado al dominio de un servicio en el **`internal/`** de ese backend (no hay carpeta `pkgs/` en este repo).
 

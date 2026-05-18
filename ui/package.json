@@ -23,7 +23,7 @@
     "@clerk/themes": "^2.4.57",
     "@devpablocristo/platform-authn": "^0.1.0",
     "@devpablocristo/platform-browser": "^0.1.0",
-    "@devpablocristo/platform-fsm": "^0.1.0",
+    "@devpablocristo/platform-fsm": "^0.2.0",
     "@devpablocristo/platform-http": "^0.1.0",
     "@devpablocristo/platform-admin-insights": "^0.1.0",
     "@devpablocristo/platform-calendar-board": "^0.1.1",

@@ -1,6 +1,13 @@
 // URL slug canónico para recursos CRUD. Los resourceId internos (keys en
 // `resourceConfigs` + `crudModuleCatalog`) siguen en camelCase porque son
 // identificadores de código; las URLs que consume el usuario usan kebab-case.
+//
+// Ola B5: la mecánica genérica (camelToKebab / kebabToCamel / applySlugMap)
+// vive en @devpablocristo/platform-browser. Acá sólo definimos el mapping
+// pymes-specific para resourceIds cuya transformación algorítmica no
+// produce el slug deseado (irregularidades en pymes).
+
+import { applySlugMap, unapplySlugMap } from '@devpablocristo/platform-browser';
 
 const CAMEL_TO_SLUG: Record<string, string> = {
   bikeWorkOrders: 'bike-work-orders',
@@ -13,16 +20,12 @@ const CAMEL_TO_SLUG: Record<string, string> = {
   procurementRequests: 'procurement-requests',
 };
 
-const SLUG_TO_CAMEL: Record<string, string> = Object.fromEntries(
-  Object.entries(CAMEL_TO_SLUG).map(([camel, slug]) => [slug, camel]),
-);
-
 /** camelCase → kebab-case para URLs. Recursos sin mapeo se devuelven tal cual. */
 export function toCrudResourceSlug(resourceId: string): string {
-  return CAMEL_TO_SLUG[resourceId] ?? resourceId;
+  return applySlugMap(resourceId, CAMEL_TO_SLUG);
 }
 
 /** kebab-case desde URL → camelCase resourceId interno. */
 export function fromCrudResourceSlug(slug: string): string {
-  return SLUG_TO_CAMEL[slug] ?? slug;
+  return unapplySlugMap(slug, CAMEL_TO_SLUG);
 }

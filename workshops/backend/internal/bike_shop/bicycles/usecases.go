@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	archive "github.com/devpablocristo/platform/features/crud/archive/go/archive"
+	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
 	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/core/shared/backend/vertvalues"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles/usecases/domain"

@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	utils "github.com/devpablocristo/platform/validate/go/stringutil"
-	archive "github.com/devpablocristo/platform/features/crud/archive/go/archive"
+	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
 	quotedomain "github.com/devpablocristo/pymes/core/backend/internal/quotes/usecases/domain"
 	"github.com/devpablocristo/pymes/core/backend/internal/sales"
 	salesdomain "github.com/devpablocristo/pymes/core/backend/internal/sales/usecases/domain"

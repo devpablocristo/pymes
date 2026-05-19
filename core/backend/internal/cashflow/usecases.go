@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
-	archive "github.com/devpablocristo/platform/features/crud/archive/go/archive"
+	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
 	cashdomain "github.com/devpablocristo/pymes/core/backend/internal/cashflow/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 )

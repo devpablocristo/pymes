@@ -11,7 +11,6 @@ require (
 	github.com/devpablocristo/platform/config/go v0.1.0
 	github.com/devpablocristo/platform/databases/postgres/go v0.1.0
 	github.com/devpablocristo/platform/errors/go v0.1.0
-	github.com/devpablocristo/platform/features/crud/archive/go v0.1.0
 	github.com/devpablocristo/platform/features/crud/paths/go v0.1.0
 	github.com/devpablocristo/platform/features/scheduling/go v0.1.0
 	github.com/devpablocristo/platform/http/gin/go v0.2.3
@@ -68,6 +67,7 @@ require (
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/devpablocristo/platform/jobs/go v0.1.0 // indirect
+	github.com/devpablocristo/platform/lifecycle/go v0.1.0
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect

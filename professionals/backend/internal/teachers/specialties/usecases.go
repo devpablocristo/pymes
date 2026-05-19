@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	archive "github.com/devpablocristo/platform/features/crud/archive/go/archive"
+	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 )

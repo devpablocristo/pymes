@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
-	archive "github.com/devpablocristo/platform/features/crud/archive/go/archive"
+	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
 	purchasesdomain "github.com/devpablocristo/pymes/core/backend/internal/purchases/usecases/domain"
 	"github.com/devpablocristo/pymes/core/backend/internal/shared/status"
 )

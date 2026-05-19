@@ -71,8 +71,6 @@ github.com/devpablocristo/platform/databases/postgres/go v0.1.0 h1:m8+iISxkiZO0H
 github.com/devpablocristo/platform/databases/postgres/go v0.1.0/go.mod h1:jgCqHHL8B9khk8K5GYA8LIDhnq6kQqAJEDwTk9pXQN4=
 github.com/devpablocristo/platform/errors/go v0.1.0 h1:lI+4cSrI1FNAfzgNBXEwSZemrsT7EJyaDJ3FkLt7Vfo=
 github.com/devpablocristo/platform/errors/go v0.1.0/go.mod h1:1cHoflrIdeQrLDtVPgsl5GqjYH7AZKASNYCMSAcdjOA=
-github.com/devpablocristo/platform/features/crud/archive/go v0.1.0 h1:QFF+EwgCUC9qzWxXq9BL429cnzxsgJ9uaF38ivoAPwM=
-github.com/devpablocristo/platform/features/crud/archive/go v0.1.0/go.mod h1:djawl3yfpDq8HvL8e5bT+OQHsnSEmFvJqy3+aybeu/0=
 github.com/devpablocristo/platform/features/crud/paths/go v0.1.0 h1:ed+PWcR1EcJOHtJ/QcddlU23tdHRSpi+tPCt+Fx9dDM=
 github.com/devpablocristo/platform/features/crud/paths/go v0.1.0/go.mod h1:P4EADb74DZOL+Y4W3cCeaZb1NM4DeHhoOeQy2ya2CuI=
 github.com/devpablocristo/platform/features/scheduling/go v0.1.0 h1:FD7BWke+nB7LZuayS/+erHQxMIpecEP8FK22Fp28Aqg=
@@ -87,6 +85,8 @@ github.com/devpablocristo/platform/kernels/governance/go v0.1.0 h1:zJkwPmCCFktaj
 github.com/devpablocristo/platform/kernels/governance/go v0.1.0/go.mod h1:kcQuJ0t1gL+/XxRItAIKo61Y1RSRmkF0v1qzxUc2sjc=
 github.com/devpablocristo/platform/kernels/saas/go v0.1.0 h1:TtiOZQNEyLgQaPahE8jUcgXhwqMoGteNfJPgaH8V9x0=
 github.com/devpablocristo/platform/kernels/saas/go v0.1.0/go.mod h1:CppwVcz20LN7Z80EzetW/7Z4McAFJoUAihK2AhNvKNs=
+github.com/devpablocristo/platform/lifecycle/go v0.1.0 h1:x6HpoZ/mEKl9TXN4Ih0IfxP7eZeRT2VnixrudmHTG3o=
+github.com/devpablocristo/platform/lifecycle/go v0.1.0/go.mod h1:8XcEUg6JKgzL+Bg0widQ5kUenQ/ZbY2zWaTEkHJGg9Y=
 github.com/devpablocristo/platform/notifications/go v0.1.1 h1:UZGEIE/Js7K1DKMlNH/ceiVMXjXWwoALaqVgdqSlLUI=
 github.com/devpablocristo/platform/notifications/go v0.1.1/go.mod h1:+aS6MQQLfTzt3DWdqlZe/haUXG5Omc7tT56JGvcAX2U=
 github.com/devpablocristo/platform/sdks/google-calendar/go v0.1.0 h1:yX+kfHQJ/8rw7bgk5hrNBh5eyvWBQLhm2AuPKIYvzHg=

@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	archive "github.com/devpablocristo/platform/features/crud/archive/go/archive"
+	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
 	productdomain "github.com/devpablocristo/pymes/core/backend/internal/products/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 )

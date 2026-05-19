@@ -11,6 +11,7 @@ import (
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
+	lifecycle "github.com/devpablocristo/platform/lifecycle/go/lifecycle"
 	paymentsdomain "github.com/devpablocristo/pymes/core/backend/internal/payments/usecases/domain"
 )
 
@@ -35,13 +36,30 @@ type NotificationPort interface {
 }
 
 type Usecases struct {
-	repo     RepositoryPort
-	audit    AuditPort
-	notifier NotificationPort
+	repo      RepositoryPort
+	audit     AuditPort
+	notifier  NotificationPort
+	lifecycle *lifecycle.Service // optional; when nil, legacy path
 }
 
-func NewUsecases(repo RepositoryPort, audit AuditPort, notifier NotificationPort) *Usecases {
-	return &Usecases{repo: repo, audit: audit, notifier: notifier}
+// Option customizes Usecases at construction.
+type Option func(*Usecases)
+
+// WithLifecycle wires lifecycle.Service for Soft/Restore/HardDelete.
+func WithLifecycle(svc *lifecycle.Service) Option {
+	return func(u *Usecases) {
+		if svc != nil {
+			u.lifecycle = svc
+		}
+	}
+}
+
+func NewUsecases(repo RepositoryPort, audit AuditPort, notifier NotificationPort, opts ...Option) *Usecases {
+	u := &Usecases{repo: repo, audit: audit, notifier: notifier}
+	for _, opt := range opts {
+		opt(u)
+	}
+	return u
 }
 
 func (u *Usecases) ListSalePayments(ctx context.Context, orgID, saleID uuid.UUID) ([]paymentsdomain.Payment, error) {
@@ -92,6 +110,14 @@ func (u *Usecases) Update(ctx context.Context, in paymentsdomain.Payment, actor 
 }
 
 func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.SoftDelete(ctx, &lifecycle.ArchiveRequest{
+			ResourceType: ResourceTypePayment,
+			ResourceID:   id,
+			TenantID:     orgID,
+			Actor:        actor,
+		})
+	}
 	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("payment", id.String())
@@ -105,6 +131,14 @@ func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 }
 
 func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.Restore(ctx, &lifecycle.RestoreRequest{
+			ResourceType: ResourceTypePayment,
+			ResourceID:   id,
+			TenantID:     orgID,
+			Actor:        actor,
+		})
+	}
 	if err := u.repo.Restore(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("payment", id.String())
@@ -118,6 +152,15 @@ func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor strin
 }
 
 func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.HardDelete(ctx, &lifecycle.HardDeleteRequest{
+			ResourceType:   ResourceTypePayment,
+			ResourceID:     id,
+			TenantID:       orgID,
+			Actor:          actor,
+			MustBeArchived: false,
+		})
+	}
 	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("payment", id.String())

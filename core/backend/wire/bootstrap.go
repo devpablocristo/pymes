@@ -146,16 +146,6 @@ func InitializeApp() *app.App {
 	customerMessagingRepo := customer_messaging.NewRepository(db)
 
 	auditUC := audit.NewUsecases(auditRepo)
-	adminUC := admin.NewUsecases(adminRepo)
-	attachmentsUC := attachments.NewUsecases(attachmentsRepo, "/tmp/attachments")
-	cashflowUC := cashflow.NewUsecases(cashflowRepo, auditUC)
-	timelineUC := timeline.NewUsecases(timelineRepo)
-	outwebhooksUC := outwebhooks.NewUsecases(outwebhooksRepo)
-	customersUC := customers.NewUsecases(customersRepo, auditUC)
-	suppliersUC := suppliers.NewUsecases(suppliersRepo, auditUC)
-	accountsUC := accounts.NewUsecases(accountsRepo)
-	currencyUC := currency.NewUsecases(currencyRepo)
-	dashboardUC := dashboard.NewUsecases(dashboardRepo)
 	// Ola C steps 3-5 — single shared platform/lifecycle/go.Service for every
 	// CRUDAR module that has opted in. The registration list lives in
 	// pymesLifecycleRegistrations() (wire/lifecycle.go). Audit is routed
@@ -163,14 +153,25 @@ func InitializeApp() *app.App {
 	// ArchivePolicy + table layout there and then construct their Usecases
 	// with WithLifecycle(pymesLifecycle).
 	pymesLifecycle := buildPymesLifecycleService(db, auditUC, pymesLifecycleRegistrations())
+
+	adminUC := admin.NewUsecases(adminRepo)
+	attachmentsUC := attachments.NewUsecases(attachmentsRepo, "/tmp/attachments")
+	cashflowUC := cashflow.NewUsecases(cashflowRepo, auditUC, cashflow.WithLifecycle(pymesLifecycle))
+	timelineUC := timeline.NewUsecases(timelineRepo)
+	outwebhooksUC := outwebhooks.NewUsecases(outwebhooksRepo)
+	customersUC := customers.NewUsecases(customersRepo, auditUC)
+	suppliersUC := suppliers.NewUsecases(suppliersRepo, auditUC)
+	accountsUC := accounts.NewUsecases(accountsRepo)
+	currencyUC := currency.NewUsecases(currencyRepo)
+	dashboardUC := dashboard.NewUsecases(dashboardRepo)
 	priceListsUC := pricelists.NewUsecases(priceListsRepo, pricelists.WithLifecycle(pymesLifecycle))
 	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC, purchases.WithTimeline(timelineUC), purchases.WithWebhooks(outwebhooksUC))
 	// procurement requiere Nexus governance: ya no hay motor local.
 	reportsUC := reports.NewUsecases(reportsRepo)
-	recurringUC := recurring.NewUsecases(recurringRepo, auditUC)
+	recurringUC := recurring.NewUsecases(recurringRepo, auditUC, recurring.WithLifecycle(pymesLifecycle))
 	rbacUC := rbac.NewUsecases(rbacRepo, auditUC)
 	rbacMiddleware := handlers.NewRBACMiddleware(rbacUC)
-	returnsUC := returns.NewUsecases(returnsRepo, auditUC, timelineUC, outwebhooksUC)
+	returnsUC := returns.NewUsecases(returnsRepo, auditUC, timelineUC, outwebhooksUC, returns.WithLifecycle(pymesLifecycle))
 	schedulingUC := schedulingmodule.NewUsecases(schedulingRepo, auditUC, schedulingmodule.WithNotifications(outwebhooksUC))
 	calendarExportUC := calendar_export.NewUsecases(calendarExportRepo, schedulingUC, calendar_export.Config{
 		ProductID: "-//Pymes SaaS//Calendar Export//ES",
@@ -255,7 +256,7 @@ func InitializeApp() *app.App {
 		sales.WithWebhooks(outwebhooksUC),
 		sales.WithNotifications(businessInsightsUC),
 	)
-	paymentsUC := payments.NewUsecases(paymentsRepo, auditUC, businessInsightsUC)
+	paymentsUC := payments.NewUsecases(paymentsRepo, auditUC, businessInsightsUC, payments.WithLifecycle(pymesLifecycle))
 	quotesUC := quotes.NewUsecases(quotesRepo, salesUC, auditUC)
 	invoicesUC := invoices.NewUsecases(invoicesRepo, auditUC)
 	employeesUC := employees.NewUsecases(employeesRepo, auditUC, employees.WithLifecycle(pymesLifecycle))

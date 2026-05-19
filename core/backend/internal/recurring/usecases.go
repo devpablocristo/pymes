@@ -11,6 +11,7 @@ import (
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
+	lifecycle "github.com/devpablocristo/platform/lifecycle/go/lifecycle"
 	recurringdomain "github.com/devpablocristo/pymes/core/backend/internal/recurring/usecases/domain"
 )
 
@@ -32,12 +33,30 @@ type AuditPort interface {
 }
 
 type Usecases struct {
-	repo  RepositoryPort
-	audit AuditPort
+	repo      RepositoryPort
+	audit     AuditPort
+	lifecycle *lifecycle.Service // optional; when nil, legacy path
 }
 
-func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
-	return &Usecases{repo: repo, audit: audit}
+// Option customizes Usecases at construction.
+type Option func(*Usecases)
+
+// WithLifecycle wires lifecycle.Service for Soft/Restore/HardDelete. When
+// active, audit emission is delegated to the Service's AuditPort.
+func WithLifecycle(svc *lifecycle.Service) Option {
+	return func(u *Usecases) {
+		if svc != nil {
+			u.lifecycle = svc
+		}
+	}
+}
+
+func NewUsecases(repo RepositoryPort, audit AuditPort, opts ...Option) *Usecases {
+	u := &Usecases{repo: repo, audit: audit}
+	for _, opt := range opts {
+		opt(u)
+	}
+	return u
 }
 
 func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, activeOnly bool, limit int) ([]recurringdomain.RecurringExpense, error) {
@@ -117,6 +136,14 @@ func (u *Usecases) Deactivate(ctx context.Context, orgID, id uuid.UUID, actor st
 }
 
 func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.SoftDelete(ctx, &lifecycle.ArchiveRequest{
+			ResourceType: ResourceTypeRecurringExpense,
+			ResourceID:   id,
+			TenantID:     orgID,
+			Actor:        actor,
+		})
+	}
 	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("recurring_expense", id.String())
@@ -130,6 +157,14 @@ func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 }
 
 func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.Restore(ctx, &lifecycle.RestoreRequest{
+			ResourceType: ResourceTypeRecurringExpense,
+			ResourceID:   id,
+			TenantID:     orgID,
+			Actor:        actor,
+		})
+	}
 	if err := u.repo.Restore(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("recurring_expense", id.String())
@@ -143,6 +178,15 @@ func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor strin
 }
 
 func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.HardDelete(ctx, &lifecycle.HardDeleteRequest{
+			ResourceType:   ResourceTypeRecurringExpense,
+			ResourceID:     id,
+			TenantID:       orgID,
+			Actor:          actor,
+			MustBeArchived: false,
+		})
+	}
 	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("recurring_expense", id.String())

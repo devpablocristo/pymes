@@ -19,8 +19,12 @@ import (
 	lifecycle "github.com/devpablocristo/platform/lifecycle/go/lifecycle"
 	"github.com/devpablocristo/pymes/core/backend/internal/audit"
 	auditdomain "github.com/devpablocristo/pymes/core/backend/internal/audit/usecases/domain"
+	"github.com/devpablocristo/pymes/core/backend/internal/cashflow"
 	"github.com/devpablocristo/pymes/core/backend/internal/employees"
+	"github.com/devpablocristo/pymes/core/backend/internal/payments"
 	"github.com/devpablocristo/pymes/core/backend/internal/pricelists"
+	"github.com/devpablocristo/pymes/core/backend/internal/recurring"
+	"github.com/devpablocristo/pymes/core/backend/internal/returns"
 	"gorm.io/gorm"
 )
 
@@ -163,6 +167,34 @@ func pymesLifecycleRegistrations() map[string]LifecycleEntry {
 			Policy: employees.Policy,
 			Config: lifecycle.SoftDeleterConfig{
 				Table: "employees", IDColumn: "id",
+				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+			},
+		},
+		recurring.ResourceTypeRecurringExpense: {
+			Policy: recurring.Policy,
+			Config: lifecycle.SoftDeleterConfig{
+				Table: "recurring_expenses", IDColumn: "id",
+				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+			},
+		},
+		cashflow.ResourceTypeCashMovement: {
+			Policy: cashflow.Policy,
+			Config: lifecycle.SoftDeleterConfig{
+				Table: "cash_movements", IDColumn: "id",
+				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+			},
+		},
+		payments.ResourceTypePayment: {
+			Policy: payments.Policy,
+			Config: lifecycle.SoftDeleterConfig{
+				Table: "payments", IDColumn: "id",
+				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+			},
+		},
+		returns.ResourceTypeReturn: {
+			Policy: returns.Policy,
+			Config: lifecycle.SoftDeleterConfig{
+				Table: "returns", IDColumn: "id",
 				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
 			},
 		},

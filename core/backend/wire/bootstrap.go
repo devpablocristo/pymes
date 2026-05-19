@@ -156,10 +156,14 @@ func InitializeApp() *app.App {
 	accountsUC := accounts.NewUsecases(accountsRepo)
 	currencyUC := currency.NewUsecases(currencyRepo)
 	dashboardUC := dashboard.NewUsecases(dashboardRepo)
-	// Ola C step 3-4 — wire platform/lifecycle/go.Service for pricelists piloto,
-	// routing its audit through the canonical pymes audit.Usecases (auditUC).
-	// Other CRUDAR modules continue using the legacy path until they each opt in.
-	priceListsUC := pricelists.NewUsecases(priceListsRepo, pricelists.WithLifecycle(buildPriceListsLifecycleService(db, auditUC)))
+	// Ola C steps 3-5 — single shared platform/lifecycle/go.Service for every
+	// CRUDAR module that has opted in. The registration list lives in
+	// pymesLifecycleRegistrations() (wire/lifecycle.go). Audit is routed
+	// through pymesAuditPort over auditUC. New modules register their
+	// ArchivePolicy + table layout there and then construct their Usecases
+	// with WithLifecycle(pymesLifecycle).
+	pymesLifecycle := buildPymesLifecycleService(db, auditUC, pymesLifecycleRegistrations())
+	priceListsUC := pricelists.NewUsecases(priceListsRepo, pricelists.WithLifecycle(pymesLifecycle))
 	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC, purchases.WithTimeline(timelineUC), purchases.WithWebhooks(outwebhooksUC))
 	// procurement requiere Nexus governance: ya no hay motor local.
 	reportsUC := reports.NewUsecases(reportsRepo)
@@ -254,7 +258,7 @@ func InitializeApp() *app.App {
 	paymentsUC := payments.NewUsecases(paymentsRepo, auditUC, businessInsightsUC)
 	quotesUC := quotes.NewUsecases(quotesRepo, salesUC, auditUC)
 	invoicesUC := invoices.NewUsecases(invoicesRepo, auditUC)
-	employeesUC := employees.NewUsecases(employeesRepo, auditUC)
+	employeesUC := employees.NewUsecases(employeesRepo, auditUC, employees.WithLifecycle(pymesLifecycle))
 
 	partyUC := party.NewUsecases(partyRepo, auditUC, party.WithTimeline(timelineUC), party.WithWebhooks(outwebhooksUC))
 	pdfgenUC := pdfgen.NewUsecases(quotesUC, salesUC, adminUC)

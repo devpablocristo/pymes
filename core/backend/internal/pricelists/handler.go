@@ -22,9 +22,9 @@ type usecasesPort interface {
 	Create(ctx context.Context, in pricelistdomain.PriceList) (pricelistdomain.PriceList, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (pricelistdomain.PriceList, error)
 	Update(ctx context.Context, in pricelistdomain.PriceList) (pricelistdomain.PriceList, error)
-	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
-	Restore(ctx context.Context, orgID, id uuid.UUID) error
-	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 }
 
 type Handler struct{ uc usecasesPort }
@@ -142,7 +142,8 @@ func (h *Handler) Delete(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id); err != nil {
+	actor := handlers.GetAuthContext(c).Actor
+	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -158,7 +159,8 @@ func (h *Handler) Restore(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.uc.Restore(c.Request.Context(), orgID, id); err != nil {
+	actor := handlers.GetAuthContext(c).Actor
+	if err := h.uc.Restore(c.Request.Context(), orgID, id, actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -170,7 +172,8 @@ func (h *Handler) HardDelete(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.uc.HardDelete(c.Request.Context(), orgID, id); err != nil {
+	actor := handlers.GetAuthContext(c).Actor
+	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}

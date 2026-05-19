@@ -10,6 +10,7 @@ import (
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
+	lifecycle "github.com/devpablocristo/platform/lifecycle/go/lifecycle"
 	pricelistdomain "github.com/devpablocristo/pymes/core/backend/internal/pricelists/usecases/domain"
 )
 
@@ -24,9 +25,37 @@ type RepositoryPort interface {
 	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
-type Usecases struct{ repo RepositoryPort }
+// Usecases is the pricelists application service. As of Ola C step 3, the
+// soft-delete / restore / hard-delete flow optionally delegates to
+// platform/lifecycle/go.Service when wired via WithLifecycle. When nil,
+// behavior falls back to the legacy direct-repository path (preserves
+// backward compatibility for tests and non-wired environments).
+type Usecases struct {
+	repo      RepositoryPort
+	lifecycle *lifecycle.Service // optional; when nil, legacy path
+}
 
-func NewUsecases(repo RepositoryPort) *Usecases { return &Usecases{repo: repo} }
+// Option customizes Usecases at construction.
+type Option func(*Usecases)
+
+// WithLifecycle enables the lifecycle.Service path for archive/restore/hard.
+// When this option is applied, SoftDelete/Restore/HardDelete go through the
+// Service (audit + policy enforcement) instead of the bare repository.
+func WithLifecycle(svc *lifecycle.Service) Option {
+	return func(u *Usecases) {
+		if svc != nil {
+			u.lifecycle = svc
+		}
+	}
+}
+
+func NewUsecases(repo RepositoryPort, opts ...Option) *Usecases {
+	u := &Usecases{repo: repo}
+	for _, opt := range opts {
+		opt(u)
+	}
+	return u
+}
 
 func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, activeOnly bool, limit int) ([]pricelistdomain.PriceList, error) {
 	return u.repo.List(ctx, orgID, activeOnly, limit)
@@ -74,7 +103,21 @@ func (u *Usecases) Update(ctx context.Context, in pricelistdomain.PriceList) (pr
 	return u.repo.Update(ctx, in)
 }
 
-func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
+// SoftDelete archives the price list. When a lifecycle.Service is wired
+// (WithLifecycle), it dispatches through it for audit + policy enforcement.
+// Otherwise it falls back to the legacy direct-repository path.
+//
+// `actor` is propagated to the audit log when lifecycle is active and
+// ignored on the legacy path.
+func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.SoftDelete(ctx, &lifecycle.ArchiveRequest{
+			ResourceType: ResourceTypePriceList,
+			ResourceID:   id,
+			TenantID:     orgID,
+			Actor:        actor,
+		})
+	}
 	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("price_list", id.String())
@@ -84,7 +127,15 @@ func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.Restore(ctx, &lifecycle.RestoreRequest{
+			ResourceType: ResourceTypePriceList,
+			ResourceID:   id,
+			TenantID:     orgID,
+			Actor:        actor,
+		})
+	}
 	if err := u.repo.Restore(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("price_list", id.String())
@@ -94,7 +145,16 @@ func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	return nil
 }
 
-func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.HardDelete(ctx, &lifecycle.HardDeleteRequest{
+			ResourceType:   ResourceTypePriceList,
+			ResourceID:     id,
+			TenantID:       orgID,
+			Actor:          actor,
+			MustBeArchived: false, // pymes admin can hard-delete without soft step
+		})
+	}
 	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("price_list", id.String())

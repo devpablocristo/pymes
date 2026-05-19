@@ -21,8 +21,10 @@ import (
 	auditdomain "github.com/devpablocristo/pymes/core/backend/internal/audit/usecases/domain"
 	"github.com/devpablocristo/pymes/core/backend/internal/cashflow"
 	"github.com/devpablocristo/pymes/core/backend/internal/employees"
+	"github.com/devpablocristo/pymes/core/backend/internal/invoices"
 	"github.com/devpablocristo/pymes/core/backend/internal/payments"
 	"github.com/devpablocristo/pymes/core/backend/internal/pricelists"
+	"github.com/devpablocristo/pymes/core/backend/internal/quotes"
 	"github.com/devpablocristo/pymes/core/backend/internal/recurring"
 	"github.com/devpablocristo/pymes/core/backend/internal/returns"
 	"gorm.io/gorm"
@@ -195,6 +197,20 @@ func pymesLifecycleRegistrations() map[string]LifecycleEntry {
 			Policy: returns.Policy,
 			Config: lifecycle.SoftDeleterConfig{
 				Table: "returns", IDColumn: "id",
+				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+			},
+		},
+		invoices.ResourceTypeInvoice: {
+			Policy: invoices.Policy,
+			Config: lifecycle.SoftDeleterConfig{
+				Table: "invoices", IDColumn: "id",
+				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+			},
+		},
+		quotes.ResourceTypeQuote: {
+			Policy: quotes.Policy,
+			Config: lifecycle.SoftDeleterConfig{
+				Table: "quotes", IDColumn: "id",
 				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
 			},
 		},

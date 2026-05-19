@@ -257,8 +257,8 @@ func InitializeApp() *app.App {
 		sales.WithNotifications(businessInsightsUC),
 	)
 	paymentsUC := payments.NewUsecases(paymentsRepo, auditUC, businessInsightsUC, payments.WithLifecycle(pymesLifecycle))
-	quotesUC := quotes.NewUsecases(quotesRepo, salesUC, auditUC)
-	invoicesUC := invoices.NewUsecases(invoicesRepo, auditUC)
+	quotesUC := quotes.NewUsecases(quotesRepo, salesUC, auditUC, quotes.WithLifecycle(pymesLifecycle))
+	invoicesUC := invoices.NewUsecases(invoicesRepo, auditUC, invoices.WithLifecycle(pymesLifecycle))
 	employeesUC := employees.NewUsecases(employeesRepo, auditUC, employees.WithLifecycle(pymesLifecycle))
 
 	partyUC := party.NewUsecases(partyRepo, auditUC, party.WithTimeline(timelineUC), party.WithWebhooks(outwebhooksUC))

@@ -12,6 +12,7 @@ import (
 
 	utils "github.com/devpablocristo/platform/validate/go/stringutil"
 	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
+	lifecycle "github.com/devpablocristo/platform/lifecycle/go/lifecycle"
 	quotedomain "github.com/devpablocristo/pymes/core/backend/internal/quotes/usecases/domain"
 	"github.com/devpablocristo/pymes/core/backend/internal/sales"
 	salesdomain "github.com/devpablocristo/pymes/core/backend/internal/sales/usecases/domain"
@@ -53,13 +54,31 @@ type AuditPort interface {
 }
 
 type Usecases struct {
-	repo  RepositoryPort
-	sales SalesPort
-	audit AuditPort
+	repo      RepositoryPort
+	sales     SalesPort
+	audit     AuditPort
+	lifecycle *lifecycle.Service // optional; when nil, legacy path
 }
 
-func NewUsecases(repo RepositoryPort, salesUC SalesPort, audit AuditPort) *Usecases {
-	return &Usecases{repo: repo, sales: salesUC, audit: audit}
+// Option customizes Usecases at construction.
+type Option func(*Usecases)
+
+// WithLifecycle wires lifecycle.Service for Archive/Restore/HardDelete.
+// Quote.Archive is treated as SoftDelete inside lifecycle.Service.
+func WithLifecycle(svc *lifecycle.Service) Option {
+	return func(u *Usecases) {
+		if svc != nil {
+			u.lifecycle = svc
+		}
+	}
+}
+
+func NewUsecases(repo RepositoryPort, salesUC SalesPort, audit AuditPort, opts ...Option) *Usecases {
+	u := &Usecases{repo: repo, sales: salesUC, audit: audit}
+	for _, opt := range opts {
+		opt(u)
+	}
+	return u
 }
 
 type QuoteItemInput struct {
@@ -364,6 +383,14 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quote
 }
 
 func (u *Usecases) Archive(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.SoftDelete(ctx, &lifecycle.ArchiveRequest{
+			ResourceType: ResourceTypeQuote,
+			ResourceID:   quoteID,
+			TenantID:     orgID,
+			Actor:        actor,
+		})
+	}
 	if err := u.repo.Archive(ctx, orgID, quoteID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
@@ -377,6 +404,14 @@ func (u *Usecases) Archive(ctx context.Context, orgID, quoteID uuid.UUID, actor 
 }
 
 func (u *Usecases) Restore(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.Restore(ctx, &lifecycle.RestoreRequest{
+			ResourceType: ResourceTypeQuote,
+			ResourceID:   quoteID,
+			TenantID:     orgID,
+			Actor:        actor,
+		})
+	}
 	if err := u.repo.Restore(ctx, orgID, quoteID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
@@ -390,6 +425,15 @@ func (u *Usecases) Restore(ctx context.Context, orgID, quoteID uuid.UUID, actor 
 }
 
 func (u *Usecases) HardDelete(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.HardDelete(ctx, &lifecycle.HardDeleteRequest{
+			ResourceType:   ResourceTypeQuote,
+			ResourceID:     quoteID,
+			TenantID:       orgID,
+			Actor:          actor,
+			MustBeArchived: false,
+		})
+	}
 	if err := u.repo.HardDelete(ctx, orgID, quoteID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)

@@ -11,6 +11,7 @@ import (
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
+	lifecycle "github.com/devpablocristo/platform/lifecycle/go/lifecycle"
 	purchasesdomain "github.com/devpablocristo/pymes/core/backend/internal/purchases/usecases/domain"
 	"github.com/devpablocristo/pymes/core/backend/internal/shared/status"
 )
@@ -43,16 +44,26 @@ type WebhookPort interface {
 }
 
 type Usecases struct {
-	repo     RepositoryPort
-	audit    AuditPort
-	timeline TimelinePort
-	webhooks WebhookPort
+	repo      RepositoryPort
+	audit     AuditPort
+	timeline  TimelinePort
+	webhooks  WebhookPort
+	lifecycle *lifecycle.Service // optional; when nil, legacy path
 }
 
 type Option func(*Usecases)
 
 func WithTimeline(t TimelinePort) Option { return func(u *Usecases) { u.timeline = t } }
 func WithWebhooks(w WebhookPort) Option  { return func(u *Usecases) { u.webhooks = w } }
+
+// WithLifecycle wires lifecycle.Service for Soft/Restore/HardDelete.
+func WithLifecycle(svc *lifecycle.Service) Option {
+	return func(u *Usecases) {
+		if svc != nil {
+			u.lifecycle = svc
+		}
+	}
+}
 
 func NewUsecases(repo RepositoryPort, audit AuditPort, opts ...Option) *Usecases {
 	uc := &Usecases{repo: repo, audit: audit}
@@ -227,6 +238,14 @@ func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor
 }
 
 func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.SoftDelete(ctx, &lifecycle.ArchiveRequest{
+			ResourceType: ResourceTypePurchase,
+			ResourceID:   id,
+			TenantID:     orgID,
+			Actor:        actor,
+		})
+	}
 	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("purchase", id.String())
@@ -240,6 +259,14 @@ func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 }
 
 func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.Restore(ctx, &lifecycle.RestoreRequest{
+			ResourceType: ResourceTypePurchase,
+			ResourceID:   id,
+			TenantID:     orgID,
+			Actor:        actor,
+		})
+	}
 	if err := u.repo.Restore(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("purchase", id.String())
@@ -253,6 +280,15 @@ func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor strin
 }
 
 func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.HardDelete(ctx, &lifecycle.HardDeleteRequest{
+			ResourceType:   ResourceTypePurchase,
+			ResourceID:     id,
+			TenantID:       orgID,
+			Actor:          actor,
+			MustBeArchived: false,
+		})
+	}
 	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("purchase", id.String())

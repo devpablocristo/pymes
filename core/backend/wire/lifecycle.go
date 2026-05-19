@@ -24,9 +24,12 @@ import (
 	"github.com/devpablocristo/pymes/core/backend/internal/invoices"
 	"github.com/devpablocristo/pymes/core/backend/internal/payments"
 	"github.com/devpablocristo/pymes/core/backend/internal/pricelists"
+	"github.com/devpablocristo/pymes/core/backend/internal/products"
+	"github.com/devpablocristo/pymes/core/backend/internal/purchases"
 	"github.com/devpablocristo/pymes/core/backend/internal/quotes"
 	"github.com/devpablocristo/pymes/core/backend/internal/recurring"
 	"github.com/devpablocristo/pymes/core/backend/internal/returns"
+	pymesservices "github.com/devpablocristo/pymes/core/backend/internal/services"
 	"gorm.io/gorm"
 )
 
@@ -211,6 +214,27 @@ func pymesLifecycleRegistrations() map[string]LifecycleEntry {
 			Policy: quotes.Policy,
 			Config: lifecycle.SoftDeleterConfig{
 				Table: "quotes", IDColumn: "id",
+				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+			},
+		},
+		products.ResourceTypeProduct: {
+			Policy: products.Policy,
+			Config: lifecycle.SoftDeleterConfig{
+				Table: "products", IDColumn: "id",
+				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+			},
+		},
+		pymesservices.ResourceTypeService: {
+			Policy: pymesservices.Policy,
+			Config: lifecycle.SoftDeleterConfig{
+				Table: "services", IDColumn: "id",
+				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+			},
+		},
+		purchases.ResourceTypePurchase: {
+			Policy: purchases.Policy,
+			Config: lifecycle.SoftDeleterConfig{
+				Table: "purchases", IDColumn: "id",
 				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
 			},
 		},

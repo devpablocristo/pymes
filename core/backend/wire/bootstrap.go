@@ -165,7 +165,7 @@ func InitializeApp() *app.App {
 	currencyUC := currency.NewUsecases(currencyRepo)
 	dashboardUC := dashboard.NewUsecases(dashboardRepo)
 	priceListsUC := pricelists.NewUsecases(priceListsRepo, pricelists.WithLifecycle(pymesLifecycle))
-	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC, purchases.WithTimeline(timelineUC), purchases.WithWebhooks(outwebhooksUC))
+	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC, purchases.WithTimeline(timelineUC), purchases.WithWebhooks(outwebhooksUC), purchases.WithLifecycle(pymesLifecycle))
 	// procurement requiere Nexus governance: ya no hay motor local.
 	reportsUC := reports.NewUsecases(reportsRepo)
 	recurringUC := recurring.NewUsecases(recurringRepo, auditUC, recurring.WithLifecycle(pymesLifecycle))
@@ -245,8 +245,8 @@ func InitializeApp() *app.App {
 		LowStockDedupWindow:      cfg.InsightsLowStockDedupWindow,
 	})
 	inventoryUC := inventory.NewUsecases(inventoryRepo, auditUC, businessInsightsUC)
-	productsUC := products.NewUsecases(productsRepo, inventoryUC, auditUC)
-	servicesUC := services.NewUsecases(servicesRepo, auditUC)
+	productsUC := products.NewUsecases(productsRepo, inventoryUC, auditUC, products.WithLifecycle(pymesLifecycle))
+	servicesUC := services.NewUsecases(servicesRepo, auditUC, services.WithLifecycle(pymesLifecycle))
 	salesUC := sales.NewUsecases(
 		salesRepo,
 		inventoryUC,

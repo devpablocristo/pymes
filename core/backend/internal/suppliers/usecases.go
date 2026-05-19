@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
+	lifecycle "github.com/devpablocristo/platform/lifecycle/go/lifecycle"
 	supplierdomain "github.com/devpablocristo/pymes/core/backend/internal/suppliers/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 )
@@ -30,12 +31,31 @@ type AuditPort interface {
 }
 
 type Usecases struct {
-	repo  RepositoryPort
-	audit AuditPort
+	repo      RepositoryPort
+	audit     AuditPort
+	lifecycle *lifecycle.Service // optional; when nil, legacy path
 }
 
-func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
-	return &Usecases{repo: repo, audit: audit}
+// Option customizes Usecases at construction.
+type Option func(*Usecases)
+
+// WithLifecycle wires lifecycle.Service. The wire site must supply a custom
+// RepositoryPort adapter for "supplier" because the SoftDelete spans
+// multiple tables (parties + party_roles + party_organizations + accounts).
+func WithLifecycle(svc *lifecycle.Service) Option {
+	return func(u *Usecases) {
+		if svc != nil {
+			u.lifecycle = svc
+		}
+	}
+}
+
+func NewUsecases(repo RepositoryPort, audit AuditPort, opts ...Option) *Usecases {
+	u := &Usecases{repo: repo, audit: audit}
+	for _, opt := range opts {
+		opt(u)
+	}
+	return u
 }
 
 func (u *Usecases) List(ctx context.Context, p ListParams) ([]supplierdomain.Supplier, int64, bool, *uuid.UUID, error) {
@@ -139,6 +159,14 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (supplierdo
 }
 
 func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.SoftDelete(ctx, &lifecycle.ArchiveRequest{
+			ResourceType: ResourceTypeSupplier,
+			ResourceID:   id,
+			TenantID:     orgID,
+			Actor:        actor,
+		})
+	}
 	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("supplier not found: %w", httperrors.ErrNotFound)
@@ -156,6 +184,14 @@ func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID) ([]supplie
 }
 
 func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.Restore(ctx, &lifecycle.RestoreRequest{
+			ResourceType: ResourceTypeSupplier,
+			ResourceID:   id,
+			TenantID:     orgID,
+			Actor:        actor,
+		})
+	}
 	if err := u.repo.Restore(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("supplier not found: %w", httperrors.ErrNotFound)
@@ -169,6 +205,15 @@ func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor strin
 }
 
 func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if u.lifecycle != nil {
+		return u.lifecycle.HardDelete(ctx, &lifecycle.HardDeleteRequest{
+			ResourceType:   ResourceTypeSupplier,
+			ResourceID:     id,
+			TenantID:       orgID,
+			Actor:          actor,
+			MustBeArchived: false,
+		})
+	}
 	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("supplier not found: %w", httperrors.ErrNotFound)

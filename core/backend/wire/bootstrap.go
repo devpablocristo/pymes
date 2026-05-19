@@ -146,21 +146,25 @@ func InitializeApp() *app.App {
 	customerMessagingRepo := customer_messaging.NewRepository(db)
 
 	auditUC := audit.NewUsecases(auditRepo)
-	// Ola C steps 3-5 — single shared platform/lifecycle/go.Service for every
+	// Ola C steps 3-9 — single shared platform/lifecycle/go.Service for every
 	// CRUDAR module that has opted in. The registration list lives in
-	// pymesLifecycleRegistrations() (wire/lifecycle.go). Audit is routed
-	// through pymesAuditPort over auditUC. New modules register their
-	// ArchivePolicy + table layout there and then construct their Usecases
-	// with WithLifecycle(pymesLifecycle).
-	pymesLifecycle := buildPymesLifecycleService(db, auditUC, pymesLifecycleRegistrations())
+	// pymesLifecycleRegistrations() (wire/lifecycle.go) for modules with a
+	// simple table layout, and pymesLifecyclePartiesRegistrations() for
+	// customers + suppliers (multi-table transactions over `parties`).
+	// Audit is routed through pymesAuditPort over auditUC.
+	lifecycleEntries := pymesLifecycleRegistrations()
+	for k, v := range pymesLifecyclePartiesRegistrations(db, customersRepo, suppliersRepo) {
+		lifecycleEntries[k] = v
+	}
+	pymesLifecycle := buildPymesLifecycleService(db, auditUC, lifecycleEntries)
 
 	adminUC := admin.NewUsecases(adminRepo)
 	attachmentsUC := attachments.NewUsecases(attachmentsRepo, "/tmp/attachments")
 	cashflowUC := cashflow.NewUsecases(cashflowRepo, auditUC, cashflow.WithLifecycle(pymesLifecycle))
 	timelineUC := timeline.NewUsecases(timelineRepo)
 	outwebhooksUC := outwebhooks.NewUsecases(outwebhooksRepo)
-	customersUC := customers.NewUsecases(customersRepo, auditUC)
-	suppliersUC := suppliers.NewUsecases(suppliersRepo, auditUC)
+	customersUC := customers.NewUsecases(customersRepo, auditUC, customers.WithLifecycle(pymesLifecycle))
+	suppliersUC := suppliers.NewUsecases(suppliersRepo, auditUC, suppliers.WithLifecycle(pymesLifecycle))
 	accountsUC := accounts.NewUsecases(accountsRepo)
 	currencyUC := currency.NewUsecases(currencyRepo)
 	dashboardUC := dashboard.NewUsecases(dashboardRepo)

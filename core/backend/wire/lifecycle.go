@@ -20,6 +20,7 @@ import (
 	"github.com/devpablocristo/pymes/core/backend/internal/audit"
 	auditdomain "github.com/devpablocristo/pymes/core/backend/internal/audit/usecases/domain"
 	"github.com/devpablocristo/pymes/core/backend/internal/cashflow"
+	"github.com/devpablocristo/pymes/core/backend/internal/customers"
 	"github.com/devpablocristo/pymes/core/backend/internal/employees"
 	"github.com/devpablocristo/pymes/core/backend/internal/invoices"
 	"github.com/devpablocristo/pymes/core/backend/internal/payments"
@@ -30,21 +31,29 @@ import (
 	"github.com/devpablocristo/pymes/core/backend/internal/recurring"
 	"github.com/devpablocristo/pymes/core/backend/internal/returns"
 	pymesservices "github.com/devpablocristo/pymes/core/backend/internal/services"
+	"github.com/devpablocristo/pymes/core/backend/internal/suppliers"
 	"gorm.io/gorm"
 )
 
 // LifecycleEntry is the per-resource registration consumed by
 // buildPymesLifecycleService.
 //
-//   - Policy:   the lifecycle.ArchivePolicy for this resource (lives in
-//               the consumer module; e.g. pricelists.Policy).
-//   - Config:   the table layout (table, id col, tenant col, archived col).
+//   - Policy: the lifecycle.ArchivePolicy for this resource.
+//   - Config: the table layout (table, id col, tenant col, archived col).
+//             Used to construct a generic lifecycle.SoftDeleter when Repo
+//             is not provided.
+//   - Repo:   an explicit lifecycle.RepositoryPort. When set, it overrides
+//             Config — useful for modules whose SoftDelete/Restore/HardDelete
+//             span multiple tables or contain custom transactional logic
+//             (e.g. customers + suppliers, which share the `parties` table
+//             and update party_roles, party_persons, accounts in one tx).
 //
-// The function constructs a SoftDeleter from Config and registers the
-// resulting lifecycle.RepositoryPort under Policy.ResourceType.
+// Exactly one of {Repo set, Config populated} is expected. If both are
+// provided, Repo wins.
 type LifecycleEntry struct {
 	Policy *lifecycle.ArchivePolicy
 	Config lifecycle.SoftDeleterConfig
+	Repo   lifecycle.RepositoryPort
 }
 
 // pymesAuditPort implements lifecycle.AuditPort by translating ArchiveAudit
@@ -127,12 +136,16 @@ func buildPymesLifecycleService(
 	repos := make(map[string]lifecycle.RepositoryPort, len(entries))
 	policies := make([]*lifecycle.ArchivePolicy, 0, len(entries))
 	for rt, entry := range entries {
-		sd, sdErr := lifecycle.NewSoftDeleter(sqlDB, entry.Config)
-		if sdErr != nil {
-			log.Printf("warn: pymes lifecycle wire skipped for %q (NewSoftDeleter: %v)", rt, sdErr)
-			return nil
+		if entry.Repo != nil {
+			repos[rt] = entry.Repo
+		} else {
+			sd, sdErr := lifecycle.NewSoftDeleter(sqlDB, entry.Config)
+			if sdErr != nil {
+				log.Printf("warn: pymes lifecycle wire skipped for %q (NewSoftDeleter: %v)", rt, sdErr)
+				return nil
+			}
+			repos[rt] = sd
 		}
-		repos[rt] = sd
 		policies = append(policies, entry.Policy)
 	}
 
@@ -237,6 +250,30 @@ func pymesLifecycleRegistrations() map[string]LifecycleEntry {
 				Table: "purchases", IDColumn: "id",
 				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
 			},
+		},
+	}
+}
+
+// pymesLifecyclePartiesRegistrations declares the customers + suppliers
+// entries that need custom RepositoryPort adapters (multi-table transactions
+// on the parties table). They are kept separate from the table-driven map
+// in pymesLifecycleRegistrations so the type signatures stay clean.
+func pymesLifecyclePartiesRegistrations(
+	gdb *gorm.DB,
+	customersRepo *customers.Repository,
+	suppliersRepo *suppliers.Repository,
+) map[string]LifecycleEntry {
+	if gdb == nil || customersRepo == nil || suppliersRepo == nil {
+		return nil
+	}
+	return map[string]LifecycleEntry{
+		customers.ResourceTypeCustomer: {
+			Policy: customers.Policy,
+			Repo:   &customersLifecycleRepo{repo: customersRepo, db: gdb},
+		},
+		suppliers.ResourceTypeSupplier: {
+			Policy: suppliers.Policy,
+			Repo:   &suppliersLifecycleRepo{repo: suppliersRepo, db: gdb},
 		},
 	}
 }

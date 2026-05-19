@@ -21,7 +21,7 @@ type ReturnModel struct {
 	Notes        string         `gorm:"not null;default:''"`
 	IsFavorite   bool           `gorm:"column:is_favorite;not null"`
 	Tags         pq.StringArray `gorm:"type:text[]"`
-	DeletedAt    *time.Time     `gorm:"column:deleted_at;index"`
+	DeletedAt    *time.Time     `gorm:"column:archived_at;index"`
 	CreatedBy    string         `gorm:"default:''"`
 	CreatedAt    time.Time      `gorm:"not null"`
 }

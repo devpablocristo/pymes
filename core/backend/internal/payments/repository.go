@@ -33,7 +33,7 @@ type paymentRow struct {
 	ReceivedAt    time.Time      `gorm:"column:received_at"`
 	IsFavorite    bool           `gorm:"column:is_favorite"`
 	Tags          pq.StringArray `gorm:"column:tags;type:text[]"`
-	DeletedAt     *time.Time     `gorm:"column:deleted_at"`
+	DeletedAt     *time.Time     `gorm:"column:archived_at"`
 	CreatedBy     string         `gorm:"column:created_by"`
 	CreatedAt     time.Time      `gorm:"column:created_at"`
 }
@@ -59,9 +59,9 @@ func (p paymentRow) toDomain() paymentsdomain.Payment {
 func (r *Repository) ListSalePayments(ctx context.Context, orgID, saleID uuid.UUID) ([]paymentsdomain.Payment, error) {
 	var rows []paymentRow
 	if err := r.db.WithContext(ctx).Raw(`
-		SELECT id, org_id, reference_type, reference_id, method, amount, notes, received_at, is_favorite, tags, deleted_at, created_by, created_at
+		SELECT id, org_id, reference_type, reference_id, method, amount, notes, received_at, is_favorite, tags, archived_at, created_by, created_at
 		FROM payments
-		WHERE org_id = ? AND reference_type = 'sale' AND reference_id = ? AND deleted_at IS NULL
+		WHERE org_id = ? AND reference_type = 'sale' AND reference_id = ? AND archived_at IS NULL
 		ORDER BY created_at DESC
 	`, orgID, saleID).Scan(&rows).Error; err != nil {
 		return nil, err
@@ -77,10 +77,10 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, limit in
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	var rows []paymentRow
 	if err := r.db.WithContext(ctx).Raw(`
-		SELECT id, org_id, reference_type, reference_id, method, amount, notes, received_at, is_favorite, tags, deleted_at, created_by, created_at
+		SELECT id, org_id, reference_type, reference_id, method, amount, notes, received_at, is_favorite, tags, archived_at, created_by, created_at
 		FROM payments
-		WHERE org_id = ? AND deleted_at IS NOT NULL
-		ORDER BY deleted_at DESC
+		WHERE org_id = ? AND archived_at IS NOT NULL
+		ORDER BY archived_at DESC
 		LIMIT ?
 	`, orgID, limit).Scan(&rows).Error; err != nil {
 		return nil, err
@@ -95,9 +95,9 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, limit in
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (paymentsdomain.Payment, error) {
 	var row paymentRow
 	res := r.db.WithContext(ctx).Raw(`
-		SELECT id, org_id, reference_type, reference_id, method, amount, notes, received_at, is_favorite, tags, deleted_at, created_by, created_at
+		SELECT id, org_id, reference_type, reference_id, method, amount, notes, received_at, is_favorite, tags, archived_at, created_by, created_at
 		FROM payments
-		WHERE org_id = ? AND id = ? AND deleted_at IS NULL
+		WHERE org_id = ? AND id = ? AND archived_at IS NULL
 	`, orgID, id).Scan(&row)
 	if res.Error != nil {
 		return paymentsdomain.Payment{}, res.Error
@@ -112,7 +112,7 @@ func (r *Repository) Update(ctx context.Context, in paymentsdomain.Payment) (pay
 	res := r.db.WithContext(ctx).Exec(`
 		UPDATE payments
 		SET notes = ?, is_favorite = ?, tags = ?
-		WHERE org_id = ? AND id = ? AND deleted_at IS NULL
+		WHERE org_id = ? AND id = ? AND archived_at IS NULL
 	`, in.Notes, in.IsFavorite, pq.StringArray(utils.NormalizeTags(in.Tags)), in.OrgID, in.ID)
 	if res.Error != nil {
 		return paymentsdomain.Payment{}, res.Error
@@ -125,7 +125,7 @@ func (r *Repository) Update(ctx context.Context, in paymentsdomain.Payment) (pay
 
 func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Exec(`
-		UPDATE payments SET deleted_at = ? WHERE org_id = ? AND id = ? AND deleted_at IS NULL
+		UPDATE payments SET archived_at = ? WHERE org_id = ? AND id = ? AND archived_at IS NULL
 	`, time.Now().UTC(), orgID, id)
 	if res.Error != nil {
 		return res.Error
@@ -138,7 +138,7 @@ func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error 
 
 func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Exec(`
-		UPDATE payments SET deleted_at = NULL WHERE org_id = ? AND id = ? AND deleted_at IS NOT NULL
+		UPDATE payments SET archived_at = NULL WHERE org_id = ? AND id = ? AND archived_at IS NOT NULL
 	`, orgID, id)
 	if res.Error != nil {
 		return res.Error

@@ -75,7 +75,7 @@ func (a *suppliersLifecycleRepo) IsArchived(ctx context.Context, tenantID, resou
 func isPartyArchived(ctx context.Context, db *gorm.DB, tenantID, resourceID uuid.UUID) (bool, error) {
 	var archived bool
 	err := db.WithContext(ctx).
-		Raw(`SELECT deleted_at IS NOT NULL FROM parties WHERE org_id = ? AND id = ?`, tenantID, resourceID).
+		Raw(`SELECT archived_at IS NOT NULL FROM parties WHERE org_id = ? AND id = ?`, tenantID, resourceID).
 		Scan(&archived).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

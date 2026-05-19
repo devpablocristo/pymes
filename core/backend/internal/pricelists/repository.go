@@ -20,7 +20,7 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) List(ctx context.Context, orgID uuid.UUID, activeOnly bool, limit int) ([]pricelistdomain.PriceList, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.PriceListModel{}).Where("org_id = ? AND deleted_at IS NULL", orgID)
+	q := r.db.WithContext(ctx).Model(&models.PriceListModel{}).Where("org_id = ? AND archived_at IS NULL", orgID)
 	if activeOnly {
 		q = q.Where("is_active = true")
 	}
@@ -39,8 +39,8 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, limit in
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	var rows []models.PriceListModel
 	if err := r.db.WithContext(ctx).
-		Where("org_id = ? AND deleted_at IS NOT NULL", orgID).
-		Order("deleted_at DESC").
+		Where("org_id = ? AND archived_at IS NOT NULL", orgID).
+		Order("archived_at DESC").
 		Limit(limit).
 		Find(&rows).Error; err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func (r *Repository) Create(ctx context.Context, in pricelistdomain.PriceList) (
 
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (pricelistdomain.PriceList, error) {
 	var row models.PriceListModel
-	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).Take(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).Take(&row).Error; err != nil {
 		return pricelistdomain.PriceList{}, err
 	}
 	var items []models.PriceListItemModel
@@ -108,7 +108,7 @@ func (r *Repository) Update(ctx context.Context, in pricelistdomain.PriceList) (
 				return err
 			}
 		}
-		if err := tx.Model(&models.PriceListModel{}).Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).Updates(map[string]any{"name": in.Name, "description": in.Description, "is_default": in.IsDefault, "markup": in.Markup, "is_active": in.IsActive, "is_favorite": in.IsFavorite, "tags": pq.StringArray(utils.NormalizeTags(in.Tags)), "updated_at": time.Now().UTC()}).Error; err != nil {
+		if err := tx.Model(&models.PriceListModel{}).Where("org_id = ? AND id = ? AND archived_at IS NULL", in.OrgID, in.ID).Updates(map[string]any{"name": in.Name, "description": in.Description, "is_default": in.IsDefault, "markup": in.Markup, "is_active": in.IsActive, "is_favorite": in.IsFavorite, "tags": pq.StringArray(utils.NormalizeTags(in.Tags)), "updated_at": time.Now().UTC()}).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("price_list_id = ?", in.ID).Delete(&models.PriceListItemModel{}).Error; err != nil {
@@ -144,8 +144,8 @@ func (r *Repository) Update(ctx context.Context, in pricelistdomain.PriceList) (
 func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	now := time.Now().UTC()
 	res := r.db.WithContext(ctx).Model(&models.PriceListModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
-		Update("deleted_at", now)
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
+		Update("archived_at", now)
 	if res.Error != nil {
 		return res.Error
 	}
@@ -157,8 +157,8 @@ func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error 
 
 func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.PriceListModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
-		Update("deleted_at", nil)
+		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, id).
+		Update("archived_at", nil)
 	if res.Error != nil {
 		return res.Error
 	}

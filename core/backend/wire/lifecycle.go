@@ -178,77 +178,77 @@ func pymesLifecycleRegistrations() map[string]LifecycleEntry {
 			Policy: pricelists.Policy,
 			Config: lifecycle.SoftDeleterConfig{
 				Table: "price_lists", IDColumn: "id",
-				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+				TenantColumn: "org_id", ArchivedAtColumn: "archived_at",
 			},
 		},
 		employees.ResourceTypeEmployee: {
 			Policy: employees.Policy,
 			Config: lifecycle.SoftDeleterConfig{
 				Table: "employees", IDColumn: "id",
-				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+				TenantColumn: "org_id", ArchivedAtColumn: "archived_at",
 			},
 		},
 		recurring.ResourceTypeRecurringExpense: {
 			Policy: recurring.Policy,
 			Config: lifecycle.SoftDeleterConfig{
 				Table: "recurring_expenses", IDColumn: "id",
-				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+				TenantColumn: "org_id", ArchivedAtColumn: "archived_at",
 			},
 		},
 		cashflow.ResourceTypeCashMovement: {
 			Policy: cashflow.Policy,
 			Config: lifecycle.SoftDeleterConfig{
 				Table: "cash_movements", IDColumn: "id",
-				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+				TenantColumn: "org_id", ArchivedAtColumn: "archived_at",
 			},
 		},
 		payments.ResourceTypePayment: {
 			Policy: payments.Policy,
 			Config: lifecycle.SoftDeleterConfig{
 				Table: "payments", IDColumn: "id",
-				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+				TenantColumn: "org_id", ArchivedAtColumn: "archived_at",
 			},
 		},
 		returns.ResourceTypeReturn: {
 			Policy: returns.Policy,
 			Config: lifecycle.SoftDeleterConfig{
 				Table: "returns", IDColumn: "id",
-				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+				TenantColumn: "org_id", ArchivedAtColumn: "archived_at",
 			},
 		},
 		invoices.ResourceTypeInvoice: {
 			Policy: invoices.Policy,
 			Config: lifecycle.SoftDeleterConfig{
 				Table: "invoices", IDColumn: "id",
-				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+				TenantColumn: "org_id", ArchivedAtColumn: "archived_at",
 			},
 		},
 		quotes.ResourceTypeQuote: {
 			Policy: quotes.Policy,
 			Config: lifecycle.SoftDeleterConfig{
 				Table: "quotes", IDColumn: "id",
-				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+				TenantColumn: "org_id", ArchivedAtColumn: "archived_at",
 			},
 		},
 		products.ResourceTypeProduct: {
 			Policy: products.Policy,
 			Config: lifecycle.SoftDeleterConfig{
 				Table: "products", IDColumn: "id",
-				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+				TenantColumn: "org_id", ArchivedAtColumn: "archived_at",
 			},
 		},
 		pymesservices.ResourceTypeService: {
 			Policy: pymesservices.Policy,
 			Config: lifecycle.SoftDeleterConfig{
 				Table: "services", IDColumn: "id",
-				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+				TenantColumn: "org_id", ArchivedAtColumn: "archived_at",
 			},
 		},
 		purchases.ResourceTypePurchase: {
 			Policy: purchases.Policy,
 			Config: lifecycle.SoftDeleterConfig{
 				Table: "purchases", IDColumn: "id",
-				TenantColumn: "org_id", ArchivedAtColumn: "deleted_at",
+				TenantColumn: "org_id", ArchivedAtColumn: "archived_at",
 			},
 		},
 	}

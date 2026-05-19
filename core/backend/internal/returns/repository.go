@@ -182,7 +182,7 @@ func (r *Repository) List(ctx context.Context, orgID uuid.UUID, limit int) ([]re
 	err = r.db.WithContext(ctx).Table("returns r").
 		Select(fmt.Sprintf("r.*, %s, %s", salePartyIDExpr, salePartyNameExpr)).
 		Joins("JOIN sales s ON s.id = r.sale_id").
-		Where("r.org_id = ? AND r.deleted_at IS NULL", orgID).
+		Where("r.org_id = ? AND r.archived_at IS NULL", orgID).
 		Order("r.created_at DESC").
 		Limit(limit).
 		Scan(&rows).Error
@@ -210,8 +210,8 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, limit in
 	err = r.db.WithContext(ctx).Table("returns r").
 		Select(fmt.Sprintf("r.*, %s, %s", salePartyIDExpr, salePartyNameExpr)).
 		Joins("JOIN sales s ON s.id = r.sale_id").
-		Where("r.org_id = ? AND r.deleted_at IS NOT NULL", orgID).
-		Order("r.deleted_at DESC").
+		Where("r.org_id = ? AND r.archived_at IS NOT NULL", orgID).
+		Order("r.archived_at DESC").
 		Limit(limit).
 		Scan(&rows).Error
 	if err != nil {
@@ -226,7 +226,7 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, limit in
 
 func (r *Repository) Update(ctx context.Context, in returndomain.Return) (returndomain.Return, error) {
 	res := r.db.WithContext(ctx).Model(&returnmodels.ReturnModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", in.OrgID, in.ID).
 		Updates(map[string]any{
 			"notes":       strings.TrimSpace(in.Notes),
 			"is_favorite": in.IsFavorite,
@@ -243,8 +243,8 @@ func (r *Repository) Update(ctx context.Context, in returndomain.Return) (return
 
 func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&returnmodels.ReturnModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
-		Update("deleted_at", time.Now().UTC())
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
+		Update("archived_at", time.Now().UTC())
 	if res.Error != nil {
 		return res.Error
 	}
@@ -256,8 +256,8 @@ func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error 
 
 func (r *Repository) RestoreArchived(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&returnmodels.ReturnModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
-		Update("deleted_at", nil)
+		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, id).
+		Update("archived_at", nil)
 	if res.Error != nil {
 		return res.Error
 	}
@@ -297,7 +297,7 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (returndo
 	err = r.db.WithContext(ctx).Table("returns r").
 		Select(fmt.Sprintf("r.*, %s, %s", salePartyIDExpr, salePartyNameExpr)).
 		Joins("JOIN sales s ON s.id = r.sale_id").
-		Where("r.org_id = ? AND r.id = ? AND r.deleted_at IS NULL", orgID, id).
+		Where("r.org_id = ? AND r.id = ? AND r.archived_at IS NULL", orgID, id).
 		Take(&row).Error
 	if err != nil {
 		return returndomain.Return{}, err

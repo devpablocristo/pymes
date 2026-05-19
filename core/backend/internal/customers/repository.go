@@ -46,13 +46,13 @@ type customerPartyRow struct {
 	Metadata    []byte         `gorm:"column:metadata"`
 	CreatedAt   time.Time      `gorm:"column:created_at"`
 	UpdatedAt   time.Time      `gorm:"column:updated_at"`
-	DeletedAt   *time.Time     `gorm:"column:deleted_at"`
+	DeletedAt   *time.Time     `gorm:"column:archived_at"`
 }
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]customerdomain.Customer, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
-	q := r.baseQuery(ctx, p.OrgID).Where("p.deleted_at IS NULL")
+	q := r.baseQuery(ctx, p.OrgID).Where("p.archived_at IS NULL")
 	if t := strings.TrimSpace(p.Type); t != "" {
 		q = q.Where("p.party_type = ?", mapCustomerType(t))
 	}
@@ -160,7 +160,7 @@ func (r *Repository) Update(ctx context.Context, in customerdomain.Customer) (cu
 	partyType := mapCustomerType(in.Type)
 	if err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		res := tx.Table("parties").
-			Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
+			Where("org_id = ? AND id = ? AND archived_at IS NULL", in.OrgID, in.ID).
 			Updates(map[string]any{
 				"party_type":   partyType,
 				"display_name": strings.TrimSpace(in.Name),
@@ -190,8 +190,8 @@ func (r *Repository) Update(ctx context.Context, in customerdomain.Customer) (cu
 func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	if err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		res := tx.Table("parties").
-			Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
-			Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
+			Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
+			Updates(map[string]any{"archived_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 		if res.Error != nil {
 			return res.Error
 		}
@@ -209,9 +209,9 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]custo
 	var rows []customerPartyRow
 	err := r.db.WithContext(ctx).
 		Table("parties p").
-		Select(`p.id, p.org_id, p.party_type, p.display_name, p.email, p.phone, p.address, p.tax_id, p.notes, p.is_favorite, p.tags, p.metadata, p.created_at, p.updated_at, p.deleted_at`).
+		Select(`p.id, p.org_id, p.party_type, p.display_name, p.email, p.phone, p.address, p.tax_id, p.notes, p.is_favorite, p.tags, p.metadata, p.created_at, p.updated_at, p.archived_at`).
 		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'customer'").
-		Where("p.org_id = ? AND p.deleted_at IS NOT NULL", orgID).
+		Where("p.org_id = ? AND p.archived_at IS NOT NULL", orgID).
 		Order("p.updated_at DESC").
 		Limit(200).
 		Scan(&rows).Error
@@ -228,8 +228,8 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]custo
 func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		res := tx.Table("parties").
-			Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
-			Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
+			Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, id).
+			Updates(map[string]any{"archived_at": nil, "updated_at": gorm.Expr("now()")})
 		if res.Error != nil {
 			return res.Error
 		}
@@ -245,7 +245,7 @@ func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error 
 		// Verify it's archived before hard-deleting.
 		var count int64
 		if err := tx.Table("parties").
-			Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+			Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, id).
 			Count(&count).Error; err != nil {
 			return err
 		}
@@ -328,7 +328,7 @@ func (r *Repository) baseQuery(ctx context.Context, orgID uuid.UUID) *gorm.DB {
 			p.metadata,
 			p.created_at,
 			p.updated_at,
-			p.deleted_at
+			p.archived_at
 		`).
 		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'customer' AND pr.is_active = true").
 		Where("p.org_id = ?", orgID)

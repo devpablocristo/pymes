@@ -38,7 +38,7 @@ func normalizeBranchID(branchID *uuid.UUID) *uuid.UUID {
 
 func (r *Repository) List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).Where("org_id = ? AND deleted_at IS NULL", orgID)
+	q := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).Where("org_id = ? AND archived_at IS NULL", orgID)
 	if branchID != nil && *branchID != uuid.Nil {
 		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *branchID)
 	}
@@ -58,7 +58,7 @@ func (r *Repository) List(ctx context.Context, orgID uuid.UUID, branchID *uuid.U
 
 func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).Where("org_id = ? AND deleted_at IS NOT NULL", orgID)
+	q := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).Where("org_id = ? AND archived_at IS NOT NULL", orgID)
 	if branchID != nil && *branchID != uuid.Nil {
 		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *branchID)
 	}
@@ -138,8 +138,8 @@ func (r *Repository) getByIDWithDB(ctx context.Context, db *gorm.DB, orgID, id u
 
 func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
-		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
+		Updates(map[string]any{"archived_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -151,8 +151,8 @@ func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error 
 
 func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
-		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
+		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, id).
+		Updates(map[string]any{"archived_at": nil, "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -164,7 +164,7 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 
 func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, id).
 		Delete(&models.PurchaseModel{})
 	if res.Error != nil {
 		return res.Error
@@ -321,7 +321,7 @@ func (r *Repository) GetSupplierName(ctx context.Context, orgID, supplierID uuid
 		Table("parties p").
 		Select("p.display_name").
 		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'supplier' AND pr.is_active = true").
-		Where("p.org_id = ? AND p.id = ? AND p.deleted_at IS NULL", orgID, supplierID).
+		Where("p.org_id = ? AND p.id = ? AND p.archived_at IS NULL", orgID, supplierID).
 		Take(&name).Error
 	return name, err
 }

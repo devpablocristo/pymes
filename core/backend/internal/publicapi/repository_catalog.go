@@ -25,7 +25,7 @@ func (r *Repository) ListPublicServices(ctx context.Context, orgID uuid.UUID, li
 	err := r.db.WithContext(ctx).
 		Table("services").
 		Select("id, name, 'service' as type, description, '' as unit, sale_price as price, currency").
-		Where("org_id = ? AND deleted_at IS NULL AND is_active = true", orgID).
+		Where("org_id = ? AND archived_at IS NULL AND is_active = true", orgID).
 		Order("name ASC").
 		Limit(limit).
 		Scan(&rows).Error
@@ -116,7 +116,7 @@ func (r *Repository) ListPublicServiceCatalog(ctx context.Context, orgID uuid.UU
 		Table("services").
 		Select(`id, code, name, description, category_code, sale_price, currency,
 			tax_rate, default_duration_minutes, metadata`).
-		Where("org_id = ? AND deleted_at IS NULL AND is_active = true", orgID)
+		Where("org_id = ? AND archived_at IS NULL AND is_active = true", orgID)
 
 	if v := strings.TrimSpace(vertical); v != "" {
 		q = q.Where("metadata->>'vertical' = ?", v)

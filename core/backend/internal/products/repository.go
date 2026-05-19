@@ -44,9 +44,9 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]productdomain.Pr
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.ProductModel{}).Where("org_id = ? AND type = 'product'", p.OrgID)
 	if p.Archived {
-		q = q.Where("deleted_at IS NOT NULL")
+		q = q.Where("archived_at IS NOT NULL")
 	} else {
-		q = q.Where("deleted_at IS NULL")
+		q = q.Where("archived_at IS NULL")
 	}
 	if tag := strings.TrimSpace(p.Tag); tag != "" {
 		q = q.Where("? = ANY(tags)", tag)
@@ -129,7 +129,7 @@ func (r *Repository) Create(ctx context.Context, in productdomain.Product) (prod
 }
 
 // GetByID devuelve el producto independientemente de su estado de archivado.
-// El caller decide qué hacer con DeletedAt (Update rechaza archivados; el handler los expone con deleted_at).
+// El caller decide qué hacer con ArchivedAt (Update rechaza archivados; el handler los expone con archived_at).
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (productdomain.Product, error) {
 	var row models.ProductModel
 	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ? AND type = 'product'", orgID, id).Take(&row).Error
@@ -168,7 +168,7 @@ func (r *Repository) Update(ctx context.Context, in productdomain.Product) (prod
 		"updated_at":     time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.ProductModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL AND type = 'product'", in.OrgID, in.ID).
+		Where("org_id = ? AND id = ? AND archived_at IS NULL AND type = 'product'", in.OrgID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		if httperrors.IsUniqueViolation(res.Error) {
@@ -191,8 +191,8 @@ func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.ProductModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL AND type = 'product'", orgID, id).
-		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
+		Where("org_id = ? AND id = ? AND archived_at IS NULL AND type = 'product'", orgID, id).
+		Updates(map[string]any{"archived_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -208,8 +208,8 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.ProductModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL AND type = 'product'", orgID, id).
-		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
+		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL AND type = 'product'", orgID, id).
+		Updates(map[string]any{"archived_at": nil, "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -217,7 +217,7 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 }
 
 func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
-	// Borrado físico solo si está archivado (deleted_at). Antes: liberar FKs que no tienen ON DELETE CASCADE.
+	// Borrado físico solo si está archivado (archived_at). Antes: liberar FKs que no tienen ON DELETE CASCADE.
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Exec(
 			"DELETE FROM stock_movements WHERE org_id = ? AND product_id = ?",
@@ -237,7 +237,7 @@ func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 			}
 		}
 		res := tx.Unscoped().
-			Where("org_id = ? AND id = ? AND type = 'product' AND deleted_at IS NOT NULL", orgID, id).
+			Where("org_id = ? AND id = ? AND type = 'product' AND archived_at IS NOT NULL", orgID, id).
 			Delete(&models.ProductModel{})
 		if res.Error != nil {
 			return res.Error
@@ -252,7 +252,7 @@ func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 func (r *Repository) lookupState(ctx context.Context, orgID, id uuid.UUID) (models.ProductModel, error) {
 	var row models.ProductModel
 	err := r.db.WithContext(ctx).
-		Select("id, deleted_at").
+		Select("id, archived_at").
 		Where("org_id = ? AND id = ? AND type = 'product'", orgID, id).
 		Take(&row).Error
 	if err != nil {

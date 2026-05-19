@@ -71,7 +71,7 @@ func applyBranchFilter(db *gorm.DB, alias string, branchID *uuid.UUID) *gorm.DB 
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]cashdomain.CashMovement, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Table("cash_movements cm").Where("cm.org_id = ? AND cm.deleted_at IS NULL", p.OrgID)
+	q := r.db.WithContext(ctx).Table("cash_movements cm").Where("cm.org_id = ? AND cm.archived_at IS NULL", p.OrgID)
 	q = applyBranchFilter(q, "cm", p.BranchID)
 	if t := strings.TrimSpace(p.Type); t != "" {
 		q = q.Where("cm.type = ?", t)
@@ -139,7 +139,7 @@ func (r *Repository) Create(ctx context.Context, in cashdomain.CashMovement) (ca
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (cashdomain.CashMovement, error) {
 	var row models.CashMovementModel
 	if err := r.db.WithContext(ctx).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
 		Take(&row).Error; err != nil {
 		return cashdomain.CashMovement{}, err
 	}
@@ -148,7 +148,7 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (cashdoma
 
 func (r *Repository) Update(ctx context.Context, in cashdomain.CashMovement) (cashdomain.CashMovement, error) {
 	res := r.db.WithContext(ctx).Model(&models.CashMovementModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", in.OrgID, in.ID).
 		Updates(map[string]any{
 			"category":       in.Category,
 			"description":    in.Description,
@@ -169,8 +169,8 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, limit in
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	var rows []models.CashMovementModel
 	if err := r.db.WithContext(ctx).
-		Where("org_id = ? AND deleted_at IS NOT NULL", orgID).
-		Order("deleted_at DESC").
+		Where("org_id = ? AND archived_at IS NOT NULL", orgID).
+		Order("archived_at DESC").
 		Limit(limit).
 		Find(&rows).Error; err != nil {
 		return nil, err
@@ -185,8 +185,8 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, limit in
 func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	now := time.Now().UTC()
 	res := r.db.WithContext(ctx).Model(&models.CashMovementModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
-		Update("deleted_at", now)
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
+		Update("archived_at", now)
 	if res.Error != nil {
 		return res.Error
 	}
@@ -198,8 +198,8 @@ func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error 
 
 func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.CashMovementModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
-		Update("deleted_at", nil)
+		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, id).
+		Update("archived_at", nil)
 	if res.Error != nil {
 		return res.Error
 	}
@@ -238,7 +238,7 @@ func (r *Repository) Summary(ctx context.Context, orgID uuid.UUID, branchID *uui
 	q = applyBranchFilter(q, "cm", branchID)
 	if err := q.
 		Select("COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END),0) as income, COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END),0) as expense").
-		Where("cm.org_id = ? AND cm.deleted_at IS NULL AND cm.created_at >= ? AND cm.created_at <= ?", orgID, from, to).
+		Where("cm.org_id = ? AND cm.archived_at IS NULL AND cm.created_at >= ? AND cm.created_at <= ?", orgID, from, to).
 		Take(&agg).Error; err != nil {
 		return cashdomain.CashSummary{}, err
 	}
@@ -263,7 +263,7 @@ func (r *Repository) DailySummary(ctx context.Context, orgID uuid.UUID, branchID
 	q = applyBranchFilter(q, "cm", branchID)
 	if err := q.
 		Select("date_trunc('day', created_at) as day, COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END),0) as income, COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END),0) as expense").
-		Where("cm.org_id = ? AND cm.deleted_at IS NULL AND cm.created_at >= ?", orgID, start).
+		Where("cm.org_id = ? AND cm.archived_at IS NULL AND cm.created_at >= ?", orgID, start).
 		Group("day").
 		Order("day ASC").
 		Find(&rows).Error; err != nil {

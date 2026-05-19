@@ -26,7 +26,7 @@ type InvoiceModel struct {
 	CreatedBy       string         `gorm:"column:created_by"`
 	CreatedAt       time.Time      `gorm:"column:created_at"`
 	UpdatedAt       time.Time      `gorm:"column:updated_at"`
-	DeletedAt       *time.Time     `gorm:"column:deleted_at"`
+	DeletedAt       *time.Time     `gorm:"column:archived_at"`
 }
 
 func (InvoiceModel) TableName() string { return "invoices" }

@@ -44,9 +44,9 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]servicedomain.Se
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.ServiceModel{}).Where("org_id = ?", p.OrgID)
 	if p.Archived {
-		q = q.Where("deleted_at IS NOT NULL")
+		q = q.Where("archived_at IS NOT NULL")
 	} else {
-		q = q.Where("deleted_at IS NULL")
+		q = q.Where("archived_at IS NULL")
 	}
 	if tag := strings.TrimSpace(p.Tag); tag != "" {
 		q = q.Where("? = ANY(tags)", tag)
@@ -126,7 +126,7 @@ func (r *Repository) Create(ctx context.Context, in servicedomain.Service) (serv
 }
 
 // GetByID devuelve el servicio independientemente de su estado de archivado.
-// El caller decide qué hacer con DeletedAt (Update rechaza archivados; el handler los expone con deleted_at).
+// El caller decide qué hacer con ArchivedAt (Update rechaza archivados; el handler los expone con archived_at).
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (servicedomain.Service, error) {
 	var row models.ServiceModel
 	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error
@@ -158,7 +158,7 @@ func (r *Repository) Update(ctx context.Context, in servicedomain.Service) (serv
 		"updated_at":               time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.ServiceModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", in.OrgID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		if httperrors.IsUniqueViolation(res.Error) {
@@ -181,8 +181,8 @@ func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.ServiceModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
-		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
+		Updates(map[string]any{"archived_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -198,8 +198,8 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.ServiceModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
-		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
+		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, id).
+		Updates(map[string]any{"archived_at": nil, "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -208,7 +208,7 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 
 func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Unscoped().
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, id).
 		Delete(&models.ServiceModel{})
 	if res.Error != nil {
 		return res.Error
@@ -222,7 +222,7 @@ func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 func (r *Repository) lookupState(ctx context.Context, orgID, id uuid.UUID) (models.ServiceModel, error) {
 	var row models.ServiceModel
 	err := r.db.WithContext(ctx).
-		Select("id, deleted_at").
+		Select("id, archived_at").
 		Where("org_id = ? AND id = ?", orgID, id).
 		Take(&row).Error
 	if err != nil {

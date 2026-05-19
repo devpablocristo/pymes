@@ -21,7 +21,7 @@ type CashMovementModel struct {
 	ReferenceID   *uuid.UUID     `gorm:"type:uuid"`
 	IsFavorite    bool           `gorm:"column:is_favorite;not null"`
 	Tags          pq.StringArray `gorm:"type:text[]"`
-	DeletedAt     *time.Time     `gorm:"column:deleted_at;index"`
+	DeletedAt     *time.Time     `gorm:"column:archived_at;index"`
 	CreatedBy     string
 	CreatedAt     time.Time
 }

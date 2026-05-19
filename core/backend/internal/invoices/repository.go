@@ -30,7 +30,7 @@ type ListParams struct {
 func (r *Repository) List(ctx context.Context, p ListParams) ([]invdomain.Invoice, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.InvoiceModel{}).
-		Where("org_id = ? AND deleted_at IS NULL", p.OrgID)
+		Where("org_id = ? AND archived_at IS NULL", p.OrgID)
 	if s := strings.TrimSpace(p.Status); s != "" {
 		q = q.Where("status = ?", s)
 	}
@@ -65,8 +65,8 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, limit in
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	var rows []models.InvoiceModel
 	if err := r.db.WithContext(ctx).
-		Where("org_id = ? AND deleted_at IS NOT NULL", orgID).
-		Order("deleted_at DESC").
+		Where("org_id = ? AND archived_at IS NOT NULL", orgID).
+		Order("archived_at DESC").
 		Limit(limit).
 		Find(&rows).Error; err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, limit in
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (invdomain.Invoice, error) {
 	var row models.InvoiceModel
 	if err := r.db.WithContext(ctx).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
 		Take(&row).Error; err != nil {
 		return invdomain.Invoice{}, err
 	}
@@ -161,7 +161,7 @@ func (r *Repository) Update(ctx context.Context, in invdomain.Invoice) (invdomai
 		"updated_at":       now,
 	}
 	res := r.db.WithContext(ctx).Model(&models.InvoiceModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", in.OrgID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		return invdomain.Invoice{}, res.Error
@@ -176,7 +176,7 @@ func (r *Repository) Update(ctx context.Context, in invdomain.Invoice) (invdomai
 // vive en el usecase (vía invoiceStateMachine + status.MapFSMError).
 func (r *Repository) UpdateStatus(ctx context.Context, orgID, id uuid.UUID, status string) (invdomain.Invoice, error) {
 	res := r.db.WithContext(ctx).Model(&models.InvoiceModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
 		Updates(map[string]any{
 			"status":     status,
 			"updated_at": time.Now().UTC(),
@@ -193,8 +193,8 @@ func (r *Repository) UpdateStatus(ctx context.Context, orgID, id uuid.UUID, stat
 func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	now := time.Now().UTC()
 	res := r.db.WithContext(ctx).Model(&models.InvoiceModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
-		Update("deleted_at", now)
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
+		Update("archived_at", now)
 	if res.Error != nil {
 		return res.Error
 	}
@@ -206,8 +206,8 @@ func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error 
 
 func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.InvoiceModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
-		Update("deleted_at", nil)
+		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, id).
+		Update("archived_at", nil)
 	if res.Error != nil {
 		return res.Error
 	}

@@ -257,7 +257,7 @@ func (r *Repository) InventoryValuation(ctx context.Context, orgID uuid.UUID, br
 			(aggregated.quantity * p.cost_price) AS valuation
 		`).
 		Joins("JOIN products p ON p.id = aggregated.product_id").
-		Where("p.org_id = ? AND p.deleted_at IS NULL", orgID).
+		Where("p.org_id = ? AND p.archived_at IS NULL", orgID).
 		Order("valuation DESC").
 		Scan(&rows).Error; err != nil {
 		return nil, 0, err
@@ -294,7 +294,7 @@ func (r *Repository) LowStock(ctx context.Context, orgID uuid.UUID, branchID *uu
 	if err := r.db.WithContext(ctx).Table("(?) aggregated", subquery).
 		Select("aggregated.product_id::text AS product_id, p.name AS product_name, p.sku, aggregated.quantity, aggregated.min_quantity").
 		Joins("JOIN products p ON p.id = aggregated.product_id").
-		Where("p.org_id = ? AND p.deleted_at IS NULL AND aggregated.min_quantity > 0 AND aggregated.quantity <= aggregated.min_quantity", orgID).
+		Where("p.org_id = ? AND p.archived_at IS NULL AND aggregated.min_quantity > 0 AND aggregated.quantity <= aggregated.min_quantity", orgID).
 		Order("aggregated.quantity ASC").
 		Scan(&out).Error; err != nil {
 		return nil, err

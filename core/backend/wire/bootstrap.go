@@ -156,9 +156,10 @@ func InitializeApp() *app.App {
 	accountsUC := accounts.NewUsecases(accountsRepo)
 	currencyUC := currency.NewUsecases(currencyRepo)
 	dashboardUC := dashboard.NewUsecases(dashboardRepo)
-	// Ola C step 3 — wire platform/lifecycle/go.Service for pricelists piloto.
+	// Ola C step 3-4 — wire platform/lifecycle/go.Service for pricelists piloto,
+	// routing its audit through the canonical pymes audit.Usecases (auditUC).
 	// Other CRUDAR modules continue using the legacy path until they each opt in.
-	priceListsUC := pricelists.NewUsecases(priceListsRepo, pricelists.WithLifecycle(buildPriceListsLifecycleService(db)))
+	priceListsUC := pricelists.NewUsecases(priceListsRepo, pricelists.WithLifecycle(buildPriceListsLifecycleService(db, auditUC)))
 	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC, purchases.WithTimeline(timelineUC), purchases.WithWebhooks(outwebhooksUC))
 	// procurement requiere Nexus governance: ya no hay motor local.
 	reportsUC := reports.NewUsecases(reportsRepo)

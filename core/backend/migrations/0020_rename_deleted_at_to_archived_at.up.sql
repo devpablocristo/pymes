@@ -13,57 +13,57 @@
 --   1. ALTER TABLE ... RENAME COLUMN deleted_at TO archived_at;
 --   2. ALTER INDEX ... RENAME (when an index exists on the column).
 --
--- Idempotency: each statement is guarded with IF EXISTS / IF NOT EXISTS where
--- supported by PostgreSQL 11+. Run a second time and it's a no-op.
+-- Idempotency: PostgreSQL has ALTER TABLE IF EXISTS, but not RENAME COLUMN IF
+-- EXISTS. The DO block below checks both source and destination columns before
+-- renaming so mixed local schemas are safe.
 
 BEGIN;
 
--- 1. price_lists
-ALTER TABLE IF EXISTS price_lists RENAME COLUMN deleted_at TO archived_at;
-ALTER INDEX IF EXISTS idx_price_lists_org_deleted_at RENAME TO idx_price_lists_org_archived_at;
+DO $$
+DECLARE
+  item record;
+BEGIN
+  FOR item IN
+    SELECT * FROM (VALUES
+      ('price_lists',        'idx_price_lists_org_deleted_at',        'idx_price_lists_org_archived_at'),
+      ('employees',          'idx_employees_org_deleted_at',          'idx_employees_org_archived_at'),
+      ('recurring_expenses', 'idx_recurring_expenses_org_deleted_at', 'idx_recurring_expenses_org_archived_at'),
+      ('cash_movements',     'idx_cash_movements_org_deleted_at',     'idx_cash_movements_org_archived_at'),
+      ('payments',           'idx_payments_org_deleted_at',           'idx_payments_org_archived_at'),
+      ('returns',            'idx_returns_org_deleted_at',            'idx_returns_org_archived_at'),
+      ('invoices',           'idx_invoices_org_deleted_at',           'idx_invoices_org_archived_at'),
+      ('products',           'idx_products_org_deleted_at',           'idx_products_org_archived_at'),
+      ('services',           'idx_services_org_deleted_at',           'idx_services_org_archived_at'),
+      ('sales',              'idx_sales_org_deleted_at',              'idx_sales_org_archived_at'),
+      ('purchases',          'idx_purchases_org_deleted_at',          'idx_purchases_org_archived_at'),
+      ('parties',            'idx_parties_org_deleted_at',            'idx_parties_org_archived_at')
+    ) AS rename_plan(table_name, old_index_name, new_index_name)
+  LOOP
+    IF to_regclass(format('public.%I', item.table_name)) IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = item.table_name
+          AND column_name = 'deleted_at'
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = item.table_name
+          AND column_name = 'archived_at'
+      )
+    THEN
+      EXECUTE format('ALTER TABLE %I RENAME COLUMN deleted_at TO archived_at', item.table_name);
+    END IF;
 
--- 2. employees
-ALTER TABLE IF EXISTS employees RENAME COLUMN deleted_at TO archived_at;
-ALTER INDEX IF EXISTS idx_employees_org_deleted_at RENAME TO idx_employees_org_archived_at;
-
--- 3. recurring_expenses
-ALTER TABLE IF EXISTS recurring_expenses RENAME COLUMN deleted_at TO archived_at;
-ALTER INDEX IF EXISTS idx_recurring_expenses_org_deleted_at RENAME TO idx_recurring_expenses_org_archived_at;
-
--- 4. cash_movements
-ALTER TABLE IF EXISTS cash_movements RENAME COLUMN deleted_at TO archived_at;
-ALTER INDEX IF EXISTS idx_cash_movements_org_deleted_at RENAME TO idx_cash_movements_org_archived_at;
-
--- 5. payments
-ALTER TABLE IF EXISTS payments RENAME COLUMN deleted_at TO archived_at;
-ALTER INDEX IF EXISTS idx_payments_org_deleted_at RENAME TO idx_payments_org_archived_at;
-
--- 6. returns
-ALTER TABLE IF EXISTS returns RENAME COLUMN deleted_at TO archived_at;
-ALTER INDEX IF EXISTS idx_returns_org_deleted_at RENAME TO idx_returns_org_archived_at;
-
--- 7. invoices
-ALTER TABLE IF EXISTS invoices RENAME COLUMN deleted_at TO archived_at;
-ALTER INDEX IF EXISTS idx_invoices_org_deleted_at RENAME TO idx_invoices_org_archived_at;
-
--- 8. products
-ALTER TABLE IF EXISTS products RENAME COLUMN deleted_at TO archived_at;
-ALTER INDEX IF EXISTS idx_products_org_deleted_at RENAME TO idx_products_org_archived_at;
-
--- 9. services
-ALTER TABLE IF EXISTS services RENAME COLUMN deleted_at TO archived_at;
-ALTER INDEX IF EXISTS idx_services_org_deleted_at RENAME TO idx_services_org_archived_at;
-
--- 10. sales
-ALTER TABLE IF EXISTS sales RENAME COLUMN deleted_at TO archived_at;
-ALTER INDEX IF EXISTS idx_sales_org_deleted_at RENAME TO idx_sales_org_archived_at;
-
--- 11. purchases
-ALTER TABLE IF EXISTS purchases RENAME COLUMN deleted_at TO archived_at;
-ALTER INDEX IF EXISTS idx_purchases_org_deleted_at RENAME TO idx_purchases_org_archived_at;
-
--- 12. parties (customers + suppliers share this table)
-ALTER TABLE IF EXISTS parties RENAME COLUMN deleted_at TO archived_at;
-ALTER INDEX IF EXISTS idx_parties_org_deleted_at RENAME TO idx_parties_org_archived_at;
+    IF to_regclass(format('public.%I', item.old_index_name)) IS NOT NULL
+      AND to_regclass(format('public.%I', item.new_index_name)) IS NULL
+    THEN
+      EXECUTE format('ALTER INDEX %I RENAME TO %I', item.old_index_name, item.new_index_name);
+    END IF;
+  END LOOP;
+END $$;
 
 COMMIT;

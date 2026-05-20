@@ -117,7 +117,6 @@ services:
 
   # ── Chat AI servido por Companion (sibling repo). Para levantar el chat
   # localmente: docker compose -f ../companion/docker-compose.yml up companion.
-  # El servicio pymes-ai fue decomisionado (modular-swinging-hummingbird Fase 4).
 
   # ── Professionals Vertical ──
 

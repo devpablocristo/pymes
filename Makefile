@@ -124,28 +124,10 @@ modules-check:
 
 # Stack local
 
-# Levanta Ollama compartido del ecosistema local (opcional si existe el compose en LOCAL_INFRA_DIR)
-llm-up:
-	@if [ -f "$(LOCAL_INFRA_DIR)/docker-compose.ollama.yml" ]; then \
-		docker compose --project-directory "$(LOCAL_INFRA_DIR)" -f "$(LOCAL_INFRA_DIR)/docker-compose.ollama.yml" up -d; \
-	else \
-		echo "Skipping llm-up: $(LOCAL_INFRA_DIR)/docker-compose.ollama.yml not found (clone local-infra alongside pymes or set LOCAL_INFRA_DIR)."; \
-	fi
-
-# Asegura el modelo LLM local por defecto en el Ollama compartido
-llm-pull:
-	@if [ -f "$(LOCAL_INFRA_DIR)/docker-compose.ollama.yml" ] && [ -f "$(LOCAL_INFRA_DIR)/scripts/pull-ollama-model.sh" ]; then \
-		bash "$(LOCAL_INFRA_DIR)/scripts/pull-ollama-model.sh" gemma4:e4b; \
-	else \
-		echo "Skipping llm-pull: no Ollama stack under LOCAL_INFRA_DIR=$(LOCAL_INFRA_DIR)."; \
-	fi
-
 # Stack local (compose Pymes). Nexus governance corre en el compose del repo ../nexus.
 # Levantá Nexus antes con `make up` (o `docker compose up`) en ese repo.
 up:
-	@$(MAKE) llm-up
-	@$(MAKE) llm-pull
-	$(DC) build cp-backend prof-backend work-backend beauty-backend restaurants-backend medical-backend ui ai
+	$(DC) build cp-backend prof-backend work-backend beauty-backend restaurants-backend medical-backend ui
 	$(DC) up -d --no-build
 
 # Baja y elimina contenedores de la red del proyecto

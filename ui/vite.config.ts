@@ -6,6 +6,14 @@ export default defineConfig({
   envDir: '..',
   cacheDir: process.env.VITE_CACHE_DIR ?? 'node_modules/.vite',
   plugins: [react()],
+  resolve: {
+    alias: {
+      // platform-ui-page-shell@0.1.0 still imports the pre-rename CSS package.
+      '@devpablocristo/modules-shell-sidebar/styles.css': '@devpablocristo/platform-shell-sidebar/styles.css',
+      // platform-scheduling@0.1.0 has the same stale CSS import pattern.
+      '@devpablocristo/modules-calendar-board/styles.css': '@devpablocristo/platform-calendar-board/styles.css',
+    },
+  },
   build: {
     rollupOptions: {
       output: {

@@ -22,7 +22,7 @@ ENV VITE_API_URL=$VITE_API_URL \
     VITE_API_ROLE=$VITE_API_ROLE \
     VITE_API_SCOPES=$VITE_API_SCOPES
 
-COPY ui/package.json ui/package-lock.json /app/ui/
+COPY ui/package.json ui/package-lock.json ui/.npmrc /app/ui/
 WORKDIR /app/ui
 RUN npm ci
 

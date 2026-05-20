@@ -88,7 +88,7 @@ func (r *Repository) ListUserIDsByTenant(orgID uuid.UUID) ([]uuid.UUID, error) {
 func (r *Repository) ListOrgIDsWithUsers() ([]uuid.UUID, error) {
 	var rows []tenantIDRow
 	err := r.db.Table("org_members AS tm").
-		Select("DISTINCT tm.org_id AS tenant_id").
+		Select("DISTINCT tm.org_id AS org_id").
 		Joins("JOIN users AS u ON u.id = tm.user_id").
 		Where("u.deleted_at IS NULL").
 		Order("tm.org_id ASC").

@@ -19,7 +19,7 @@ require (
 	github.com/devpablocristo/platform/kernels/saas/go v0.1.0
 	github.com/devpablocristo/platform/notifications/go v0.1.1
 	github.com/devpablocristo/platform/sdks/google-calendar/go v0.1.0
-	github.com/devpablocristo/platform/security/go v0.2.1
+	github.com/devpablocristo/platform/security/go v0.2.2
 	github.com/devpablocristo/platform/validate/go v0.1.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-pdf/fpdf v0.9.0

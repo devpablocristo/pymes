@@ -4,13 +4,13 @@ go 1.26.1
 
 require (
 	github.com/MicahParks/keyfunc/v3 v3.8.0
-	github.com/devpablocristo/platform/authn/go v0.1.0
+	github.com/devpablocristo/platform/authn/go v0.2.0
 	github.com/devpablocristo/platform/authz/go v0.1.0
 	github.com/devpablocristo/platform/calendar/ics/go v0.1.0
 	github.com/devpablocristo/platform/concurrency/go v0.1.1
 	github.com/devpablocristo/platform/config/go v0.1.0
 	github.com/devpablocristo/platform/databases/postgres/go v0.1.0
-	github.com/devpablocristo/platform/errors/go v0.1.0
+	github.com/devpablocristo/platform/errors/go v0.2.0
 	github.com/devpablocristo/platform/features/crud/paths/go v0.1.0
 	github.com/devpablocristo/platform/features/scheduling/go v0.1.0
 	github.com/devpablocristo/platform/http/gin/go v0.2.3
@@ -19,7 +19,7 @@ require (
 	github.com/devpablocristo/platform/kernels/saas/go v0.1.0
 	github.com/devpablocristo/platform/notifications/go v0.1.1
 	github.com/devpablocristo/platform/sdks/google-calendar/go v0.1.0
-	github.com/devpablocristo/platform/security/go v0.1.0
+	github.com/devpablocristo/platform/security/go v0.2.1
 	github.com/devpablocristo/platform/validate/go v0.1.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-pdf/fpdf v0.9.0

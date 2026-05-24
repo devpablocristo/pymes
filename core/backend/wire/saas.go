@@ -143,7 +143,7 @@ func (v *jwtPrincipalVerifier) Verify(ctx context.Context, credential string) (t
 	}
 	rawTenant := firstTenantClaim(claims, valueOrDefault(v.cfg.JWTTenantClaim, "org_id"), "org_id", "o.id")
 	if rawTenant == "" {
-		return tenantPrincipal{}, domainerr.Forbidden("tenant claim is required")
+		return tenantPrincipal{}, domainerr.TenantMissing()
 	}
 	orgID := rawTenant
 	if _, parseErr := uuid.Parse(orgID); parseErr != nil {
@@ -152,7 +152,7 @@ func (v *jwtPrincipalVerifier) Verify(ctx context.Context, credential string) (t
 			return tenantPrincipal{}, resolveErr
 		}
 		if !ok {
-			return tenantPrincipal{}, domainerr.Forbidden("tenant is not registered in Pymes")
+			return tenantPrincipal{}, domainerr.TenantNotFound(rawTenant)
 		}
 		orgID = resolved
 	}

@@ -59,6 +59,8 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/devpablocristo/platform/authn/go v0.1.0 h1:woGSnfKFW4ORVm1/E4x0yafHlIE4F/8RRLNm/xZAmUg=
 github.com/devpablocristo/platform/authn/go v0.1.0/go.mod h1:u2frPGnCJXqyQQO6tDYwvsWAyZuwFm2BJp9XPzAV4BI=
+github.com/devpablocristo/platform/authn/go v0.2.0 h1:/DNUrCp17iQpFndS1/dJcoMXbbXW8hC+e3T1+WlZ1Ns=
+github.com/devpablocristo/platform/authn/go v0.2.0/go.mod h1:tib4hqfWR4Lf5cBrZ014JTn9/rZg+tuCr/tFLBequWc=
 github.com/devpablocristo/platform/authz/go v0.1.0 h1:SfGjNxGTPUlO7AvKTkbD5F87fXJ+utiqbaME8T8tse8=
 github.com/devpablocristo/platform/authz/go v0.1.0/go.mod h1:XkjFFyhF+46jazoz/pANMvkkva/7wlHY6qnMe3kmnA4=
 github.com/devpablocristo/platform/calendar/ics/go v0.1.0 h1:XUMQhN69EOofP3BHTffpw4MYAMq/lkgcwIExZpuUj7Q=
@@ -71,6 +73,8 @@ github.com/devpablocristo/platform/databases/postgres/go v0.1.0 h1:m8+iISxkiZO0H
 github.com/devpablocristo/platform/databases/postgres/go v0.1.0/go.mod h1:jgCqHHL8B9khk8K5GYA8LIDhnq6kQqAJEDwTk9pXQN4=
 github.com/devpablocristo/platform/errors/go v0.1.0 h1:lI+4cSrI1FNAfzgNBXEwSZemrsT7EJyaDJ3FkLt7Vfo=
 github.com/devpablocristo/platform/errors/go v0.1.0/go.mod h1:1cHoflrIdeQrLDtVPgsl5GqjYH7AZKASNYCMSAcdjOA=
+github.com/devpablocristo/platform/errors/go v0.2.0 h1:I7WZlgEd7ic6c2IETYgzA3ULykDd8Qnx+w6NYPXlRKM=
+github.com/devpablocristo/platform/errors/go v0.2.0/go.mod h1:1cHoflrIdeQrLDtVPgsl5GqjYH7AZKASNYCMSAcdjOA=
 github.com/devpablocristo/platform/features/crud/paths/go v0.1.0 h1:ed+PWcR1EcJOHtJ/QcddlU23tdHRSpi+tPCt+Fx9dDM=
 github.com/devpablocristo/platform/features/crud/paths/go v0.1.0/go.mod h1:P4EADb74DZOL+Y4W3cCeaZb1NM4DeHhoOeQy2ya2CuI=
 github.com/devpablocristo/platform/features/scheduling/go v0.1.0 h1:FD7BWke+nB7LZuayS/+erHQxMIpecEP8FK22Fp28Aqg=
@@ -93,6 +97,8 @@ github.com/devpablocristo/platform/sdks/google-calendar/go v0.1.0 h1:yX+kfHQJ/8r
 github.com/devpablocristo/platform/sdks/google-calendar/go v0.1.0/go.mod h1:1aS1asRsZolPxiFDTRaSgeYEywClx/F25YGgmRxDpSg=
 github.com/devpablocristo/platform/security/go v0.1.0 h1:XVpaxj8y0uiNRPGi60KZx7YqVCLkC5erJXSl03kUm9M=
 github.com/devpablocristo/platform/security/go v0.1.0/go.mod h1:Urgj+tAuwcOtJMTAlLA7BDbUgKvz2yfNPcXpK3G2OnQ=
+github.com/devpablocristo/platform/security/go v0.2.1 h1:rKmr160pPdOXFLC8efMUbTbeTYV4O/mOq5EW54bvu/8=
+github.com/devpablocristo/platform/security/go v0.2.1/go.mod h1:P0FEZO5qZDDOxLk6+d90AFlQeiK3qiQ3CnTKqscCmeg=
 github.com/devpablocristo/platform/validate/go v0.1.0 h1:FZYmHxYekgl574IWhFIJBgpfebMPsoJheaUHdF8oJs4=
 github.com/devpablocristo/platform/validate/go v0.1.0/go.mod h1:8DnGB8uMKeTH2HuCCEQahGvSERqCf15z84DPu9TiuY0=
 github.com/dhui/dktest v0.4.6 h1:+DPKyScKSEp3VLtbMDHcUq6V5Lm5zfZZVb0Sk7Ahom4=

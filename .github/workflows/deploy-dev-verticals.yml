@@ -161,7 +161,7 @@ jobs:
       - name: Resolve core URL
         run: |
           set -euo pipefail
-          core_service="${{ vars.CLOUD_RUN_SERVICE_BACKEND_DEV || 'core' }}"
+          core_service="${{ vars.CLOUD_RUN_SERVICE_BACKEND_DEV || 'pymes-core' }}"
           core_url="$(gcloud run services describe "$core_service" \
             --project="$GCP_PROJECT_ID" \
             --region="$GCP_REGION" \

@@ -4,22 +4,12 @@ platform:
   firebase:
     public: ui/dist
     region: us-central1
-    core_service: core
+    core_service: pymes-core
     ignore:
       - firebase.generated.json
       - firebase.json
       - "**/.*"
       - "**/node_modules/**"
-    static_rewrites:
-      # Chat + insights atendidos por Companion (sucesor de pymes-ai, ya
-      # decomisionado por completo).
-      - source: /v1/chat
-        service: axis-companion-dev
-      - source: /v1/chat/**
-        service: axis-companion-dev
-      - source: /v1/notifications
-        service: axis-companion-dev
-
 verticals:
   workshops:
     enabled: true

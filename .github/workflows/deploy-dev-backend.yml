@@ -31,7 +31,7 @@ jobs:
       GCP_PROJECT_ID: pymes-dev-352318
       ARTIFACT_REGISTRY: pymes
       IMAGE_NAME: core
-      SERVICE_NAME: core
+      SERVICE_NAME: pymes-core
       CLOUD_RUN_SERVICE_ACCOUNT: 884236221349-compute@developer.gserviceaccount.com
       WIF_PROVIDER: projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
       WIF_SERVICE_ACCOUNT: github-actions@pymes-dev-352318.iam.gserviceaccount.com
@@ -193,8 +193,7 @@ jobs:
               --format='value(status.url)' 2>/dev/null || true)"
           fi
           if [[ -z "$companion_url" ]]; then
-            echo "::error::No se pudo resolver COMPANION_INTERNAL_URL desde DEV_COMPANION_INTERNAL_URL ni desde Cloud Run service $AXIS_COMPANION_SERVICE_NAME."
-            exit 1
+            echo "::warning::No se pudo resolver COMPANION_INTERNAL_URL desde DEV_COMPANION_INTERNAL_URL ni desde Cloud Run service $AXIS_COMPANION_SERVICE_NAME. Se desplegará el backend sin Companion interno."
           fi
           echo "GOVERNANCE_URL_EFFECTIVE=$governance_url" >> "$GITHUB_ENV"
           echo "COMPANION_INTERNAL_URL_EFFECTIVE=$companion_url" >> "$GITHUB_ENV"
@@ -202,11 +201,15 @@ jobs:
       - name: Resolve required GCP secrets
         run: |
           set -euo pipefail
-          for secret_name in \
-            "$SECRET_DATABASE_URL_NAME" \
-            "$SECRET_CLERK_SECRET_KEY_NAME" \
-            "$SECRET_GOVERNANCE_API_KEY_NAME" \
-            "$SECRET_COMPANION_API_KEY_NAME"; do
+          secret_names=(
+            "$SECRET_DATABASE_URL_NAME"
+            "$SECRET_CLERK_SECRET_KEY_NAME"
+            "$SECRET_GOVERNANCE_API_KEY_NAME"
+          )
+          if [[ -n "${COMPANION_INTERNAL_URL_EFFECTIVE:-}" ]]; then
+            secret_names+=("$SECRET_COMPANION_API_KEY_NAME")
+          fi
+          for secret_name in "${secret_names[@]}"; do
             if ! gcloud secrets versions access latest \
               --secret="$secret_name" \
               --project="$GCP_PROJECT_ID" >/dev/null; then
@@ -217,7 +220,9 @@ jobs:
           secret_flags="DATABASE_URL=${SECRET_DATABASE_URL_NAME}:latest"
           secret_flags="${secret_flags},CLERK_SECRET_KEY=${SECRET_CLERK_SECRET_KEY_NAME}:latest"
           secret_flags="${secret_flags},GOVERNANCE_API_KEY=${SECRET_GOVERNANCE_API_KEY_NAME}:latest"
-          secret_flags="${secret_flags},COMPANION_API_KEY=${SECRET_COMPANION_API_KEY_NAME}:latest"
+          if [[ -n "${COMPANION_INTERNAL_URL_EFFECTIVE:-}" ]]; then
+            secret_flags="${secret_flags},COMPANION_API_KEY=${SECRET_COMPANION_API_KEY_NAME}:latest"
+          fi
           echo "SECRET_FLAGS=$secret_flags" >> "$GITHUB_ENV"
 
       - name: Deploy to Cloud Run (DEV)
@@ -237,7 +242,7 @@ jobs:
           if [[ -n "${GOVERNANCE_URL_EFFECTIVE}" ]]; then
             env_vars="${env_vars},GOVERNANCE_URL=${GOVERNANCE_URL_EFFECTIVE}"
           fi
-          if [[ -n "${COMPANION_INTERNAL_URL_EFFECTIVE}" ]]; then
+          if [[ -n "${COMPANION_INTERNAL_URL_EFFECTIVE:-}" ]]; then
             env_vars="${env_vars},COMPANION_INTERNAL_URL=${COMPANION_INTERNAL_URL_EFFECTIVE}"
           fi
           gcloud run deploy "$SERVICE_NAME" \

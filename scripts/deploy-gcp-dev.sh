@@ -154,7 +154,7 @@ BACKEND_SECRET_VARS="DATABASE_URL=DATABASE_URL:latest,CLERK_SECRET_KEY=CLERK_SEC
 if [[ -n "$GOVERNANCE_API_KEY_EFFECTIVE" ]]; then
   BACKEND_SECRET_VARS="${BACKEND_SECRET_VARS},GOVERNANCE_API_KEY=GOVERNANCE_API_KEY:latest"
 fi
-gcloud run deploy core --image="$BACKEND_IMAGE" --region="$REGION" \
+gcloud run deploy pymes-core --image="$BACKEND_IMAGE" --region="$REGION" \
   --platform=managed --allow-unauthenticated \
   --add-cloudsql-instances="$CONN" \
   --set-env-vars="$BACKEND_ENV_VARS" \
@@ -162,7 +162,7 @@ gcloud run deploy core --image="$BACKEND_IMAGE" --region="$REGION" \
   --min-instances=0 --max-instances=3 --memory=512Mi --cpu=1 --timeout=300 \
   --project="$PROJECT_ID"
 
-BACKEND_URL=$(gcloud run services describe core --region="$REGION" --project="$PROJECT_ID" --format="value(status.url)")
+BACKEND_URL=$(gcloud run services describe pymes-core --region="$REGION" --project="$PROJECT_ID" --format="value(status.url)")
 
 CLERK_ENABLED=false
 

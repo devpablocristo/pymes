@@ -31,7 +31,7 @@ jobs:
       GCP_PROJECT_ID: pymes-dev-352318
       WIF_PROVIDER: projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
       WIF_SERVICE_ACCOUNT: github-actions@pymes-dev-352318.iam.gserviceaccount.com
-      BACKEND_SERVICE_NAME: core
+      BACKEND_SERVICE_NAME: pymes-core
       COMPANION_SERVICE_NAME: axis-companion-dev
       FIREBASE_HOSTING_SITE_ID: pymes-dev-352318
       FRONTEND_CLERK_PUBLISHABLE_KEY: pk_test_c2VsZWN0ZWQtdGljay00OC5jbGVyay5hY2NvdW50cy5kZXYk
@@ -111,9 +111,8 @@ jobs:
           set -euo pipefail
           cd ui
           npm ci
-          # /v1/chat, /v1/chat/conversations* y /v1/notifications los
-          # atiende Companion vía Firebase rewrites (infra/verticals.yml).
-          # Same-origin = "/" inyectado en build.
+          # Same-origin = "/" inyectado en build; /v1/** queda resuelto por
+          # Firebase hacia los servicios Cloud Run declarados en infra/verticals.yml.
           VITE_API_URL="/" \
           VITE_COMPANION_BASE_URL="/" \
           VITE_WORKSHOPS_API_URL="/" \

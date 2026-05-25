@@ -9,27 +9,6 @@
     ],
     "rewrites": [
       {
-        "source": "/v1/chat",
-        "run": {
-          "serviceId": "axis-companion-dev",
-          "region": "us-central1"
-        }
-      },
-      {
-        "source": "/v1/chat/**",
-        "run": {
-          "serviceId": "axis-companion-dev",
-          "region": "us-central1"
-        }
-      },
-      {
-        "source": "/v1/notifications",
-        "run": {
-          "serviceId": "axis-companion-dev",
-          "region": "us-central1"
-        }
-      },
-      {
         "source": "/v1/workshops/**",
         "run": {
           "serviceId": "pymes-workshops",
@@ -88,7 +67,7 @@
       {
         "source": "/v1/**",
         "run": {
-          "serviceId": "core",
+          "serviceId": "pymes-core",
           "region": "us-central1"
         }
       },

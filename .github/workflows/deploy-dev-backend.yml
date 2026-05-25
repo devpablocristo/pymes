@@ -47,6 +47,9 @@ jobs:
       SECRET_CLERK_SECRET_KEY_NAME: CLERK_SECRET_KEY
       SECRET_GOVERNANCE_API_KEY_NAME: GOVERNANCE_API_KEY
       SECRET_COMPANION_API_KEY_NAME: COMPANION_API_KEY
+      SECRET_COMPANION_INTERNAL_JWT_SECRET_NAME: COMPANION_INTERNAL_JWT_SECRET
+      COMPANION_INTERNAL_JWT_ISSUER: axis-bff
+      COMPANION_INTERNAL_JWT_AUDIENCE: companion
       AUTH_ENABLE_JWT: "true"
       AUTH_ALLOW_API_KEY: "true"
       NOTIFICATION_BACKEND: noop
@@ -208,6 +211,7 @@ jobs:
             "$SECRET_CLERK_SECRET_KEY_NAME"
             "$SECRET_GOVERNANCE_API_KEY_NAME"
             "$SECRET_COMPANION_API_KEY_NAME"
+            "$SECRET_COMPANION_INTERNAL_JWT_SECRET_NAME"
           )
           for secret_name in "${secret_names[@]}"; do
             if ! gcloud secrets versions access latest \
@@ -221,6 +225,7 @@ jobs:
           secret_flags="${secret_flags},CLERK_SECRET_KEY=${SECRET_CLERK_SECRET_KEY_NAME}:latest"
           secret_flags="${secret_flags},GOVERNANCE_API_KEY=${SECRET_GOVERNANCE_API_KEY_NAME}:latest"
           secret_flags="${secret_flags},COMPANION_API_KEY=${SECRET_COMPANION_API_KEY_NAME}:latest"
+          secret_flags="${secret_flags},COMPANION_INTERNAL_JWT_SECRET=${SECRET_COMPANION_INTERNAL_JWT_SECRET_NAME}:latest"
           echo "SECRET_FLAGS=$secret_flags" >> "$GITHUB_ENV"
 
       - name: Deploy to Cloud Run (DEV)
@@ -241,6 +246,7 @@ jobs:
             env_vars="${env_vars},GOVERNANCE_URL=${GOVERNANCE_URL_EFFECTIVE}"
           fi
           env_vars="${env_vars},COMPANION_INTERNAL_URL=${COMPANION_INTERNAL_URL_EFFECTIVE}"
+          env_vars="${env_vars},COMPANION_INTERNAL_JWT_ISSUER=${COMPANION_INTERNAL_JWT_ISSUER},COMPANION_INTERNAL_JWT_AUDIENCE=${COMPANION_INTERNAL_JWT_AUDIENCE}"
           gcloud run deploy "$SERVICE_NAME" \
             --project="$GCP_PROJECT_ID" \
             --region="$GCP_REGION" \

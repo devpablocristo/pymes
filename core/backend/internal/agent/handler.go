@@ -30,6 +30,7 @@ func NewHandler(uc *Usecases, checker PermissionChecker) *Handler {
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup) {
 	agent := auth.Group("/agent")
 	agent.GET("/capabilities", h.ListCapabilities)
+	agent.GET("/manifest", h.GetManifest)
 	agent.GET("/capabilities/:id", h.GetCapability)
 	agent.POST("/confirmations", h.CreateConfirmation)
 	agent.POST("/actions/:id/dry-run", h.DryRun)
@@ -38,6 +39,20 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup) {
 }
 
 func (h *Handler) ListCapabilities(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"items": h.visibleCapabilities(c)})
+}
+
+func (h *Handler) GetManifest(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"schema_version": "pymes.agent_manifest.v1",
+		"product":        "pymes",
+		"owner_system":   "pymes.core",
+		"generated_at":   time.Now().UTC().Format(time.RFC3339),
+		"capabilities":   h.visibleCapabilities(c),
+	})
+}
+
+func (h *Handler) visibleCapabilities(c *gin.Context) []Capability {
 	auth := authContext(c)
 	channel := Channel(strings.TrimSpace(c.Query("channel")))
 	items := make([]Capability, 0)
@@ -50,7 +65,7 @@ func (h *Handler) ListCapabilities(c *gin.Context) {
 		}
 		items = append(items, cap)
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	return items
 }
 
 func (h *Handler) GetCapability(c *gin.Context) {
@@ -219,7 +234,7 @@ func (h *Handler) allowed(ctx context.Context, auth ActorContext, cap Capability
 func authContext(c *gin.Context) ActorContext {
 	auth := handlers.GetAuthContext(c)
 	return ActorContext{
-		OrgID:   auth.OrgID,
+		OrgID:      auth.OrgID,
 		Actor:      auth.Actor,
 		Role:       auth.Role,
 		Scopes:     auth.Scopes,
@@ -239,5 +254,5 @@ func respondAgentError(c *gin.Context, err error) {
 		c.JSON(status, gin.H{"code": code, "message": message})
 		return
 	}
-	c.JSON(http.StatusInternalServerError, gin.H{"code": "internal_error", "message": err.Error()})
+	c.JSON(http.StatusInternalServerError, gin.H{"code": "internal_error", "message": "error interno"})
 }

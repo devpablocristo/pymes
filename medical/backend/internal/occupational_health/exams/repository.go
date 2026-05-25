@@ -31,7 +31,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Exam, int
 		deletedClause = "deleted_at IS NOT NULL"
 		base = base.Unscoped()
 	}
-	q := base.Where("tenant_id = ? AND "+deletedClause, p.OrgID)
+	q := base.Where("org_id = ? AND "+deletedClause, p.OrgID)
 	if status := strings.TrimSpace(p.Status); status != "" {
 		q = q.Where("status = ?", status)
 	}
@@ -58,7 +58,7 @@ func (r *Repository) Create(ctx context.Context, in domain.Exam) (domain.Exam, e
 	now := time.Now().UTC()
 	row := models.ExamModel{
 		ID:              uuid.New(),
-		OrgID:        in.OrgID,
+		OrgID:           in.OrgID,
 		PatientName:     in.PatientName,
 		PatientDocument: in.PatientDocument,
 		EmployerName:    in.EmployerName,
@@ -86,7 +86,7 @@ func (r *Repository) Create(ctx context.Context, in domain.Exam) (domain.Exam, e
 
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Exam, error) {
 	var row models.ExamModel
-	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).Take(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).Take(&row).Error; err != nil {
 		return domain.Exam{}, err
 	}
 	return toDomain(row), nil
@@ -94,7 +94,7 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.E
 
 func (r *Repository) Update(ctx context.Context, in domain.Exam) (domain.Exam, error) {
 	res := r.db.WithContext(ctx).Model(&models.ExamModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
 		Updates(map[string]any{
 			"patient_name":     in.PatientName,
 			"patient_document": in.PatientDocument,
@@ -124,7 +124,7 @@ func (r *Repository) Update(ctx context.Context, in domain.Exam) (domain.Exam, e
 
 func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.ExamModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
 		Updates(map[string]any{"deleted_at": time.Now().UTC(), "updated_at": time.Now().UTC()})
 	if res.Error != nil {
 		return res.Error
@@ -137,7 +137,7 @@ func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
 
 func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Unscoped().Model(&models.ExamModel{}).
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
 		Updates(map[string]any{"deleted_at": nil, "updated_at": time.Now().UTC()})
 	if res.Error != nil {
 		return res.Error
@@ -150,7 +150,7 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 
 func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Unscoped().
-		Where("tenant_id = ? AND id = ?", orgID, id).
+		Where("org_id = ? AND id = ?", orgID, id).
 		Delete(&models.ExamModel{})
 	if res.Error != nil {
 		return res.Error
@@ -169,7 +169,7 @@ func toDomain(row models.ExamModel) domain.Exam {
 	}
 	return domain.Exam{
 		ID:              row.ID,
-		OrgID:        row.OrgID,
+		OrgID:           row.OrgID,
 		PatientName:     row.PatientName,
 		PatientDocument: row.PatientDocument,
 		EmployerName:    row.EmployerName,

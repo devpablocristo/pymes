@@ -2,7 +2,9 @@ package procurement
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
 	"testing"
 
 	"github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
@@ -48,8 +50,12 @@ type fakeGovernance struct {
 	simulateResp governanceclient.SimulateResponse
 	simulateErr  error
 	submitResp   governanceclient.SubmitResponse
+	getResp      governanceclient.RequestSummary
+	getStatus    int
+	getErr       error
 	simulateHits int
 	submitHits   int
+	getHits      int
 }
 
 func (f *fakeGovernance) SimulateRequestForTenant(_ context.Context, _ string, _ governanceclient.SimulateRequestBody) (governanceclient.SimulateResponse, error) {
@@ -60,6 +66,15 @@ func (f *fakeGovernance) SimulateRequestForTenant(_ context.Context, _ string, _
 func (f *fakeGovernance) SubmitRequestForTenant(_ context.Context, _ string, _ string, _ governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error) {
 	f.submitHits++
 	return f.submitResp, nil
+}
+
+func (f *fakeGovernance) GetRequestForTenant(_ context.Context, _ string, _ string) (governanceclient.RequestSummary, int, error) {
+	f.getHits++
+	status := f.getStatus
+	if status == 0 {
+		status = http.StatusOK
+	}
+	return f.getResp, status, f.getErr
 }
 
 func (f *fakeGovernance) ListPoliciesForTenant(context.Context, string) (int, []byte, error) {
@@ -114,7 +129,7 @@ func TestSubmitAllowsViaNexusSimulate(t *testing.T) {
 	reqID := uuid.New()
 	repo := &fakeProcurementRepo{item: domain.ProcurementRequest{
 		ID:             reqID,
-		OrgID:       orgID,
+		OrgID:          orgID,
 		RequesterActor: "owner@example.com",
 		Title:          "Compra chica",
 		Status:         domain.StatusDraft,
@@ -148,7 +163,7 @@ func TestSubmitEscalatesRequireApprovalToNexusSubmit(t *testing.T) {
 	reqID := uuid.New()
 	repo := &fakeProcurementRepo{item: domain.ProcurementRequest{
 		ID:             reqID,
-		OrgID:       orgID,
+		OrgID:          orgID,
 		RequesterActor: "owner@example.com",
 		Title:          "Compra grande",
 		Status:         domain.StatusDraft,
@@ -185,7 +200,7 @@ func TestSubmitDenyRejectsWithoutLocalFallback(t *testing.T) {
 	reqID := uuid.New()
 	repo := &fakeProcurementRepo{item: domain.ProcurementRequest{
 		ID:             reqID,
-		OrgID:       orgID,
+		OrgID:          orgID,
 		RequesterActor: "owner@example.com",
 		Title:          "Compra bloqueada",
 		Status:         domain.StatusDraft,
@@ -218,7 +233,7 @@ func TestSubmitFailsClosedWhenNexusSimulateFails(t *testing.T) {
 	reqID := uuid.New()
 	repo := &fakeProcurementRepo{item: domain.ProcurementRequest{
 		ID:             reqID,
-		OrgID:       orgID,
+		OrgID:          orgID,
 		RequesterActor: "owner@example.com",
 		Title:          "Compra sin Nexus",
 		Status:         domain.StatusDraft,
@@ -234,5 +249,123 @@ func TestSubmitFailsClosedWhenNexusSimulateFails(t *testing.T) {
 	}
 	if repo.item.Status != domain.StatusDraft {
 		t.Fatalf("expected request to remain draft, got %s", repo.item.Status)
+	}
+}
+
+func TestApproveRequiresApprovedNexusRequest(t *testing.T) {
+	t.Parallel()
+	orgID := uuid.New()
+	reqID := uuid.New()
+	repo := &fakeProcurementRepo{item: domain.ProcurementRequest{
+		ID:             reqID,
+		OrgID:          orgID,
+		RequesterActor: "owner@example.com",
+		Title:          "Compra grande",
+		Status:         domain.StatusPendingApproval,
+		EstimatedTotal: 75000,
+		Currency:       "ARS",
+		EvaluationJSON: json.RawMessage(`{"nexus_request_id":"req-nexus-1"}`),
+	}}
+	gov := &fakeGovernance{getResp: governanceclient.RequestSummary{
+		ID:     "req-nexus-1",
+		Status: governanceclient.StatusApproved,
+	}}
+	uc := NewUsecases(repo, gov, nil, nil, nil)
+
+	out, err := uc.Approve(context.Background(), orgID, reqID, "owner@example.com")
+	if err != nil {
+		t.Fatalf("approve: %v", err)
+	}
+	if out.Status != domain.StatusApproved {
+		t.Fatalf("expected approved, got %s", out.Status)
+	}
+	if gov.getHits != 1 {
+		t.Fatalf("expected one nexus verification, got %d", gov.getHits)
+	}
+}
+
+func TestApproveFailsClosedWithoutNexusRequestID(t *testing.T) {
+	t.Parallel()
+	orgID := uuid.New()
+	reqID := uuid.New()
+	repo := &fakeProcurementRepo{item: domain.ProcurementRequest{
+		ID:             reqID,
+		OrgID:          orgID,
+		RequesterActor: "owner@example.com",
+		Title:          "Compra grande",
+		Status:         domain.StatusPendingApproval,
+		EstimatedTotal: 75000,
+		Currency:       "ARS",
+	}}
+	gov := &fakeGovernance{}
+	uc := NewUsecases(repo, gov, nil, nil, nil)
+
+	_, err := uc.Approve(context.Background(), orgID, reqID, "owner@example.com")
+	if err == nil {
+		t.Fatal("expected approve to fail without nexus_request_id")
+	}
+	if repo.item.Status != domain.StatusPendingApproval {
+		t.Fatalf("expected request to remain pending approval, got %s", repo.item.Status)
+	}
+	if gov.getHits != 0 {
+		t.Fatalf("expected no nexus fetch without request id, got %d", gov.getHits)
+	}
+}
+
+func TestApproveFailsClosedWhenNexusStillPending(t *testing.T) {
+	t.Parallel()
+	orgID := uuid.New()
+	reqID := uuid.New()
+	repo := &fakeProcurementRepo{item: domain.ProcurementRequest{
+		ID:             reqID,
+		OrgID:          orgID,
+		RequesterActor: "owner@example.com",
+		Title:          "Compra grande",
+		Status:         domain.StatusPendingApproval,
+		EstimatedTotal: 75000,
+		Currency:       "ARS",
+		EvaluationJSON: json.RawMessage(`{"nexus_request_id":"req-nexus-1"}`),
+	}}
+	gov := &fakeGovernance{getResp: governanceclient.RequestSummary{
+		ID:     "req-nexus-1",
+		Status: governanceclient.StatusPendingApproval,
+	}}
+	uc := NewUsecases(repo, gov, nil, nil, nil)
+
+	_, err := uc.Approve(context.Background(), orgID, reqID, "owner@example.com")
+	if err == nil {
+		t.Fatal("expected approve to fail while Nexus is still pending")
+	}
+	if repo.item.Status != domain.StatusPendingApproval {
+		t.Fatalf("expected request to remain pending approval, got %s", repo.item.Status)
+	}
+}
+
+func TestRejectRequiresRejectedNexusRequest(t *testing.T) {
+	t.Parallel()
+	orgID := uuid.New()
+	reqID := uuid.New()
+	repo := &fakeProcurementRepo{item: domain.ProcurementRequest{
+		ID:             reqID,
+		OrgID:          orgID,
+		RequesterActor: "owner@example.com",
+		Title:          "Compra rechazada",
+		Status:         domain.StatusPendingApproval,
+		EstimatedTotal: 75000,
+		Currency:       "ARS",
+		EvaluationJSON: json.RawMessage(`{"nexus_request_id":"req-nexus-1"}`),
+	}}
+	gov := &fakeGovernance{getResp: governanceclient.RequestSummary{
+		ID:     "req-nexus-1",
+		Status: governanceclient.StatusRejected,
+	}}
+	uc := NewUsecases(repo, gov, nil, nil, nil)
+
+	out, err := uc.Reject(context.Background(), orgID, reqID, "owner@example.com")
+	if err != nil {
+		t.Fatalf("reject: %v", err)
+	}
+	if out.Status != domain.StatusRejected {
+		t.Fatalf("expected rejected, got %s", out.Status)
 	}
 }

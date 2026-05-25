@@ -9,10 +9,10 @@ Plataforma SaaS multi-vertical para PyMEs latinoamericanas. Monorepo con:
 - `beauty/` — vertical belleza / salón (equipo, menú de servicios; backend Go)
 - `restaurants/` — vertical bares / restaurantes (zonas, mesas, sesiones de mesa; backend Go)
 - `ui/` — consola React unificada
-- `ai/` — servicio FastAPI con Gemini
+- Axis Companion (`../axis/companion`) — runtime IA conversacional y memoria; Pymes conserva el gateway de capabilities
 - `mobile/` — app móvil Expo (React Native, Expo Router v6, Clerk auth, Zustand)
 
-Código reutilizable: librería externa **`github.com/devpablocristo/core/...`** (checkout típico en `../core`) para lo agnóstico; **`core/shared/`** del monorepo para lo transversal del producto; lo atado al dominio de un servicio en el **`internal/`** de ese backend (no hay carpeta `pkgs/` en este repo).
+Código reutilizable: librerías externas **`github.com/devpablocristo/platform/...`** y paquetes npm **`@devpablocristo/platform-*`** para lo agnóstico; **`core/shared/`** del monorepo para lo transversal del producto; lo atado al dominio de un servicio vive en el **`internal/`** de ese backend (no hay carpeta `pkgs/` en este repo).
 
 Documentación canónica del monorepo: **`docs/README.md`** (índice), **`docs/AUTH.md`** (identidad y acceso), **`docs/CLERK_LOCAL.md`** (Clerk en Docker, org y JWT), **`docs/PYMES_CORE.md`** (backend transversal), **`docs/CORE_INTEGRATION.md`** (librerías `core`), **`core/docs/FRAUD_PREVENTION.md`** (auditoría, cobros, RBAC / anti-fraude).
 
@@ -90,18 +90,17 @@ core/
 ├── backend/                        # base transversal
 ├── shared/                         # runtime y utilidades compartidas entre verticales
 │   ├── backend/                    # Go: auth, config, middleware
-│   └── ai/                         # Python: AI runtime
 ├── infra/aws/                      # Terraform por cloud (hermanos: gcp/, azure/...)
 ui/                                 # consola React unificada
 mobile/                             # app móvil Expo (React Native)
-ai/                                 # servicio FastAPI
+../axis/companion                   # runtime IA
 professionals/                      # vertical (backend + infra/aws)
 workshops/                          # vertical (backend + infra/aws)
 beauty/                             # vertical (backend + infra/aws)
 restaurants/                        # vertical (backend/; infra opcional por vertical)
 ```
 
-Librerías agnósticas: módulos `github.com/devpablocristo/core/...` en `go.mod` (checkout local típico `../core`), no carpeta `pkgs/` en este repo. Puertos locales: ver **`docs/README.md`** (tabla) y **`docker-compose.yml`**.
+Librerías agnósticas: módulos `github.com/devpablocristo/platform/...` en `go.mod` y paquetes `@devpablocristo/platform-*` en `ui/package.json`, no carpeta `pkgs/` en este repo. Puertos locales: ver **`docs/README.md`** (tabla) y **`docker-compose.yml`**.
 
 ### 5.2 Estructura de módulo
 
@@ -152,7 +151,7 @@ Los **mappers** viven en el adapter que los necesita:
 
 | Ubicación | Qué contiene | Criterio |
 |-----------|-------------|----------|
-| Librería **`core`** (`github.com/devpablocristo/core/...`) | Primitivas agnósticas (authn, saas, governance, helpers HTTP, etc.) | Portable entre productos; versionada fuera de este repo |
+| Librería **`platform`** (`github.com/devpablocristo/platform/...`, `@devpablocristo/platform-*`) | Primitivas agnósticas, kernels y features reutilizables | Portable entre productos; versionada fuera de este repo |
 | `core/shared/` | Código transversal del producto | Específico de Pymes, usado por varios verticales o capas |
 | `internal/{modulo}/` del servicio owner | Dominio y adapters del módulo | Acoplado al negocio de ese backend; no se fuerza a `shared` ni a `core` |
 

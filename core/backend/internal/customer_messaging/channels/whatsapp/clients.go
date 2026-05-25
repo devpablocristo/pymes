@@ -13,7 +13,7 @@ import (
 	cm "github.com/devpablocristo/pymes/core/backend/internal/customer_messaging"
 )
 
-type AIClient struct {
+type CompanionClient struct {
 	caller *httpclient.Caller
 }
 
@@ -37,13 +37,13 @@ type metaSendResponse struct {
 	Success bool `json:"success"`
 }
 
-func NewAIClient(baseURL, internalToken string) *AIClient {
+func NewCompanionClient(baseURL, internalToken string) *CompanionClient {
 	h := make(http.Header)
 	if t := strings.TrimSpace(internalToken); t != "" {
 		h.Set("X-Internal-Service-Token", t)
 		h.Set("X-API-Key", t)
 	}
-	return &AIClient{
+	return &CompanionClient{
 		caller: &httpclient.Caller{
 			BaseURL:     strings.TrimRight(strings.TrimSpace(baseURL), "/"),
 			Header:      h,
@@ -51,6 +51,13 @@ func NewAIClient(baseURL, internalToken string) *AIClient {
 			MaxBodySize: 32 * 1024,
 		},
 	}
+}
+
+// AIClient and NewAIClient are legacy aliases kept for old wiring/tests.
+type AIClient = CompanionClient
+
+func NewAIClient(baseURL, internalToken string) *CompanionClient {
+	return NewCompanionClient(baseURL, internalToken)
 }
 
 func NewMetaClient(baseURL string) *MetaClient {
@@ -67,9 +74,9 @@ func NewMetaClient(baseURL string) *MetaClient {
 	}
 }
 
-func (c *AIClient) ProcessWhatsApp(ctx context.Context, req cm.InboundMessage) (cm.AIMessageResponse, error) {
+func (c *CompanionClient) ProcessWhatsApp(ctx context.Context, req cm.InboundMessage) (cm.CompanionMessageResponse, error) {
 	if c == nil || c.caller.BaseURL == "" {
-		return cm.AIMessageResponse{}, fmt.Errorf("ai service url not configured")
+		return cm.CompanionMessageResponse{}, fmt.Errorf("companion internal url not configured")
 	}
 	body := CustomerMessagingInboundRequest{
 		OrgID:         req.OrgID.String(),
@@ -81,14 +88,14 @@ func (c *AIClient) ProcessWhatsApp(ctx context.Context, req cm.InboundMessage) (
 	}
 	st, raw, err := c.caller.DoJSON(ctx, http.MethodPost, "/v1/internal/customer-messaging/inbound", body)
 	if err != nil {
-		return cm.AIMessageResponse{}, err
+		return cm.CompanionMessageResponse{}, err
 	}
 	if st >= http.StatusMultipleChoices {
-		return cm.AIMessageResponse{}, fmt.Errorf("ai service returned %d: %s", st, strings.TrimSpace(string(raw)))
+		return cm.CompanionMessageResponse{}, fmt.Errorf("companion service returned %d: %s", st, strings.TrimSpace(string(raw)))
 	}
-	var out cm.AIMessageResponse
+	var out cm.CompanionMessageResponse
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return cm.AIMessageResponse{}, err
+		return cm.CompanionMessageResponse{}, err
 	}
 	return out, nil
 }

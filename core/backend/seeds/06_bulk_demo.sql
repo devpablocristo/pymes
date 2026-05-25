@@ -48,7 +48,7 @@ BEGIN
     -- Clientes 4..10.
     INSERT INTO parties (
         id, org_id, party_type, display_name, email, phone, address,
-        tax_id, notes, tags, metadata, created_at, updated_at, deleted_at, is_favorite
+        tax_id, notes, tags, metadata, created_at, updated_at, archived_at, is_favorite
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text),
@@ -85,7 +85,7 @@ BEGIN
             tags = EXCLUDED.tags,
             metadata = EXCLUDED.metadata,
             updated_at = now(),
-            deleted_at = NULL,
+            archived_at = NULL,
             is_favorite = EXCLUDED.is_favorite;
 
     INSERT INTO party_persons (party_id, first_name, last_name)
@@ -139,7 +139,7 @@ BEGIN
     -- Proveedores 4..10.
     INSERT INTO parties (
         id, org_id, party_type, display_name, email, phone, address,
-        tax_id, notes, tags, metadata, created_at, updated_at, deleted_at, is_favorite
+        tax_id, notes, tags, metadata, created_at, updated_at, archived_at, is_favorite
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v2/supplier/' || gs::text),
@@ -176,7 +176,7 @@ BEGIN
             tags = EXCLUDED.tags,
             metadata = EXCLUDED.metadata,
             updated_at = now(),
-            deleted_at = NULL,
+            archived_at = NULL,
             is_favorite = EXCLUDED.is_favorite;
 
     INSERT INTO party_organizations (party_id, legal_name, trade_name, tax_condition)
@@ -218,7 +218,7 @@ BEGIN
     INSERT INTO products (
         id, org_id, type, sku, name, description, unit, price, cost_price,
         tax_rate, track_stock, tags, metadata, price_currency, is_active,
-        image_url, image_urls, is_favorite, created_at, updated_at, deleted_at
+        image_url, image_urls, is_favorite, created_at, updated_at, archived_at
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v2/product/' || gs::text),
@@ -266,13 +266,13 @@ BEGIN
             is_active = EXCLUDED.is_active,
             is_favorite = EXCLUDED.is_favorite,
             updated_at = now(),
-            deleted_at = NULL;
+            archived_at = NULL;
 
     -- Servicios 4..8. Workshops agrega 2 servicios publicos mas, dejando 10 visibles en total.
     INSERT INTO services (
         id, org_id, code, name, description, category_code, sale_price,
         cost_price, tax_rate, currency, default_duration_minutes, tags,
-        metadata, is_active, is_favorite, created_at, updated_at, deleted_at
+        metadata, is_active, is_favorite, created_at, updated_at, archived_at
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v2/service/' || gs::text),
@@ -317,7 +317,7 @@ BEGIN
             is_active = EXCLUDED.is_active,
             is_favorite = EXCLUDED.is_favorite,
             updated_at = now(),
-            deleted_at = NULL;
+            archived_at = NULL;
 
     INSERT INTO stock_levels (org_id, product_id, quantity, min_quantity)
     SELECT
@@ -336,7 +336,7 @@ BEGIN
         id, org_id, number, party_id, party_name, status, subtotal,
         tax_total, total, currency, notes, valid_until, created_by,
         discount_type, discount_value, discount_total, tags, metadata,
-        is_favorite, created_at, updated_at, deleted_at
+        is_favorite, created_at, updated_at, archived_at
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v2/quote/' || gs::text),
@@ -375,7 +375,7 @@ BEGIN
             metadata = EXCLUDED.metadata,
             is_favorite = EXCLUDED.is_favorite,
             updated_at = now(),
-            deleted_at = NULL;
+            archived_at = NULL;
 
     INSERT INTO quote_items (
         id, quote_id, product_id, service_id, description, quantity,
@@ -508,7 +508,7 @@ BEGIN
     INSERT INTO cash_movements (
         id, org_id, type, amount, currency, category, description,
         payment_method, reference_type, reference_id, created_by,
-        created_at, is_favorite, tags, deleted_at
+        created_at, is_favorite, tags, archived_at
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v2/cash-move/' || gs::text),
@@ -538,13 +538,13 @@ BEGIN
             created_at = EXCLUDED.created_at,
             is_favorite = EXCLUDED.is_favorite,
             tags = EXCLUDED.tags,
-            deleted_at = NULL;
+            archived_at = NULL;
 
     -- Compras 3..10 + item.
     INSERT INTO purchases (
         id, org_id, number, party_id, party_name, status, payment_status,
         subtotal, tax_total, total, currency, notes, received_at, created_by,
-        tags, metadata, is_favorite, created_at, updated_at, deleted_at
+        tags, metadata, is_favorite, created_at, updated_at, archived_at
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v2/purchase/' || gs::text),
@@ -592,7 +592,7 @@ BEGIN
             metadata = EXCLUDED.metadata,
             is_favorite = EXCLUDED.is_favorite,
             updated_at = now(),
-            deleted_at = NULL;
+            archived_at = NULL;
 
     INSERT INTO purchase_items (id, purchase_id, product_id, service_id, description, quantity, unit_cost, tax_rate, subtotal, sort_order)
     SELECT
@@ -679,7 +679,7 @@ BEGIN
     -- Pagos 4..10.
     INSERT INTO payments (
         id, org_id, reference_type, reference_id, method, amount,
-        notes, received_at, created_by, created_at, is_favorite, tags, deleted_at
+        notes, received_at, created_by, created_at, is_favorite, tags, archived_at
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v2/payment/' || gs::text),
@@ -703,14 +703,14 @@ BEGIN
             received_at = EXCLUDED.received_at,
             is_favorite = EXCLUDED.is_favorite,
             tags = EXCLUDED.tags,
-            deleted_at = NULL;
+            archived_at = NULL;
 
     -- Gastos recurrentes 3..10, sumados al seed base quedan 10 visibles.
     INSERT INTO recurring_expenses (
         id, org_id, description, amount, currency, category, payment_method,
         frequency, day_of_month, party_id, is_active, next_due_date,
         last_paid_date, notes, created_by, created_at, updated_at,
-        is_favorite, tags, deleted_at
+        is_favorite, tags, archived_at
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v2/recurring/' || gs::text),
@@ -749,13 +749,13 @@ BEGIN
             is_favorite = EXCLUDED.is_favorite,
             tags = EXCLUDED.tags,
             updated_at = now(),
-            deleted_at = NULL;
+            archived_at = NULL;
 
     -- Procurement requests 3..10 + lineas.
     INSERT INTO procurement_requests (
         id, org_id, requester_actor, title, description, category, status,
         estimated_total, currency, evaluation_json, purchase_id, created_at,
-        updated_at, deleted_at
+        updated_at, archived_at
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v2/procurement/' || gs::text),
@@ -782,7 +782,7 @@ BEGIN
             evaluation_json = EXCLUDED.evaluation_json,
             purchase_id = EXCLUDED.purchase_id,
             updated_at = now(),
-            deleted_at = NULL;
+            archived_at = NULL;
 
     INSERT INTO procurement_request_lines (id, request_id, description, product_id, quantity, unit_price_estimate, sort_order)
     SELECT
@@ -805,7 +805,7 @@ BEGIN
     INSERT INTO invoices (
         id, org_id, number, party_id, customer_name, issued_date, due_date,
         status, subtotal, discount_percent, tax_percent, total, notes,
-        is_favorite, tags, created_by, created_at, updated_at, deleted_at
+        is_favorite, tags, created_by, created_at, updated_at, archived_at
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v2/invoice/' || gs::text),
@@ -842,7 +842,7 @@ BEGIN
             is_favorite = EXCLUDED.is_favorite,
             tags = EXCLUDED.tags,
             updated_at = now(),
-            deleted_at = NULL;
+            archived_at = NULL;
 
     DELETE FROM invoice_line_items
      WHERE invoice_id IN (
@@ -866,7 +866,7 @@ BEGIN
     INSERT INTO employees (
         id, org_id, first_name, last_name, email, phone, position, status,
         hire_date, notes, is_favorite, tags, created_by, created_at,
-        updated_at, deleted_at, metadata
+        updated_at, archived_at, metadata
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/' || gs::text),
@@ -899,13 +899,13 @@ BEGIN
             is_favorite = EXCLUDED.is_favorite,
             tags = EXCLUDED.tags,
             updated_at = now(),
-            deleted_at = NULL,
+            archived_at = NULL,
             metadata = EXCLUDED.metadata;
 
     -- La pantalla /employees lista parties con rol employee; espejamos los 10 employees ahi tambien.
     INSERT INTO parties (
         id, org_id, party_type, display_name, email, phone, address,
-        tax_id, notes, is_favorite, tags, metadata, created_at, updated_at, deleted_at
+        tax_id, notes, is_favorite, tags, metadata, created_at, updated_at, archived_at
     )
     SELECT
         e.id,
@@ -947,7 +947,7 @@ BEGIN
             tags = EXCLUDED.tags,
             metadata = EXCLUDED.metadata,
             updated_at = now(),
-            deleted_at = NULL;
+            archived_at = NULL;
 
     INSERT INTO party_persons (party_id, first_name, last_name)
     SELECT e.id, e.first_name, e.last_name
@@ -1001,7 +1001,7 @@ BEGIN
     INSERT INTO returns (
         id, org_id, number, sale_id, reason, subtotal, tax_total, total,
         refund_method, status, notes, created_by, created_at, is_favorite,
-        tags, deleted_at
+        tags, archived_at
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v2/return/' || gs::text),
@@ -1032,7 +1032,7 @@ BEGIN
             notes = EXCLUDED.notes,
             is_favorite = EXCLUDED.is_favorite,
             tags = EXCLUDED.tags,
-            deleted_at = NULL;
+            archived_at = NULL;
 
     INSERT INTO return_items (id, return_id, sale_item_id, product_id, description, quantity, unit_price, tax_rate, subtotal)
     SELECT

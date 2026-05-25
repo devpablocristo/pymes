@@ -9,7 +9,7 @@ import (
 
 type ServiceModel struct {
 	ID                     uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID               uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID                  uuid.UUID `gorm:"type:uuid;index;not null"`
 	Code                   string
 	Name                   string `gorm:"not null"`
 	Description            string
@@ -25,7 +25,7 @@ type ServiceModel struct {
 	Metadata               []byte         `gorm:"type:jsonb"`
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
-	DeletedAt              *time.Time
+	DeletedAt              *time.Time `gorm:"column:archived_at"`
 }
 
 func (ServiceModel) TableName() string { return "services" }

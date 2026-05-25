@@ -9,7 +9,7 @@ import (
 
 type PurchaseModel struct {
 	ID            uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	OrgID      uuid.UUID  `gorm:"type:uuid;index;not null"`
+	OrgID         uuid.UUID  `gorm:"type:uuid;index;not null"`
 	BranchID      *uuid.UUID `gorm:"type:uuid;index"`
 	Number        string
 	SupplierID    *uuid.UUID `gorm:"column:party_id;type:uuid"`
@@ -27,7 +27,7 @@ type PurchaseModel struct {
 	CreatedBy     string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
-	DeletedAt     *time.Time
+	DeletedAt     *time.Time `gorm:"column:archived_at"`
 }
 
 func (PurchaseModel) TableName() string { return "purchases" }

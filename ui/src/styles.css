@@ -13,7 +13,7 @@
  * - Primitivas UI (cards, tablas, formularios, botones…): `src/styles/components.css`.
  * - Página de módulo / explorador de API: `src/styles/module-page.css`.
  * - Sin CSS Modules ni Tailwind en este paquete: hojas .css por página/import en TSX.
- * - Librerías externas (@devpablocristo/modules-*) traen su propio CSS; `styles.css` solo concentra estos imports.
+ * - Librerías externas (@devpablocristo/platform-*) traen su propio CSS; `styles.css` solo concentra estos imports.
  * - Nuevo CSS: preferir var(--text-*), var(--font-weight-*), var(--space-*), var(--color-*).
  * - Evitar tamaños sueltos en rem/px salvo layout puntual.
  */

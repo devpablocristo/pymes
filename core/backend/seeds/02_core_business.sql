@@ -41,7 +41,7 @@ BEGIN
     sale2 := uuid_generate_v5(v_tenant, 'pymes-seed/v1/sale/2');
     sale3 := uuid_generate_v5(v_tenant, 'pymes-seed/v1/sale/3');
 
-    INSERT INTO parties (id, org_id, party_type, display_name, email, phone, address, tax_id, notes, tags, metadata, created_at, updated_at, deleted_at)
+    INSERT INTO parties (id, org_id, party_type, display_name, email, phone, address, tax_id, notes, tags, metadata, created_at, updated_at, archived_at)
     VALUES
         (c1, v_tenant, 'person', 'Cliente Demo Uno', 'cliente1@local.dev', '+54-11-1000-0001', '{}'::jsonb, NULL, 'seed', ARRAY['demo'], '{}'::jsonb, now(), now(), NULL),
         (c2, v_tenant, 'organization', 'Cliente Demo Dos', 'compras@demo2.local', '+54-11-1000-0002', '{}'::jsonb, '20111222333', 'seed', ARRAY['demo', 'vip'], '{}'::jsonb, now(), now(), NULL),
@@ -79,46 +79,46 @@ BEGIN
         metadata = EXCLUDED.metadata;
 
     -- Índice único (org_id, sku) es parcial → no sirve para ON CONFLICT; upsert manual.
-    SELECT id INTO p1 FROM products WHERE org_id = v_tenant AND sku = 'DEMO-PROD-001' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO p1 FROM products WHERE org_id = v_tenant AND sku = 'DEMO-PROD-001' AND archived_at IS NULL LIMIT 1;
     IF p1 IS NULL THEN
         INSERT INTO products (id, org_id, type, sku, name, description, unit, price, price_currency, cost_price, tax_rate, track_stock, is_active, tags)
         VALUES (uuid_generate_v5(v_tenant, 'pymes-seed/v1/product/1'), v_tenant, 'product', 'DEMO-PROD-001', 'Producto Demo A', 'Producto físico A', 'unit', 15000, 'ARS', 9000, 21, true, true, ARRAY['demo']);
-        SELECT id INTO p1 FROM products WHERE org_id = v_tenant AND sku = 'DEMO-PROD-001' AND deleted_at IS NULL LIMIT 1;
+        SELECT id INTO p1 FROM products WHERE org_id = v_tenant AND sku = 'DEMO-PROD-001' AND archived_at IS NULL LIMIT 1;
     END IF;
 
-    SELECT id INTO p2 FROM products WHERE org_id = v_tenant AND sku = 'DEMO-PROD-002' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO p2 FROM products WHERE org_id = v_tenant AND sku = 'DEMO-PROD-002' AND archived_at IS NULL LIMIT 1;
     IF p2 IS NULL THEN
         INSERT INTO products (id, org_id, type, sku, name, description, unit, price, price_currency, cost_price, tax_rate, track_stock, is_active, tags)
         VALUES (uuid_generate_v5(v_tenant, 'pymes-seed/v1/product/2'), v_tenant, 'product', 'DEMO-PROD-002', 'Producto Demo B', 'Producto físico B', 'unit', 9500, 'ARS', 6000, 21, true, true, ARRAY['demo']);
-        SELECT id INTO p2 FROM products WHERE org_id = v_tenant AND sku = 'DEMO-PROD-002' AND deleted_at IS NULL LIMIT 1;
+        SELECT id INTO p2 FROM products WHERE org_id = v_tenant AND sku = 'DEMO-PROD-002' AND archived_at IS NULL LIMIT 1;
     END IF;
 
-    SELECT id INTO p3 FROM products WHERE org_id = v_tenant AND sku = 'DEMO-PROD-003' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO p3 FROM products WHERE org_id = v_tenant AND sku = 'DEMO-PROD-003' AND archived_at IS NULL LIMIT 1;
     IF p3 IS NULL THEN
         INSERT INTO products (id, org_id, type, sku, name, description, unit, price, price_currency, cost_price, tax_rate, track_stock, is_active, tags)
         VALUES (uuid_generate_v5(v_tenant, 'pymes-seed/v1/product/3'), v_tenant, 'product', 'DEMO-PROD-003', 'Producto Demo C', 'Producto físico C', 'unit', 7300, 'ARS', 4200, 21, true, true, ARRAY['demo']);
-        SELECT id INTO p3 FROM products WHERE org_id = v_tenant AND sku = 'DEMO-PROD-003' AND deleted_at IS NULL LIMIT 1;
+        SELECT id INTO p3 FROM products WHERE org_id = v_tenant AND sku = 'DEMO-PROD-003' AND archived_at IS NULL LIMIT 1;
     END IF;
 
-    SELECT id INTO svc1 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc1 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-001' AND archived_at IS NULL LIMIT 1;
     IF svc1 IS NULL THEN
         INSERT INTO services (id, org_id, code, name, description, category_code, sale_price, cost_price, tax_rate, currency, default_duration_minutes, is_active, tags, metadata)
         VALUES (uuid_generate_v5(v_tenant, 'pymes-seed/v1/product/4'), v_tenant, 'DEMO-SVC-001', 'Servicio Demo Instalación', 'Servicio de instalación', 'general', 25000, 12000, 21, 'ARS', 60, true, ARRAY['demo'], '{}'::jsonb);
-        SELECT id INTO svc1 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
+        SELECT id INTO svc1 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-001' AND archived_at IS NULL LIMIT 1;
     END IF;
 
-    SELECT id INTO svc2 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc2 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-002' AND archived_at IS NULL LIMIT 1;
     IF svc2 IS NULL THEN
         INSERT INTO services (id, org_id, code, name, description, category_code, sale_price, cost_price, tax_rate, currency, default_duration_minutes, is_active, tags, metadata)
         VALUES (uuid_generate_v5(v_tenant, 'pymes-seed/v1/product/5'), v_tenant, 'DEMO-SVC-002', 'Servicio Demo Mantenimiento', 'Servicio de mantenimiento', 'general', 12000, 7000, 21, 'ARS', 45, true, ARRAY['demo'], '{}'::jsonb);
-        SELECT id INTO svc2 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
+        SELECT id INTO svc2 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-002' AND archived_at IS NULL LIMIT 1;
     END IF;
 
-    SELECT id INTO svc3 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-003' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc3 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-003' AND archived_at IS NULL LIMIT 1;
     IF svc3 IS NULL THEN
         INSERT INTO services (id, org_id, code, name, description, category_code, sale_price, cost_price, tax_rate, currency, default_duration_minutes, is_active, tags, metadata)
         VALUES (uuid_generate_v5(v_tenant, 'pymes-seed/v1/product/6'), v_tenant, 'DEMO-SVC-003', 'Servicio Demo Express', 'Servicio rápido demo', 'general', 8500, 4000, 21, 'ARS', 30, true, ARRAY['demo'], '{}'::jsonb);
-        SELECT id INTO svc3 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-003' AND deleted_at IS NULL LIMIT 1;
+        SELECT id INTO svc3 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-003' AND archived_at IS NULL LIMIT 1;
     END IF;
 
     IF p1 IS NULL OR p2 IS NULL OR p3 IS NULL OR svc1 IS NULL OR svc2 IS NULL OR svc3 IS NULL THEN
@@ -126,7 +126,7 @@ BEGIN
     END IF;
 
     UPDATE products
-       SET deleted_at = COALESCE(deleted_at, now()),
+       SET archived_at = COALESCE(archived_at, now()),
            updated_at = now()
      WHERE org_id = v_tenant
        AND type = 'service'

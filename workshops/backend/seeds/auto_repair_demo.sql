@@ -24,7 +24,7 @@ BEGIN
     VALUES
         (srv1, v_tenant, 'SRV-OIL', 'Cambio de aceite y filtro', 'Servicio estandar', 'mantenimiento', 25000, 0, 21, 'ARS', 30, true, ARRAY['demo', 'workshops'], jsonb_build_object('vertical', 'workshops', 'segment', 'auto_repair')),
         (srv2, v_tenant, 'SRV-BRAKE', 'Revision de frenos', 'Inspeccion y ajuste', 'frenos', 45000, 0, 21, 'ARS', 90, true, ARRAY['demo', 'workshops'], jsonb_build_object('vertical', 'workshops', 'segment', 'auto_repair'))
-    ON CONFLICT (org_id, code) WHERE deleted_at IS NULL AND code IS NOT NULL AND code <> '' DO UPDATE
+    ON CONFLICT (org_id, code) WHERE archived_at IS NULL AND code IS NOT NULL AND code <> '' DO UPDATE
         SET name = EXCLUDED.name,
             description = EXCLUDED.description,
             category_code = EXCLUDED.category_code,

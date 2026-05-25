@@ -11,7 +11,7 @@ BEGIN
 
     INSERT INTO parties (
         id, org_id, party_type, display_name, email, phone, address,
-        tax_id, notes, tags, metadata, created_at, updated_at, deleted_at, is_favorite
+        tax_id, notes, tags, metadata, created_at, updated_at, archived_at, is_favorite
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/party/' || gs::text),
@@ -42,7 +42,7 @@ BEGIN
             tags = EXCLUDED.tags,
             metadata = EXCLUDED.metadata,
             updated_at = now(),
-            deleted_at = NULL,
+            archived_at = NULL,
             is_favorite = EXCLUDED.is_favorite;
 
     INSERT INTO party_persons (party_id, first_name, last_name)

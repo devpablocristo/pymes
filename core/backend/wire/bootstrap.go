@@ -7,10 +7,10 @@ import (
 	"os"
 	"strings"
 
-	googleoauth "github.com/devpablocristo/platform/sdks/google-calendar/go"
 	schedulingmodule "github.com/devpablocristo/platform/features/scheduling/go"
 	schedulinghttp "github.com/devpablocristo/platform/features/scheduling/go/httpgin"
 	schedulingpublichttp "github.com/devpablocristo/platform/features/scheduling/go/publichttpgin"
+	googleoauth "github.com/devpablocristo/platform/sdks/google-calendar/go"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -198,13 +198,13 @@ func InitializeApp() *app.App {
 		Scopes:       []string{googleoauth.ScopeCalendar},
 	})
 	calendarSyncUC := calendar_sync.NewUsecases(calendarSyncRepo, paymentGatewayCrypto, googleOAuthClient, calendar_sync.Config{})
-	whatsappAIClient := customerwhatsapp.NewAIClient(cfg.AIServiceURL, cfg.InternalServiceToken)
+	whatsappCompanionClient := customerwhatsapp.NewCompanionClient(cfg.CompanionInternalURL, cfg.InternalServiceToken)
 	whatsappMetaClient := customerwhatsapp.NewMetaClient(cfg.WhatsAppGraphAPIBaseURL)
 	customerMessagingUC := customer_messaging.NewUsecases(
 		customerMessagingRepo,
 		timelineUC,
 		cfg.FrontendURL,
-		whatsappAIClient,
+		whatsappCompanionClient,
 		whatsappMetaClient,
 		paymentGatewayCrypto,
 		cfg.WhatsAppWebhookVerifyToken,

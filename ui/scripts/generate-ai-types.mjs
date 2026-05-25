@@ -1,9 +1,8 @@
 // Genera tipos TypeScript a partir del openapi de Companion.
 //
-// Fuente: ../../companion/openapi.yaml (repo hermano en el monorepo local).
-// Si el archivo local no existe, intenta como fallback la URL configurable
-// PYMES_COMPANION_OPENAPI_URL — útil para CI donde companion puede no estar
-// montado en disco.
+// Fuente local preferida: ../axis/companion/openapi.yaml dentro del workspace
+// pablo. Conserva compat con el layout viejo ../companion/openapi.yaml y, si
+// no hay archivo local, intenta PYMES_COMPANION_OPENAPI_URL para CI.
 //
 // Output:
 //   src/generated/companion.openapi.yaml  (copia textual del schema)
@@ -21,7 +20,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const frontendRoot = resolve(__dirname, "..");
 const repoRoot = resolve(frontendRoot, "..");
 const ecosystemRoot = resolve(repoRoot, "..");
-const companionOpenapiLocal = resolve(ecosystemRoot, "companion", "openapi.yaml");
+const companionOpenapiCandidates = [
+  resolve(ecosystemRoot, "axis", "companion", "openapi.yaml"),
+  resolve(ecosystemRoot, "companion", "openapi.yaml"),
+];
 const outputDir = resolve(frontendRoot, "src", "generated");
 const schemaPath = resolve(outputDir, "companion.openapi.yaml");
 const typesPath = resolve(outputDir, "companion.openapi.ts");
@@ -30,7 +32,8 @@ const remoteUrl = process.env.PYMES_COMPANION_OPENAPI_URL;
 async function exportSchema() {
   mkdirSync(outputDir, { recursive: true });
 
-  if (existsSync(companionOpenapiLocal)) {
+  const companionOpenapiLocal = companionOpenapiCandidates.find((candidate) => existsSync(candidate));
+  if (companionOpenapiLocal) {
     const payload = readFileSync(companionOpenapiLocal, "utf-8");
     writeFileSync(schemaPath, payload.replace(/\r\n/g, "\n"), "utf-8");
     console.log(`schema: copied from ${companionOpenapiLocal}`);
@@ -49,7 +52,7 @@ async function exportSchema() {
   }
 
   throw new Error(
-    `companion openapi not found at ${companionOpenapiLocal} and PYMES_COMPANION_OPENAPI_URL is unset`,
+    `companion openapi not found at ${companionOpenapiCandidates.join(" or ")} and PYMES_COMPANION_OPENAPI_URL is unset`,
   );
 }
 

@@ -24,7 +24,7 @@ type Repository struct {
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 type ListParams struct {
-	OrgID  uuid.UUID
+	OrgID     uuid.UUID
 	Limit     int
 	After     *uuid.UUID
 	Search    string
@@ -37,7 +37,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]partydomain.Part
 
 	q := r.db.WithContext(ctx).
 		Model(&models.PartyModel{}).
-		Where("org_id = ? AND deleted_at IS NULL", p.OrgID)
+		Where("org_id = ? AND archived_at IS NULL", p.OrgID)
 
 	if v := strings.TrimSpace(p.PartyType); v != "" {
 		q = q.Where("party_type = ?", v)
@@ -91,7 +91,7 @@ func (r *Repository) Create(ctx context.Context, in partydomain.Party) (partydom
 		meta, _ := json.Marshal(defaultMap(in.Metadata))
 		row := models.PartyModel{
 			ID:          uuid.New(),
-			OrgID:    in.OrgID,
+			OrgID:       in.OrgID,
 			PartyType:   strings.TrimSpace(in.PartyType),
 			DisplayName: strings.TrimSpace(in.DisplayName),
 			Email:       strings.TrimSpace(in.Email),
@@ -139,7 +139,7 @@ func (r *Repository) Update(ctx context.Context, in partydomain.Party) (partydom
 		addr, _ := json.Marshal(in.Address)
 		meta, _ := json.Marshal(defaultMap(in.Metadata))
 		res := tx.Model(&models.PartyModel{}).
-			Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
+			Where("org_id = ? AND id = ? AND archived_at IS NULL", in.OrgID, in.ID).
 			Updates(map[string]any{
 				"party_type":   strings.TrimSpace(in.PartyType),
 				"display_name": strings.TrimSpace(in.DisplayName),
@@ -174,8 +174,8 @@ func (r *Repository) Update(ctx context.Context, in partydomain.Party) (partydom
 
 func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.PartyModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
-		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
+		Updates(map[string]any{"archived_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -235,7 +235,7 @@ func (r *Repository) CreateRelationship(ctx context.Context, in partydomain.Part
 	meta, _ := json.Marshal(defaultMap(in.Metadata))
 	row := models.PartyRelationshipModel{
 		ID:               uuid.New(),
-		OrgID:         in.OrgID,
+		OrgID:            in.OrgID,
 		FromPartyID:      in.FromPartyID,
 		ToPartyID:        in.ToPartyID,
 		RelationshipType: strings.TrimSpace(in.RelationshipType),
@@ -255,7 +255,7 @@ func (r *Repository) CreateRelationship(ctx context.Context, in partydomain.Part
 
 func getByIDWithTx(ctx context.Context, tx *gorm.DB, orgID, id uuid.UUID) (partydomain.Party, error) {
 	var row models.PartyModel
-	if err := tx.WithContext(ctx).Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).Take(&row).Error; err != nil {
+	if err := tx.WithContext(ctx).Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).Take(&row).Error; err != nil {
 		return partydomain.Party{}, err
 	}
 	parties, err := hydrateWithTx(ctx, tx, []models.PartyModel{row})
@@ -318,7 +318,7 @@ func loadRoles(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, ids []uuid.UUI
 		out[row.PartyID] = append(out[row.PartyID], partydomain.PartyRole{
 			ID:          row.ID,
 			PartyID:     row.PartyID,
-			OrgID:    row.OrgID,
+			OrgID:       row.OrgID,
 			Role:        row.Role,
 			IsActive:    row.IsActive,
 			PriceListID: row.PriceListID,
@@ -421,7 +421,7 @@ func createRoleWithTx(ctx context.Context, tx *gorm.DB, orgID, partyID uuid.UUID
 	row := models.PartyRoleModel{
 		ID:          uuid.New(),
 		PartyID:     partyID,
-		OrgID:    orgID,
+		OrgID:       orgID,
 		Role:        strings.TrimSpace(in.Role),
 		IsActive:    true,
 		PriceListID: in.PriceListID,
@@ -445,7 +445,7 @@ func relationshipRowsToDomain(rows []models.PartyRelationshipModel) []partydomai
 		}
 		out = append(out, partydomain.PartyRelationship{
 			ID:               row.ID,
-			OrgID:         row.OrgID,
+			OrgID:            row.OrgID,
 			FromPartyID:      row.FromPartyID,
 			ToPartyID:        row.ToPartyID,
 			RelationshipType: row.RelationshipType,
@@ -470,7 +470,7 @@ func toDomain(row models.PartyModel, roles []partydomain.PartyRole, person *part
 	}
 	return partydomain.Party{
 		ID:           row.ID,
-		OrgID:     row.OrgID,
+		OrgID:        row.OrgID,
 		PartyType:    row.PartyType,
 		DisplayName:  row.DisplayName,
 		Email:        row.Email,

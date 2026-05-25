@@ -2,7 +2,7 @@ import { createCrudKanbanTransitionModel } from '../modules/crud';
 
 /**
  * Fases del tablero Kanban de OT (macro-columnas) y etiquetas finas para badges.
- * Lógica idéntica a @devpablocristo/modules-work-orders/kanbanConfig.
+ * Lógica conservada del paquete legacy @devpablocristo/modules-work-orders.
  */
 
 export type WorkOrderKanbanPhase = 'wo_intake' | 'wo_quote' | 'wo_shop' | 'wo_exit' | 'wo_closed';

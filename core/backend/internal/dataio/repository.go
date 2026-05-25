@@ -110,7 +110,7 @@ func (r *Repository) ImportProducts(ctx context.Context, orgID uuid.UUID, rows [
 
 func importProductRow(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, row map[string]string, mode string, idx int, result *ImportResult) error {
 	return tx.WithContext(ctx).Transaction(func(sp *gorm.DB) error {
-		q := sp.Table("products").Select("id::text").Where("org_id = ? AND deleted_at IS NULL", orgID)
+		q := sp.Table("products").Select("id::text").Where("org_id = ? AND archived_at IS NULL", orgID)
 		sku := strings.TrimSpace(row["sku"])
 		name := strings.TrimSpace(row["name"])
 		switch {
@@ -168,7 +168,7 @@ func (r *Repository) ExportCustomers(ctx context.Context, orgID uuid.UUID) ([]st
 			COALESCE(array_to_string(p.tags, ','), '')
 		FROM parties p
 		JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'customer' AND pr.is_active = true
-		WHERE p.org_id = ? AND p.deleted_at IS NULL
+		WHERE p.org_id = ? AND p.archived_at IS NULL
 		ORDER BY p.created_at DESC
 	`, orgID)
 	return headers, rows, err
@@ -190,7 +190,7 @@ func (r *Repository) ExportProducts(ctx context.Context, orgID uuid.UUID) ([]str
 			COALESCE(array_to_string(tags, ','), ''),
 			COALESCE(array_to_string(image_urls, E'\n'), '')
 		FROM products
-		WHERE org_id = ? AND deleted_at IS NULL
+		WHERE org_id = ? AND archived_at IS NULL
 		ORDER BY created_at DESC
 	`, orgID)
 	return headers, rows, err
@@ -214,7 +214,7 @@ func (r *Repository) ExportSuppliers(ctx context.Context, orgID uuid.UUID) ([]st
 			COALESCE(array_to_string(p.tags, ','), '')
 		FROM parties p
 		JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'supplier' AND pr.is_active = true
-		WHERE p.org_id = ? AND p.deleted_at IS NULL
+		WHERE p.org_id = ? AND p.archived_at IS NULL
 		ORDER BY p.created_at DESC
 	`, orgID)
 	return headers, rows, err
@@ -269,7 +269,7 @@ func (r *Repository) findPartyByRole(ctx context.Context, tx *gorm.DB, orgID uui
 		Table("parties p").
 		Select("p.id::text").
 		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = ? AND pr.is_active = true", role).
-		Where("p.org_id = ? AND p.deleted_at IS NULL", orgID)
+		Where("p.org_id = ? AND p.archived_at IS NULL", orgID)
 	if strings.TrimSpace(taxID) != "" {
 		query = query.Where("p.tax_id = ?", strings.TrimSpace(taxID))
 	} else if strings.TrimSpace(email) != "" {
@@ -297,7 +297,7 @@ func createCustomerParty(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, row 
 	address, meta, tags := customerPartyData(row)
 	if err := tx.WithContext(ctx).Table("parties").Create(map[string]any{
 		"id":           partyID,
-		"org_id":    orgID,
+		"org_id":       orgID,
 		"party_type":   partyType,
 		"display_name": strings.TrimSpace(row["name"]),
 		"email":        strings.TrimSpace(row["email"]),
@@ -325,7 +325,7 @@ func createCustomerParty(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, row 
 func upsertCustomerParty(ctx context.Context, tx *gorm.DB, orgID, partyID uuid.UUID, row map[string]string) error {
 	partyType := customerPartyType(row["type"])
 	address, meta, tags := customerPartyData(row)
-	res := tx.WithContext(ctx).Table("parties").Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, partyID).Updates(map[string]any{
+	res := tx.WithContext(ctx).Table("parties").Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, partyID).Updates(map[string]any{
 		"party_type":   partyType,
 		"display_name": strings.TrimSpace(row["name"]),
 		"email":        strings.TrimSpace(row["email"]),
@@ -351,7 +351,7 @@ func createSupplierParty(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, row 
 	address, meta, roleMeta, tags := supplierPartyData(row)
 	if err := tx.WithContext(ctx).Table("parties").Create(map[string]any{
 		"id":           partyID,
-		"org_id":    orgID,
+		"org_id":       orgID,
 		"party_type":   "organization",
 		"display_name": strings.TrimSpace(row["name"]),
 		"email":        strings.TrimSpace(row["email"]),
@@ -382,7 +382,7 @@ func createSupplierParty(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, row 
 
 func upsertSupplierParty(ctx context.Context, tx *gorm.DB, orgID, partyID uuid.UUID, row map[string]string) error {
 	address, meta, roleMeta, tags := supplierPartyData(row)
-	res := tx.WithContext(ctx).Table("parties").Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, partyID).Updates(map[string]any{
+	res := tx.WithContext(ctx).Table("parties").Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, partyID).Updates(map[string]any{
 		"party_type":   "organization",
 		"display_name": strings.TrimSpace(row["name"]),
 		"email":        strings.TrimSpace(row["email"]),
@@ -443,7 +443,7 @@ func upsertProduct(ctx context.Context, tx *gorm.DB, orgID, id uuid.UUID, row ma
 	}
 	trackStock := parseBool(row["track_stock"], true)
 	urls, firstURL := splitImageURLsFromCSV(row)
-	return tx.WithContext(ctx).Table("products").Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).Updates(map[string]any{
+	return tx.WithContext(ctx).Table("products").Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).Updates(map[string]any{
 		"type":        defaultProductType(row["type"]),
 		"sku":         strings.TrimSpace(row["sku"]),
 		"name":        strings.TrimSpace(row["name"]),

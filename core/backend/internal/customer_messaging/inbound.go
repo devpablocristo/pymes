@@ -21,7 +21,7 @@ import (
 )
 
 type Connection struct {
-	OrgID      uuid.UUID
+	OrgID         uuid.UUID
 	PhoneNumberID string
 	WABAID        string
 	AccessToken   string
@@ -33,9 +33,11 @@ type TokenCrypto interface {
 	Decrypt(cipherText string) (string, error)
 }
 
-type AIClientPort interface {
-	ProcessWhatsApp(ctx context.Context, req InboundMessage) (AIMessageResponse, error)
+type CompanionClientPort interface {
+	ProcessWhatsApp(ctx context.Context, req InboundMessage) (CompanionMessageResponse, error)
 }
+
+type AIClientPort = CompanionClientPort
 
 type MetaClientPort interface {
 	SendTextMessage(ctx context.Context, phoneNumberID, accessToken, to, body string) (string, error)
@@ -46,7 +48,7 @@ type MetaClientPort interface {
 }
 
 type InboundMessage struct {
-	OrgID      uuid.UUID
+	OrgID         uuid.UUID
 	PhoneNumberID string
 	FromPhone     string
 	Text          string
@@ -59,12 +61,14 @@ type InboundResult struct {
 	Replied   int `json:"replied"`
 }
 
-type AIMessageResponse struct {
+type CompanionMessageResponse struct {
 	ConversationID string   `json:"conversation_id"`
 	Reply          string   `json:"reply"`
 	TokensUsed     int      `json:"tokens_used"`
 	ToolCalls      []string `json:"tool_calls"`
 }
+
+type AIMessageResponse = CompanionMessageResponse
 
 type InteractiveButtonPayload struct {
 	ID    string
@@ -176,8 +180,8 @@ func (u *Usecases) HandleInboundWebhook(ctx context.Context, payload []byte) (In
 	if len(messages) == 0 {
 		return InboundResult{}, nil
 	}
-	if u.ai == nil {
-		return InboundResult{}, domainerr.Unavailable("whatsapp ai bridge not configured")
+	if u.companion == nil {
+		return InboundResult{}, domainerr.Unavailable("whatsapp companion bridge not configured")
 	}
 	if u.meta == nil {
 		return InboundResult{}, domainerr.Unavailable("whatsapp delivery not configured")
@@ -205,7 +209,7 @@ func (u *Usecases) HandleInboundWebhook(ctx context.Context, payload []byte) (In
 				now := time.Now()
 				inboundMsg := domain.Message{
 					ID:             uuid.New(),
-					OrgID:       orgID,
+					OrgID:          orgID,
 					PhoneNumberID:  msg.PhoneNumberID,
 					Direction:      domain.DirectionInbound,
 					WAMessageID:    msg.MessageID,
@@ -228,7 +232,7 @@ func (u *Usecases) HandleInboundWebhook(ctx context.Context, payload []byte) (In
 			}
 		}
 
-		reply, err := u.ai.ProcessWhatsApp(ctx, msg)
+		reply, err := u.companion.ProcessWhatsApp(ctx, msg)
 		if err != nil {
 			return result, fmt.Errorf("process whatsapp message phone=%s msg=%s: %w", msg.PhoneNumberID, msg.MessageID, domainerr.UpstreamError("failed to process whatsapp message"))
 		}
@@ -250,7 +254,7 @@ func (u *Usecases) HandleInboundWebhook(ctx context.Context, payload []byte) (In
 			domainConn := domain.Connection{OrgID: orgID, PhoneNumberID: conn.PhoneNumberID}
 			outMsg := u.buildOutboundMessage(domainConn, orgID, inboundPartyID, msg.FromPhone, domain.TypeText, reply.Reply, waReplyID)
 			outMsg.ConversationID = convID
-			outMsg.CreatedBy = "ai"
+			outMsg.CreatedBy = "companion"
 			_ = u.repo.SaveMessage(ctx, outMsg)
 			replyPreview := reply.Reply
 			if len(replyPreview) > 100 {

@@ -19,7 +19,7 @@ func NewRepository(db *gorm.DB) *Repository {
 
 type confirmationModel struct {
 	ID           uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID     uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID        uuid.UUID `gorm:"type:uuid;index;not null"`
 	Actor        string    `gorm:"not null;default:''"`
 	CapabilityID string    `gorm:"not null;index"`
 	PayloadHash  string    `gorm:"not null"`
@@ -35,7 +35,7 @@ func (confirmationModel) TableName() string { return "agent_confirmations" }
 
 type idempotencyModel struct {
 	ID             uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID       uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID          uuid.UUID `gorm:"type:uuid;index;not null"`
 	Actor          string    `gorm:"not null;default:''"`
 	CapabilityID   string    `gorm:"not null;index"`
 	IdempotencyKey string    `gorm:"column:idempotency_key;not null;index"`
@@ -50,7 +50,7 @@ func (idempotencyModel) TableName() string { return "agent_idempotency_records" 
 
 type agentEventModel struct {
 	ID                string          `gorm:"column:id"`
-	OrgID          string          `gorm:"column:org_id"`
+	OrgID             string          `gorm:"column:org_id"`
 	ConversationID    *string         `gorm:"column:conversation_id"`
 	RequestID         *string         `gorm:"column:request_id"`
 	CapabilityID      *string         `gorm:"column:capability_id"`
@@ -79,7 +79,7 @@ func (r *Repository) CreateConfirmation(ctx context.Context, in Confirmation) (C
 	now := time.Now().UTC()
 	row := confirmationModel{
 		ID:           in.ID,
-		OrgID:     in.OrgID,
+		OrgID:        in.OrgID,
 		Actor:        in.Actor,
 		CapabilityID: in.CapabilityID,
 		PayloadHash:  in.PayloadHash,
@@ -108,9 +108,16 @@ func (r *Repository) GetConfirmation(ctx context.Context, orgID uuid.UUID, id uu
 
 func (r *Repository) MarkConfirmationUsed(ctx context.Context, orgID uuid.UUID, id uuid.UUID) error {
 	now := time.Now().UTC()
-	return r.db.WithContext(ctx).Model(&confirmationModel{}).
+	res := r.db.WithContext(ctx).Model(&confirmationModel{}).
 		Where("org_id = ? AND id = ? AND status = 'pending'", orgID, id).
-		Updates(map[string]any{"status": "used", "used_at": now}).Error
+		Updates(map[string]any{"status": "used", "used_at": now})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *Repository) GetIdempotencyRecord(ctx context.Context, orgID uuid.UUID, actor, capabilityID, key string) (IdempotencyRecord, bool, error) {
@@ -131,7 +138,7 @@ func (r *Repository) SaveIdempotencyRecord(ctx context.Context, in IdempotencyRe
 	now := time.Now().UTC()
 	row := idempotencyModel{
 		ID:             in.ID,
-		OrgID:       in.OrgID,
+		OrgID:          in.OrgID,
 		Actor:          in.Actor,
 		CapabilityID:   in.CapabilityID,
 		IdempotencyKey: in.IdempotencyKey,
@@ -172,7 +179,7 @@ func (r *Repository) ListAgentEvents(ctx context.Context, orgID uuid.UUID, limit
 func confirmationToDomain(row confirmationModel) Confirmation {
 	return Confirmation{
 		ID:           row.ID,
-		OrgID:     row.OrgID,
+		OrgID:        row.OrgID,
 		Actor:        row.Actor,
 		CapabilityID: row.CapabilityID,
 		PayloadHash:  row.PayloadHash,
@@ -188,7 +195,7 @@ func confirmationToDomain(row confirmationModel) Confirmation {
 func idempotencyToDomain(row idempotencyModel) IdempotencyRecord {
 	return IdempotencyRecord{
 		ID:             row.ID,
-		OrgID:       row.OrgID,
+		OrgID:          row.OrgID,
 		Actor:          row.Actor,
 		CapabilityID:   row.CapabilityID,
 		IdempotencyKey: row.IdempotencyKey,
@@ -207,7 +214,7 @@ func eventToDomain(row agentEventModel) AgentEvent {
 	}
 	return AgentEvent{
 		ID:              row.ID,
-		OrgID:        row.OrgID,
+		OrgID:           row.OrgID,
 		ConversationID:  row.ConversationID,
 		RequestID:       row.RequestID,
 		CapabilityID:    row.CapabilityID,

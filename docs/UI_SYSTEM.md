@@ -87,7 +87,7 @@ Bundler procesa los archivos como CSS separado — no hay render-blocking ni dep
 - Activación: clic en el botón con icono ☾/☀ del footer del sidebar (`<ThemeToggle />`).
 - Persistencia: `localStorage('pymes-ui:pymes:theme')`.
 - Fallback inicial: `prefers-color-scheme`.
-- Implementación: el theme manager (`@devpablocristo/core-browser/theme`, instanciado en `ui/src/lib/theme.ts`) setea `data-theme="light|dark"` en `<html>`.
+- Implementación: el theme manager (`@devpablocristo/platform-browser/theme`, instanciado en `ui/src/lib/theme.ts`) setea `data-theme="light|dark"` en `<html>`.
 - El sidebar respeta los tokens dark via override explícito en `shell-sidebar.css` (`background: var(--color-sidebar) !important`) — la lib externa hardcodeaba blanco.
 
 Para forzar el tema desde DevTools:
@@ -239,5 +239,5 @@ Si encontrás un componente roto post-migración:
 
 - Plan canónico: `.claude/plans/tengo-un-bug-en-melodic-river.md`
 - Helper diff: `scripts/wooko-diff.sh`
-- Theme manager: `@devpablocristo/core-browser/theme` (instancia en `ui/src/lib/theme.ts`)
+- Theme manager: `@devpablocristo/platform-browser/theme` (instancia en `ui/src/lib/theme.ts`)
 - I18n keys del toggle: `shell.theme.light` / `shell.theme.dark` en `ui/src/lib/i18n/messages/shell.ts`

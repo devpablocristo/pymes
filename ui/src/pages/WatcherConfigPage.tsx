@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { useSearch } from '@devpablocristo/platform-search';
-import { listWatchers, updateWatcher, type WatcherResponse } from '../lib/governanceApi';
+import { getSession } from '../lib/api';
+import { createWatcher, listWatchers, updateWatcher, type WatcherResponse } from '../lib/aiApi';
 import { queryKeys } from '../lib/queryKeys';
 import './WatcherConfigPage.css';
 
@@ -30,7 +31,7 @@ const WATCHER_TEMPLATES: WatcherTemplate[] = [
     hasThreshold: true,
   },
   {
-    watcherType: 'unconfirmed_bookings',
+    watcherType: 'unconfirmed_appointments',
     name: 'Recordar turnos no confirmados',
     description: 'Envia recordatorio el dia anterior al turno si no fue confirmado',
     thresholdKey: 'hours_before_booking',
@@ -74,6 +75,7 @@ const WATCHER_TEMPLATES: WatcherTemplate[] = [
 interface WatcherState {
   enabled: boolean;
   threshold: number;
+  config?: Record<string, unknown>;
   watcherId?: string;
   lastRunAt?: string | null;
   lastResult?: { found: number; proposed: number; executed: number } | null;
@@ -83,9 +85,15 @@ export default function WatcherConfigPage() {
   const [watchers, setWatchers] = useState<Record<string, WatcherState>>({});
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const queryClient = useQueryClient();
+  const sessionQuery = useQuery({
+    queryKey: queryKeys.session.current,
+    queryFn: () => getSession(),
+  });
+  const orgID = sessionQuery.data?.auth.org_id || sessionQuery.data?.tenant?.id || '';
   const watchersQuery = useQuery({
-    queryKey: queryKeys.governance.watchers,
-    queryFn: listWatchers,
+    queryKey: [...queryKeys.governance.watchers, orgID],
+    queryFn: () => listWatchers(orgID),
+    enabled: Boolean(orgID),
     retry: false,
   });
 
@@ -94,10 +102,13 @@ export default function WatcherConfigPage() {
     for (const tpl of WATCHER_TEMPLATES) {
       const match = (items ?? []).find((w) => w.watcher_type === tpl.watcherType);
       if (match) {
-        const config = (match.config || {}) as Record<string, number>;
+        const config = match.config || {};
+        const rawThreshold = config[tpl.thresholdKey];
+        const threshold = typeof rawThreshold === 'number' ? rawThreshold : tpl.defaultThreshold;
         state[tpl.watcherType] = {
           enabled: match.enabled,
-          threshold: config[tpl.thresholdKey] ?? tpl.defaultThreshold,
+          threshold,
+          config: match.config || {},
           watcherId: match.id,
           lastRunAt: match.last_run_at,
           lastResult: match.last_result,
@@ -120,13 +131,24 @@ export default function WatcherConfigPage() {
     mutationFn: async (draft: Record<string, WatcherState>) => {
       for (const tpl of WATCHER_TEMPLATES) {
         const state = draft[tpl.watcherType];
-        if (!state || !state.watcherId) continue;
-        await updateWatcher(state.watcherId, { [tpl.thresholdKey]: state.threshold }, state.enabled);
+        if (!state || !orgID) continue;
+        const config = { ...(state.config ?? {}), [tpl.thresholdKey]: state.threshold };
+        if (state.watcherId) {
+          await updateWatcher(state.watcherId, config, state.enabled);
+          continue;
+        }
+        await createWatcher({
+          org_id: orgID,
+          name: tpl.name,
+          watcher_type: tpl.watcherType,
+          config,
+          enabled: state.enabled,
+        });
       }
     },
     onSuccess: async () => {
       setStatusMsg({ text: 'Configuracion guardada', type: 'success' });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.governance.watchers });
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.governance.watchers, orgID] });
     },
     onError: () => {
       setStatusMsg({ text: 'Error al guardar', type: 'error' });
@@ -158,7 +180,7 @@ export default function WatcherConfigPage() {
   const wTextFn = useCallback((tpl: WatcherTemplate) => `${tpl.name} ${tpl.description} ${tpl.watcherType}`, []);
   const filteredWatchers = useSearch(WATCHER_TEMPLATES, wTextFn, wSearch);
 
-  if (watchersQuery.isLoading) {
+  if (sessionQuery.isLoading || watchersQuery.isLoading) {
     return (
       <PageLayout
         className="watcher-config-page"
@@ -166,6 +188,20 @@ export default function WatcherConfigPage() {
         lead="Activá alertas y umbrales; se aplican según la configuración del motor de revisión."
       >
         <div className="loading">Cargando configuración...</div>
+      </PageLayout>
+    );
+  }
+
+  if (!orgID) {
+    return (
+      <PageLayout
+        className="watcher-config-page"
+        title="Monitores automáticos"
+        lead="Activá alertas y umbrales; se aplican según la configuración del motor de revisión."
+      >
+        <p className="status-msg error" role="alert">
+          No se pudo resolver la organización activa.
+        </p>
       </PageLayout>
     );
   }

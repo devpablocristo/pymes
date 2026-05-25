@@ -48,7 +48,7 @@ type Config struct {
 	SchedulerSecret                  string
 	ExchangeRateProvider             string
 	InternalServiceToken             string
-	AIServiceURL                     string
+	CompanionInternalURL             string
 	GovernanceCallbackToken          string
 	GovernanceSyncInterval           time.Duration
 	WhatsAppWebhookVerifyToken       string
@@ -105,9 +105,10 @@ func LoadFromEnv() Config {
 		SchedulerSecret:       envconfig.Get("SCHEDULER_SECRET", ""),
 		ExchangeRateProvider:  envconfig.Get("EXCHANGE_RATE_PROVIDER", "manual"),
 		InternalServiceToken:  strings.TrimSpace(envconfig.Get("INTERNAL_SERVICE_TOKEN", localInternalServiceToken)),
-		// AI_SERVICE_URL apunta al endpoint interno de Companion para mensajes entrantes.
-		// Default vacío → AIClient.ProcessWhatsApp devuelve "ai service url not configured".
-		AIServiceURL:                     envconfig.Get("AI_SERVICE_URL", ""),
+		// COMPANION_INTERNAL_URL apunta al endpoint interno de Axis Companion para mensajes entrantes.
+		// AI_SERVICE_URL queda como alias legacy para ambientes no migrados.
+		// Default vacío -> CompanionClient.ProcessWhatsApp devuelve error de configuracion claro.
+		CompanionInternalURL:             envconfig.Get("COMPANION_INTERNAL_URL", envconfig.Get("AI_SERVICE_URL", "")),
 		GovernanceCallbackToken:          envconfig.Get("GOVERNANCE_CALLBACK_TOKEN", ""),
 		GovernanceSyncInterval:           envconfig.Duration("GOVERNANCE_SYNC_INTERVAL_SECONDS", 30*time.Second),
 		WhatsAppWebhookVerifyToken:       envconfig.Get("WHATSAPP_WEBHOOK_VERIFY_TOKEN", ""),

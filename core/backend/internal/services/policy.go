@@ -1,8 +1,8 @@
 // Package services — Ola C step 8.
 //
 // ArchivePolicy for services. See pricelists/policy.go for the canonical
-// pattern documentation. ArchivedAtColumn remains "deleted_at" in the
-// services table (rename to archived_at is a future coordinated migration).
+// pattern documentation. The services table uses archived_at as the canonical
+// archive column after migration 0020.
 package services
 
 import lifecycle "github.com/devpablocristo/platform/lifecycle/go/lifecycle"

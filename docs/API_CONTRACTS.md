@@ -2,7 +2,7 @@
 
 ## Capabilities
 
-`core` publica el contrato canonico en `/v1/agent/*`. `ai/` y MCP deben consumir ese catalogo en vez de duplicar tools hardcodeadas.
+`core` publica el contrato canonico en `/v1/agent/*` y el manifest en `/v1/agent/manifest`. Axis Companion y MCP deben consumir ese catalogo en vez de duplicar tools hardcodeadas.
 
 ## Idempotencia
 
@@ -10,7 +10,7 @@ Las escrituras gobernadas requieren `Idempotency-Key`.
 
 La clave se guarda por:
 
-- `tenant_id`
+- `org_id`
 - `actor`
 - `capability_id`
 - `idempotency_key`
@@ -31,4 +31,3 @@ Los endpoints agentic devuelven errores con:
 ```
 
 Codigos importantes: `confirmation_required`, `review_unavailable`, `signature_required`, `idempotency_key_required`, `executor_not_registered`.
-

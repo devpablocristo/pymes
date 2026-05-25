@@ -26,7 +26,7 @@ type RepositoryPort interface {
 
 type GovernanceClient interface {
 	SubmitRequestForTenant(ctx context.Context, orgID, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
-	GetRequest(ctx context.Context, id string) (governanceclient.RequestSummary, int, error)
+	GetRequestForTenant(ctx context.Context, orgID, id string) (governanceclient.RequestSummary, int, error)
 }
 
 type AuditPort interface {
@@ -96,7 +96,7 @@ func (u *Usecases) CreateConfirmation(ctx context.Context, in CreateConfirmation
 		return ConfirmationOutput{}, agentError(http.StatusBadRequest, "invalid_expiration", "expires_at debe estar en el futuro")
 	}
 	out, err := u.repo.CreateConfirmation(ctx, Confirmation{
-		OrgID:     orgID,
+		OrgID:        orgID,
 		Actor:        strings.TrimSpace(in.Auth.Actor),
 		CapabilityID: capability.ID,
 		PayloadHash:  payloadHash,
@@ -243,8 +243,10 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 		}
 	}
 
+	confirmation := Confirmation{}
 	if capability.RequiresConfirmation {
-		if err := u.validateConfirmation(ctx, orgID, strings.TrimSpace(in.Auth.Actor), capability, payloadHash, in.ConfirmationID); err != nil {
+		confirmation, err = u.validateConfirmation(ctx, orgID, strings.TrimSpace(in.Auth.Actor), capability, payloadHash, in.ConfirmationID, strings.TrimSpace(in.ReviewRequestID) != "")
+		if err != nil {
 			return ExecuteResult{}, err
 		}
 	}
@@ -286,6 +288,9 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 			reviewDecision = resp.Decision
 			reviewStatus = resp.Status
 			if !reviewAllows(resp.Decision, resp.Status) {
+				if err := u.markConfirmationUsed(ctx, orgID, confirmation); err != nil {
+					return ExecuteResult{}, err
+				}
 				output := ExecuteOutput{
 					Status:          "pending_review",
 					CapabilityID:    capability.ID,
@@ -308,6 +313,48 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 				u.logExecution(ctx, in.Auth, capability, payloadHash, "agent.action.pending_review", reviewRequestID, idempotencyKey)
 				return ExecuteResult{StatusCode: http.StatusAccepted, Output: output}, nil
 			}
+			if err := u.markConfirmationUsed(ctx, orgID, confirmation); err != nil {
+				return ExecuteResult{}, err
+			}
+		} else {
+			review, status, err := u.review.GetRequestForTenant(ctx, orgID.String(), reviewRequestID)
+			if err != nil {
+				return ExecuteResult{}, err
+			}
+			if status != http.StatusOK {
+				return ExecuteResult{}, agentError(http.StatusConflict, "review_not_verified", "Nexus Governance no pudo verificar la approval")
+			}
+			reviewDecision = review.Decision
+			reviewStatus = review.Status
+			if !reviewAllows(review.Decision, review.Status) {
+				output := ExecuteOutput{
+					Status:          "pending_review",
+					CapabilityID:    capability.ID,
+					PayloadHash:     payloadHash,
+					IdempotencyKey:  idempotencyKey,
+					ConfirmationID:  strings.TrimSpace(in.ConfirmationID),
+					ReviewRequestID: reviewRequestID,
+					ReviewDecision:  reviewDecision,
+					ReviewStatus:    reviewStatus,
+					ExecutorStatus:  capability.ExecutorStatus,
+					Message:         "Nexus Governance todavia no aprobo esta accion.",
+					Requirements: map[string]any{
+						"review":       true,
+						"confirmation": capability.RequiresConfirmation,
+					},
+				}
+				if err := u.saveIdempotency(ctx, orgID, in.Auth.Actor, capability.ID, idempotencyKey, payloadHash, http.StatusAccepted, output); err != nil {
+					return ExecuteResult{}, err
+				}
+				return ExecuteResult{StatusCode: http.StatusAccepted, Output: output}, nil
+			}
+			if err := u.markConfirmationUsed(ctx, orgID, confirmation); err != nil {
+				return ExecuteResult{}, err
+			}
+		}
+	} else if capability.RequiresConfirmation {
+		if err := u.markConfirmationUsed(ctx, orgID, confirmation); err != nil {
+			return ExecuteResult{}, err
 		}
 	}
 
@@ -338,29 +385,42 @@ func (u *Usecases) ListEvents(ctx context.Context, auth ActorContext, limit int,
 	return u.repo.ListAgentEvents(ctx, orgID, limit, strings.TrimSpace(capabilityID), strings.TrimSpace(requestID))
 }
 
-func (u *Usecases) validateConfirmation(ctx context.Context, orgID uuid.UUID, actor string, capability Capability, payloadHash, rawID string) error {
+func (u *Usecases) validateConfirmation(ctx context.Context, orgID uuid.UUID, actor string, capability Capability, payloadHash, rawID string, allowUsed bool) (Confirmation, error) {
 	if strings.TrimSpace(rawID) == "" {
-		return agentError(http.StatusPreconditionRequired, "confirmation_required", "confirmation_id requerido")
+		return Confirmation{}, agentError(http.StatusPreconditionRequired, "confirmation_required", "confirmation_id requerido")
 	}
 	id, err := uuid.Parse(strings.TrimSpace(rawID))
 	if err != nil {
-		return agentError(http.StatusBadRequest, "invalid_confirmation", "confirmation_id invalido")
+		return Confirmation{}, agentError(http.StatusBadRequest, "invalid_confirmation", "confirmation_id invalido")
 	}
 	conf, err := u.repo.GetConfirmation(ctx, orgID, id)
 	if err != nil {
-		return agentError(http.StatusNotFound, "confirmation_not_found", "confirmacion no encontrada")
+		return Confirmation{}, agentError(http.StatusNotFound, "confirmation_not_found", "confirmacion no encontrada")
 	}
 	if conf.Actor != actor {
-		return agentError(http.StatusForbidden, "confirmation_actor_mismatch", "confirmacion creada por otro actor")
+		return Confirmation{}, agentError(http.StatusForbidden, "confirmation_actor_mismatch", "confirmacion creada por otro actor")
 	}
 	if conf.CapabilityID != capability.ID {
-		return agentError(http.StatusConflict, "confirmation_capability_mismatch", "confirmacion no corresponde a la capability")
+		return Confirmation{}, agentError(http.StatusConflict, "confirmation_capability_mismatch", "confirmacion no corresponde a la capability")
 	}
-	if conf.Status != "pending" || time.Now().UTC().After(conf.ExpiresAt) {
-		return agentError(http.StatusConflict, "confirmation_expired_or_used", "confirmacion expirada o usada")
+	if time.Now().UTC().After(conf.ExpiresAt) {
+		return Confirmation{}, agentError(http.StatusConflict, "confirmation_expired_or_used", "confirmacion expirada o usada")
+	}
+	if conf.Status != "pending" && !(allowUsed && conf.Status == "used") {
+		return Confirmation{}, agentError(http.StatusConflict, "confirmation_expired_or_used", "confirmacion expirada o usada")
 	}
 	if conf.PayloadHash != payloadHash {
-		return agentError(http.StatusConflict, "confirmation_payload_mismatch", "payload no coincide con la confirmacion")
+		return Confirmation{}, agentError(http.StatusConflict, "confirmation_payload_mismatch", "payload no coincide con la confirmacion")
+	}
+	return conf, nil
+}
+
+func (u *Usecases) markConfirmationUsed(ctx context.Context, orgID uuid.UUID, conf Confirmation) error {
+	if conf.ID == uuid.Nil || conf.Status == "used" {
+		return nil
+	}
+	if err := u.repo.MarkConfirmationUsed(ctx, orgID, conf.ID); err != nil {
+		return agentError(http.StatusConflict, "confirmation_expired_or_used", "confirmacion expirada o usada")
 	}
 	return nil
 }
@@ -374,7 +434,7 @@ func (u *Usecases) saveIdempotency(ctx context.Context, orgID uuid.UUID, actor, 
 		return err
 	}
 	return u.repo.SaveIdempotencyRecord(ctx, IdempotencyRecord{
-		OrgID:       orgID,
+		OrgID:          orgID,
 		Actor:          strings.TrimSpace(actor),
 		CapabilityID:   capabilityID,
 		IdempotencyKey: strings.TrimSpace(key),

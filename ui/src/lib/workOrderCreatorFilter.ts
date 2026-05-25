@@ -1,7 +1,6 @@
 /**
  * Filtro por `created_by` (creador del registro).
- * Lógica idéntica a @devpablocristo/modules-work-orders/creatorFilter
- * pero sin importar del módulo para evitar problemas de resolución en Docker.
+ * Lógica conservada del paquete legacy @devpablocristo/modules-work-orders.
  */
 
 export type CreatorFilterState =

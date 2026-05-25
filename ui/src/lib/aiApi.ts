@@ -102,3 +102,41 @@ export async function createInsightNotifications(payload?: {
 }): Promise<InsightNotificationsResponse> {
   return apiRequest('/v1/notifications', companionOptions({ method: 'POST', body: payload ?? {} }));
 }
+
+export interface WatcherResponse {
+  id: string;
+  org_id: string;
+  name: string;
+  watcher_type: string;
+  config: Record<string, unknown>;
+  enabled: boolean;
+  last_run_at?: string | null;
+  last_result?: { found: number; proposed: number; executed: number } | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateWatcherRequest {
+  org_id: string;
+  name: string;
+  watcher_type: string;
+  config: Record<string, unknown>;
+  enabled: boolean;
+}
+
+export async function listWatchers(orgID: string): Promise<{ watchers: WatcherResponse[] }> {
+  const params = new URLSearchParams({ org_id: orgID });
+  return apiRequest(`/v1/watchers?${params.toString()}`, companionOptions());
+}
+
+export async function createWatcher(payload: CreateWatcherRequest): Promise<WatcherResponse> {
+  return apiRequest('/v1/watchers', companionOptions({ method: 'POST', body: payload }));
+}
+
+export async function updateWatcher(
+  id: string,
+  config: Record<string, unknown>,
+  enabled: boolean,
+): Promise<WatcherResponse> {
+  return apiRequest(`/v1/watchers/${id}`, companionOptions({ method: 'PATCH', body: { config, enabled } }));
+}

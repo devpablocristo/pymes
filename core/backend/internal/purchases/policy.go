@@ -5,8 +5,8 @@
 // hard-delete. State transitions continue to be enforced by
 // fsm.MapDomainError inside UpdateStatus.
 //
-// ArchivedAtColumn remains "deleted_at" in the purchases table (rename to
-// archived_at is a future coordinated migration).
+// The purchases table uses archived_at as the canonical archive column after
+// migration 0020.
 package purchases
 
 import lifecycle "github.com/devpablocristo/platform/lifecycle/go/lifecycle"

@@ -74,7 +74,7 @@ type Usecases struct {
 	repo               RepositoryPort
 	timeline           TimelinePort
 	frontendURL        string
-	ai                 AIClientPort
+	companion          CompanionClientPort
 	meta               MetaClientPort
 	tokenCrypto        TokenCrypto
 	webhookVerifyToken string
@@ -110,12 +110,12 @@ type Result struct {
 	Message      string              `json:"message"`
 }
 
-func NewUsecases(repo RepositoryPort, timeline TimelinePort, frontendURL string, ai AIClientPort, meta MetaClientPort, tokenCrypto TokenCrypto, webhookVerifyToken, webhookAppSecret string) *Usecases {
+func NewUsecases(repo RepositoryPort, timeline TimelinePort, frontendURL string, companion CompanionClientPort, meta MetaClientPort, tokenCrypto TokenCrypto, webhookVerifyToken, webhookAppSecret string) *Usecases {
 	return &Usecases{
 		repo:               repo,
 		timeline:           timeline,
 		frontendURL:        strings.TrimRight(strings.TrimSpace(frontendURL), "/"),
-		ai:                 ai,
+		companion:          companion,
 		meta:               meta,
 		tokenCrypto:        tokenCrypto,
 		webhookVerifyToken: strings.TrimSpace(webhookVerifyToken),
@@ -222,7 +222,7 @@ func (u *Usecases) Connect(ctx context.Context, orgID uuid.UUID, phoneNumberID, 
 	}
 
 	conn := domain.Connection{
-		OrgID:           orgID,
+		OrgID:              orgID,
 		PhoneNumberID:      strings.TrimSpace(phoneNumberID),
 		WABAID:             strings.TrimSpace(wabaID),
 		AccessToken:        encryptedToken,
@@ -506,7 +506,7 @@ func (u *Usecases) resolvePartyForSend(ctx context.Context, orgID, partyID uuid.
 func (u *Usecases) buildOutboundMessage(conn domain.Connection, orgID uuid.UUID, partyID *uuid.UUID, phone string, msgType domain.MessageType, body, waMessageID string) domain.Message {
 	return domain.Message{
 		ID:            uuid.New(),
-		OrgID:      orgID,
+		OrgID:         orgID,
 		PhoneNumberID: conn.PhoneNumberID,
 		Direction:     domain.DirectionOutbound,
 		WAMessageID:   waMessageID,

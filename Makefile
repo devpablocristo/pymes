@@ -2,7 +2,7 @@
 # Verificación preferida: targets `*-docker-*`; `build` y `test` quedan como respaldo nativo.
 .PHONY: \
 	up down ps logs \
-	go-compile staticcheck ruff lint \
+	go-compile staticcheck ruff lint companion-openapi-check \
 	audit audit-baseline audit-crud audit-crud-json audit-crud-strict audit-debt audit-governance ui-typecheck ai-test \
 	seed seed-clear seed-clear-verify seed-verify seed-reset modules-check cleanup-pablo e2e-governance-notifications \
 	build-docker-ui test-docker-ui lint-docker-ui test-docker-core test-docker-workshops \
@@ -47,18 +47,19 @@ go-compile:
 # Análisis estático Go (código muerto U1000, imports duplicados, etc.); versión alineada con go.mod
 staticcheck:
 	$(GO_PRIVATE) go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 $(GO_PACKAGES)
-# Lint Python del servicio AI (ruff en ai/src); requiere `pip install -r ai/requirements-dev.txt` o ruff en PATH
-ruff:
-	cd ai && (test -x .venv/bin/ruff && .venv/bin/ruff check src || ruff check src || python3 -m ruff check src)
 
-# Go staticcheck + ruff AI
-lint: staticcheck ruff
+# Alias historico: el servicio `pymes/ai` fue retirado; el runtime IA vive en Axis Companion.
+ruff:
+	@echo "pymes/ai retirado; ejecutar checks de IA en ../axis/companion"
+
+# Go staticcheck del monorepo Pymes.
+lint: staticcheck
 
 # Auditorias de saneamiento arquitectural: no cambian comportamiento productivo.
 audit: audit-crud audit-debt audit-governance
 
 # Baseline reproducible antes de refactors estructurales.
-audit-baseline: go-compile audit ui-typecheck ruff ai-test
+audit-baseline: go-compile audit ui-typecheck companion-openapi-check
 
 audit-crud:
 	@python3 scripts/audit/crud_contract.py
@@ -78,8 +79,11 @@ audit-governance:
 ui-typecheck:
 	cd ui && npm run typecheck
 
+companion-openapi-check:
+	cd ui && npm run generate:ai-types
+
 ai-test:
-	cd ai && (test -x .venv/bin/pytest && .venv/bin/pytest -q || pytest -q)
+	@echo "pymes/ai retirado; ejecutar tests de IA en ../axis/companion"
 
 # Seeds y utilidades
 
@@ -163,7 +167,7 @@ test-docker-workshops:
 
 # Respaldo nativo
 
-# Compila backends Go + build del frontend + chequeo básico del servicio AI (nativo en host)
+# Compila backends Go + build del frontend. Companion se valida en el repo Axis.
 build:
 	cd core/backend && $(GO_PRIVATE) go build ./...
 	cd professionals/backend && $(GO_PRIVATE) go build ./...
@@ -171,9 +175,8 @@ build:
 	cd beauty/backend && $(GO_PRIVATE) go build ./...
 	cd restaurants/backend && $(GO_PRIVATE) go build ./...
 	cd ui && npm run build
-	cd ai && _pc=$$(mktemp -d) && export PYTHONPYCACHEPREFIX=$$_pc && (test -x .venv/bin/python && .venv/bin/python -m compileall -q src || python3 -m compileall -q src); _e=$$?; rm -rf $$_pc; exit $$_e
 
-# Tests (Go en core + professionals + workshops + beauty + restaurants + ui + AI)
+# Tests (Go en core + professionals + workshops + beauty + restaurants + ui)
 test:
 	cd core/backend && $(GO_PRIVATE) go test ./...
 	cd professionals/backend && $(GO_PRIVATE) go test ./...
@@ -181,8 +184,6 @@ test:
 	cd beauty/backend && $(GO_PRIVATE) go test ./...
 	cd restaurants/backend && $(GO_PRIVATE) go test ./...
 	cd ui && npm test
-	@$(MAKE) ruff
-	cd ai && (test -x .venv/bin/pytest && .venv/bin/pytest -q || pytest -q)
 
 # E2E UI (Playwright / Chromium)
 test-ui-e2e:

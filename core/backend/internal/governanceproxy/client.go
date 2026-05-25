@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
 	"github.com/devpablocristo/platform/http/go/httpclient"
+	"github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
 )
 
 // Client wraps core/governance/go. Product code only passes tenant IDs; this
@@ -59,6 +59,24 @@ func (c *Client) SubmitRequestForTenant(ctx context.Context, tenantID, idempoten
 
 func (c *Client) SimulateRequestForTenant(ctx context.Context, tenantID string, body governanceclient.SimulateRequestBody) (governanceclient.SimulateResponse, error) {
 	return c.core.SimulateRequest(ctx, body, governanceclient.WithOrgID(strings.TrimSpace(tenantID)))
+}
+
+func (c *Client) GetRequestForTenant(ctx context.Context, tenantID, id string) (governanceclient.RequestSummary, int, error) {
+	var out governanceclient.RequestSummary
+	st, raw, err := c.caller.DoJSON(ctx, http.MethodGet, "/v1/requests/"+strings.TrimSpace(id), nil, nexusTenantScopeOpts(tenantID)...)
+	if err != nil {
+		return out, 0, fmt.Errorf("governance get request: %w", err)
+	}
+	if st == http.StatusNotFound {
+		return out, st, nil
+	}
+	if st != http.StatusOK {
+		return out, st, fmt.Errorf("governance get request: status %d body %s", st, governanceclient.ParseErrorBody(raw))
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return out, st, fmt.Errorf("decode get response: %w", err)
+	}
+	return out, st, nil
 }
 
 func (c *Client) ListPoliciesForTenant(ctx context.Context, tenantID string) (int, []byte, error) {

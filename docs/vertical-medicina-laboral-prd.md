@@ -6,7 +6,7 @@ Documento de referencia para diseñar e implementar una **versión nueva** dentr
 
 ## 1. Objetivo
 
-- Ofrecer a clientes PyME y prestadores una **consola** para gestionar **trabajadores**, **turnos**, **exámenes y prestaciones**, **ausentismos**, **accidentes** e **historia clínica laboral**, con **permisos por rol**, **trazabilidad** y **capacidades de IA** acopladas al servicio `ai/` (FastAPI).
+- Ofrecer a clientes PyME y prestadores una **consola** para gestionar **trabajadores**, **turnos**, **exámenes y prestaciones**, **ausentismos**, **accidentes** e **historia clínica laboral**, con **permisos por rol**, **trazabilidad** y **capacidades de IA** acopladas a Axis Companion.
 - Integrarse con las reglas del repo: **hexagonal en Go**, **sin duplicar** lo que ya cubre `core`, **UI en español**, **código en inglés**.
 
 ---
@@ -77,7 +77,7 @@ Cada implementación debe listar explícitamente (convención del repo):
 - **Citas / appointments** si el modelo coincide con turnos (validar con dominio).
 - **Clientes / terceros** si “empresa contratante” encaja en el party model existente.
 - **Facturación / cobros** solo si el vertical no redefine cobro propio; revisar `core` y documentación de fraude/auditoría.
-- **IA**: invocación vía servicio `ai/` con políticas de datos y logs.
+- **IA**: invocación vía Axis Companion con políticas de datos y logs.
 
 ### 4.2 Nuevo en el vertical (delta de dominio)
 
@@ -86,7 +86,7 @@ Cada implementación debe listar explícitamente (convención del repo):
 
 ---
 
-## 5. IA (servicio `ai/`)
+## 5. IA (Axis Companion)
 
 Capacidades orientativas (sujetas a cumplimiento y consentimiento):
 

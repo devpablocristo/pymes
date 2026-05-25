@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -47,6 +48,7 @@ type repositoryPort interface {
 type governancePort interface {
 	SimulateRequestForTenant(ctx context.Context, orgID string, body governanceclient.SimulateRequestBody) (governanceclient.SimulateResponse, error)
 	SubmitRequestForTenant(ctx context.Context, orgID, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
+	GetRequestForTenant(ctx context.Context, orgID, id string) (governanceclient.RequestSummary, int, error)
 	ListPoliciesForTenant(ctx context.Context, orgID string) (int, []byte, error)
 	GetPolicyForTenant(ctx context.Context, orgID, id string) (int, []byte, error)
 	CreatePolicyForTenant(ctx context.Context, orgID string, body any) (int, []byte, error)
@@ -93,7 +95,7 @@ func NewUsecases(
 }
 
 type CreateInput struct {
-	OrgID       uuid.UUID
+	OrgID          uuid.UUID
 	Actor          string
 	Title          string
 	Description    string
@@ -121,7 +123,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (domain.Procureme
 	}
 	req := domain.ProcurementRequest{
 		ID:             uuid.New(),
-		OrgID:       in.OrgID,
+		OrgID:          in.OrgID,
 		RequesterActor: actor,
 		Title:          strings.TrimSpace(in.Title),
 		Description:    strings.TrimSpace(in.Description),
@@ -147,7 +149,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (domain.Procureme
 }
 
 type UpdateInput struct {
-	OrgID       uuid.UUID
+	OrgID          uuid.UUID
 	ID             uuid.UUID
 	Actor          string
 	Title          string
@@ -261,7 +263,7 @@ func procurementSubmitParams(req domain.ProcurementRequest, total float64) map[s
 		"estimated_total": total,
 		"category":        req.Category,
 		"currency":        req.Currency,
-		"org_id":       req.OrgID.String(),
+		"org_id":          req.OrgID.String(),
 	}
 }
 
@@ -386,15 +388,9 @@ func (u *Usecases) Submit(ctx context.Context, orgID, id uuid.UUID, actor string
 	return out, nil
 }
 
-// Approve finaliza un procurement request en Pendiente. Si fue escalado a
-// Nexus (require_approval), el caller ya debió aprobar en consola Nexus —
-// acá Pymes solo refleja el estado y crea el purchase.
-//
-// NOTA (deuda Fase 5): este endpoint hoy NO consulta Nexus para verificar
-// que la approval realmente ocurrió. Para no abrir un agujero de drift, el
-// caller (UI Pymes) debería redirigir al admin a consola Nexus para casos
-// que requieren approval. La validación cross-source queda para el contract
-// test de la Fase 5.
+// Approve finaliza un procurement request en Pendiente solo si Nexus ya
+// registró la aprobación humana. Pymes refleja el estado y crea el purchase;
+// Nexus sigue siendo source of truth de la decisión.
 func (u *Usecases) Approve(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.ProcurementRequest, error) {
 	req, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
@@ -406,7 +402,16 @@ func (u *Usecases) Approve(ctx context.Context, orgID, id uuid.UUID, actor strin
 	if req.Status != domain.StatusPendingApproval {
 		return domain.ProcurementRequest{}, domainerr.BusinessRule("only pending requests can be approved")
 	}
+	verified, err := u.verifyNexusProcurementDecision(ctx, req, governanceclient.StatusApproved)
+	if err != nil {
+		return domain.ProcurementRequest{}, err
+	}
 	req.Status = domain.StatusApproved
+	req.EvaluationJSON = mergeEvaluationJSON(req.EvaluationJSON, map[string]any{
+		"nexus_verified_status": verified.Status,
+		"nexus_verified_at":     time.Now().UTC().Format(time.RFC3339),
+		"nexus_verified_by":     actor,
+	})
 	req.UpdatedAt = time.Now()
 	out, err := u.repo.Update(ctx, req)
 	if err != nil {
@@ -444,7 +449,16 @@ func (u *Usecases) Reject(ctx context.Context, orgID, id uuid.UUID, actor string
 	if req.Status != domain.StatusPendingApproval {
 		return domain.ProcurementRequest{}, domainerr.BusinessRule("only pending requests can be rejected")
 	}
+	verified, err := u.verifyNexusProcurementDecision(ctx, req, governanceclient.StatusRejected)
+	if err != nil {
+		return domain.ProcurementRequest{}, err
+	}
 	req.Status = domain.StatusRejected
+	req.EvaluationJSON = mergeEvaluationJSON(req.EvaluationJSON, map[string]any{
+		"nexus_verified_status": verified.Status,
+		"nexus_verified_at":     time.Now().UTC().Format(time.RFC3339),
+		"nexus_verified_by":     actor,
+	})
 	req.UpdatedAt = time.Now()
 	out, err := u.repo.Update(ctx, req)
 	if err != nil {
@@ -458,6 +472,59 @@ func (u *Usecases) Reject(ctx context.Context, orgID, id uuid.UUID, actor string
 	return out, nil
 }
 
+func (u *Usecases) verifyNexusProcurementDecision(ctx context.Context, req domain.ProcurementRequest, wantStatus string) (governanceclient.RequestSummary, error) {
+	nexusRequestID := nexusRequestIDFromEvaluation(req.EvaluationJSON)
+	if nexusRequestID == "" {
+		return governanceclient.RequestSummary{}, domainerr.BusinessRule("procurement request has no nexus_request_id to verify")
+	}
+	summary, status, err := u.governance.GetRequestForTenant(ctx, req.OrgID.String(), nexusRequestID)
+	if err != nil {
+		return governanceclient.RequestSummary{}, fmt.Errorf("nexus get procurement request %s: %w", nexusRequestID, err)
+	}
+	if status == http.StatusNotFound {
+		return governanceclient.RequestSummary{}, domainerr.BusinessRule("nexus request not found")
+	}
+	if status != http.StatusOK {
+		return governanceclient.RequestSummary{}, fmt.Errorf("nexus get procurement request %s: status %d", nexusRequestID, status)
+	}
+	if summary.Status != wantStatus {
+		return governanceclient.RequestSummary{}, domainerr.BusinessRule(fmt.Sprintf("nexus request status must be %s, got %s", wantStatus, summary.Status))
+	}
+	return summary, nil
+}
+
+func nexusRequestIDFromEvaluation(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return ""
+	}
+	if v, ok := payload["nexus_request_id"].(string); ok {
+		return strings.TrimSpace(v)
+	}
+	return ""
+}
+
+func mergeEvaluationJSON(raw json.RawMessage, values map[string]any) json.RawMessage {
+	payload := map[string]any{}
+	if len(raw) > 0 {
+		_ = json.Unmarshal(raw, &payload)
+	}
+	if payload == nil {
+		payload = map[string]any{}
+	}
+	for k, v := range values {
+		payload[k] = v
+	}
+	out, err := json.Marshal(payload)
+	if err != nil {
+		return raw
+	}
+	return out
+}
+
 func (u *Usecases) createPurchaseFromRequest(ctx context.Context, req domain.ProcurementRequest, actor string) (purchasesdomain.Purchase, error) {
 	items := buildPurchaseItems(req)
 	if len(items) == 0 {
@@ -465,7 +532,7 @@ func (u *Usecases) createPurchaseFromRequest(ctx context.Context, req domain.Pro
 	}
 	notes := fmt.Sprintf("Generado desde solicitud interna %s", req.ID.String())
 	return u.purchases.Create(ctx, purchases.CreateInput{
-		OrgID:      req.OrgID,
+		OrgID:         req.OrgID,
 		SupplierName:  "Pendiente (solicitud interna)",
 		Status:        "draft",
 		PaymentStatus: "pending",

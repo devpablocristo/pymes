@@ -185,13 +185,13 @@ func (r *testRepo) GetOptedInPartiesByTag(_ context.Context, _ uuid.UUID, _ stri
 	return nil, nil
 }
 
-type testAIClient struct {
+type testCompanionClient struct {
 	last InboundMessage
 }
 
-func (c *testAIClient) ProcessWhatsApp(ctx context.Context, req InboundMessage) (AIMessageResponse, error) {
+func (c *testCompanionClient) ProcessWhatsApp(ctx context.Context, req InboundMessage) (CompanionMessageResponse, error) {
 	c.last = req
-	return AIMessageResponse{ConversationID: "conv-1", Reply: "Recibido: " + req.Text, TokensUsed: 12}, nil
+	return CompanionMessageResponse{ConversationID: "conv-1", Reply: "Recibido: " + req.Text, TokensUsed: 12}, nil
 }
 
 type testMetaClient struct {
@@ -251,14 +251,14 @@ func TestHandleInboundWebhook(t *testing.T) {
 	t.Parallel()
 	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	repo := &testRepo{conn: Connection{
-		OrgID:      orgID,
+		OrgID:         orgID,
 		PhoneNumberID: "123456789",
 		AccessToken:   "plain-token",
 		IsActive:      true,
 	}}
-	aiClient := &testAIClient{}
+	companionClient := &testCompanionClient{}
 	metaClient := &testMetaClient{}
-	uc := NewUsecases(repo, nil, "http://localhost:5173", aiClient, metaClient, nil, "verify-token", "")
+	uc := NewUsecases(repo, nil, "http://localhost:5173", companionClient, metaClient, nil, "verify-token", "")
 
 	payload := []byte(`{
 		"object":"whatsapp_business_account",
@@ -281,8 +281,8 @@ func TestHandleInboundWebhook(t *testing.T) {
 	if result.Processed != 1 || result.Replied != 1 {
 		t.Fatalf("HandleInboundWebhook() = %+v, want processed=1 replied=1", result)
 	}
-	if aiClient.last.OrgID != orgID {
-		t.Fatalf("ai org_id = %s, want %s", aiClient.last.OrgID, orgID)
+	if companionClient.last.OrgID != orgID {
+		t.Fatalf("companion org_id = %s, want %s", companionClient.last.OrgID, orgID)
 	}
 	if metaClient.phoneNumberID != "123456789" {
 		t.Fatalf("meta phone_number_id = %q, want %q", metaClient.phoneNumberID, "123456789")
@@ -326,7 +326,7 @@ func TestSendText(t *testing.T) {
 	partyID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	repo := &testRepo{
 		domainConn: domain.Connection{
-			OrgID:      orgID,
+			OrgID:         orgID,
 			PhoneNumberID: "123456789",
 			AccessToken:   "plain-token",
 			IsActive:      true,
@@ -334,19 +334,19 @@ func TestSendText(t *testing.T) {
 		partyPhone: "+5491112345678",
 		partyName:  "Juan",
 		optIns: []domain.OptIn{{
-			OrgID: orgID,
-			PartyID:  partyID,
-			Status:   domain.OptInStatusOptedIn,
+			OrgID:   orgID,
+			PartyID: partyID,
+			Status:  domain.OptInStatusOptedIn,
 		}},
 	}
 	metaClient := &testMetaClient{}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, metaClient, nil, "", "")
 
 	msg, err := uc.SendText(context.Background(), domain.SendTextRequest{
-		OrgID: orgID,
-		PartyID:  partyID,
-		Body:     "Hola Juan, tu pedido está listo",
-		Actor:    "admin",
+		OrgID:   orgID,
+		PartyID: partyID,
+		Body:    "Hola Juan, tu pedido está listo",
+		Actor:   "admin",
 	})
 	if err != nil {
 		t.Fatalf("SendText() error = %v", err)
@@ -368,7 +368,7 @@ func TestSendTextRequiresOptIn(t *testing.T) {
 	partyID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	repo := &testRepo{
 		domainConn: domain.Connection{
-			OrgID:      orgID,
+			OrgID:         orgID,
 			PhoneNumberID: "123456789",
 			AccessToken:   "plain-token",
 			IsActive:      true,
@@ -381,10 +381,10 @@ func TestSendTextRequiresOptIn(t *testing.T) {
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, metaClient, nil, "", "")
 
 	_, err := uc.SendText(context.Background(), domain.SendTextRequest{
-		OrgID: orgID,
-		PartyID:  partyID,
-		Body:     "Hola",
-		Actor:    "admin",
+		OrgID:   orgID,
+		PartyID: partyID,
+		Body:    "Hola",
+		Actor:   "admin",
 	})
 	if err == nil {
 		t.Fatal("SendText() error = nil, want business rule when opt-in missing")
@@ -498,7 +498,7 @@ func TestVerifyWebhook_TokenNotConfigured(t *testing.T) {
 func TestHandleInboundWebhook_InvalidJSON(t *testing.T) {
 	t.Parallel()
 	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
-	uc := NewUsecases(repo, nil, "http://localhost:5173", &testAIClient{}, &testMetaClient{}, nil, "", "")
+	uc := NewUsecases(repo, nil, "http://localhost:5173", &testCompanionClient{}, &testMetaClient{}, nil, "", "")
 	_, err := uc.HandleInboundWebhook(context.Background(), []byte(`not-json`))
 	if err == nil {
 		t.Fatal("HandleInboundWebhook() error = nil, want bad input for invalid JSON")
@@ -508,7 +508,7 @@ func TestHandleInboundWebhook_InvalidJSON(t *testing.T) {
 func TestHandleInboundWebhook_NoMessages(t *testing.T) {
 	t.Parallel()
 	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
-	uc := NewUsecases(repo, nil, "http://localhost:5173", &testAIClient{}, &testMetaClient{}, nil, "", "")
+	uc := NewUsecases(repo, nil, "http://localhost:5173", &testCompanionClient{}, &testMetaClient{}, nil, "", "")
 	result, err := uc.HandleInboundWebhook(context.Background(), []byte(`{"object":"whatsapp_business_account","entry":[]}`))
 	if err != nil {
 		t.Fatalf("HandleInboundWebhook() error = %v", err)
@@ -549,7 +549,7 @@ func TestHandleInboundWebhook_SkipsUnknownConnection(t *testing.T) {
 	repo := &testRepo{
 		getConnByPhoneErr: gorm.ErrRecordNotFound,
 	}
-	uc := NewUsecases(repo, nil, "http://localhost:5173", &testAIClient{}, &testMetaClient{}, nil, "", "")
+	uc := NewUsecases(repo, nil, "http://localhost:5173", &testCompanionClient{}, &testMetaClient{}, nil, "", "")
 	payload := []byte(`{
 		"object":"whatsapp_business_account",
 		"entry":[{"changes":[{"field":"messages","value":{
@@ -566,20 +566,20 @@ func TestHandleInboundWebhook_SkipsUnknownConnection(t *testing.T) {
 	}
 }
 
-func TestHandleInboundWebhook_RequiresAI(t *testing.T) {
+func TestHandleInboundWebhook_RequiresCompanion(t *testing.T) {
 	t.Parallel()
 	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, &testMetaClient{}, nil, "", "")
 	_, err := uc.HandleInboundWebhook(context.Background(), []byte(`{"object":"whatsapp_business_account","entry":[{"changes":[{"field":"messages","value":{"metadata":{"phone_number_id":"1"},"messages":[{"id":"m1","from":"5491100000000","type":"text","text":{"body":"Hola"}}]}}]}]}`))
 	if err == nil {
-		t.Fatal("HandleInboundWebhook() error = nil, want error when AI is not configured")
+		t.Fatal("HandleInboundWebhook() error = nil, want error when Companion is not configured")
 	}
 }
 
 func TestHandleInboundWebhook_RequiresMeta(t *testing.T) {
 	t.Parallel()
 	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
-	uc := NewUsecases(repo, nil, "http://localhost:5173", &testAIClient{}, nil, nil, "", "")
+	uc := NewUsecases(repo, nil, "http://localhost:5173", &testCompanionClient{}, nil, nil, "", "")
 	_, err := uc.HandleInboundWebhook(context.Background(), []byte(`{"object":"whatsapp_business_account","entry":[{"changes":[{"field":"messages","value":{"metadata":{"phone_number_id":"1"},"messages":[{"id":"m1","from":"5491100000000","type":"text","text":{"body":"Hola"}}]}}]}]}`))
 	if err == nil {
 		t.Fatal("HandleInboundWebhook() error = nil, want error when Meta client is not configured")

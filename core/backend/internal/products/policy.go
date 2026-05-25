@@ -1,8 +1,8 @@
 // Package products — Ola C step 8.
 //
 // ArchivePolicy for products. See pricelists/policy.go for the canonical
-// pattern documentation. ArchivedAtColumn remains "deleted_at" in the
-// product table (rename to archived_at is a future coordinated migration).
+// pattern documentation. The product table uses archived_at as the canonical
+// archive column after migration 0020.
 package products
 
 import lifecycle "github.com/devpablocristo/platform/lifecycle/go/lifecycle"

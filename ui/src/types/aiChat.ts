@@ -1,6 +1,6 @@
 // Tipos del chat de Pymes mapeados al contrato canónico de Companion.
 //
-// Origen autoritativo: `core/ai/contracts/go` + `companion/openapi.yaml`.
+// Origen autoritativo: `axis/companion/openapi.yaml`.
 // Los tipos se generan en `../generated/companion.openapi.ts`. Acá los
 // re-exportamos con los nombres heredados (CommercialChatRequest,
 // PymesAssistantChatResponse, etc.) para no romper consumidores existentes
@@ -59,9 +59,7 @@ export interface PymesAssistantChatResponse extends Omit<CompanionChatResponse, 
   routing_source: string;
   output_kind: string;
   blocks?: PymesAssistantChatBlock[];
-  // pending_confirmations en Companion canon son objetos
-  // {id,description,binding_hash}; el FE legacy guarda solo IDs.
-  pending_confirmations?: string[];
+  pending_confirmations?: PymesChatPendingConfirmation[];
   // Campos extras que pymes-ai exponía y el FE consume opcionalmente. No están
   // en el contrato canónico de Companion v0.1; viven acá como opcionales con
   // shape laxo hasta que el contrato los absorba o el FE los elimine.
@@ -97,6 +95,7 @@ export type PymesRoutingSource = PymesAssistantChatResponse['routing_source'];
 export type PymesChatOutputKind = PymesAssistantChatResponse['output_kind'];
 
 export type InsightNotificationItem = Schemas['NotificationItem'];
+export type PymesChatPendingConfirmation = Schemas['ChatPendingConfirmation'];
 export type InsightNotificationsResponse =
   paths['/v1/notifications']['post']['responses'][200]['content']['application/json'];
 export type PymesInsightServiceKind = InsightNotificationsResponse['service_kind'];

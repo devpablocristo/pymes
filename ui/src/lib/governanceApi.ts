@@ -71,16 +71,6 @@ export interface ConditionTemplate {
   default_value: string;
 }
 
-export interface WatcherResponse {
-  id: string;
-  name: string;
-  watcher_type: string;
-  config: Record<string, unknown>;
-  enabled: boolean;
-  last_run_at: string | null;
-  last_result: { found: number; proposed: number; executed: number } | null;
-}
-
 // --- Policies ---
 
 export async function listPolicies(): Promise<PolicyListResponse> {
@@ -123,18 +113,4 @@ export async function rejectRequest(id: string, note: string): Promise<void> {
 
 export async function getConditionTemplates(actionType: string): Promise<{ templates: ConditionTemplate[] }> {
   return apiRequest(`/v1/governance/condition-templates/${actionType}`);
-}
-
-// --- Watchers ---
-
-export async function listWatchers(): Promise<{ watchers: WatcherResponse[] }> {
-  return apiRequest('/v1/governance/watchers');
-}
-
-export async function updateWatcher(
-  id: string,
-  config: Record<string, unknown>,
-  enabled: boolean,
-): Promise<WatcherResponse> {
-  return apiRequest(`/v1/governance/watchers/${id}`, { method: 'PATCH', body: { config, enabled } });
 }

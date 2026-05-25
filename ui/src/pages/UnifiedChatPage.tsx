@@ -10,7 +10,7 @@ import {
   buildHandoffUserMessage,
   type NotificationChatHandoff,
 } from '../lib/notificationChatHandoff';
-import type { CommercialChatRequest, PymesAssistantAction } from '../types/aiChat';
+import type { CommercialChatRequest, PymesAssistantAction, PymesChatPendingConfirmation } from '../types/aiChat';
 import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { queryKeys } from '../lib/queryKeys';
@@ -124,6 +124,10 @@ export function UnifiedChatPage() {
     () => resolveInputPrompt(activePendingRouteHint, language, t),
     [activePendingRouteHint, language, t],
   );
+  const pendingConfirmationIDs = useCallback(
+    (items: PymesChatPendingConfirmation[] | undefined) => (items ?? []).map((item) => item.id).filter(Boolean),
+    [],
+  );
 
   // Aviso in-app → Asistente Pymes: primer turno automático con contexto
   useEffect(() => {
@@ -186,7 +190,7 @@ export function UnifiedChatPage() {
         setChatIds((prev) => ({ ...prev, [AI_PYMES_ID]: reply.chat_id }));
         setPendingConfirmationsByContact((prev) => ({
           ...prev,
-          [AI_PYMES_ID]: reply.pending_confirmations ?? [],
+          [AI_PYMES_ID]: pendingConfirmationIDs(reply.pending_confirmations),
         }));
         const additions = buildAssistantMessages(AI_PYMES_ID, reply, language, t);
         setMsgs((p) => [...p, ...additions]);
@@ -195,7 +199,7 @@ export function UnifiedChatPage() {
       }
     };
     void run();
-  }, [chatMutation, language, t]);
+  }, [chatMutation, language, pendingConfirmationIDs, t]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -264,7 +268,7 @@ export function UnifiedChatPage() {
         setChatIds((prev) => ({ ...prev, [AI_PYMES_ID]: reply.chat_id }));
         setPendingConfirmationsByContact((prev) => ({
           ...prev,
-          [AI_PYMES_ID]: reply.pending_confirmations ?? [],
+          [AI_PYMES_ID]: pendingConfirmationIDs(reply.pending_confirmations),
         }));
         if (hasPromptForQueryBlock(reply.blocks)) {
           setPendingRouteHintsByContact((prev) => ({
@@ -286,7 +290,7 @@ export function UnifiedChatPage() {
         setError(formatAssistantHttpError(err, t('ai.chat.error.unreachable')));
       }
     },
-    [busy, chatIds, chatMutation, language, pendingRouteHintsByContact, t],
+    [busy, chatIds, chatMutation, language, pendingConfirmationIDs, pendingRouteHintsByContact, t],
   );
 
   const send = useCallback(async () => {

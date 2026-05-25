@@ -61,15 +61,15 @@ BEGIN
         RAISE EXCEPTION 'pymes full seed: expected active owner membership for tenant %', v_tenant;
     END IF;
 
-    SELECT id INTO svc1 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
-    SELECT id INTO svc2 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc1 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-001' AND archived_at IS NULL LIMIT 1;
+    SELECT id INTO svc2 FROM services WHERE org_id = v_tenant AND code = 'DEMO-SVC-002' AND archived_at IS NULL LIMIT 1;
     IF svc1 IS NULL OR svc2 IS NULL THEN
         RAISE EXCEPTION 'pymes full seed: expected demo services for org %', v_tenant;
     END IF;
 
     INSERT INTO parties (
         id, org_id, party_type, display_name, email, phone, address,
-        tax_id, notes, tags, metadata, created_at, updated_at, deleted_at
+        tax_id, notes, tags, metadata, created_at, updated_at, archived_at
     )
     VALUES (
         emp_party, v_tenant, 'person', 'Empleado Demo', 'empleado@local.dev', '+54-11-4000-0001', '{}'::jsonb,
@@ -84,7 +84,7 @@ BEGIN
             tags = EXCLUDED.tags,
             metadata = EXCLUDED.metadata,
             updated_at = now(),
-            deleted_at = NULL;
+            archived_at = NULL;
 
     INSERT INTO party_persons (party_id, first_name, last_name)
     VALUES (emp_party, 'Empleado', 'Demo')
@@ -233,7 +233,7 @@ BEGIN
 
     INSERT INTO procurement_requests (
         id, org_id, requester_actor, title, description, category, status,
-        estimated_total, currency, evaluation_json, purchase_id, created_at, updated_at, deleted_at
+        estimated_total, currency, evaluation_json, purchase_id, created_at, updated_at, archived_at
     )
     VALUES
         (
@@ -259,7 +259,7 @@ BEGIN
             evaluation_json = EXCLUDED.evaluation_json,
             purchase_id = EXCLUDED.purchase_id,
             updated_at = now(),
-            deleted_at = EXCLUDED.deleted_at;
+            archived_at = EXCLUDED.archived_at;
 
     INSERT INTO procurement_request_lines (
         id, request_id, description, product_id, quantity, unit_price_estimate, sort_order

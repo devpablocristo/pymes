@@ -52,13 +52,15 @@ type fakeAgentGovernance struct {
 	submitResp governanceclient.SubmitResponse
 	getResp    governanceclient.RequestSummary
 	getStatus  int
+	body       governanceclient.SubmitRequestBody
 }
 
-func (f fakeAgentGovernance) SubmitRequestForTenant(context.Context, string, string, governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error) {
+func (f *fakeAgentGovernance) SubmitRequestForTenant(_ context.Context, _ string, _ string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error) {
+	f.body = body
 	return f.submitResp, nil
 }
 
-func (f fakeAgentGovernance) GetRequestForTenant(context.Context, string, string) (governanceclient.RequestSummary, int, error) {
+func (f *fakeAgentGovernance) GetRequestForTenant(context.Context, string, string) (governanceclient.RequestSummary, int, error) {
 	return f.getResp, f.getStatus, nil
 }
 
@@ -85,11 +87,12 @@ func TestExecuteConsumesConfirmationWhenReviewIsSubmitted(t *testing.T) {
 		Status:       "pending",
 		ExpiresAt:    time.Now().UTC().Add(time.Hour),
 	}}
-	uc := NewUsecases(repo, fakeAgentGovernance{submitResp: governanceclient.SubmitResponse{
+	gov := &fakeAgentGovernance{submitResp: governanceclient.SubmitResponse{
 		RequestID: "req-1",
 		Decision:  governanceclient.DecisionRequireApproval,
 		Status:    governanceclient.StatusPendingApproval,
-	}}, nil)
+	}}
+	uc := NewUsecases(repo, gov, nil)
 
 	result, err := uc.Execute(context.Background(), ExecuteInput{
 		Auth: ActorContext{
@@ -110,6 +113,13 @@ func TestExecuteConsumesConfirmationWhenReviewIsSubmitted(t *testing.T) {
 	}
 	if repo.markHits != 1 || repo.confirmation.Status != "used" {
 		t.Fatalf("confirmation was not consumed: hits=%d status=%s", repo.markHits, repo.confirmation.Status)
+	}
+	binding, ok := gov.body.Params["action_binding"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected action_binding in governance params: %+v", gov.body.Params)
+	}
+	if binding["schema_version"] != "tool_intent.v1" || binding["org_id"] != orgID.String() || binding["capability_id"] != "pymes.sales.create" {
+		t.Fatalf("unexpected strict action binding %+v", binding)
 	}
 }
 
@@ -132,7 +142,7 @@ func TestExecuteRequiresApprovedReviewRequest(t *testing.T) {
 		Status:       "pending",
 		ExpiresAt:    time.Now().UTC().Add(time.Hour),
 	}}
-	uc := NewUsecases(repo, fakeAgentGovernance{
+	uc := NewUsecases(repo, &fakeAgentGovernance{
 		getStatus: 200,
 		getResp: governanceclient.RequestSummary{
 			ID:       "req-1",

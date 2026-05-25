@@ -50,6 +50,9 @@ type Config struct {
 	InternalServiceToken             string
 	CompanionInternalURL             string
 	CompanionAPIKey                  string
+	CompanionInternalJWTSecret       string
+	CompanionInternalJWTIssuer       string
+	CompanionInternalJWTAudience     string
 	GovernanceCallbackToken          string
 	GovernanceSyncInterval           time.Duration
 	WhatsAppWebhookVerifyToken       string
@@ -111,6 +114,9 @@ func LoadFromEnv() Config {
 		// Default vacío -> CompanionClient.ProcessWhatsApp devuelve error de configuracion claro.
 		CompanionInternalURL:             envconfig.Get("COMPANION_INTERNAL_URL", envconfig.Get("AI_SERVICE_URL", "")),
 		CompanionAPIKey:                  envconfig.Get("COMPANION_API_KEY", ""),
+		CompanionInternalJWTSecret:       envconfig.Get("COMPANION_INTERNAL_JWT_SECRET", envconfig.Get("AXIS_INTERNAL_JWT_SECRET", "")),
+		CompanionInternalJWTIssuer:       envconfig.Get("COMPANION_INTERNAL_JWT_ISSUER", envconfig.Get("AXIS_INTERNAL_JWT_ISSUER", "axis-bff")),
+		CompanionInternalJWTAudience:     envconfig.Get("COMPANION_INTERNAL_JWT_AUDIENCE", "companion"),
 		GovernanceCallbackToken:          envconfig.Get("GOVERNANCE_CALLBACK_TOKEN", ""),
 		GovernanceSyncInterval:           envconfig.Duration("GOVERNANCE_SYNC_INTERVAL_SECONDS", 30*time.Second),
 		WhatsAppWebhookVerifyToken:       envconfig.Get("WHATSAPP_WEBHOOK_VERIFY_TOKEN", ""),

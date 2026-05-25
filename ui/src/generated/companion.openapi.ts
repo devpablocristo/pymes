@@ -235,6 +235,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/customer-messaging/inbound": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Procesa un mensaje inbound server-to-server desde un producto autorizado
+         * @description Contrato público server-to-server para integraciones de customer messaging.
+         *     Pymes usa este endpoint para inbound WhatsApp. Requiere Bearer JWT interno
+         *     o credencial de servicio equivalente con `companion:tasks:write`, `org_id`
+         *     de customer org y `product_surface=pymes`.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CustomerMessagingInboundRequest"];
+                };
+            };
+            responses: {
+                /** @description Message processed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CustomerMessagingInboundResponse"];
+                    };
+                };
+                /** @description Invalid payload */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing or invalid service identity */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing scope */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Duplicate message or conflicting state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rate limited */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Processing failed */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tasks": {
         parameters: {
             query?: never;
@@ -3120,6 +3208,11 @@ export interface components {
         ChatResponse: {
             /** Format: uuid */
             chat_id?: string;
+            /**
+             * Format: uuid
+             * @description ID operativo legacy de la task; frontends deben preferir chat_id.
+             */
+            task_id?: string;
             reply: string;
             blocks?: components["schemas"]["ChatBlock"][];
             tool_calls?: components["schemas"]["ChatToolCall"][];
@@ -3160,6 +3253,24 @@ export interface components {
             id: string;
             description?: string;
             binding_hash?: string;
+        };
+        CustomerMessagingInboundRequest: {
+            /** @description Customer org/work context where the AI employee operates. */
+            org_id: string;
+            /** @description WhatsApp/Meta phone number id that received the inbound message. */
+            phone_number_id: string;
+            /** @description Sender phone in provider format. */
+            from_phone: string;
+            message: string;
+            /** @description Provider message id used by callers for duplicate detection/replay diagnostics. */
+            message_id?: string;
+            profile_name?: string;
+        };
+        CustomerMessagingInboundResponse: {
+            conversation_id: string;
+            reply: string;
+            tokens_used: number;
+            tool_calls: string[];
         };
         TaskMessage: {
             /** Format: uuid */

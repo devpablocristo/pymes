@@ -197,6 +197,11 @@ func (u *Usecases) HandleInboundWebhook(ctx context.Context, payload []byte) (In
 		}
 		orgID := conn.OrgID
 		msg.OrgID = orgID
+		if exists, existsErr := u.repo.MessageExistsByWAMessageID(ctx, orgID, msg.MessageID); existsErr != nil {
+			return result, existsErr
+		} else if exists {
+			continue
+		}
 
 		var convID *uuid.UUID
 		var inboundPartyID *uuid.UUID

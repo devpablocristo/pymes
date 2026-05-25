@@ -16,22 +16,23 @@ import (
 // --- Fakes ---
 
 type testRepo struct {
-	conn                Connection
-	getConnByPhoneErr   error
-	domainConn          domain.Connection
-	partyPhone          string
-	partyName           string
-	messages            []domain.Message
-	templates           []domain.Template
-	optIns              []domain.OptIn
-	savedMsg            *domain.Message
-	savedTpl            *domain.Template
-	savedOptIn          *domain.OptIn
-	savedConn           *domain.Connection
-	lastStatusMessageID string
-	lastStatus          domain.MessageStatus
-	lastStatusCode      string
-	lastStatusTitle     string
+	conn                 Connection
+	getConnByPhoneErr    error
+	domainConn           domain.Connection
+	partyPhone           string
+	partyName            string
+	messages             []domain.Message
+	templates            []domain.Template
+	optIns               []domain.OptIn
+	savedMsg             *domain.Message
+	existingWAMessageIDs map[string]bool
+	savedTpl             *domain.Template
+	savedOptIn           *domain.OptIn
+	savedConn            *domain.Connection
+	lastStatusMessageID  string
+	lastStatus           domain.MessageStatus
+	lastStatusCode       string
+	lastStatusTitle      string
 }
 
 func (r *testRepo) GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.UUID) (QuoteSnapshot, error) {
@@ -77,6 +78,13 @@ func (r *testRepo) GetConnectionStats(ctx context.Context, orgID uuid.UUID) (dom
 func (r *testRepo) SaveMessage(ctx context.Context, msg domain.Message) error {
 	r.savedMsg = &msg
 	return nil
+}
+
+func (r *testRepo) MessageExistsByWAMessageID(_ context.Context, _ uuid.UUID, waMessageID string) (bool, error) {
+	if r.existingWAMessageIDs == nil {
+		return false, nil
+	}
+	return r.existingWAMessageIDs[waMessageID], nil
 }
 
 func (r *testRepo) UpdateMessageStatus(ctx context.Context, waMessageID string, status domain.MessageStatus, errorCode, errorMsg string) error {
@@ -292,6 +300,48 @@ func TestHandleInboundWebhook(t *testing.T) {
 	}
 	if metaClient.body != "Recibido: Hola" {
 		t.Fatalf("meta body = %q, want %q", metaClient.body, "Recibido: Hola")
+	}
+}
+
+func TestHandleInboundWebhookSkipsDuplicateDelivery(t *testing.T) {
+	t.Parallel()
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	repo := &testRepo{
+		conn: Connection{
+			OrgID:         orgID,
+			PhoneNumberID: "123456789",
+			AccessToken:   "plain-token",
+			IsActive:      true,
+		},
+		existingWAMessageIDs: map[string]bool{"wamid-duplicate": true},
+	}
+	companionClient := &testCompanionClient{}
+	metaClient := &testMetaClient{}
+	uc := NewUsecases(repo, nil, "http://localhost:5173", companionClient, metaClient, nil, "verify-token", "")
+
+	payload := []byte(`{
+		"object":"whatsapp_business_account",
+		"entry":[{
+			"changes":[{
+				"field":"messages",
+				"value":{
+					"metadata":{"phone_number_id":"123456789"},
+					"contacts":[{"wa_id":"5491112345678","profile":{"name":"Juan"}}],
+					"messages":[{"id":"wamid-duplicate","from":"5491112345678","type":"text","text":{"body":"Hola otra vez"}}]
+				}
+			}]
+		}]
+	}`)
+
+	result, err := uc.HandleInboundWebhook(context.Background(), payload)
+	if err != nil {
+		t.Fatalf("HandleInboundWebhook() error = %v", err)
+	}
+	if result.Processed != 0 || result.Replied != 0 {
+		t.Fatalf("duplicate should be skipped, got %+v", result)
+	}
+	if companionClient.last.MessageID != "" || metaClient.body != "" {
+		t.Fatalf("duplicate should not call Companion or Meta: companion=%+v meta_body=%q", companionClient.last, metaClient.body)
 	}
 }
 

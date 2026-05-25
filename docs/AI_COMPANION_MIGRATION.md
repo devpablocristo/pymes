@@ -7,7 +7,7 @@ El runtime historico `pymes/ai` queda retirado del flujo local de Pymes. Axis Co
 ## Boundaries
 
 - Companion: LLM, perfiles de agente, memoria conversacional y seleccion de capabilities.
-- Pymes: datos de negocio, endpoints de negocio, autorizacion por tenant/actor/rol y ejecucion de capabilities.
+- Pymes: BFF del producto, datos de negocio, endpoints de negocio, autorizacion por tenant/actor/rol y ejecucion de capabilities.
 - Nexus: governance para acciones que requieren policy o approval.
 - `pymes/ai`: decommissioned; `AI_SERVICE_URL` solo puede existir como alias legacy de `COMPANION_INTERNAL_URL`.
 
@@ -32,6 +32,7 @@ El runtime historico `pymes/ai` queda retirado del flujo local de Pymes. Axis Co
 
 - No hay tools genericas tipo `execute_sql`, `call_endpoint` o `update_entity`.
 - Companion no autoriza dominio. Pymes reautoriza cada capability call.
+- La UI de Pymes no llama Companion directamente ni usa credenciales `VITE_*`; entra por `/v1/ai/*` en Pymes backend.
 - El actor context siempre incluye `org_id`, `actor_id`, `actor_type`, `role`, `scopes`, `conversation_id` y `trace_id`.
 - La memoria conversacional migra a Companion DB; los datos de negocio permanecen en Pymes DB.
 - Pymes no ejecuta LLM ni memoria conversacional local. Si falta Companion, los flujos agenticos deben fallar de forma visible y gobernada.

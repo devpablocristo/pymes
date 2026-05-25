@@ -2,6 +2,8 @@ package procurement
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -290,6 +292,9 @@ func (u *Usecases) Submit(ctx context.Context, orgID, id uuid.UUID, actor string
 		total = sumLinesTotal(req.Lines)
 	}
 	req.EstimatedTotal = total
+	idemKey := fmt.Sprintf("procurement-%s-%s", orgID.String(), req.ID)
+	params := procurementSubmitParams(req, total)
+	params["action_binding"] = procurementActionBinding(orgID, actor, req, params, idemKey)
 
 	body := governanceclient.SimulateRequestBody{
 		RequesterType:  "human",
@@ -298,7 +303,7 @@ func (u *Usecases) Submit(ctx context.Context, orgID, id uuid.UUID, actor string
 		ActionType:     "procurement.submit",
 		TargetSystem:   "pymes",
 		TargetResource: "procurement_request",
-		Params:         procurementSubmitParams(req, total),
+		Params:         params,
 	}
 	sim, err := u.governance.SimulateRequestForTenant(ctx, orgID.String(), body)
 	if err != nil {
@@ -337,7 +342,6 @@ func (u *Usecases) Submit(ctx context.Context, orgID, id uuid.UUID, actor string
 			Reason:         fmt.Sprintf("procurement request %s", req.ID),
 			Context:        "core procurement.submit",
 		}
-		idemKey := fmt.Sprintf("procurement-%s-%s", orgID.String(), req.ID)
 		submitResp, subErr := u.governance.SubmitRequestForTenant(ctx, orgID.String(), idemKey, submitBody)
 		if subErr != nil {
 			return domain.ProcurementRequest{}, fmt.Errorf("nexus submit procurement.submit (require_approval escalation): %w", subErr)
@@ -386,6 +390,38 @@ func (u *Usecases) Submit(ctx context.Context, orgID, id uuid.UUID, actor string
 		"purchase_id":            nullableUUIDPtr(out.PurchaseID),
 	})
 	return out, nil
+}
+
+func procurementActionBinding(orgID uuid.UUID, actor string, req domain.ProcurementRequest, params map[string]any, idempotencyKey string) map[string]any {
+	return map[string]any{
+		"schema_version":     "tool_intent.v1",
+		"org_id":             orgID.String(),
+		"actor_id":           strings.TrimSpace(actor),
+		"actor_type":         "human",
+		"product_surface":    "pymes",
+		"run_id":             req.ID.String(),
+		"tool_invocation_id": req.ID.String(),
+		"connector_id":       "pymes.procurement",
+		"capability_id":      "procurement.submit",
+		"operation":          "submit",
+		"target_system":      "pymes",
+		"target_resource":    "procurement_request",
+		"payload_hash":       governancePayloadHash(params),
+		"idempotency_key":    strings.TrimSpace(idempotencyKey),
+	}
+}
+
+func governancePayloadHash(payload map[string]any) string {
+	copyPayload := make(map[string]any, len(payload))
+	for key, value := range payload {
+		if key == "action_binding" {
+			continue
+		}
+		copyPayload[key] = value
+	}
+	raw, _ := json.Marshal(copyPayload)
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:])
 }
 
 // Approve finaliza un procurement request en Pendiente solo si Nexus ya

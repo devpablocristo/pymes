@@ -200,6 +200,19 @@ func (r *Repository) SaveMessage(ctx context.Context, msg domain.Message) error 
 	return r.db.WithContext(ctx).Create(&m).Error
 }
 
+func (r *Repository) MessageExistsByWAMessageID(ctx context.Context, orgID uuid.UUID, waMessageID string) (bool, error) {
+	waMessageID = strings.TrimSpace(waMessageID)
+	if waMessageID == "" {
+		return false, nil
+	}
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&whmodels.WhatsAppMessage{}).
+		Where("org_id = ? AND wa_message_id = ?", orgID, waMessageID).
+		Count(&count).Error
+	return count > 0, err
+}
+
 func (r *Repository) UpdateMessageStatus(ctx context.Context, waMessageID string, status domain.MessageStatus, errorCode, errorMsg string) error {
 	updates := map[string]any{"status": string(status), "updated_at": time.Now()}
 	if errorCode != "" {

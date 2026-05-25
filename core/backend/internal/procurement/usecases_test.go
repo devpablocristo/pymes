@@ -56,15 +56,19 @@ type fakeGovernance struct {
 	simulateHits int
 	submitHits   int
 	getHits      int
+	simulateBody governanceclient.SimulateRequestBody
+	submitBody   governanceclient.SubmitRequestBody
 }
 
-func (f *fakeGovernance) SimulateRequestForTenant(_ context.Context, _ string, _ governanceclient.SimulateRequestBody) (governanceclient.SimulateResponse, error) {
+func (f *fakeGovernance) SimulateRequestForTenant(_ context.Context, _ string, body governanceclient.SimulateRequestBody) (governanceclient.SimulateResponse, error) {
 	f.simulateHits++
+	f.simulateBody = body
 	return f.simulateResp, f.simulateErr
 }
 
-func (f *fakeGovernance) SubmitRequestForTenant(_ context.Context, _ string, _ string, _ governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error) {
+func (f *fakeGovernance) SubmitRequestForTenant(_ context.Context, _ string, _ string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error) {
 	f.submitHits++
+	f.submitBody = body
 	return f.submitResp, nil
 }
 
@@ -191,6 +195,18 @@ func TestSubmitEscalatesRequireApprovalToNexusSubmit(t *testing.T) {
 	}
 	if gov.simulateHits != 1 || gov.submitHits != 1 {
 		t.Fatalf("expected simulate=1 submit=1, got simulate=%d submit=%d", gov.simulateHits, gov.submitHits)
+	}
+	for label, params := range map[string]map[string]any{"simulate": gov.simulateBody.Params, "submit": gov.submitBody.Params} {
+		binding, ok := params["action_binding"].(map[string]any)
+		if !ok {
+			t.Fatalf("%s params missing action_binding: %+v", label, params)
+		}
+		if binding["schema_version"] != "tool_intent.v1" || binding["org_id"] != orgID.String() || binding["target_system"] != "pymes" {
+			t.Fatalf("%s action_binding invalid: %+v", label, binding)
+		}
+		if binding["idempotency_key"] == "" || binding["payload_hash"] == "" {
+			t.Fatalf("%s action_binding missing idempotency/hash: %+v", label, binding)
+		}
 	}
 }
 

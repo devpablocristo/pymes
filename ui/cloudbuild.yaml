@@ -9,8 +9,6 @@ steps:
       - --build-arg
       - VITE_API_URL=${_VITE_API_URL}
       - --build-arg
-      - VITE_COMPANION_BASE_URL=${_VITE_COMPANION_BASE_URL}
-      - --build-arg
       - VITE_CLERK_PUBLISHABLE_KEY=${_VITE_CLERK_PUBLISHABLE_KEY}
       - --build-arg
       - VITE_API_KEY=${_VITE_API_KEY}
@@ -30,7 +28,6 @@ options:
 substitutions:
   _IMAGE: ''
   _VITE_API_URL: ''
-  _VITE_COMPANION_BASE_URL: ''
   _VITE_CLERK_PUBLISHABLE_KEY: ''
   _VITE_API_KEY: ''
 

@@ -2,6 +2,9 @@ package whatsapp
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,6 +18,8 @@ import (
 
 type CompanionClient struct {
 	caller *httpclient.Caller
+	apiKey string
+	jwt    companionJWTSigner
 }
 
 type MetaClient struct {
@@ -30,6 +35,23 @@ type CustomerMessagingInboundRequest struct {
 	ProfileName   string `json:"profile_name,omitempty"`
 }
 
+type CompanionConfig struct {
+	BaseURL             string
+	APIKey              string
+	InternalJWTSecret   string
+	InternalJWTIssuer   string
+	InternalJWTAudience string
+	HTTP                *http.Client
+	Now                 func() time.Time
+}
+
+type companionJWTSigner struct {
+	secret   string
+	issuer   string
+	audience string
+	now      func() time.Time
+}
+
 type metaSendResponse struct {
 	Messages []struct {
 		ID string `json:"id"`
@@ -38,15 +60,31 @@ type metaSendResponse struct {
 }
 
 func NewCompanionClient(baseURL, apiKey string) *CompanionClient {
+	return NewCompanionClientWithConfig(CompanionConfig{BaseURL: baseURL, APIKey: apiKey})
+}
+
+func NewCompanionClientWithConfig(cfg CompanionConfig) *CompanionClient {
 	h := make(http.Header)
-	if key := strings.TrimSpace(apiKey); key != "" {
+	jwtSecret := strings.TrimSpace(cfg.InternalJWTSecret)
+	if key := strings.TrimSpace(cfg.APIKey); key != "" && jwtSecret == "" {
 		h.Set("X-API-Key", key)
 	}
+	httpClient := cfg.HTTP
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 15 * time.Second}
+	}
 	return &CompanionClient{
+		apiKey: strings.TrimSpace(cfg.APIKey),
+		jwt: companionJWTSigner{
+			secret:   jwtSecret,
+			issuer:   defaultString(cfg.InternalJWTIssuer, "axis-bff"),
+			audience: defaultString(cfg.InternalJWTAudience, "companion"),
+			now:      cfg.Now,
+		},
 		caller: &httpclient.Caller{
-			BaseURL:     strings.TrimRight(strings.TrimSpace(baseURL), "/"),
+			BaseURL:     strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"),
 			Header:      h,
-			HTTP:        &http.Client{Timeout: 15 * time.Second},
+			HTTP:        httpClient,
 			MaxBodySize: 32 * 1024,
 		},
 	}
@@ -85,7 +123,11 @@ func (c *CompanionClient) ProcessWhatsApp(ctx context.Context, req cm.InboundMes
 		MessageID:     req.MessageID,
 		ProfileName:   req.ProfileName,
 	}
-	st, raw, err := c.caller.DoJSON(ctx, http.MethodPost, "/v1/internal/customer-messaging/inbound", body)
+	opts := make([]httpclient.RequestOption, 0, 1)
+	if token, ok := c.jwt.Sign(req.OrgID.String()); ok {
+		opts = append(opts, httpclient.WithHeader("Authorization", "Bearer "+token))
+	}
+	st, raw, err := c.caller.DoJSON(ctx, http.MethodPost, "/v1/customer-messaging/inbound", body, opts...)
 	if err != nil {
 		return cm.CompanionMessageResponse{}, err
 	}
@@ -96,7 +138,65 @@ func (c *CompanionClient) ProcessWhatsApp(ctx context.Context, req cm.InboundMes
 	if err := json.Unmarshal(raw, &out); err != nil {
 		return cm.CompanionMessageResponse{}, err
 	}
+	if strings.TrimSpace(out.ConversationID) == "" {
+		return cm.CompanionMessageResponse{}, fmt.Errorf("companion service returned invalid response: conversation_id is required")
+	}
 	return out, nil
+}
+
+func (s companionJWTSigner) Sign(orgID string) (string, bool) {
+	if strings.TrimSpace(s.secret) == "" || strings.TrimSpace(orgID) == "" {
+		return "", false
+	}
+	now := time.Now().UTC()
+	if s.now != nil {
+		now = s.now().UTC()
+	}
+	claims := map[string]any{
+		"iss":               s.issuer,
+		"aud":               s.audience,
+		"sub":               "pymes-whatsapp-bridge",
+		"org_id":            strings.TrimSpace(orgID),
+		"actor_id":          "pymes-whatsapp-bridge",
+		"actor_type":        "service",
+		"role":              "service",
+		"scope":             "companion:tasks:write",
+		"service_principal": true,
+		"on_behalf_of":      "pymes-whatsapp-bridge",
+		"product_surface":   "pymes",
+		"iat":               now.Unix(),
+		"nbf":               now.Add(-30 * time.Second).Unix(),
+		"exp":               now.Add(5 * time.Minute).Unix(),
+	}
+	token, err := signHS256(claims, s.secret)
+	if err != nil {
+		return "", false
+	}
+	return token, true
+}
+
+func signHS256(claims map[string]any, secret string) (string, error) {
+	headerJSON, err := json.Marshal(map[string]string{"alg": "HS256", "typ": "JWT"})
+	if err != nil {
+		return "", err
+	}
+	claimsJSON, err := json.Marshal(claims)
+	if err != nil {
+		return "", err
+	}
+	header := base64.RawURLEncoding.EncodeToString(headerJSON)
+	payload := base64.RawURLEncoding.EncodeToString(claimsJSON)
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte(header + "." + payload))
+	signature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	return header + "." + payload + "." + signature, nil
+}
+
+func defaultString(value, fallback string) string {
+	if trimmed := strings.TrimSpace(value); trimmed != "" {
+		return trimmed
+	}
+	return fallback
 }
 
 func (c *MetaClient) sendMessage(ctx context.Context, phoneNumberID, accessToken string, payload any) (string, error) {

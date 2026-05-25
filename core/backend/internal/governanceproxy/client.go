@@ -20,6 +20,19 @@ type Client struct {
 	caller *httpclient.Caller
 }
 
+type submitRequestWireBody struct {
+	RequesterType  string         `json:"requester_type"`
+	RequesterID    string         `json:"requester_id"`
+	RequesterName  string         `json:"requester_name,omitempty"`
+	ActionType     string         `json:"action_type"`
+	TargetSystem   string         `json:"target_system,omitempty"`
+	TargetResource string         `json:"target_resource,omitempty"`
+	ActionBinding  map[string]any `json:"action_binding,omitempty"`
+	Params         map[string]any `json:"params,omitempty"`
+	Reason         string         `json:"reason,omitempty"`
+	Context        string         `json:"context,omitempty"`
+}
+
 // NewClient crea un nuevo cliente HTTP hacia Nexus Governance.
 func NewClient(baseURL, apiKey string) *Client {
 	header := make(http.Header)
@@ -44,7 +57,7 @@ func (c *Client) SubmitRequestForTenant(ctx context.Context, tenantID, idempoten
 	}
 
 	var out governanceclient.SubmitResponse
-	st, raw, err := c.caller.DoJSON(ctx, http.MethodPost, "/v1/requests", body, opts...)
+	st, raw, err := c.caller.DoJSON(ctx, http.MethodPost, "/v1/requests", submitWireBody(body), opts...)
 	if err != nil {
 		return out, fmt.Errorf("governance submit: %w", err)
 	}
@@ -55,6 +68,44 @@ func (c *Client) SubmitRequestForTenant(ctx context.Context, tenantID, idempoten
 		return out, fmt.Errorf("decode submit response: %w", err)
 	}
 	return out, nil
+}
+
+func submitWireBody(body governanceclient.SubmitRequestBody) submitRequestWireBody {
+	return submitRequestWireBody{
+		RequesterType:  body.RequesterType,
+		RequesterID:    body.RequesterID,
+		RequesterName:  body.RequesterName,
+		ActionType:     body.ActionType,
+		TargetSystem:   body.TargetSystem,
+		TargetResource: body.TargetResource,
+		ActionBinding:  actionBindingFromParams(body.Params),
+		Params:         body.Params,
+		Reason:         body.Reason,
+		Context:        body.Context,
+	}
+}
+
+func actionBindingFromParams(params map[string]any) map[string]any {
+	if len(params) == 0 {
+		return nil
+	}
+	raw, ok := params["action_binding"]
+	if !ok {
+		return nil
+	}
+	binding, ok := raw.(map[string]any)
+	if !ok || len(binding) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(binding))
+	for key, value := range binding {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		out[key] = value
+	}
+	return out
 }
 
 func (c *Client) SimulateRequestForTenant(ctx context.Context, tenantID string, body governanceclient.SimulateRequestBody) (governanceclient.SimulateResponse, error) {

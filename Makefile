@@ -4,7 +4,7 @@
 	up down ps logs \
 	go-compile staticcheck ruff lint companion-openapi-check \
 	audit audit-baseline audit-crud audit-crud-json audit-crud-strict audit-debt audit-governance axis-contracts-check ui-typecheck ai-test \
-	seed seed-clear seed-clear-verify seed-verify seed-reset modules-check cleanup-pablo e2e-governance-notifications \
+	seed seed-clear seed-clear-verify seed-verify seed-reset modules-check cleanup-pablo e2e-governance-notifications e2e-axis-negative \
 	build-docker-ui test-docker-ui lint-docker-ui test-docker-core test-docker-workshops \
 	build test test-ui-e2e
 
@@ -118,6 +118,10 @@ seed-reset:
 # Uso: `make e2e-governance-notifications` o `make e2e-governance-notifications DECISION=reject`
 e2e-governance-notifications:
 	bash scripts/e2e-governance-notifications.sh "$(DECISION)"
+
+# Negative/live smoke de contratos Axis Nexus/Companion consumidos por Pymes.
+e2e-axis-negative:
+	bash scripts/e2e-axis-negative.sh
 
 # Limpieza del árbol padre (p.ej. ~/Projects/Pablo): caches Python, vacíos, binarios Go sueltos bajo backend/cmd, dirs vacíos.
 # Simular: make cleanup-pablo DRY_RUN=1

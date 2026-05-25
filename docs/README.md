@@ -18,6 +18,7 @@
 | [UI System](UI_SYSTEM.md) | Tokens de diseño, fuentes, dark mode, componentes shared y reglas para CSS nuevo. Estado de la migración Wooko → Pymes. |
 | [Database Init](DATABASE_INIT.md) | Bootstrap del schema desde DB vacía, orden de migraciones post-squash, debug y convenciones (identidad `orgs`, soft-delete `archived_at`, etc). |
 | [Migrations Audit](MIGRATIONS_AUDIT.md) | Inventario pre-squash de las 125 migraciones legacy + diagnóstico del drift cross-source que motivó el cutover. |
+| [Integración Axis](AXIS_INTEGRATION.md) | Boundary Pymes backend ↔ Axis Companion/Nexus, credenciales server-side y firma de callbacks. |
 
 `architecture/` — diagramas o notas adicionales (vacío hasta que se agregue contenido).
 

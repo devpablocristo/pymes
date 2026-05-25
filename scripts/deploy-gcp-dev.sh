@@ -186,7 +186,6 @@ log "building ui static bundle"
 (
   cd "$REPO_ROOT/ui"
   export VITE_API_URL="/"
-  export VITE_COMPANION_BASE_URL="/"
   export VITE_CLERK_PUBLISHABLE_KEY="$FRONTEND_CLERK_PUBLISHABLE_KEY"
   npm ci
   npm run build

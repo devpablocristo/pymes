@@ -4,15 +4,32 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 E2E_BASE_URL="${BASE_URL:-}"
-E2E_GOVERNANCE_URL="${GOVERNANCE_URL:-}"
+E2E_GOVERNANCE_URL="${E2E_GOVERNANCE_URL:-}"
 E2E_API_KEY="${API_KEY:-}"
 E2E_GOVERNANCE_API_KEY="${GOVERNANCE_API_KEY:-}"
 # shellcheck source=scripts/seeds/lib.sh
 source "$ROOT_DIR/scripts/seeds/lib.sh"
 
 DECISION="${1:-approve}"
-BASE_URL="${E2E_BASE_URL:-${BASE_URL:-http://localhost:8100}}"
-GOVERNANCE_URL="${E2E_GOVERNANCE_URL:-${GOVERNANCE_URL:-http://localhost:18084}}"
+E2E_MODE="${E2E_MODE:-host}"
+case "$E2E_MODE" in
+  host)
+    BASE_URL="${E2E_BASE_URL:-${PYMES_BASE_URL_HOST:-http://localhost:8100}}"
+    GOVERNANCE_URL="${E2E_GOVERNANCE_URL:-${GOVERNANCE_URL_HOST:-http://localhost:18084}}"
+    ;;
+  compose)
+    BASE_URL="${E2E_BASE_URL:-${PYMES_BASE_URL_COMPOSE:-http://cp-backend:8080}}"
+    GOVERNANCE_URL="${E2E_GOVERNANCE_URL:-${GOVERNANCE_URL_COMPOSE:-http://host.docker.internal:18084}}"
+    ;;
+  ci)
+    BASE_URL="${E2E_BASE_URL:-${PYMES_BASE_URL_CI:-http://localhost:8100}}"
+    GOVERNANCE_URL="${E2E_GOVERNANCE_URL:-${GOVERNANCE_URL_CI:-http://localhost:18084}}"
+    ;;
+  *)
+    echo "E2E_MODE debe ser host, compose o ci" >&2
+    exit 1
+    ;;
+esac
 API_KEY="${E2E_API_KEY:-${API_KEY:-psk_local_admin}}"
 GOVERNANCE_API_KEY="${E2E_GOVERNANCE_API_KEY:-${GOVERNANCE_API_KEY:-nexus-admin-dev-key}}"
 if [[ -z "${TENANT_ID:-}" ]]; then

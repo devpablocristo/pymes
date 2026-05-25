@@ -20,6 +20,7 @@ import (
 	"github.com/devpablocristo/pymes/core/backend/internal/accounts"
 	"github.com/devpablocristo/pymes/core/backend/internal/admin"
 	"github.com/devpablocristo/pymes/core/backend/internal/agent"
+	"github.com/devpablocristo/pymes/core/backend/internal/assistantproxy"
 	"github.com/devpablocristo/pymes/core/backend/internal/attachments"
 	"github.com/devpablocristo/pymes/core/backend/internal/audit"
 	"github.com/devpablocristo/pymes/core/backend/internal/businessinsights"
@@ -198,7 +199,20 @@ func InitializeApp() *app.App {
 		Scopes:       []string{googleoauth.ScopeCalendar},
 	})
 	calendarSyncUC := calendar_sync.NewUsecases(calendarSyncRepo, paymentGatewayCrypto, googleOAuthClient, calendar_sync.Config{})
-	whatsappCompanionClient := customerwhatsapp.NewCompanionClient(cfg.CompanionInternalURL, cfg.CompanionAPIKey)
+	whatsappCompanionClient := customerwhatsapp.NewCompanionClientWithConfig(customerwhatsapp.CompanionConfig{
+		BaseURL:             cfg.CompanionInternalURL,
+		APIKey:              cfg.CompanionAPIKey,
+		InternalJWTSecret:   cfg.CompanionInternalJWTSecret,
+		InternalJWTIssuer:   cfg.CompanionInternalJWTIssuer,
+		InternalJWTAudience: cfg.CompanionInternalJWTAudience,
+	})
+	assistantProxyClient := assistantproxy.NewClient(assistantproxy.Config{
+		BaseURL:             cfg.CompanionInternalURL,
+		APIKey:              cfg.CompanionAPIKey,
+		InternalJWTSecret:   cfg.CompanionInternalJWTSecret,
+		InternalJWTIssuer:   cfg.CompanionInternalJWTIssuer,
+		InternalJWTAudience: cfg.CompanionInternalJWTAudience,
+	})
 	whatsappMetaClient := customerwhatsapp.NewMetaClient(cfg.WhatsAppGraphAPIBaseURL)
 	customerMessagingUC := customer_messaging.NewUsecases(
 		customerMessagingRepo,
@@ -300,6 +314,7 @@ func InitializeApp() *app.App {
 	outwebhooksHandler := outwebhooks.NewHandler(outwebhooksUC)
 	partyHandler := party.NewHandler(partyUC)
 	pdfgenHandler := pdfgen.NewHandler(pdfgenUC)
+	assistantProxyHandler := assistantproxy.NewHandler(assistantProxyClient)
 	returnsHandler := returns.NewHandler(returnsUC)
 	timelineHandler := timeline.NewHandler(timelineUC)
 	schedulingHandler := schedulinghttp.NewHandler(schedulingUC)
@@ -361,6 +376,7 @@ func InitializeApp() *app.App {
 			auditHandler,
 			notificationHandler,
 			inAppNotifHandler,
+			assistantProxyHandler,
 		},
 		rbac: []rbacRoutesRegistrar{
 			partyHandler,

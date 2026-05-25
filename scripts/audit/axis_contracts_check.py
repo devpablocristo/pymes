@@ -23,6 +23,7 @@ COMPANION_ROUTES = [
     ("GET", "/v1/chat/conversations"),
     ("GET", "/v1/chat/conversations/{id}"),
     ("POST", "/v1/notifications"),
+    ("POST", "/v1/customer-messaging/inbound"),
     ("GET", "/v1/watchers"),
     ("POST", "/v1/watchers"),
     ("PATCH", "/v1/watchers/{id}"),
@@ -70,6 +71,8 @@ FORBIDDEN_OPERATIONAL_REFERENCES = [
     re.compile(re.escape("nexus_governance")),
     re.compile(re.escape("pymes/ai")),
 ]
+
+OLD_COMPANION_INTERNAL_CUSTOMER_MESSAGING_ROUTE = "/v1/" + "internal/customer-messaging/inbound"
 
 
 def fail(message: str) -> int:
@@ -129,10 +132,6 @@ def main() -> int:
         errors.extend(check_routes(companion, COMPANION_ROUTES, "Axis Companion"))
         errors.extend(check_routes(nexus, NEXUS_ROUTES, "Axis Nexus"))
 
-    handler = AXIS_ROOT / "companion" / "internal" / "tasks" / "handler.go"
-    if not handler.exists() or '"POST /v1/internal/customer-messaging/inbound"' not in handler.read_text(encoding="utf-8"):
-        errors.append("Axis Companion internal customer-messaging inbound route is missing")
-
     tracked_ai = subprocess.run(
         ["git", "ls-files", "ai"],
         cwd=ROOT,
@@ -149,6 +148,23 @@ def main() -> int:
         for pattern in FORBIDDEN_OPERATIONAL_REFERENCES:
             if pattern.search(text):
                 errors.append(f"{rel}: forbidden operational reference {pattern.pattern!r}")
+
+    tracked = subprocess.run(
+        ["git", "ls-files"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    for raw_rel in tracked.stdout.splitlines():
+        if not raw_rel or raw_rel == "scripts/audit/axis_contracts_check.py":
+            continue
+        path = ROOT / raw_rel
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if OLD_COMPANION_INTERNAL_CUSTOMER_MESSAGING_ROUTE in text:
+            errors.append(f"{raw_rel}: forbidden Companion internal customer-messaging route")
 
     if errors:
         for error in errors:

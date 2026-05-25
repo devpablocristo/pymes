@@ -20,7 +20,7 @@ Antes de documentar o cambiar comportamiento, verificar contra codigo real con `
 - `professionals/`, `workshops/`, `beauty/`, `restaurants/`, `medical/`: backends Go verticales.
 - `ui/`: consola React/Vite unificada.
 - `mobile/`: app Expo / React Native con Expo Router, Clerk y Zustand.
-- `ai/`: servicio FastAPI historico/de soporte; el chat local actual apunta a Companion como repo hermano via `VITE_COMPANION_BASE_URL`.
+- `ai/`: runtime FastAPI historico retirado del camino canonico; el chat local entra por Pymes backend y este llama server-side a Axis Companion.
 - `docs/`: documentacion de arquitectura, API, gobernanza, UI y migraciones.
 - `scripts/`: auditorias, seeds, migraciones, infra y utilidades.
 - `infra/`: definicion declarativa de verticales y recursos asociados.
@@ -115,8 +115,8 @@ Mobile:
 
 AI / Companion:
 
-- `ai/` conserva runtime FastAPI y checks `ruff` / `pytest`.
-- Chat en UI usa Companion por `VITE_COMPANION_BASE_URL`; no asumir que el compose de Pymes levanta un servicio AI local.
+- `ai/` no es runtime canonico del producto.
+- Chat en UI usa `/v1/ai/*` en Pymes backend; Pymes backend llama Axis Companion con `COMPANION_INTERNAL_URL` y credenciales server-side.
 
 ## Posiblemente obsoleto / pendiente de confirmar
 

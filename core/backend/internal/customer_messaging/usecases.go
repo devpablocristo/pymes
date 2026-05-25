@@ -29,6 +29,7 @@ type RepositoryPort interface {
 	GetConnectionStats(ctx context.Context, orgID uuid.UUID) (domain.ConnectionStats, error)
 
 	SaveMessage(ctx context.Context, msg domain.Message) error
+	MessageExistsByWAMessageID(ctx context.Context, orgID uuid.UUID, waMessageID string) (bool, error)
 	UpdateMessageStatus(ctx context.Context, waMessageID string, status domain.MessageStatus, errorCode, errorMsg string) error
 	ListMessages(ctx context.Context, filter domain.MessageFilter) ([]domain.Message, int, error)
 

@@ -210,7 +210,11 @@ func (h *Handler) approve(c *gin.Context) {
 		req = dto.ApprovalDecisionRequest{}
 	}
 
-	body := map[string]string{"decided_by": "owner", "note": req.Note}
+	actorID, ok := decisionActorFromAuth(c)
+	if !ok {
+		return
+	}
+	body := map[string]string{"decided_by": actorID, "note": req.Note}
 
 	status, data, err := h.client.ApproveForTenant(c.Request.Context(), orgID, id, body)
 	if err != nil {
@@ -237,7 +241,11 @@ func (h *Handler) reject(c *gin.Context) {
 		req = dto.ApprovalDecisionRequest{}
 	}
 
-	body := map[string]string{"decided_by": "owner", "note": req.Note}
+	actorID, ok := decisionActorFromAuth(c)
+	if !ok {
+		return
+	}
+	body := map[string]string{"decided_by": actorID, "note": req.Note}
 
 	status, data, err := h.client.RejectForTenant(c.Request.Context(), orgID, id, body)
 	if err != nil {
@@ -262,4 +270,14 @@ func tenantIDFromAuth(c *gin.Context) (string, bool) {
 		return "", false
 	}
 	return orgID, true
+}
+
+func decisionActorFromAuth(c *gin.Context) (string, bool) {
+	auth := handlers.GetAuthContext(c)
+	actorID := strings.TrimSpace(auth.Actor)
+	if actorID == "" {
+		c.JSON(http.StatusForbidden, gin.H{"code": "actor_required", "message": "actor autenticado requerido"})
+		return "", false
+	}
+	return actorID, true
 }

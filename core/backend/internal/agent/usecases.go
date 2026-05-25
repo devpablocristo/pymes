@@ -279,6 +279,7 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 					"request_id":        strings.TrimSpace(in.RequestID),
 					"executor_status":   capability.ExecutorStatus,
 					"requires_callback": true,
+					"action_binding":    buildGovernanceActionBinding(orgID.String(), in.Auth, capability, payloadHash, idempotencyKey, strings.TrimSpace(in.RequestID), strings.TrimSpace(in.ConfirmationID)),
 				},
 			})
 			if err != nil {
@@ -375,6 +376,27 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 	}
 	u.logExecution(ctx, in.Auth, capability, payloadHash, "agent.action.executor_missing", reviewRequestID, idempotencyKey)
 	return ExecuteResult{StatusCode: http.StatusNotImplemented, Output: output}, nil
+}
+
+func buildGovernanceActionBinding(orgID string, auth ActorContext, capability Capability, payloadHash, idempotencyKey, requestID, confirmationID string) map[string]any {
+	runID := defaultString(requestID, idempotencyKey)
+	invocationID := defaultString(confirmationID, idempotencyKey)
+	return map[string]any{
+		"schema_version":     "tool_intent.v1",
+		"org_id":             strings.TrimSpace(orgID),
+		"actor_id":           strings.TrimSpace(auth.Actor),
+		"actor_type":         requesterType(auth.AuthMethod),
+		"product_surface":    "pymes",
+		"run_id":             runID,
+		"tool_invocation_id": invocationID,
+		"connector_id":       "pymes." + strings.TrimSpace(capability.OwnerModule),
+		"capability_id":      strings.TrimSpace(capability.ID),
+		"operation":          strings.TrimSpace(capability.Action),
+		"target_system":      "pymes",
+		"target_resource":    strings.TrimSpace(capability.Resource),
+		"payload_hash":       strings.TrimSpace(payloadHash),
+		"idempotency_key":    strings.TrimSpace(idempotencyKey),
+	}
 }
 
 func (u *Usecases) ListEvents(ctx context.Context, auth ActorContext, limit int, capabilityID, requestID string) ([]AgentEvent, error) {

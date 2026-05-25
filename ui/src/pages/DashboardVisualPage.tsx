@@ -31,6 +31,7 @@ import type {
   QuotesPipelineData,
   RecentSalesData,
   TopServicesData,
+  TopCustomersData,
 } from '../dashboard/types';
 import './DashboardVisualPage.css';
 
@@ -713,18 +714,7 @@ function TopServices() {
 // ─── Clientes frecuentes ───
 
 function FrequentCustomers() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['frequent-customers'],
-    queryFn: async () => {
-      try {
-        return await apiRequest<{ items?: DashItem[] }>('/v1/dashboard-data/top-customers');
-      } catch {
-        return { items: [] as DashItem[] };
-      }
-    },
-    staleTime: 60_000,
-    retry: 0,
-  });
+  const { data, isLoading } = useDashboardDataEndpoint<TopCustomersData>('/v1/dashboard-data/top-customers', HOME_DASHBOARD_CONTEXT);
 
   const items = data?.items ?? [];
   if (!isLoading && items.length === 0) return null;
@@ -740,7 +730,7 @@ function FrequentCustomers() {
             const name = displayName(c.name ?? c.customer_name ?? c.party_name);
             const pal  = avatarPalette(name);
             return (
-              <div key={c.id ?? i} className="spike-row-item">
+              <div key={c.customer_id ?? c.party_id ?? c.id ?? `${name}-${i}`} className="spike-row-item">
                 <div className="spike-avatar-sm" style={{ background: pal.bg, color: pal.color }}>{initials(name)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="spike-avatar-name">{name}</div>
@@ -953,11 +943,11 @@ function Debtors() {
       <div className="spike-card-body">
         <div className="spike-section-title" style={{ marginBottom: 12 }}>Con saldo pendiente</div>
         {isLoading ? <div className="spinner" /> : (
-          items.slice(0, 5).map((d) => {
+          items.slice(0, 5).map((d, i) => {
             const name = displayName(d.party_name);
             const pal = avatarPalette(name);
             return (
-              <div key={d.party_id} className="spike-row-item">
+              <div key={d.party_id || `${name}-${i}`} className="spike-row-item">
                 <div className="spike-avatar-sm" style={{ background: pal.bg, color: pal.color }}>{initials(name)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="spike-avatar-name">{name}</div>

@@ -89,6 +89,18 @@ func fixedDashboardWidgets() []dashboarddomain.WidgetDefinition {
 			Status:            "active",
 		},
 		{
+			WidgetKey:         "customers.top",
+			Title:             "Clientes frecuentes",
+			Description:       "Clientes con mayor facturacion en el periodo.",
+			Domain:            "control-plane",
+			Kind:              "list",
+			SupportedContexts: []string{"home"},
+			AllowedRoles:      []string{"owner", "admin", "member", "service"},
+			SettingsSchema:    map[string]any{},
+			DataEndpoint:      "/v1/dashboard-data/top-customers",
+			Status:            "active",
+		},
+		{
 			WidgetKey:         "billing.subscription",
 			Title:             "Estado del plan",
 			Description:       "Plan actual, estado de facturacion y limites.",

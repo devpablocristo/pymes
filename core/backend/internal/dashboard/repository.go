@@ -220,6 +220,26 @@ func (r *Repository) LoadTopServices(ctx context.Context, orgID uuid.UUID, branc
 	return out, err
 }
 
+func (r *Repository) LoadTopCustomers(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopCustomersData, error) {
+	out := dashboarddomain.TopCustomersData{Period: currentPeriodLabel()}
+	q := r.db.WithContext(ctx).Table("sales s")
+	q = applyEntityBranchFilter(q, "s", branchID)
+	err := q.Select(`
+			COALESCE(s.party_id::text, '') AS customer_id,
+			COALESCE(s.party_id::text, '') AS party_id,
+			COALESCE(NULLIF(s.party_name, ''), 'Cliente sin nombre') AS name,
+			COUNT(*) AS visit_count,
+			COALESCE(SUM(s.total), 0) AS total
+		`).
+		Where("s.org_id = ? AND s.created_at >= ? AND s.status = 'completed'", orgID, currentMonthStart()).
+		Group("s.party_id, COALESCE(NULLIF(s.party_name, ''), 'Cliente sin nombre')").
+		Order("SUM(s.total) DESC").
+		Order("COUNT(*) DESC").
+		Limit(5).
+		Scan(&out.Items).Error
+	return out, err
+}
+
 type billingStatusRow struct {
 	PlanCode   string    `gorm:"column:plan_code"`
 	Status     string    `gorm:"column:billing_status"`

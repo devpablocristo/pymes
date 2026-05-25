@@ -117,6 +117,7 @@ describe('DashboardVisualPage', () => {
     expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/quotes-pipeline?context=home');
     expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/recent-sales?context=home');
     expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/top-services?context=home');
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/top-customers?context=home');
   });
 
   it('does not crash when dashboard payloads are incomplete', async () => {
@@ -184,6 +185,9 @@ describe('DashboardVisualPage', () => {
     );
     expect(apiMocks.apiRequest).toHaveBeenCalledWith(
       '/v1/dashboard-data/top-services?context=home&branch_id=branch-active',
+    );
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith(
+      '/v1/dashboard-data/top-customers?context=home&branch_id=branch-active',
     );
   });
 });

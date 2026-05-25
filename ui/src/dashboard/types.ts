@@ -72,6 +72,19 @@ export type TopServicesData = {
   items: TopService[];
 };
 
+export type TopCustomer = {
+  customer_id?: string;
+  party_id?: string;
+  name: string;
+  visit_count: number;
+  total: number;
+};
+
+export type TopCustomersData = {
+  period: string;
+  items: TopCustomer[];
+};
+
 export type BillingStatusData = {
   plan_code: string;
   status: string;

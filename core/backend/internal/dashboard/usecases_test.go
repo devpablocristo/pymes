@@ -15,6 +15,7 @@ type fakeDashboardRepo struct {
 	widgets        []dashboarddomain.WidgetDefinition
 	topServices    dashboarddomain.TopServicesData
 	topServicesErr error
+	topCustomers   dashboarddomain.TopCustomersData
 	lastBranchID   *uuid.UUID
 }
 
@@ -72,6 +73,13 @@ func (f *fakeDashboardRepo) LoadTopServices(ctx context.Context, orgID uuid.UUID
 	return f.topServices, f.topServicesErr
 }
 
+func (f *fakeDashboardRepo) LoadTopCustomers(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopCustomersData, error) {
+	_ = ctx
+	_ = orgID
+	f.lastBranchID = branchID
+	return f.topCustomers, nil
+}
+
 func (f *fakeDashboardRepo) LoadBillingStatus(ctx context.Context, orgID uuid.UUID) (dashboarddomain.BillingStatusData, error) {
 	_ = ctx
 	_ = orgID
@@ -107,7 +115,7 @@ func TestGetWidgetDataReturnsTopServices(t *testing.T) {
 
 	out, err := uc.GetWidgetData(context.Background(), dashboarddomain.Viewer{
 		OrgID: uuid.New(),
-		Role:     "admin",
+		Role:  "admin",
 	}, "home", "top-services")
 	if err != nil {
 		t.Fatalf("GetWidgetData() error = %v", err)
@@ -122,6 +130,47 @@ func TestGetWidgetDataReturnsTopServices(t *testing.T) {
 	}
 	if data.Items[0].ServiceID != "svc-1" {
 		t.Fatalf("ServiceID = %q; want svc-1", data.Items[0].ServiceID)
+	}
+}
+
+func TestGetWidgetDataReturnsTopCustomers(t *testing.T) {
+	repo := &fakeDashboardRepo{
+		widgets: []dashboarddomain.WidgetDefinition{
+			{
+				WidgetKey:         "customers.top",
+				Title:             "Clientes frecuentes",
+				DataEndpoint:      "/v1/dashboard-data/top-customers",
+				Status:            "active",
+				AllowedRoles:      []string{"admin"},
+				SupportedContexts: []string{"home"},
+			},
+		},
+		topCustomers: dashboarddomain.TopCustomersData{
+			Period: "2026-05",
+			Items: []dashboarddomain.TopCustomer{
+				{PartyID: "party-1", CustomerID: "party-1", Name: "Medlab", VisitCount: 3, Total: 45000},
+			},
+		},
+	}
+	uc := NewUsecases(repo)
+
+	out, err := uc.GetWidgetData(context.Background(), dashboarddomain.Viewer{
+		OrgID: uuid.New(),
+		Role:  "admin",
+	}, "home", "top-customers")
+	if err != nil {
+		t.Fatalf("GetWidgetData() error = %v", err)
+	}
+
+	data, ok := out.(dashboarddomain.TopCustomersData)
+	if !ok {
+		t.Fatalf("GetWidgetData() type = %T; want dashboarddomain.TopCustomersData", out)
+	}
+	if len(data.Items) != 1 {
+		t.Fatalf("len(Items) = %d; want 1", len(data.Items))
+	}
+	if data.Items[0].PartyID != "party-1" {
+		t.Fatalf("PartyID = %q; want party-1", data.Items[0].PartyID)
 	}
 }
 
@@ -142,7 +191,7 @@ func TestGetWidgetDataRejectsWidgetHiddenByRole(t *testing.T) {
 
 	_, err := uc.GetWidgetData(context.Background(), dashboarddomain.Viewer{
 		OrgID: uuid.New(),
-		Role:     "member",
+		Role:  "member",
 	}, "home", "billing-status")
 	if !errors.Is(err, httperrors.ErrNotFound) {
 		t.Fatalf("GetWidgetData() error = %v; want ErrNotFound", err)
@@ -194,8 +243,8 @@ func TestGetWidgetDataAllowsScopedViewerWithoutRole(t *testing.T) {
 	uc := NewUsecases(repo)
 
 	out, err := uc.GetWidgetData(context.Background(), dashboarddomain.Viewer{
-		OrgID: uuid.New(),
-		Scopes:   []string{"admin:console:read"},
+		OrgID:  uuid.New(),
+		Scopes: []string{"admin:console:read"},
 	}, "home", "top-services")
 	if err != nil {
 		t.Fatalf("GetWidgetData() error = %v", err)
@@ -227,7 +276,7 @@ func TestGetWidgetDataForwardsViewerBranchID(t *testing.T) {
 	branchID := uuid.New()
 
 	if _, err := uc.GetWidgetData(context.Background(), dashboarddomain.Viewer{
-		OrgID: uuid.New(),
+		OrgID:    uuid.New(),
 		BranchID: &branchID,
 		Role:     "admin",
 	}, "home", "top-services"); err != nil {

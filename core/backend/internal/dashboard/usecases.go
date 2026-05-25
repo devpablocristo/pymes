@@ -22,6 +22,7 @@ type RepositoryPort interface {
 	LoadRecentSales(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.RecentSalesData, error)
 	LoadTopProducts(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopProductsData, error)
 	LoadTopServices(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopServicesData, error)
+	LoadTopCustomers(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopCustomersData, error)
 	LoadBillingStatus(ctx context.Context, orgID uuid.UUID) (dashboarddomain.BillingStatusData, error)
 	LoadAuditActivity(ctx context.Context, orgID uuid.UUID) (dashboarddomain.AuditActivityData, error)
 }
@@ -55,6 +56,8 @@ func (u *Usecases) GetWidgetData(ctx context.Context, viewer dashboarddomain.Vie
 		return u.repo.LoadTopProducts(ctx, viewer.OrgID, viewer.BranchID)
 	case "services.top":
 		return u.repo.LoadTopServices(ctx, viewer.OrgID, viewer.BranchID)
+	case "customers.top":
+		return u.repo.LoadTopCustomers(ctx, viewer.OrgID, viewer.BranchID)
 	case "billing.subscription":
 		return u.repo.LoadBillingStatus(ctx, viewer.OrgID)
 	case "audit.activity":

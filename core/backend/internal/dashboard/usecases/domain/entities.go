@@ -7,7 +7,7 @@ import (
 )
 
 type Viewer struct {
-	OrgID uuid.UUID
+	OrgID    uuid.UUID
 	BranchID *uuid.UUID
 	Actor    string
 	Role     string
@@ -98,6 +98,19 @@ type TopService struct {
 type TopServicesData struct {
 	Period string       `json:"period"`
 	Items  []TopService `json:"items"`
+}
+
+type TopCustomer struct {
+	CustomerID string  `json:"customer_id,omitempty"`
+	PartyID    string  `json:"party_id,omitempty"`
+	Name       string  `json:"name"`
+	VisitCount int64   `json:"visit_count"`
+	Total      float64 `json:"total"`
+}
+
+type TopCustomersData struct {
+	Period string        `json:"period"`
+	Items  []TopCustomer `json:"items"`
 }
 
 type BillingStatusData struct {

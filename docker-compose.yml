@@ -1,6 +1,6 @@
 services:
-  # Nexus Governance no va en este compose: levantalo en ../nexus (`make up` en ese repo).
-  # GOVERNANCE_URL debe usar host.docker.internal y el mismo puerto host que GOVERNANCE_PORT en ../nexus/.env (típico 18084).
+  # Axis Nexus no va en este compose: levantalo en ../axis (`make up` en ese repo).
+  # GOVERNANCE_URL debe usar host.docker.internal y el mismo puerto host que NEXUS_PORT en ../axis/.env (típico 18084).
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -43,7 +43,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      # Debe coincidir con el mapeo host 8100:8080 y con GOVERNANCE_PORT publicado por Nexus en el host.
+      # Debe coincidir con el mapeo host 8100:8080 y con NEXUS_PORT publicado por Axis Nexus en el host.
       PORT: "8080"
       ENVIRONMENT: development
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
@@ -64,6 +64,7 @@ services:
       GOVERNANCE_CALLBACK_TOKEN: ${GOVERNANCE_CALLBACK_TOKEN:-local-governance-callback-token}
       # Endpoint interno de Axis Companion para inbound WhatsApp y adapters IA.
       COMPANION_INTERNAL_URL: ${COMPANION_INTERNAL_URL:-http://host.docker.internal:18085}
+      COMPANION_API_KEY: ${COMPANION_API_KEY:-companion-admin-dev-key}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
       interval: 5s
@@ -105,9 +106,10 @@ services:
       VITE_RESTAURANTS_API_URL: http://localhost:8484
       VITE_MEDICAL_API_URL: http://localhost:8585
       # Chat ahora servido por Axis Companion. Default local apunta al docker-compose
-      # de ../axis/companion en su puerto 18085. Override con
+      # de ../axis en su puerto 18085. Override con
       # VITE_COMPANION_BASE_URL en .env si el setup difiere.
       VITE_COMPANION_BASE_URL: ${VITE_COMPANION_BASE_URL:-http://host.docker.internal:18085}
+      VITE_COMPANION_API_KEY: ${VITE_COMPANION_API_KEY:-}
       # Clerk: definir en .env junto al resto (pk_test_...). Vacío = modo consola con API key.
       VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
       VITE_API_KEY: ${VITE_API_KEY:-psk_local_admin}
@@ -118,7 +120,7 @@ services:
       - cp-backend
 
   # ── Chat IA servido por Axis Companion. Para levantarlo localmente:
-  # docker compose -f ../axis/companion/docker-compose.yml up companion.
+  # docker compose --project-directory ../axis -f ../axis/docker-compose.yml up companion.
 
   # ── Professionals Vertical ──
 

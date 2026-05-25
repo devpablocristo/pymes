@@ -16,6 +16,7 @@ package wire
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	lifecycle "github.com/devpablocristo/platform/lifecycle/go/lifecycle"
@@ -25,6 +26,14 @@ import (
 	"gorm.io/gorm"
 )
 
+func parseLifecycleTenantID(tenantID string) (uuid.UUID, error) {
+	id, err := uuid.Parse(tenantID)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("invalid lifecycle tenant id %q: %w", tenantID, err)
+	}
+	return id, nil
+}
+
 // customersLifecycleRepo wraps *customers.Repository to satisfy lifecycle.RepositoryPort.
 // db is held alongside the repository to power IsArchived without requiring a
 // new exported method on customers.Repository.
@@ -33,20 +42,36 @@ type customersLifecycleRepo struct {
 	db   *gorm.DB
 }
 
-func (a *customersLifecycleRepo) SoftDelete(ctx context.Context, tenantID, resourceID uuid.UUID, _ time.Time) error {
-	return a.repo.SoftDelete(ctx, tenantID, resourceID)
+func (a *customersLifecycleRepo) SoftDelete(ctx context.Context, tenantID string, resourceID uuid.UUID, _ time.Time) error {
+	orgID, err := parseLifecycleTenantID(tenantID)
+	if err != nil {
+		return err
+	}
+	return a.repo.SoftDelete(ctx, orgID, resourceID)
 }
 
-func (a *customersLifecycleRepo) Restore(ctx context.Context, tenantID, resourceID uuid.UUID) error {
-	return a.repo.Restore(ctx, tenantID, resourceID)
+func (a *customersLifecycleRepo) Restore(ctx context.Context, tenantID string, resourceID uuid.UUID) error {
+	orgID, err := parseLifecycleTenantID(tenantID)
+	if err != nil {
+		return err
+	}
+	return a.repo.Restore(ctx, orgID, resourceID)
 }
 
-func (a *customersLifecycleRepo) HardDelete(ctx context.Context, tenantID, resourceID uuid.UUID) error {
-	return a.repo.HardDelete(ctx, tenantID, resourceID)
+func (a *customersLifecycleRepo) HardDelete(ctx context.Context, tenantID string, resourceID uuid.UUID) error {
+	orgID, err := parseLifecycleTenantID(tenantID)
+	if err != nil {
+		return err
+	}
+	return a.repo.HardDelete(ctx, orgID, resourceID)
 }
 
-func (a *customersLifecycleRepo) IsArchived(ctx context.Context, tenantID, resourceID uuid.UUID) (bool, error) {
-	return isPartyArchived(ctx, a.db, tenantID, resourceID)
+func (a *customersLifecycleRepo) IsArchived(ctx context.Context, tenantID string, resourceID uuid.UUID) (bool, error) {
+	orgID, err := parseLifecycleTenantID(tenantID)
+	if err != nil {
+		return false, err
+	}
+	return isPartyArchived(ctx, a.db, orgID, resourceID)
 }
 
 // suppliersLifecycleRepo wraps *suppliers.Repository to satisfy lifecycle.RepositoryPort.
@@ -55,20 +80,36 @@ type suppliersLifecycleRepo struct {
 	db   *gorm.DB
 }
 
-func (a *suppliersLifecycleRepo) SoftDelete(ctx context.Context, tenantID, resourceID uuid.UUID, _ time.Time) error {
-	return a.repo.SoftDelete(ctx, tenantID, resourceID)
+func (a *suppliersLifecycleRepo) SoftDelete(ctx context.Context, tenantID string, resourceID uuid.UUID, _ time.Time) error {
+	orgID, err := parseLifecycleTenantID(tenantID)
+	if err != nil {
+		return err
+	}
+	return a.repo.SoftDelete(ctx, orgID, resourceID)
 }
 
-func (a *suppliersLifecycleRepo) Restore(ctx context.Context, tenantID, resourceID uuid.UUID) error {
-	return a.repo.Restore(ctx, tenantID, resourceID)
+func (a *suppliersLifecycleRepo) Restore(ctx context.Context, tenantID string, resourceID uuid.UUID) error {
+	orgID, err := parseLifecycleTenantID(tenantID)
+	if err != nil {
+		return err
+	}
+	return a.repo.Restore(ctx, orgID, resourceID)
 }
 
-func (a *suppliersLifecycleRepo) HardDelete(ctx context.Context, tenantID, resourceID uuid.UUID) error {
-	return a.repo.HardDelete(ctx, tenantID, resourceID)
+func (a *suppliersLifecycleRepo) HardDelete(ctx context.Context, tenantID string, resourceID uuid.UUID) error {
+	orgID, err := parseLifecycleTenantID(tenantID)
+	if err != nil {
+		return err
+	}
+	return a.repo.HardDelete(ctx, orgID, resourceID)
 }
 
-func (a *suppliersLifecycleRepo) IsArchived(ctx context.Context, tenantID, resourceID uuid.UUID) (bool, error) {
-	return isPartyArchived(ctx, a.db, tenantID, resourceID)
+func (a *suppliersLifecycleRepo) IsArchived(ctx context.Context, tenantID string, resourceID uuid.UUID) (bool, error) {
+	orgID, err := parseLifecycleTenantID(tenantID)
+	if err != nil {
+		return false, err
+	}
+	return isPartyArchived(ctx, a.db, orgID, resourceID)
 }
 
 // isPartyArchived is the shared probe over the parties table.

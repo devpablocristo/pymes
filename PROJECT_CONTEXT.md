@@ -38,7 +38,7 @@ Codigo reutilizable:
 - UI: Node `>=20.9.0`, React 18, Vite, TypeScript, Vitest.
 - Mobile: Expo SDK 54, React Native 0.81, React 19, Expo Router v6.
 - DB local: `postgres:16-alpine`, base `pymes`, puerto host `5434`.
-- Nexus Governance corre fuera de este compose, usualmente en `../nexus`, y Pymes lo consume por `GOVERNANCE_URL`.
+- Axis Nexus corre fuera de este compose, en `../axis/nexus`, y Pymes lo consume por `GOVERNANCE_URL`.
 - Companion corre como repo hermano para chat/capabilities, usualmente en `:18085`.
 
 Puertos locales publicados por `docker-compose.yml`:

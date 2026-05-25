@@ -83,7 +83,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (empdomain.
 }
 
 type CreateInput struct {
-	OrgID   uuid.UUID
+	OrgID      uuid.UUID
 	FirstName  string
 	LastName   string
 	Email      string
@@ -116,7 +116,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (empdomain.Employ
 		return empdomain.Employee{}, fmt.Errorf("invalid end_date: %w", httperrors.ErrBadInput)
 	}
 	out, err := u.repo.Create(ctx, empdomain.Employee{
-		OrgID:   in.OrgID,
+		OrgID:      in.OrgID,
 		FirstName:  in.FirstName,
 		LastName:   in.LastName,
 		Email:      in.Email,
@@ -143,7 +143,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (empdomain.Employ
 }
 
 type UpdateInput struct {
-	OrgID   uuid.UUID
+	OrgID      uuid.UUID
 	ID         uuid.UUID
 	FirstName  *string
 	LastName   *string
@@ -237,7 +237,7 @@ func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 		return u.lifecycle.SoftDelete(ctx, &lifecycle.ArchiveRequest{
 			ResourceType: ResourceTypeEmployee,
 			ResourceID:   id,
-			TenantID:     orgID,
+			TenantID:     orgID.String(),
 			Actor:        actor,
 		})
 	}
@@ -258,7 +258,7 @@ func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor strin
 		return u.lifecycle.Restore(ctx, &lifecycle.RestoreRequest{
 			ResourceType: ResourceTypeEmployee,
 			ResourceID:   id,
-			TenantID:     orgID,
+			TenantID:     orgID.String(),
 			Actor:        actor,
 		})
 	}
@@ -279,7 +279,7 @@ func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 		return u.lifecycle.HardDelete(ctx, &lifecycle.HardDeleteRequest{
 			ResourceType:   ResourceTypeEmployee,
 			ResourceID:     id,
-			TenantID:       orgID,
+			TenantID:       orgID.String(),
 			Actor:          actor,
 			MustBeArchived: false,
 		})

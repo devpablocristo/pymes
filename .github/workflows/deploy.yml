@@ -22,11 +22,11 @@ jobs:
         with:
           path: pymes
 
-      - name: Checkout nexus
+      - name: Checkout axis
         uses: actions/checkout@v4
         with:
-          repository: devpablocristo/nexus
-          path: nexus
+          repository: devpablocristo/axis
+          path: axis
 
       - name: Create env file
         working-directory: pymes
@@ -35,19 +35,21 @@ jobs:
           INTERNAL_SERVICE_TOKEN=local-internal-token
           AUTH_ENABLE_JWT=false
           AUTH_ALLOW_API_KEY=true
-          GOVERNANCE_ADMIN_API_KEY=governance-admin-dev-key
-          GOVERNANCE_API_KEY=governance-admin-dev-key
-          GOVERNANCE_CALLBACK_TOKEN=local-governance-callback-token
+          GOVERNANCE_ADMIN_API_KEY=nexus-admin-dev-key
+          GOVERNANCE_API_KEY=nexus-admin-dev-key
+          GOVERNANCE_CALLBACK_TOKEN=local-nexus-callback-token
           GOVERNANCE_URL=http://host.docker.internal:18084
+          COMPANION_INTERNAL_URL=http://host.docker.internal:18085
+          COMPANION_API_KEY=companion-admin-dev-key
           EOF
 
-      - name: Start Nexus governance
-        working-directory: nexus
+      - name: Start Axis Nexus and Companion
+        working-directory: axis
         run: |
-          export GOVERNANCE_APPROVAL_PENDING_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback
-          export GOVERNANCE_APPROVAL_RESOLVED_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback,http://host.docker.internal:8200/v1/internal/governance-callback
-          export GOVERNANCE_CALLBACK_TOKEN=local-governance-callback-token
-          docker compose up -d --build governance governance-postgres
+          export NEXUS_APPROVAL_PENDING_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback
+          export NEXUS_APPROVAL_RESOLVED_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback
+          export NEXUS_CALLBACK_TOKEN=local-nexus-callback-token
+          docker compose up -d --build nexus nexus-postgres companion companion-postgres
 
       - name: Build and start stack
         working-directory: pymes
@@ -58,12 +60,12 @@ jobs:
         run: |
           for attempt in $(seq 1 60); do
             gov_status=$(curl -fsS http://127.0.0.1:18084/readyz >/dev/null && echo ok || true)
+            companion_status=$(curl -fsS http://127.0.0.1:18085/readyz >/dev/null && echo ok || true)
             cp_status=$(curl -fsS http://127.0.0.1:8100/readyz >/dev/null && echo ok || true)
             prof_status=$(curl -fsS http://127.0.0.1:8181/readyz >/dev/null && echo ok || true)
             work_status=$(curl -fsS http://127.0.0.1:8282/readyz >/dev/null && echo ok || true)
-            ai_status=$(curl -fsS http://127.0.0.1:8200/readyz >/dev/null && echo ok || true)
             front_status=$(curl -fsS http://127.0.0.1:5180 >/dev/null && echo ok || true)
-            if [ "$gov_status" = "ok" ] && [ "$cp_status" = "ok" ] && [ "$prof_status" = "ok" ] && [ "$work_status" = "ok" ] && [ "$ai_status" = "ok" ] && [ "$front_status" = "ok" ]; then
+            if [ "$gov_status" = "ok" ] && [ "$companion_status" = "ok" ] && [ "$cp_status" = "ok" ] && [ "$prof_status" = "ok" ] && [ "$work_status" = "ok" ] && [ "$front_status" = "ok" ]; then
               exit 0
             fi
             sleep 5
@@ -78,7 +80,7 @@ jobs:
           curl -fsS http://127.0.0.1:8100/healthz
           curl -fsS http://127.0.0.1:8181/healthz
           curl -fsS http://127.0.0.1:8282/healthz
-          curl -fsS http://127.0.0.1:8200/healthz
+          curl -fsS http://127.0.0.1:18085/readyz
           curl -fsS -H 'X-API-KEY: psk_local_admin' -H 'X-USER-ID: 123' http://127.0.0.1:8100/v1/customers
           curl -fsS -H 'X-API-KEY: psk_local_admin' -H 'X-USER-ID: 123' http://127.0.0.1:8181/v1/teachers/professionals
           curl -fsS -H 'X-API-KEY: psk_local_admin' -H 'X-USER-ID: 123' http://127.0.0.1:8282/v1/auto-repair/vehicles
@@ -98,4 +100,4 @@ jobs:
         if: always()
         run: |
           docker compose --project-directory "${{ github.workspace }}/pymes" down -v || true
-          docker compose --project-directory "${{ github.workspace }}/nexus" down -v || true
+          docker compose --project-directory "${{ github.workspace }}/axis" down -v || true

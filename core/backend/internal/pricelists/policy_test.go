@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devpablocristo/pymes/core/backend/internal/pricelists"
 	lifecycle "github.com/devpablocristo/platform/lifecycle/go/lifecycle"
+	"github.com/devpablocristo/pymes/core/backend/internal/pricelists"
 	"github.com/google/uuid"
 )
 
@@ -23,7 +23,7 @@ func newFakeRepo() *fakeRepo {
 
 func (r *fakeRepo) seed(id uuid.UUID) { r.rows[id] = nil }
 
-func (r *fakeRepo) SoftDelete(_ context.Context, _, id uuid.UUID, at time.Time) error {
+func (r *fakeRepo) SoftDelete(_ context.Context, _ string, id uuid.UUID, at time.Time) error {
 	if v, ok := r.rows[id]; !ok || v != nil {
 		return lifecycleNotFound(id)
 	}
@@ -31,21 +31,21 @@ func (r *fakeRepo) SoftDelete(_ context.Context, _, id uuid.UUID, at time.Time) 
 	r.rows[id] = &t
 	return nil
 }
-func (r *fakeRepo) Restore(_ context.Context, _, id uuid.UUID) error {
+func (r *fakeRepo) Restore(_ context.Context, _ string, id uuid.UUID) error {
 	if v, ok := r.rows[id]; !ok || v == nil {
 		return lifecycleNotFound(id)
 	}
 	r.rows[id] = nil
 	return nil
 }
-func (r *fakeRepo) HardDelete(_ context.Context, _, id uuid.UUID) error {
+func (r *fakeRepo) HardDelete(_ context.Context, _ string, id uuid.UUID) error {
 	if _, ok := r.rows[id]; !ok {
 		return lifecycleNotFound(id)
 	}
 	delete(r.rows, id)
 	return nil
 }
-func (r *fakeRepo) IsArchived(_ context.Context, _, id uuid.UUID) (bool, error) {
+func (r *fakeRepo) IsArchived(_ context.Context, _ string, id uuid.UUID) (bool, error) {
 	v, ok := r.rows[id]
 	if !ok {
 		return false, lifecycleNotFound(id)
@@ -88,7 +88,7 @@ func TestPolicy_LifecycleService(t *testing.T) {
 		t.Fatalf("NewServiceWithRepos: %v", err)
 	}
 
-	tenantID := uuid.New()
+	tenantID := uuid.New().String()
 	id := uuid.New()
 	repo.seed(id)
 

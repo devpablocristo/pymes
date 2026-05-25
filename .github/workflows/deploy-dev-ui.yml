@@ -32,7 +32,7 @@ jobs:
       WIF_PROVIDER: projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
       WIF_SERVICE_ACCOUNT: github-actions@pymes-dev-352318.iam.gserviceaccount.com
       BACKEND_SERVICE_NAME: core
-      COMPANION_SERVICE_NAME: companion-dev
+      COMPANION_SERVICE_NAME: axis-companion-dev
       FIREBASE_HOSTING_SITE_ID: pymes-dev-352318
       FRONTEND_CLERK_PUBLISHABLE_KEY: pk_test_c2VsZWN0ZWQtdGljay00OC5jbGVyay5hY2NvdW50cy5kZXYk
       FIREBASE_TOOLS_VERSION: "13"

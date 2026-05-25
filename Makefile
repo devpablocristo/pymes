@@ -3,7 +3,7 @@
 .PHONY: \
 	up down ps logs \
 	go-compile staticcheck ruff lint companion-openapi-check \
-	audit audit-baseline audit-crud audit-crud-json audit-crud-strict audit-debt audit-governance ui-typecheck ai-test \
+	audit audit-baseline audit-crud audit-crud-json audit-crud-strict audit-debt audit-governance axis-contracts-check ui-typecheck ai-test \
 	seed seed-clear seed-clear-verify seed-verify seed-reset modules-check cleanup-pablo e2e-governance-notifications \
 	build-docker-ui test-docker-ui lint-docker-ui test-docker-core test-docker-workshops \
 	build test test-ui-e2e
@@ -48,9 +48,9 @@ go-compile:
 staticcheck:
 	$(GO_PRIVATE) go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 $(GO_PACKAGES)
 
-# Alias historico: el servicio `pymes/ai` fue retirado; el runtime IA vive en Axis Companion.
+# Alias historico: el runtime IA vive en Axis Companion.
 ruff:
-	@echo "pymes/ai retirado; ejecutar checks de IA en ../axis/companion"
+	@echo "runtime IA retirado de Pymes; ejecutar checks en ../axis/companion"
 
 # Go staticcheck del monorepo Pymes.
 lint: staticcheck
@@ -59,7 +59,7 @@ lint: staticcheck
 audit: audit-crud audit-debt audit-governance
 
 # Baseline reproducible antes de refactors estructurales.
-audit-baseline: go-compile audit ui-typecheck companion-openapi-check
+audit-baseline: go-compile audit ui-typecheck companion-openapi-check axis-contracts-check
 
 audit-crud:
 	@python3 scripts/audit/crud_contract.py
@@ -76,6 +76,9 @@ audit-debt:
 audit-governance:
 	@bash scripts/audit/governance_boundary.sh
 
+axis-contracts-check:
+	@python3 scripts/audit/axis_contracts_check.py
+
 ui-typecheck:
 	cd ui && npm run typecheck
 
@@ -83,7 +86,7 @@ companion-openapi-check:
 	cd ui && npm run generate:ai-types
 
 ai-test:
-	@echo "pymes/ai retirado; ejecutar tests de IA en ../axis/companion"
+	@echo "runtime IA retirado de Pymes; ejecutar tests en ../axis/companion"
 
 # Seeds y utilidades
 
@@ -128,8 +131,8 @@ modules-check:
 
 # Stack local
 
-# Stack local (compose Pymes). Nexus governance corre en el compose del repo ../nexus.
-# Levantá Nexus antes con `make up` (o `docker compose up`) en ese repo.
+# Stack local (compose Pymes). Axis Nexus corre en el compose del repo ../axis.
+# Levantá Axis antes con `make up` (o `docker compose up`) en ese repo.
 up:
 	$(DC) build cp-backend prof-backend work-backend beauty-backend restaurants-backend medical-backend ui
 	$(DC) up -d --no-build

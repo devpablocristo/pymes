@@ -25,7 +25,7 @@ check_zero() {
 check_zero \
   "no embedded governance packages" \
   'core/governance/go/(decision|policy|risk|approval|kernel)' \
-  core workshops professionals restaurants beauty medical ai ui scripts .github Makefile \
+  core workshops professionals restaurants beauty medical ui scripts .github Makefile \
   --glob '!**/node_modules/**' --glob '!**/__pycache__/**'
 
 check_zero \

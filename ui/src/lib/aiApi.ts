@@ -1,3 +1,4 @@
+import { request as rawRequest, type RequestOptions as RawRequestOptions } from '@devpablocristo/platform-http/fetch';
 import { apiRequest, type TenantAwareRequestOptions } from './api';
 import type {
   CommercialChatRequest,
@@ -6,8 +7,9 @@ import type {
   PymesAssistantChatResponse,
 } from '../types/aiChat';
 
-// Companion reemplaza a pymes-ai como backend del chat. La base URL del
-// servicio Companion se inyecta vía `VITE_COMPANION_BASE_URL` en build.
+// Companion es el backend del chat. La base URL se inyecta vía
+// `VITE_COMPANION_BASE_URL`; `VITE_COMPANION_API_KEY` queda solo para dev local
+// sin sesión Clerk.
 function resolveCompanionBaseURLs(): string[] {
   const env = import.meta.env as Record<string, string | undefined>;
   const configured = env.VITE_COMPANION_BASE_URL?.trim();
@@ -18,16 +20,33 @@ function resolveCompanionBaseURLs(): string[] {
   if (typeof window !== 'undefined') {
     const protocol = window.location.protocol || 'http:';
     const hostname = window.location.hostname || 'localhost';
-    // Default dev: companion-dev en GCP detrás del mismo proxy same-origin.
+    // Default dev: Axis Companion local en el puerto publicado por ../axis.
     candidates.push(`${protocol}//${hostname}:18085`);
   }
   return [...new Set(candidates)];
 }
 
 const companionBaseURLs = resolveCompanionBaseURLs();
+const companionAPIKey = (import.meta.env.VITE_COMPANION_API_KEY ?? '').trim();
 
 function companionOptions(options: TenantAwareRequestOptions = {}): TenantAwareRequestOptions {
   return { ...options, baseURLs: companionBaseURLs };
+}
+
+async function companionRequest<T = unknown>(path: string, options: TenantAwareRequestOptions = {}): Promise<T> {
+  const resolved = companionOptions(options);
+  if (!companionAPIKey) {
+    return apiRequest<T>(path, resolved);
+  }
+
+  const { tenantSlug: _tenantSlug, skipTenantSlug: _skipTenantSlug, orgId: _orgId, ...rawOptions } = resolved;
+  return rawRequest<T>(path, {
+    ...(rawOptions as RawRequestOptions),
+    headers: {
+      ...(rawOptions.headers ?? {}),
+      'X-API-Key': companionAPIKey,
+    },
+  });
 }
 
 export type {
@@ -49,7 +68,7 @@ export type {
 
 /** Asistente Pymes — chat interno contra Companion (POST /v1/chat). */
 export async function pymesAssistantChat(payload: CommercialChatRequest): Promise<PymesAssistantChatResponse> {
-  return apiRequest('/v1/chat', companionOptions({ method: 'POST', body: payload }));
+  return companionRequest('/v1/chat', { method: 'POST', body: payload });
 }
 
 // ── Conversaciones persistidas (Companion agent_conversations) ──
@@ -85,12 +104,12 @@ export type ConversationDetail = {
 
 /** Lista conversaciones del usuario autenticado (Companion GET /v1/chat/conversations). */
 export async function listConversations(limit = 50): Promise<{ items: ConversationSummary[] }> {
-  return apiRequest(`/v1/chat/conversations?limit=${limit}`, companionOptions());
+  return companionRequest(`/v1/chat/conversations?limit=${limit}`);
 }
 
 /** Carga una conversación con su historial de mensajes (Companion GET /v1/chat/conversations/{id}). */
 export async function getConversation(conversationId: string): Promise<ConversationDetail> {
-  return apiRequest(`/v1/chat/conversations/${conversationId}`, companionOptions());
+  return companionRequest(`/v1/chat/conversations/${conversationId}`);
 }
 
 export async function createInsightNotifications(payload?: {
@@ -100,7 +119,7 @@ export async function createInsightNotifications(payload?: {
   top_limit?: number;
   preferred_language?: 'es' | 'en';
 }): Promise<InsightNotificationsResponse> {
-  return apiRequest('/v1/notifications', companionOptions({ method: 'POST', body: payload ?? {} }));
+  return companionRequest('/v1/notifications', { method: 'POST', body: payload ?? {} });
 }
 
 export interface WatcherResponse {
@@ -126,11 +145,11 @@ export interface CreateWatcherRequest {
 
 export async function listWatchers(orgID: string): Promise<{ watchers: WatcherResponse[] }> {
   const params = new URLSearchParams({ org_id: orgID });
-  return apiRequest(`/v1/watchers?${params.toString()}`, companionOptions());
+  return companionRequest(`/v1/watchers?${params.toString()}`);
 }
 
 export async function createWatcher(payload: CreateWatcherRequest): Promise<WatcherResponse> {
-  return apiRequest('/v1/watchers', companionOptions({ method: 'POST', body: payload }));
+  return companionRequest('/v1/watchers', { method: 'POST', body: payload });
 }
 
 export async function updateWatcher(
@@ -138,5 +157,5 @@ export async function updateWatcher(
   config: Record<string, unknown>,
   enabled: boolean,
 ): Promise<WatcherResponse> {
-  return apiRequest(`/v1/watchers/${id}`, companionOptions({ method: 'PATCH', body: { config, enabled } }));
+  return companionRequest(`/v1/watchers/${id}`, { method: 'PATCH', body: { config, enabled } });
 }

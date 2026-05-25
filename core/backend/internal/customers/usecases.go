@@ -200,7 +200,7 @@ func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 		return u.lifecycle.SoftDelete(ctx, &lifecycle.ArchiveRequest{
 			ResourceType: ResourceTypeCustomer,
 			ResourceID:   id,
-			TenantID:     orgID,
+			TenantID:     orgID.String(),
 			Actor:        actor,
 		})
 	}
@@ -225,7 +225,7 @@ func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor strin
 		return u.lifecycle.Restore(ctx, &lifecycle.RestoreRequest{
 			ResourceType: ResourceTypeCustomer,
 			ResourceID:   id,
-			TenantID:     orgID,
+			TenantID:     orgID.String(),
 			Actor:        actor,
 		})
 	}
@@ -246,7 +246,7 @@ func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 		return u.lifecycle.HardDelete(ctx, &lifecycle.HardDeleteRequest{
 			ResourceType:   ResourceTypeCustomer,
 			ResourceID:     id,
-			TenantID:       orgID,
+			TenantID:       orgID.String(),
 			Actor:          actor,
 			MustBeArchived: false,
 		})

@@ -14,11 +14,11 @@ platform:
       # Chat + insights atendidos por Companion (sucesor de pymes-ai, ya
       # decomisionado por completo).
       - source: /v1/chat
-        service: companion-dev
+        service: axis-companion-dev
       - source: /v1/chat/**
-        service: companion-dev
+        service: axis-companion-dev
       - source: /v1/notifications
-        service: companion-dev
+        service: axis-companion-dev
 
 verticals:
   workshops:

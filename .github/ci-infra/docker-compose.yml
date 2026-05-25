@@ -1,5 +1,5 @@
 # Overlay compose usado por el CI y como fallback de `make up` cuando no hay repo `local-infra`:
-# Postgres (+ puerto host) y Mailhog. Nexus governance corre en compose aparte (repo `nexus`).
+# Postgres (+ puerto host) y Mailhog. Axis Nexus corre en compose aparte (repo `axis`).
 services:
   postgres:
     image: postgres:16-alpine

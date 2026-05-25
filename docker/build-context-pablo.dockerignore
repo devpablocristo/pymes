@@ -12,7 +12,7 @@
 **/.pytest_cache
 **/.mypy_cache
 **/.ruff_cache
-# No excluir `core/` ni `nexus/`: `cp-backend` y `review` hacen COPY desde ahí con `context: ..`.
+# No excluir `core/`, `pymes/` ni `axis/`: los builds dev usan el padre como contexto.
 ponti/
 medmory/
 toollab/

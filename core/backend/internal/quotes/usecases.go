@@ -10,9 +10,9 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	utils "github.com/devpablocristo/platform/validate/go/stringutil"
 	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
 	lifecycle "github.com/devpablocristo/platform/lifecycle/go/lifecycle"
+	utils "github.com/devpablocristo/platform/validate/go/stringutil"
 	quotedomain "github.com/devpablocristo/pymes/core/backend/internal/quotes/usecases/domain"
 	"github.com/devpablocristo/pymes/core/backend/internal/sales"
 	salesdomain "github.com/devpablocristo/pymes/core/backend/internal/sales/usecases/domain"
@@ -92,7 +92,7 @@ type QuoteItemInput struct {
 }
 
 type CreateQuoteInput struct {
-	OrgID     uuid.UUID
+	OrgID        uuid.UUID
 	BranchID     *uuid.UUID
 	CustomerID   *uuid.UUID
 	CustomerName string
@@ -126,7 +126,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateQuoteInput) (quotedomain
 		return quotedomain.Quote{}, err
 	}
 	out, err := u.repo.Create(ctx, CreateInput{
-		OrgID:     in.OrgID,
+		OrgID:        in.OrgID,
 		BranchID:     in.BranchID,
 		CustomerID:   in.CustomerID,
 		CustomerName: in.CustomerName,
@@ -202,7 +202,7 @@ func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor
 }
 
 type UpdateQuoteInput struct {
-	OrgID     uuid.UUID
+	OrgID        uuid.UUID
 	ID           uuid.UUID
 	CustomerID   **uuid.UUID
 	CustomerName *string
@@ -299,7 +299,7 @@ func (u *Usecases) Update(ctx context.Context, in UpdateQuoteInput) (quotedomain
 	}
 
 	out, err := u.repo.UpdateDraft(ctx, UpdateInput{
-		OrgID:     in.OrgID,
+		OrgID:        in.OrgID,
 		ID:           in.ID,
 		CustomerID:   customerID,
 		CustomerName: customerName,
@@ -387,7 +387,7 @@ func (u *Usecases) Archive(ctx context.Context, orgID, quoteID uuid.UUID, actor 
 		return u.lifecycle.SoftDelete(ctx, &lifecycle.ArchiveRequest{
 			ResourceType: ResourceTypeQuote,
 			ResourceID:   quoteID,
-			TenantID:     orgID,
+			TenantID:     orgID.String(),
 			Actor:        actor,
 		})
 	}
@@ -408,7 +408,7 @@ func (u *Usecases) Restore(ctx context.Context, orgID, quoteID uuid.UUID, actor 
 		return u.lifecycle.Restore(ctx, &lifecycle.RestoreRequest{
 			ResourceType: ResourceTypeQuote,
 			ResourceID:   quoteID,
-			TenantID:     orgID,
+			TenantID:     orgID.String(),
 			Actor:        actor,
 		})
 	}
@@ -429,7 +429,7 @@ func (u *Usecases) HardDelete(ctx context.Context, orgID, quoteID uuid.UUID, act
 		return u.lifecycle.HardDelete(ctx, &lifecycle.HardDeleteRequest{
 			ResourceType:   ResourceTypeQuote,
 			ResourceID:     quoteID,
-			TenantID:       orgID,
+			TenantID:       orgID.String(),
 			Actor:          actor,
 			MustBeArchived: false,
 		})
@@ -489,7 +489,7 @@ func (u *Usecases) ToSale(ctx context.Context, orgID, quoteID uuid.UUID, payment
 	}
 
 	saleOut, err := u.sales.Create(ctx, sales.CreateSaleInput{
-		OrgID:      orgID,
+		OrgID:         orgID,
 		BranchID:      q.BranchID,
 		CustomerID:    q.CustomerID,
 		CustomerName:  q.CustomerName,

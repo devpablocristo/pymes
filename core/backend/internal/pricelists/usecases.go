@@ -114,7 +114,7 @@ func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 		return u.lifecycle.SoftDelete(ctx, &lifecycle.ArchiveRequest{
 			ResourceType: ResourceTypePriceList,
 			ResourceID:   id,
-			TenantID:     orgID,
+			TenantID:     orgID.String(),
 			Actor:        actor,
 		})
 	}
@@ -132,7 +132,7 @@ func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor strin
 		return u.lifecycle.Restore(ctx, &lifecycle.RestoreRequest{
 			ResourceType: ResourceTypePriceList,
 			ResourceID:   id,
-			TenantID:     orgID,
+			TenantID:     orgID.String(),
 			Actor:        actor,
 		})
 	}
@@ -150,7 +150,7 @@ func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 		return u.lifecycle.HardDelete(ctx, &lifecycle.HardDeleteRequest{
 			ResourceType:   ResourceTypePriceList,
 			ResourceID:     id,
-			TenantID:       orgID,
+			TenantID:       orgID.String(),
 			Actor:          actor,
 			MustBeArchived: false, // pymes admin can hard-delete without soft step
 		})

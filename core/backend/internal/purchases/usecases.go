@@ -74,7 +74,7 @@ func NewUsecases(repo RepositoryPort, audit AuditPort, opts ...Option) *Usecases
 }
 
 type CreateInput struct {
-	OrgID      uuid.UUID
+	OrgID         uuid.UUID
 	BranchID      *uuid.UUID
 	SupplierID    *uuid.UUID
 	SupplierName  string
@@ -89,7 +89,7 @@ type CreateInput struct {
 
 type UpdateInput struct {
 	ID            uuid.UUID
-	OrgID      uuid.UUID
+	OrgID         uuid.UUID
 	BranchID      *uuid.UUID
 	SupplierID    *uuid.UUID
 	SupplierName  string
@@ -102,9 +102,9 @@ type UpdateInput struct {
 }
 
 type UpdateStatusInput struct {
-	ID       uuid.UUID
-	OrgID uuid.UUID
-	Status   string
+	ID     uuid.UUID
+	OrgID  uuid.UUID
+	Status string
 }
 
 func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
@@ -159,7 +159,7 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 		return purchasesdomain.Purchase{}, err
 	}
 	prepared, err := u.prepareCreate(ctx, CreateInput{
-		OrgID:      in.OrgID,
+		OrgID:         in.OrgID,
 		BranchID:      in.BranchID,
 		SupplierID:    in.SupplierID,
 		SupplierName:  in.SupplierName,
@@ -242,7 +242,7 @@ func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 		return u.lifecycle.SoftDelete(ctx, &lifecycle.ArchiveRequest{
 			ResourceType: ResourceTypePurchase,
 			ResourceID:   id,
-			TenantID:     orgID,
+			TenantID:     orgID.String(),
 			Actor:        actor,
 		})
 	}
@@ -263,7 +263,7 @@ func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor strin
 		return u.lifecycle.Restore(ctx, &lifecycle.RestoreRequest{
 			ResourceType: ResourceTypePurchase,
 			ResourceID:   id,
-			TenantID:     orgID,
+			TenantID:     orgID.String(),
 			Actor:        actor,
 		})
 	}
@@ -284,7 +284,7 @@ func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 		return u.lifecycle.HardDelete(ctx, &lifecycle.HardDeleteRequest{
 			ResourceType:   ResourceTypePurchase,
 			ResourceID:     id,
-			TenantID:       orgID,
+			TenantID:       orgID.String(),
 			Actor:          actor,
 			MustBeArchived: false,
 		})

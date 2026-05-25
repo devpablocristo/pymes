@@ -198,7 +198,7 @@ func InitializeApp() *app.App {
 		Scopes:       []string{googleoauth.ScopeCalendar},
 	})
 	calendarSyncUC := calendar_sync.NewUsecases(calendarSyncRepo, paymentGatewayCrypto, googleOAuthClient, calendar_sync.Config{})
-	whatsappCompanionClient := customerwhatsapp.NewCompanionClient(cfg.CompanionInternalURL, cfg.InternalServiceToken)
+	whatsappCompanionClient := customerwhatsapp.NewCompanionClient(cfg.CompanionInternalURL, cfg.CompanionAPIKey)
 	whatsappMetaClient := customerwhatsapp.NewMetaClient(cfg.WhatsAppGraphAPIBaseURL)
 	customerMessagingUC := customer_messaging.NewUsecases(
 		customerMessagingRepo,

@@ -92,7 +92,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (invdomain.
 }
 
 type CreateInput struct {
-	OrgID        uuid.UUID
+	OrgID           uuid.UUID
 	Number          string
 	PartyID         *uuid.UUID
 	CustomerName    string
@@ -162,7 +162,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (invdomain.Invoic
 	total := subtotal * (1 - in.DiscountPercent/100.0) * (1 + in.TaxPercent/100.0)
 
 	out, err := u.repo.Create(ctx, invdomain.Invoice{
-		OrgID:        in.OrgID,
+		OrgID:           in.OrgID,
 		Number:          in.Number,
 		PartyID:         in.PartyID,
 		CustomerName:    strings.TrimSpace(in.CustomerName),
@@ -319,7 +319,7 @@ func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 		return u.lifecycle.SoftDelete(ctx, &lifecycle.ArchiveRequest{
 			ResourceType: ResourceTypeInvoice,
 			ResourceID:   id,
-			TenantID:     orgID,
+			TenantID:     orgID.String(),
 			Actor:        actor,
 		})
 	}
@@ -340,7 +340,7 @@ func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor strin
 		return u.lifecycle.Restore(ctx, &lifecycle.RestoreRequest{
 			ResourceType: ResourceTypeInvoice,
 			ResourceID:   id,
-			TenantID:     orgID,
+			TenantID:     orgID.String(),
 			Actor:        actor,
 		})
 	}
@@ -361,7 +361,7 @@ func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 		return u.lifecycle.HardDelete(ctx, &lifecycle.HardDeleteRequest{
 			ResourceType:   ResourceTypeInvoice,
 			ResourceID:     id,
-			TenantID:       orgID,
+			TenantID:       orgID.String(),
 			Actor:          actor,
 			MustBeArchived: false,
 		})

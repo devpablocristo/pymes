@@ -229,12 +229,12 @@ jobs:
         with:
           path: pymes
 
-      - name: Checkout nexus
+      - name: Checkout axis
         if: github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v4
         with:
-          repository: devpablocristo/nexus
-          path: nexus
+          repository: devpablocristo/axis
+          path: axis
 
       - name: Create env file
         if: github.event_name == 'workflow_dispatch'
@@ -244,20 +244,20 @@ jobs:
           INTERNAL_SERVICE_TOKEN=local-internal-token
           AUTH_ENABLE_JWT=false
           AUTH_ALLOW_API_KEY=true
-          GOVERNANCE_ADMIN_API_KEY=governance-admin-dev-key
-          GOVERNANCE_API_KEY=governance-admin-dev-key
-          GOVERNANCE_CALLBACK_TOKEN=local-governance-callback-token
+          GOVERNANCE_ADMIN_API_KEY=nexus-admin-dev-key
+          GOVERNANCE_API_KEY=nexus-admin-dev-key
+          GOVERNANCE_CALLBACK_TOKEN=local-nexus-callback-token
           GOVERNANCE_URL=http://host.docker.internal:18084
           EOF
 
-      - name: Start Nexus governance (compose repo nexus)
+      - name: Start Axis Nexus
         if: github.event_name == 'workflow_dispatch'
-        working-directory: nexus
+        working-directory: axis
         run: |
-          export GOVERNANCE_APPROVAL_PENDING_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback
-          export GOVERNANCE_APPROVAL_RESOLVED_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback,http://host.docker.internal:8200/v1/internal/governance-callback
-          export GOVERNANCE_CALLBACK_TOKEN=local-governance-callback-token
-          docker compose up -d --build governance governance-postgres
+          export NEXUS_APPROVAL_PENDING_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback
+          export NEXUS_APPROVAL_RESOLVED_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback
+          export NEXUS_CALLBACK_TOKEN=local-nexus-callback-token
+          docker compose up -d --build nexus nexus-postgres
 
       - name: Build and start cp-backend (compose Pymes)
         if: github.event_name == 'workflow_dispatch'
@@ -298,13 +298,13 @@ jobs:
         working-directory: pymes
         env:
           LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
-          NEXUS_ROOT: ${{ github.workspace }}/nexus
+          AXIS_ROOT: ${{ github.workspace }}/axis
           PYMES_SEED_DEMO_TENANT_EXTERNAL_ID: org_e2e_test
           PYMES_SEED_DEMO_TENANT_NAME: "E2E Test Org"
         run: |
           # El E2E sólo necesita la org semilla. Los seeds de verticales requieren
           # que esos backends hayan aplicado sus propias migraciones, cosa que no
-          # pasa acá porque la stack de E2E sólo levanta Nexus governance + cp-backend de Pymes.
+          # pasa acá porque la stack de E2E sólo levanta Axis Nexus + cp-backend de Pymes.
           # Cargamos únicamente los seeds que dependen de core.
           source scripts/seeds/lib.sh
           ensure_seed_dbs_ready
@@ -341,25 +341,25 @@ jobs:
           fi
           echo "ORG_ID=$ORG_ID" >> "$GITHUB_ENV"
 
-      - name: Debug — governance env + callback connectivity
+      - name: Debug — Axis Nexus env + callback connectivity
         if: github.event_name == 'workflow_dispatch'
-        working-directory: nexus
+        working-directory: axis
         env:
           LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
         run: |
           set +e
-          echo "--- governance env (callback vars) ---"
-          docker compose exec -T governance \
-            printenv GOVERNANCE_CALLBACK_TOKEN GOVERNANCE_APPROVAL_PENDING_CALLBACK_URLS GOVERNANCE_APPROVAL_RESOLVED_CALLBACK_URLS || true
-          echo "--- governance → cp-backend connectivity (expect 401 without token) ---"
-          docker compose exec -T governance \
+          echo "--- Axis Nexus env (callback vars) ---"
+          docker compose exec -T nexus \
+            printenv NEXUS_CALLBACK_TOKEN NEXUS_APPROVAL_PENDING_CALLBACK_URLS NEXUS_APPROVAL_RESOLVED_CALLBACK_URLS || true
+          echo "--- Axis Nexus → cp-backend connectivity (expect 401 without token) ---"
+          docker compose exec -T nexus \
             wget -qSO- http://host.docker.internal:8100/v1/internal/v1/governance-callback --post-data='{}' --header='Content-Type: application/json' 2>&1 | head -20 || true
-          echo "--- governance → cp-backend with token ---"
-          docker compose exec -T governance \
+          echo "--- Axis Nexus → cp-backend with token ---"
+          docker compose exec -T nexus \
             wget -qSO- http://host.docker.internal:8100/v1/internal/v1/governance-callback \
               --post-data='{"event":"approval_pending","request_id":"debug"}' \
               --header='Content-Type: application/json' \
-              --header='Authorization: Bearer local-governance-callback-token' \
+              --header='Authorization: Bearer local-nexus-callback-token' \
               2>&1 | head -20 || true
           exit 0
 
@@ -394,4 +394,4 @@ jobs:
             -f "$LOCAL_INFRA_DIR/docker-compose.yml" \
             -f "${{ github.workspace }}/pymes/docker-compose.yml" \
             down -v || true
-          docker compose --project-directory "${{ github.workspace }}/nexus" down -v || true
+          docker compose --project-directory "${{ github.workspace }}/axis" down -v || true

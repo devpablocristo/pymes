@@ -16,12 +16,13 @@ fi
 
 LOCAL_INFRA_DIR="${LOCAL_INFRA_DIR:-$DEFAULT_LOCAL_INFRA_DIR}"
 DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker compose --project-directory $ROOT_DIR -f $ROOT_DIR/docker-compose.yml}"
-# Postgres de governance vive en el compose del repo Nexus (levantalo aparte), no en el de Pymes.
-NEXUS_ROOT="${NEXUS_ROOT:-$(cd "$ROOT_DIR/.." && pwd)/nexus}"
+# Axis Nexus vive en el compose del repo Axis (levantalo aparte), no en el de Pymes.
+AXIS_ROOT="${AXIS_ROOT:-$(cd "$ROOT_DIR/.." && pwd)/axis}"
+NEXUS_ROOT="${NEXUS_ROOT:-$AXIS_ROOT/nexus}"
 PYMES_DB_NAME="${PYMES_DB_NAME:-pymes}"
 PYMES_DB_USER="${PYMES_DB_USER:-postgres}"
-# DB del binario Nexus governance.
-GOVERNANCE_DB_NAME="${GOVERNANCE_DB_NAME:-nexus_governance}"
+# DB del binario Axis Nexus.
+GOVERNANCE_DB_NAME="${GOVERNANCE_DB_NAME:-${NEXUS_POSTGRES_DB:-nexus}}"
 GOVERNANCE_DB_USER="${GOVERNANCE_DB_USER:-postgres}"
 
 # Tenant local que reciben `make seed`, `make seed-verify` y `make seed-reset`.
@@ -41,11 +42,11 @@ dc() {
 }
 
 nexus_dc() {
-  if [[ ! -f "$NEXUS_ROOT/docker-compose.yml" ]]; then
-    echo "NEXUS_ROOT=$NEXUS_ROOT no tiene docker-compose.yml — cloná Nexus o exportá NEXUS_ROOT." >&2
+  if [[ ! -f "$AXIS_ROOT/docker-compose.yml" ]]; then
+    echo "AXIS_ROOT=$AXIS_ROOT no tiene docker-compose.yml — cloná Axis o exportá AXIS_ROOT." >&2
     return 1
   fi
-  (cd "$NEXUS_ROOT" && docker compose --project-directory "$NEXUS_ROOT" -f docker-compose.yml "$@")
+  (cd "$AXIS_ROOT" && docker compose --project-directory "$AXIS_ROOT" -f docker-compose.yml "$@")
 }
 
 wait_for_pg() {
@@ -91,23 +92,27 @@ host_pymes_psql() {
 
 governance_pg_port() {
   local published_port nexus_env_port
+  if [[ -n "${NEXUS_POSTGRES_PORT:-}" ]]; then
+    printf '%s\n' "$NEXUS_POSTGRES_PORT"
+    return 0
+  fi
   if [[ -n "${GOVERNANCE_POSTGRES_PORT:-}" ]]; then
     printf '%s\n' "$GOVERNANCE_POSTGRES_PORT"
     return 0
   fi
-  published_port="$(docker port nexus-governance-postgres-1 5432/tcp 2>/dev/null | awk -F: 'NR == 1 { print $NF }' || true)"
+  published_port="$(docker port axis-nexus-postgres-1 5432/tcp 2>/dev/null | awk -F: 'NR == 1 { print $NF }' || true)"
   if [[ -n "$published_port" ]]; then
     printf '%s\n' "$published_port"
     return 0
   fi
-  if [[ -f "$NEXUS_ROOT/.env" ]]; then
-    nexus_env_port="$(awk -F= '$1 == "GOVERNANCE_POSTGRES_PORT" { print $2; exit }' "$NEXUS_ROOT/.env" | tr -d '"'\''[:space:]')"
+  if [[ -f "$AXIS_ROOT/.env" ]]; then
+    nexus_env_port="$(awk -F= '$1 == "NEXUS_POSTGRES_PORT" || $1 == "GOVERNANCE_POSTGRES_PORT" { print $2; exit }' "$AXIS_ROOT/.env" | tr -d '"'\''[:space:]')"
     if [[ -n "$nexus_env_port" ]]; then
       printf '%s\n' "$nexus_env_port"
       return 0
     fi
   fi
-  printf '%s\n' "${GOVERNANCE_POSTGRES_PORT:-15434}"
+  printf '%s\n' "${NEXUS_POSTGRES_PORT:-${GOVERNANCE_POSTGRES_PORT:-15434}}"
 }
 
 host_governance_psql() {
@@ -163,8 +168,8 @@ ensure_pymes_seed_db_ready() {
 }
 
 ensure_governance_seed_db_ready() {
-  nexus_dc up -d governance-postgres
-  wait_for_host_governance_pg || wait_for_nexus_pg governance-postgres "$GOVERNANCE_DB_NAME" "$GOVERNANCE_DB_USER"
+  nexus_dc up -d nexus-postgres
+  wait_for_host_governance_pg || wait_for_nexus_pg nexus-postgres "$GOVERNANCE_DB_NAME" "$GOVERNANCE_DB_USER"
 }
 
 ensure_seed_dbs_ready() {
@@ -426,9 +431,9 @@ run_governance_sql_inline() {
   if command -v psql >/dev/null 2>&1; then
     host_governance_psql -v ON_ERROR_STOP=1 -f "$tmp_path"
   else
-    nexus_dc cp "$tmp_path" "governance-postgres:/tmp/$tmp_name"
-    nexus_dc exec -T governance-postgres psql -U "$GOVERNANCE_DB_USER" -d "$GOVERNANCE_DB_NAME" -v ON_ERROR_STOP=1 -f "/tmp/$tmp_name"
-    nexus_dc exec -T governance-postgres rm -f "/tmp/$tmp_name" >/dev/null 2>&1 || true
+    nexus_dc cp "$tmp_path" "nexus-postgres:/tmp/$tmp_name"
+    nexus_dc exec -T nexus-postgres psql -U "$GOVERNANCE_DB_USER" -d "$GOVERNANCE_DB_NAME" -v ON_ERROR_STOP=1 -f "/tmp/$tmp_name"
+    nexus_dc exec -T nexus-postgres rm -f "/tmp/$tmp_name" >/dev/null 2>&1 || true
   fi
   rm -f "$tmp_path"
 }
@@ -447,10 +452,10 @@ run_governance_sql_file() {
   fi
   local tmp_name
   tmp_name="governance-seed-$RANDOM-$(basename "$file")"
-  nexus_dc cp "$fullpath" "governance-postgres:/tmp/$tmp_name"
-  nexus_dc exec -T governance-postgres psql -U "$GOVERNANCE_DB_USER" -d "$GOVERNANCE_DB_NAME" -v ON_ERROR_STOP=1 -f "/tmp/$tmp_name"
-  nexus_dc exec -T governance-postgres rm -f "/tmp/$tmp_name" >/dev/null 2>&1 || true
+  nexus_dc cp "$fullpath" "nexus-postgres:/tmp/$tmp_name"
+  nexus_dc exec -T nexus-postgres psql -U "$GOVERNANCE_DB_USER" -d "$GOVERNANCE_DB_NAME" -v ON_ERROR_STOP=1 -f "/tmp/$tmp_name"
+  nexus_dc exec -T nexus-postgres rm -f "/tmp/$tmp_name" >/dev/null 2>&1 || true
 }
 
-export ROOT_DIR LOCAL_INFRA_DIR DOCKER_COMPOSE NEXUS_ROOT PYMES_DB_NAME PYMES_DB_USER
+export ROOT_DIR LOCAL_INFRA_DIR DOCKER_COMPOSE AXIS_ROOT NEXUS_ROOT PYMES_DB_NAME PYMES_DB_USER
 export GOVERNANCE_DB_NAME GOVERNANCE_DB_USER 

@@ -39,10 +39,14 @@ jobs:
       CLOUDSQL_INSTANCE: pymes-dev-352318:us-central1:pymes-dev-db
       JWKS_URL: https://selected-tick-48.clerk.accounts.dev/.well-known/jwks.json
       JWT_ISSUER: https://selected-tick-48.clerk.accounts.dev
-      GOVERNANCE_URL: ${{ vars.DEV_GOVERNANCE_URL || 'https://governance-dev-mxk6wlxnsq-uc.a.run.app' }}
+      AXIS_NEXUS_SERVICE_NAME: ${{ vars.AXIS_NEXUS_CLOUD_RUN_SERVICE_NAME_DEV || 'axis-nexus-dev' }}
+      AXIS_COMPANION_SERVICE_NAME: ${{ vars.AXIS_COMPANION_CLOUD_RUN_SERVICE_NAME_DEV || 'axis-companion-dev' }}
+      GOVERNANCE_URL: ${{ vars.DEV_GOVERNANCE_URL }}
+      COMPANION_INTERNAL_URL: ${{ vars.DEV_COMPANION_INTERNAL_URL }}
       SECRET_DATABASE_URL_NAME: DATABASE_URL
       SECRET_CLERK_SECRET_KEY_NAME: CLERK_SECRET_KEY
       SECRET_GOVERNANCE_API_KEY_NAME: GOVERNANCE_API_KEY
+      SECRET_COMPANION_API_KEY_NAME: COMPANION_API_KEY
       AUTH_ENABLE_JWT: "true"
       AUTH_ALLOW_API_KEY: "true"
       NOTIFICATION_BACKEND: noop
@@ -167,13 +171,42 @@ jobs:
             --format='value(status.url)' 2>/dev/null || true)"
           echo "SERVICE_URL_EXISTING=${service_url}" >> "$GITHUB_ENV"
 
+      - name: Resolve Axis service URLs
+        run: |
+          set -euo pipefail
+          governance_url="${GOVERNANCE_URL:-}"
+          if [[ -z "$governance_url" ]]; then
+            governance_url="$(gcloud run services describe "$AXIS_NEXUS_SERVICE_NAME" \
+              --project="$GCP_PROJECT_ID" \
+              --region="$GCP_REGION" \
+              --format='value(status.url)' 2>/dev/null || true)"
+          fi
+          if [[ -z "$governance_url" ]]; then
+            echo "::error::No se pudo resolver GOVERNANCE_URL desde DEV_GOVERNANCE_URL ni desde Cloud Run service $AXIS_NEXUS_SERVICE_NAME."
+            exit 1
+          fi
+          companion_url="${COMPANION_INTERNAL_URL:-}"
+          if [[ -z "$companion_url" ]]; then
+            companion_url="$(gcloud run services describe "$AXIS_COMPANION_SERVICE_NAME" \
+              --project="$GCP_PROJECT_ID" \
+              --region="$GCP_REGION" \
+              --format='value(status.url)' 2>/dev/null || true)"
+          fi
+          if [[ -z "$companion_url" ]]; then
+            echo "::error::No se pudo resolver COMPANION_INTERNAL_URL desde DEV_COMPANION_INTERNAL_URL ni desde Cloud Run service $AXIS_COMPANION_SERVICE_NAME."
+            exit 1
+          fi
+          echo "GOVERNANCE_URL_EFFECTIVE=$governance_url" >> "$GITHUB_ENV"
+          echo "COMPANION_INTERNAL_URL_EFFECTIVE=$companion_url" >> "$GITHUB_ENV"
+
       - name: Resolve required GCP secrets
         run: |
           set -euo pipefail
           for secret_name in \
             "$SECRET_DATABASE_URL_NAME" \
             "$SECRET_CLERK_SECRET_KEY_NAME" \
-            "$SECRET_GOVERNANCE_API_KEY_NAME"; do
+            "$SECRET_GOVERNANCE_API_KEY_NAME" \
+            "$SECRET_COMPANION_API_KEY_NAME"; do
             if ! gcloud secrets versions access latest \
               --secret="$secret_name" \
               --project="$GCP_PROJECT_ID" >/dev/null; then
@@ -184,6 +217,7 @@ jobs:
           secret_flags="DATABASE_URL=${SECRET_DATABASE_URL_NAME}:latest"
           secret_flags="${secret_flags},CLERK_SECRET_KEY=${SECRET_CLERK_SECRET_KEY_NAME}:latest"
           secret_flags="${secret_flags},GOVERNANCE_API_KEY=${SECRET_GOVERNANCE_API_KEY_NAME}:latest"
+          secret_flags="${secret_flags},COMPANION_API_KEY=${SECRET_COMPANION_API_KEY_NAME}:latest"
           echo "SECRET_FLAGS=$secret_flags" >> "$GITHUB_ENV"
 
       - name: Deploy to Cloud Run (DEV)
@@ -200,12 +234,12 @@ jobs:
           if [[ -n "${JWT_ISSUER}" ]]; then
             env_vars="${env_vars},JWT_ISSUER=${JWT_ISSUER}"
           fi
-          if [[ -n "${GOVERNANCE_URL}" ]]; then
-            env_vars="${env_vars},GOVERNANCE_URL=${GOVERNANCE_URL}"
+          if [[ -n "${GOVERNANCE_URL_EFFECTIVE}" ]]; then
+            env_vars="${env_vars},GOVERNANCE_URL=${GOVERNANCE_URL_EFFECTIVE}"
           fi
-          # AI_SERVICE_URL: pymes-ai decomisionado (Fase 4
-          # modular-swinging-hummingbird). Cuando Companion exponga el endpoint
-          # /v1/internal/customer-messaging/inbound, reactivar la inyección.
+          if [[ -n "${COMPANION_INTERNAL_URL_EFFECTIVE}" ]]; then
+            env_vars="${env_vars},COMPANION_INTERNAL_URL=${COMPANION_INTERNAL_URL_EFFECTIVE}"
+          fi
           gcloud run deploy "$SERVICE_NAME" \
             --project="$GCP_PROJECT_ID" \
             --region="$GCP_REGION" \
@@ -264,7 +298,7 @@ jobs:
               print("ERROR: tráfico no está 100% en latestRevision.")
               sys.exit(1)
           envs = svc.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [{}])[0].get("env", [])
-          watched = {"PUBLIC_BASE_URL", "FRONTEND_URL", "AI_SERVICE_URL", "GOVERNANCE_URL"}
+          watched = {"PUBLIC_BASE_URL", "FRONTEND_URL", "COMPANION_INTERNAL_URL", "GOVERNANCE_URL"}
           for env in envs:
               name = env.get("name", "")
               value = env.get("value", "")

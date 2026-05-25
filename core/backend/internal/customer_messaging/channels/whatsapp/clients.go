@@ -37,11 +37,10 @@ type metaSendResponse struct {
 	Success bool `json:"success"`
 }
 
-func NewCompanionClient(baseURL, internalToken string) *CompanionClient {
+func NewCompanionClient(baseURL, apiKey string) *CompanionClient {
 	h := make(http.Header)
-	if t := strings.TrimSpace(internalToken); t != "" {
-		h.Set("X-Internal-Service-Token", t)
-		h.Set("X-API-Key", t)
+	if key := strings.TrimSpace(apiKey); key != "" {
+		h.Set("X-API-Key", key)
 	}
 	return &CompanionClient{
 		caller: &httpclient.Caller{
@@ -56,8 +55,8 @@ func NewCompanionClient(baseURL, internalToken string) *CompanionClient {
 // AIClient and NewAIClient are legacy aliases kept for old wiring/tests.
 type AIClient = CompanionClient
 
-func NewAIClient(baseURL, internalToken string) *CompanionClient {
-	return NewCompanionClient(baseURL, internalToken)
+func NewAIClient(baseURL, apiKey string) *CompanionClient {
+	return NewCompanionClient(baseURL, apiKey)
 }
 
 func NewMetaClient(baseURL string) *MetaClient {

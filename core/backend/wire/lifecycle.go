@@ -40,13 +40,13 @@ import (
 //
 //   - Policy: the lifecycle.ArchivePolicy for this resource.
 //   - Config: the table layout (table, id col, tenant col, archived col).
-//             Used to construct a generic lifecycle.SoftDeleter when Repo
-//             is not provided.
+//     Used to construct a generic lifecycle.SoftDeleter when Repo
+//     is not provided.
 //   - Repo:   an explicit lifecycle.RepositoryPort. When set, it overrides
-//             Config — useful for modules whose SoftDelete/Restore/HardDelete
-//             span multiple tables or contain custom transactional logic
-//             (e.g. customers + suppliers, which share the `parties` table
-//             and update party_roles, party_persons, accounts in one tx).
+//     Config — useful for modules whose SoftDelete/Restore/HardDelete
+//     span multiple tables or contain custom transactional logic
+//     (e.g. customers + suppliers, which share the `parties` table
+//     and update party_roles, party_persons, accounts in one tx).
 //
 // Exactly one of {Repo set, Config populated} is expected. If both are
 // provided, Repo wins.
@@ -83,6 +83,10 @@ func (a *pymesAuditPort) Append(ctx context.Context, e lifecycle.ArchiveAudit) e
 	if a == nil || a.uc == nil {
 		return nil
 	}
+	tenantID, err := parseLifecycleTenantID(e.TenantID)
+	if err != nil {
+		return err
+	}
 	payload := map[string]any{}
 	if e.Reason != nil {
 		payload["reason"] = *e.Reason
@@ -94,7 +98,7 @@ func (a *pymesAuditPort) Append(ctx context.Context, e lifecycle.ArchiveAudit) e
 		payload["retention_expires"] = e.RetentionExpires.UTC().Format("2006-01-02T15:04:05Z")
 	}
 	a.uc.LogWithActor(ctx, auditdomain.LogInput{
-		OrgID: e.TenantID,
+		OrgID: tenantID,
 		Actor: auditdomain.ActorRef{
 			Raw:   e.Actor,
 			Type:  "user",
@@ -277,4 +281,3 @@ func pymesLifecyclePartiesRegistrations(
 		},
 	}
 }
-

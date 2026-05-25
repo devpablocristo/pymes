@@ -11,21 +11,21 @@
       {
         "source": "/v1/chat",
         "run": {
-          "serviceId": "companion-dev",
+          "serviceId": "axis-companion-dev",
           "region": "us-central1"
         }
       },
       {
         "source": "/v1/chat/**",
         "run": {
-          "serviceId": "companion-dev",
+          "serviceId": "axis-companion-dev",
           "region": "us-central1"
         }
       },
       {
         "source": "/v1/notifications",
         "run": {
-          "serviceId": "companion-dev",
+          "serviceId": "axis-companion-dev",
           "region": "us-central1"
         }
       },

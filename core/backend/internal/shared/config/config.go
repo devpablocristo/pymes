@@ -49,6 +49,7 @@ type Config struct {
 	ExchangeRateProvider             string
 	InternalServiceToken             string
 	CompanionInternalURL             string
+	CompanionAPIKey                  string
 	GovernanceCallbackToken          string
 	GovernanceSyncInterval           time.Duration
 	WhatsAppWebhookVerifyToken       string
@@ -109,6 +110,7 @@ func LoadFromEnv() Config {
 		// AI_SERVICE_URL queda como alias legacy para ambientes no migrados.
 		// Default vacío -> CompanionClient.ProcessWhatsApp devuelve error de configuracion claro.
 		CompanionInternalURL:             envconfig.Get("COMPANION_INTERNAL_URL", envconfig.Get("AI_SERVICE_URL", "")),
+		CompanionAPIKey:                  envconfig.Get("COMPANION_API_KEY", ""),
 		GovernanceCallbackToken:          envconfig.Get("GOVERNANCE_CALLBACK_TOKEN", ""),
 		GovernanceSyncInterval:           envconfig.Duration("GOVERNANCE_SYNC_INTERVAL_SECONDS", 30*time.Second),
 		WhatsAppWebhookVerifyToken:       envconfig.Get("WHATSAPP_WEBHOOK_VERIFY_TOKEN", ""),

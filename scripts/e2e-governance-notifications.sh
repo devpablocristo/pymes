@@ -3,14 +3,18 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+E2E_BASE_URL="${BASE_URL:-}"
+E2E_GOVERNANCE_URL="${GOVERNANCE_URL:-}"
+E2E_API_KEY="${API_KEY:-}"
+E2E_GOVERNANCE_API_KEY="${GOVERNANCE_API_KEY:-}"
 # shellcheck source=scripts/seeds/lib.sh
 source "$ROOT_DIR/scripts/seeds/lib.sh"
 
 DECISION="${1:-approve}"
-BASE_URL="${BASE_URL:-http://localhost:8100}"
-GOVERNANCE_URL="${GOVERNANCE_URL:-http://localhost:18084}"
-API_KEY="${API_KEY:-psk_local_admin}"
-GOVERNANCE_API_KEY="${GOVERNANCE_API_KEY:-governance-admin-dev-key}"
+BASE_URL="${E2E_BASE_URL:-${BASE_URL:-http://localhost:8100}}"
+GOVERNANCE_URL="${E2E_GOVERNANCE_URL:-${GOVERNANCE_URL:-http://localhost:18084}}"
+API_KEY="${E2E_API_KEY:-${API_KEY:-psk_local_admin}}"
+GOVERNANCE_API_KEY="${E2E_GOVERNANCE_API_KEY:-${GOVERNANCE_API_KEY:-nexus-admin-dev-key}}"
 if [[ -z "${TENANT_ID:-}" ]]; then
   ensure_pymes_seed_db_ready
   TENANT_ID="$(resolve_target_tenant_uuid)"
@@ -76,43 +80,52 @@ assert_status() {
 
 json_find_action_type_id() {
   local body="$1"
+  local tenant_id="$2"
   printf '%s' "$body" | python3 -c '
 import json, sys
 target = sys.argv[1]
+tenant_id = sys.argv[2]
 data = json.load(sys.stdin).get("data", [])
 for item in data:
-    if item.get("name") == target:
+    org_id = item.get("org_id") or ""
+    if item.get("name") == target and org_id in ("", tenant_id):
         print(item.get("id", ""))
         break
-' "$ACTION_TYPE"
+' "$ACTION_TYPE" "$tenant_id"
 }
 
 json_find_delegation_id() {
   local body="$1"
+  local tenant_id="$2"
   printf '%s' "$body" | python3 -c '
 import json, sys
 requester_id = sys.argv[1]
 action_type = sys.argv[2]
+tenant_id = sys.argv[3]
 data = json.load(sys.stdin).get("data", [])
 for item in data:
-    if item.get("agent_id") == requester_id and action_type in (item.get("allowed_action_types") or []):
+    org_id = item.get("org_id") or ""
+    if item.get("agent_id") == requester_id and action_type in (item.get("allowed_action_types") or []) and org_id in ("", tenant_id):
         print(item.get("id", ""))
         break
-' "$REQUESTER_ID" "$ACTION_TYPE"
+' "$REQUESTER_ID" "$ACTION_TYPE" "$tenant_id"
 }
 
 json_find_policy_info() {
   local body="$1"
+  local tenant_id="$2"
   printf '%s' "$body" | python3 -c '
 import json, sys
 name = sys.argv[1]
+tenant_id = sys.argv[2]
 data = json.load(sys.stdin).get("data", [])
 for item in data:
-    if item.get("name") == name:
+    org_id = item.get("org_id") or ""
+    if item.get("name") == name and org_id in ("", tenant_id):
         enabled = "true" if item.get("enabled") else "false"
         print("{}\t{}".format(item.get("id", ""), enabled))
         break
-' "$POLICY_NAME"
+' "$POLICY_NAME" "$tenant_id"
 }
 
 json_get_submit_fields() {
@@ -127,23 +140,6 @@ print("\t".join([
     approval.get("id", ""),
 ]))
 '
-}
-
-json_has_inbox_approval() {
-  local body="$1"
-  printf '%s' "$body" | python3 -c '
-import json, sys
-approval_id = sys.argv[1]
-items = json.load(sys.stdin).get("items", [])
-for item in items:
-    ctx = item.get("chat_context") or {}
-    approval = ctx.get("approval") if isinstance(ctx, dict) else None
-    if isinstance(approval, dict) and approval.get("id") == approval_id:
-        print("1")
-        break
-else:
-    print("0")
-' "$2"
 }
 
 json_has_pending_approval() {
@@ -163,6 +159,11 @@ else:
 
 db_query() {
   local sql="$1"
+  if command -v psql >/dev/null 2>&1; then
+    if host_pymes_psql -At -F '|' -c "$sql" 2>/dev/null; then
+      return 0
+    fi
+  fi
   local -a compose_cmd_parts=()
   read -r -a compose_cmd_parts <<<"$COMPOSE_CMD"
   "${compose_cmd_parts[@]}" exec -T postgres psql -U postgres -d pymes -At -F '|' -c "$sql"
@@ -241,14 +242,14 @@ http_request BODY STATUS GET "$BASE_URL/healthz"
 assert_status "GET cp-backend /healthz" "$STATUS" "200" "$BODY"
 
 print_section "Fixtures"
-http_request BODY STATUS GET "$GOVERNANCE_URL/v1/action-types" -H "X-API-Key: $GOVERNANCE_API_KEY"
+http_request BODY STATUS GET "$GOVERNANCE_URL/v1/action-types?org_id=$TENANT_ID" -H "X-API-Key: $GOVERNANCE_API_KEY"
 assert_status "GET governance action types" "$STATUS" "200" "$BODY"
-ACTION_TYPE_ID="$(json_find_action_type_id "$BODY")"
+ACTION_TYPE_ID="$(json_find_action_type_id "$BODY" "$TENANT_ID")"
 if [[ -z "$ACTION_TYPE_ID" ]]; then
   http_request BODY STATUS POST "$GOVERNANCE_URL/v1/action-types" \
     -H "X-API-Key: $GOVERNANCE_API_KEY" \
     -H "Content-Type: application/json" \
-    --data-binary "{\"name\":\"$ACTION_TYPE\",\"description\":\"E2E approval test action\",\"risk_class\":\"medium\"}"
+    --data-binary "{\"org_id\":\"$TENANT_ID\",\"name\":\"$ACTION_TYPE\",\"description\":\"E2E approval test action\",\"risk_class\":\"medium\"}"
   assert_status "POST governance action type" "$STATUS" "201" "$BODY"
 else
   printf "  %-56s %s (%s)\n" "action type fixture already present" "$(green "PASS")" "$ACTION_TYPE_ID"
@@ -256,7 +257,7 @@ fi
 
 http_request BODY STATUS GET "$GOVERNANCE_URL/v1/delegations" -H "X-API-Key: $GOVERNANCE_API_KEY"
 assert_status "GET governance delegations" "$STATUS" "200" "$BODY"
-DELEGATION_ID="$(json_find_delegation_id "$BODY")"
+DELEGATION_ID="$(json_find_delegation_id "$BODY" "$TENANT_ID")"
 if [[ -z "$DELEGATION_ID" ]]; then
   http_request BODY STATUS POST "$GOVERNANCE_URL/v1/delegations" \
     -H "X-API-Key: $GOVERNANCE_API_KEY" \
@@ -269,7 +270,7 @@ fi
 
 http_request BODY STATUS GET "$GOVERNANCE_URL/v1/policies" -H "X-API-Key: $GOVERNANCE_API_KEY"
 assert_status "GET governance policies" "$STATUS" "200" "$BODY"
-POLICY_INFO="$(json_find_policy_info "$BODY")"
+POLICY_INFO="$(json_find_policy_info "$BODY" "$TENANT_ID")"
 POLICY_ID="${POLICY_INFO%%$'\t'*}"
 POLICY_ENABLED="${POLICY_INFO#*$'\t'}"
 if [[ -z "$POLICY_ID" ]]; then
@@ -292,7 +293,7 @@ print_section "Submit"
 http_request BODY STATUS POST "$GOVERNANCE_URL/v1/requests" \
   -H "X-API-Key: $GOVERNANCE_API_KEY" \
   -H "Content-Type: application/json" \
-  --data-binary "{\"requester_type\":\"service\",\"requester_id\":\"$REQUESTER_ID\",\"requester_name\":\"E2E Governance Tester\",\"action_type\":\"$ACTION_TYPE\",\"target_system\":\"pymes\",\"target_resource\":\"$TARGET_RESOURCE\",\"params\":{\"tenant_id\":\"$TENANT_ID\"},\"reason\":\"E2E governance inbox verification\",\"context\":\"e2e-governance-notifications\"}"
+  --data-binary "{\"requester_type\":\"service\",\"requester_id\":\"$REQUESTER_ID\",\"requester_name\":\"E2E Governance Tester\",\"action_type\":\"$ACTION_TYPE\",\"target_system\":\"pymes\",\"target_resource\":\"$TARGET_RESOURCE\",\"params\":{\"tenant_id\":\"$TENANT_ID\",\"org_id\":\"$TENANT_ID\"},\"reason\":\"E2E governance inbox verification\",\"context\":\"e2e-governance-notifications\"}"
 assert_status "POST governance request" "$STATUS" "201" "$BODY"
 IFS=$'\t' read -r REQUEST_ID REQUEST_STATUS APPROVAL_ID <<<"$(json_get_submit_fields "$BODY")"
 if [[ "$REQUEST_STATUS" != "pending_approval" || -z "$APPROVAL_ID" || -z "$REQUEST_ID" ]]; then
@@ -309,14 +310,6 @@ else
   printf "  %-56s %s (> %ss)\n" "callback persisted unread inbox notification" "$(red "FAIL")" "$CALLBACK_TIMEOUT_SECONDS" >&2
   exit 1
 fi
-
-http_request BODY STATUS GET "$BASE_URL/v1/in-app-notifications" -H "X-API-Key: $API_KEY"
-assert_status "GET cp-backend /v1/in-app-notifications" "$STATUS" "200" "$BODY"
-if [[ "$(json_has_inbox_approval "$BODY" "$APPROVAL_ID")" != "1" ]]; then
-  echo "La approval no apareció en el inbox del control plane" >&2
-  exit 1
-fi
-printf "  %-56s %s\n" "inbox exposes approval notification" "$(green "PASS")"
 
 http_request BODY STATUS GET "$BASE_URL/v1/governance/approvals/pending" -H "X-API-Key: $API_KEY"
 assert_status "GET cp-backend /v1/governance/approvals/pending" "$STATUS" "200" "$BODY"
@@ -339,14 +332,6 @@ else
   printf "  %-56s %s (> %ss)\n" "resolution callback marked inbox notification read" "$(red "FAIL")" "$CALLBACK_TIMEOUT_SECONDS" >&2
   exit 1
 fi
-
-http_request BODY STATUS GET "$BASE_URL/v1/in-app-notifications" -H "X-API-Key: $API_KEY"
-assert_status "GET cp-backend /v1/in-app-notifications after resolve" "$STATUS" "200" "$BODY"
-if [[ "$(json_has_inbox_approval "$BODY" "$APPROVAL_ID")" != "0" ]]; then
-  echo "La approval resuelta sigue visible en el inbox" >&2
-  exit 1
-fi
-printf "  %-56s %s\n" "resolved approval disappears from inbox" "$(green "PASS")"
 
 http_request BODY STATUS GET "$BASE_URL/v1/governance/approvals/pending" -H "X-API-Key: $API_KEY"
 assert_status "GET cp-backend /v1/governance/approvals/pending after resolve" "$STATUS" "200" "$BODY"

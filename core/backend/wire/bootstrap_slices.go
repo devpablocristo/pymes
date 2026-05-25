@@ -1,7 +1,15 @@
 package wire
 
 import (
+	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
+	"io"
+	"net/http"
+	"strings"
 	"time"
 
 	coreworker "github.com/devpablocristo/platform/concurrency/go/worker"
@@ -84,8 +92,51 @@ func registerInternalV1Routes(v1 *gin.RouterGroup, internalServiceToken, governa
 		return
 	}
 	governanceCallbackGroup := v1.Group("/internal/v1")
-	governanceCallbackGroup.Use(ginmw.NewInternalServiceAuth(governanceCallbackToken))
+	governanceCallbackGroup.Use(newNexusCallbackAuth(governanceCallbackToken))
 	registrars.governanceCallbacks.RegisterGovernanceCallbackRoutes(governanceCallbackGroup)
+}
+
+func newNexusCallbackAuth(token string) gin.HandlerFunc {
+	token = strings.TrimSpace(token)
+	return func(c *gin.Context) {
+		if token == "" {
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable, ginmw.SimpleErrorResponse{Error: "nexus callback auth not configured"})
+			return
+		}
+		if provided := strings.TrimSpace(c.GetHeader("X-Internal-Service-Token")); subtle.ConstantTimeCompare([]byte(provided), []byte(token)) == 1 {
+			c.Next()
+			return
+		}
+
+		timestamp := strings.TrimSpace(c.GetHeader("X-Nexus-Callback-Timestamp"))
+		signature := strings.TrimSpace(c.GetHeader("X-Nexus-Callback-Signature"))
+		if timestamp == "" || signature == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, ginmw.SimpleErrorResponse{Error: "unauthorized"})
+			return
+		}
+
+		body, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, ginmw.SimpleErrorResponse{Error: "invalid callback body"})
+			return
+		}
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+
+		expected := signNexusCallback(token, timestamp, body)
+		if subtle.ConstantTimeCompare([]byte(signature), []byte(expected)) != 1 {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, ginmw.SimpleErrorResponse{Error: "unauthorized"})
+			return
+		}
+		c.Next()
+	}
+}
+
+func signNexusCallback(token, timestamp string, payload []byte) string {
+	mac := hmac.New(sha256.New, []byte(token))
+	_, _ = mac.Write([]byte(timestamp))
+	_, _ = mac.Write([]byte("."))
+	_, _ = mac.Write(payload)
+	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
 }
 
 type tenantPublicRegistrars struct {

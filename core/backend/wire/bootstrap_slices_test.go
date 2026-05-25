@@ -1,6 +1,9 @@
 package wire
 
 import (
+	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -23,6 +26,41 @@ func TestRegisterPublicV1RoutesUsesExpectedGroup(t *testing.T) {
 	})
 
 	assertRoutePaths(t, router, "GET /v1/payment-gateway/callback", "GET /v1/calendar/export", "GET /v1/scheduler/jobs")
+}
+
+func TestNexusCallbackAuthAcceptsSignedAxisCallback(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/callback", newNexusCallbackAuth("callback-token"), noopHandler)
+
+	body := []byte(`{"event":"approval_pending"}`)
+	req := httptest.NewRequest(http.MethodPost, "/callback", bytes.NewReader(body))
+	req.Header.Set("X-Nexus-Callback-Timestamp", "2026-05-25T10:00:00Z")
+	req.Header.Set("X-Nexus-Callback-Signature", signNexusCallback("callback-token", "2026-05-25T10:00:00Z", body))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNoContent, rec.Body.String())
+	}
+}
+
+func TestNexusCallbackAuthRejectsBadSignature(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/callback", newNexusCallbackAuth("callback-token"), noopHandler)
+
+	req := httptest.NewRequest(http.MethodPost, "/callback", bytes.NewReader([]byte(`{"event":"approval_pending"}`)))
+	req.Header.Set("X-Nexus-Callback-Timestamp", "2026-05-25T10:00:00Z")
+	req.Header.Set("X-Nexus-Callback-Signature", "sha256=bad")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
 }
 
 func TestRegisterInternalV1RoutesUsesExpectedGroups(t *testing.T) {

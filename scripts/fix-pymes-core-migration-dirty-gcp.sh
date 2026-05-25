@@ -6,10 +6,10 @@
 # curl/psql, y cloud-sql-proxy en PATH o en CLOUD_SQL_PROXY_BIN.
 #
 # Uso:
-#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-core-migration-dirty-gcp.sh status
-#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-core-migration-dirty-gcp.sh check-clean
-#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-core-migration-dirty-gcp.sh rewind-to 40
-#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-core-migration-dirty-gcp.sh repair-known-dev-dirty
+#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh status
+#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh check-clean
+#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh rewind-to 40
+#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh repair-known-dev-dirty
 #
 # rewind-to N: deja la tabla de migraciones en versión N sin dirty (el próximo arranque del backend
 # reaplicará N+1...). Si la migración N+1 quedó a medias, puede fallar hasta hacer DROP SCHEMA

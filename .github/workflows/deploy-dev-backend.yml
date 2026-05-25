@@ -131,8 +131,8 @@ jobs:
           PROJECT_ID: ${{ env.GCP_PROJECT_ID }}
           CLOUD_SQL_PROXY_BIN: /tmp/cloud-sql-proxy
         run: |
-          scripts/fix-core-migration-dirty-gcp.sh repair-known-dev-dirty
-          scripts/fix-core-migration-dirty-gcp.sh check-clean
+          scripts/fix-pymes-core-migration-dirty-gcp.sh repair-known-dev-dirty
+          scripts/fix-pymes-core-migration-dirty-gcp.sh check-clean
 
       - name: Stage backend build context
         run: |

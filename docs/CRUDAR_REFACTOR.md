@@ -4,13 +4,14 @@ Este documento explica cómo aplicar el patrón `@devpablocristo/platform-lifecy
 a un módulo de `pymes/core/backend/internal/<modulo>/` que ya tiene CRUDAR
 implementado a mano (Soft/Restore/Hard + `archive.IfArchived` ad-hoc).
 
-## Estado base post-Ola B/C-paso-1 (2026-05-18)
+## Estado base actual (2026-05-25)
 
-Después del paso 1 de Ola C, **todos los módulos pymes-core que usaban
-`platform/features/crud/archive/go/archive` migraron a
-`platform/lifecycle/go/archive`**. El cambio fue mecánico (rename de import).
-El comportamiento de runtime es idéntico: el subpackage `archive` de
-lifecycle es una re-implementación drop-in con la misma API:
+Pymes ya usa `platform/lifecycle/go` como fuente vigente para lifecycle CRUDAR.
+El runtime principal consulta `archived_at` como columna canónica de archivado;
+algunos DTOs o modelos conservan nombres internos `DeletedAt` por compatibilidad
+histórica, pero sus tags GORM apuntan a `archived_at`.
+
+El subpackage `archive` de lifecycle mantiene la API usada por los módulos:
 
 ```go
 archive.IfArchived(current.ArchivedAt, "resource") // 409 Conflict si archivado
@@ -18,7 +19,8 @@ archive.IsArchived(current.ArchivedAt)            // bool
 archive.ErrArchived                                // sentinel
 ```
 
-22 archivos refactorizados; tests siguen verdes.
+El refactor profundo hacia `lifecycle.Service` sigue siendo incremental y no
+requiere migraciones masivas de `deleted_at` en los módulos ya alineados.
 
 ## Pendiente: refactor profundo (uso de `lifecycle.Service`)
 
@@ -121,22 +123,22 @@ método de pymes deja de tener la lógica imperativa.
 
 ## Calendario de refactor profundo
 
-Los 14 módulos identificados con CRUDAR ya migraron sus imports en Ola C-paso-1.
-El refactor profundo es **opcional** y se prioriza según valor de producto:
+Los módulos CRUDAR principales ya operan sobre `archived_at`. El refactor
+profundo es **opcional** y se prioriza según valor de producto:
 
 | Módulo | Naming columna | FSM | Audit existente | Recomendación |
 |---|---|---|---|---|
 | pricelists | archived_at | no | ❌ falta | **piloto** (sin FSM, sin audit previa → mejor caso de uso) |
 | employees | archived_at | no | ❌ | bajo riesgo |
-| services | deleted_at | no | parcial | requiere migration `RENAME COLUMN` antes |
+| services | archived_at | no | parcial | bajo riesgo |
 | cashflow | archived_at | no | ✓ | media — ya audita |
 | recurring | archived_at | no | parcial | bajo |
 | returns | archived_at | no | parcial | bajo |
-| products | deleted_at | no | parcial | requiere migration |
-| customers | deleted_at | no | parcial | requiere migration |
-| suppliers | deleted_at | no | parcial | requiere migration |
-| sales | deleted_at | sí | parcial | **alto riesgo** — FSM + migration |
-| purchases | deleted_at | sí | parcial | alto — FSM + migration |
+| products | archived_at | no | parcial | bajo riesgo |
+| customers | archived_at | no | parcial | bajo riesgo |
+| suppliers | archived_at | no | parcial | bajo riesgo |
+| sales | archived_at | sí | parcial | **alto riesgo** — FSM + efectos contables |
+| purchases | archived_at | sí | parcial | alto — FSM + compras |
 | payments | archived_at | no | parcial | media |
 | invoices | archived_at | sí | ✓ | media |
 | quotes | archived_at | sí | ✓ | media |
@@ -147,8 +149,8 @@ El refactor profundo es **opcional** y se prioriza según valor de producto:
 2. employees, recurring, returns (mismo patrón). 0.5 día c/u.
 3. cashflow, invoices, quotes (con audit previa). 1 día c/u.
 4. payments (con audit, sin FSM). 0.5 día.
-5. customers, suppliers, products, services (requieren migration de columna `deleted_at` → `archived_at`). 1 día c/u + downtime planeado.
-6. sales, purchases (con FSM y migration). 2 días c/u (más cuidado).
+5. customers, suppliers, products, services. 1 día c/u.
+6. sales, purchases. 2 días c/u por el acoplamiento con FSM y efectos de negocio.
 
 **Total estimado**: ~3 semanas calendario con 1 ingeniero.
 
@@ -163,14 +165,13 @@ Después de refactorizar cada uno:
 - [ ] Si la policy tiene `RequireReason: true`, llamadas sin reason → 422.
 - [ ] Si la policy tiene `ValidateRelations`, los casos prohibidos → 409.
 
-## Migrations SQL para módulos con `deleted_at`
+## Migrations SQL
 
-```sql
--- 00XX_<modulo>_archived_at_rename.up.sql
-ALTER TABLE <table> RENAME COLUMN deleted_at TO archived_at;
-ALTER INDEX idx_<table>_deleted_at RENAME TO idx_<table>_archived_at;
-```
+No hay una migración masiva pendiente para los módulos listados arriba: el
+runtime actual ya usa `archived_at`. Si aparece un módulo o vertical legacy con
+`deleted_at` real en schema, tratarlo como excepción local:
 
-Espejo en `.down.sql`. Estos cambios son rápidos en Postgres (lock muy
-corto) pero deben coordinarse con un release que NO use ambos nombres
-simultáneamente.
+1. confirmar que la tabla no es una excepción semántica como `users.deleted_at`;
+2. crear migración `.up.sql` y `.down.sql` de rename de columna e índices;
+3. actualizar tags GORM, SQL raw, seeds y docs en el mismo cambio;
+4. correr tests del módulo y smoke de archive/restore.

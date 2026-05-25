@@ -13,6 +13,7 @@
 | Documento | Descripción |
 |-----------|-------------|
 | [Estándar CRUD Pymes](CRUD_STANDARD.md) | Contrato objetivo para rutas, listas, errores, arquitectura hexagonal y compatibilidad de CRUDs. |
+| [Status/FSM](STATUS_FSM.md) | Estado canonico de FSM backend/frontend para billing, reglas de sincronizacion y excepciones conocidas. |
 | [Ledger de deuda técnica](TECH_DEBT_LEDGER.md) | Registro explícito de compatibilidades, fallbacks y parches con criterio de retiro. |
 | [UI System](UI_SYSTEM.md) | Tokens de diseño, fuentes, dark mode, componentes shared y reglas para CSS nuevo. Estado de la migración Wooko → Pymes. |
 | [Database Init](DATABASE_INIT.md) | Bootstrap del schema desde DB vacía, orden de migraciones post-squash, debug y convenciones (identidad `orgs`, soft-delete `archived_at`, etc). |

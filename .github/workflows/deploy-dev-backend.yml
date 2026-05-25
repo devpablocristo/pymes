@@ -193,8 +193,10 @@ jobs:
               --format='value(status.url)' 2>/dev/null || true)"
           fi
           if [[ -z "$companion_url" ]]; then
-            echo "::warning::No se pudo resolver COMPANION_INTERNAL_URL desde DEV_COMPANION_INTERNAL_URL ni desde Cloud Run service $AXIS_COMPANION_SERVICE_NAME. Se desplegará el backend sin Companion interno."
+            echo "::error::No se pudo resolver COMPANION_INTERNAL_URL desde DEV_COMPANION_INTERNAL_URL ni desde Cloud Run service $AXIS_COMPANION_SERVICE_NAME."
+            exit 1
           fi
+          curl -fsS "$companion_url/readyz" >/dev/null
           echo "GOVERNANCE_URL_EFFECTIVE=$governance_url" >> "$GITHUB_ENV"
           echo "COMPANION_INTERNAL_URL_EFFECTIVE=$companion_url" >> "$GITHUB_ENV"
 
@@ -205,10 +207,8 @@ jobs:
             "$SECRET_DATABASE_URL_NAME"
             "$SECRET_CLERK_SECRET_KEY_NAME"
             "$SECRET_GOVERNANCE_API_KEY_NAME"
+            "$SECRET_COMPANION_API_KEY_NAME"
           )
-          if [[ -n "${COMPANION_INTERNAL_URL_EFFECTIVE:-}" ]]; then
-            secret_names+=("$SECRET_COMPANION_API_KEY_NAME")
-          fi
           for secret_name in "${secret_names[@]}"; do
             if ! gcloud secrets versions access latest \
               --secret="$secret_name" \
@@ -220,9 +220,7 @@ jobs:
           secret_flags="DATABASE_URL=${SECRET_DATABASE_URL_NAME}:latest"
           secret_flags="${secret_flags},CLERK_SECRET_KEY=${SECRET_CLERK_SECRET_KEY_NAME}:latest"
           secret_flags="${secret_flags},GOVERNANCE_API_KEY=${SECRET_GOVERNANCE_API_KEY_NAME}:latest"
-          if [[ -n "${COMPANION_INTERNAL_URL_EFFECTIVE:-}" ]]; then
-            secret_flags="${secret_flags},COMPANION_API_KEY=${SECRET_COMPANION_API_KEY_NAME}:latest"
-          fi
+          secret_flags="${secret_flags},COMPANION_API_KEY=${SECRET_COMPANION_API_KEY_NAME}:latest"
           echo "SECRET_FLAGS=$secret_flags" >> "$GITHUB_ENV"
 
       - name: Deploy to Cloud Run (DEV)
@@ -242,9 +240,7 @@ jobs:
           if [[ -n "${GOVERNANCE_URL_EFFECTIVE}" ]]; then
             env_vars="${env_vars},GOVERNANCE_URL=${GOVERNANCE_URL_EFFECTIVE}"
           fi
-          if [[ -n "${COMPANION_INTERNAL_URL_EFFECTIVE:-}" ]]; then
-            env_vars="${env_vars},COMPANION_INTERNAL_URL=${COMPANION_INTERNAL_URL_EFFECTIVE}"
-          fi
+          env_vars="${env_vars},COMPANION_INTERNAL_URL=${COMPANION_INTERNAL_URL_EFFECTIVE}"
           gcloud run deploy "$SERVICE_NAME" \
             --project="$GCP_PROJECT_ID" \
             --region="$GCP_REGION" \

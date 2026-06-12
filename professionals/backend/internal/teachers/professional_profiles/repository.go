@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/http/go/pagination"
+	"github.com/devpablocristo/platform/http/go/pagination"
+	utils "github.com/devpablocristo/platform/validate/go/stringutil"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/repository/models"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/usecases/domain"
 )
@@ -22,16 +24,22 @@ type Repository struct {
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 type ListParams struct {
-	OrgID  uuid.UUID
-	Limit  int
-	After  *uuid.UUID
-	Search string
+	OrgID uuid.UUID
+	Limit    int
+	After    *uuid.UUID
+	Search   string
+	Archived bool
 }
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.ProfessionalProfile, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
 	q := r.db.WithContext(ctx).Model(&models.ProfessionalProfileModel{}).Where("org_id = ?", p.OrgID)
+	if p.Archived {
+		q = q.Where("deleted_at IS NOT NULL")
+	} else {
+		q = q.Where("deleted_at IS NULL")
+	}
 	if s := strings.TrimSpace(p.Search); s != "" {
 		like := "%" + s + "%"
 		q = q.Where("(headline ILIKE ? OR bio ILIKE ? OR public_slug ILIKE ?)", like, like, like)
@@ -76,7 +84,7 @@ func (r *Repository) Create(ctx context.Context, in domain.ProfessionalProfile) 
 	meta, _ := json.Marshal(in.Metadata)
 	row := models.ProfessionalProfileModel{
 		ID:                uuid.New(),
-		OrgID:             in.OrgID,
+		OrgID:          in.OrgID,
 		PartyID:           in.PartyID,
 		PublicSlug:        strings.TrimSpace(in.PublicSlug),
 		Bio:               strings.TrimSpace(in.Bio),
@@ -84,6 +92,8 @@ func (r *Repository) Create(ctx context.Context, in domain.ProfessionalProfile) 
 		IsPublic:          in.IsPublic,
 		IsBookable:        in.IsBookable,
 		AcceptsNewClients: in.AcceptsNewClients,
+		IsFavorite:        in.IsFavorite,
+		Tags:              pq.StringArray(utils.NormalizeTags(in.Tags)),
 		Metadata:          meta,
 		CreatedAt:         time.Now().UTC(),
 		UpdatedAt:         time.Now().UTC(),
@@ -143,11 +153,13 @@ func (r *Repository) Update(ctx context.Context, in domain.ProfessionalProfile) 
 		"is_public":           in.IsPublic,
 		"is_bookable":         in.IsBookable,
 		"accepts_new_clients": in.AcceptsNewClients,
+		"is_favorite":         in.IsFavorite,
+		"tags":                pq.StringArray(utils.NormalizeTags(in.Tags)),
 		"metadata":            meta,
 		"updated_at":          time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.ProfessionalProfileModel{}).
-		Where("org_id = ? AND id = ?", in.OrgID, in.ID).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		return domain.ProfessionalProfile{}, res.Error
@@ -158,10 +170,66 @@ func (r *Repository) Update(ctx context.Context, in domain.ProfessionalProfile) 
 	return r.GetByID(ctx, in.OrgID, in.ID)
 }
 
+func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, orgID, id)
+	if err != nil {
+		return err
+	}
+	if state.DeletedAt != nil {
+		return nil
+	}
+	res := r.db.WithContext(ctx).Model(&models.ProfessionalProfileModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
+	return res.Error
+}
+
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, orgID, id)
+	if err != nil {
+		return err
+	}
+	if state.DeletedAt == nil {
+		return nil
+	}
+	res := r.db.WithContext(ctx).Model(&models.ProfessionalProfileModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
+	return res.Error
+}
+
+func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Unscoped().
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Delete(&models.ProfessionalProfileModel{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) lookupState(ctx context.Context, orgID, id uuid.UUID) (models.ProfessionalProfileModel, error) {
+	var row models.ProfessionalProfileModel
+	err := r.db.WithContext(ctx).
+		Select("id, deleted_at").
+		Where("org_id = ? AND id = ?", orgID, id).
+		Take(&row).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.ProfessionalProfileModel{}, gorm.ErrRecordNotFound
+		}
+		return models.ProfessionalProfileModel{}, err
+	}
+	return row, nil
+}
+
 func (r *Repository) ListPublic(ctx context.Context, orgID uuid.UUID) ([]domain.ProfessionalProfile, error) {
 	var rows []models.ProfessionalProfileModel
 	err := r.db.WithContext(ctx).
-		Where("org_id = ? AND is_public = true", orgID).
+		Where("org_id = ? AND is_public = true AND deleted_at IS NULL", orgID).
 		Order("headline ASC").
 		Find(&rows).Error
 	if err != nil {
@@ -191,7 +259,7 @@ func (r *Repository) loadSpecialties(ctx context.Context, orgID, profileID uuid.
 
 	type specRow struct {
 		ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-		OrgID       uuid.UUID `gorm:"type:uuid"`
+		OrgID    uuid.UUID `gorm:"type:uuid"`
 		Code        string
 		Name        string
 		Description string
@@ -207,7 +275,7 @@ func (r *Repository) loadSpecialties(ctx context.Context, orgID, profileID uuid.
 	for _, s := range specs {
 		out = append(out, domain.Specialty{
 			ID:          s.ID,
-			OrgID:       s.OrgID,
+			OrgID:    s.OrgID,
 			Code:        s.Code,
 			Name:        s.Name,
 			Description: s.Description,
@@ -229,7 +297,7 @@ func toDomain(row models.ProfessionalProfileModel) domain.ProfessionalProfile {
 	}
 	return domain.ProfessionalProfile{
 		ID:                row.ID,
-		OrgID:             row.OrgID,
+		OrgID:          row.OrgID,
 		PartyID:           row.PartyID,
 		PublicSlug:        row.PublicSlug,
 		Bio:               row.Bio,
@@ -237,8 +305,11 @@ func toDomain(row models.ProfessionalProfileModel) domain.ProfessionalProfile {
 		IsPublic:          row.IsPublic,
 		IsBookable:        row.IsBookable,
 		AcceptsNewClients: row.AcceptsNewClients,
+		IsFavorite:        row.IsFavorite,
+		Tags:              append([]string(nil), row.Tags...),
 		Metadata:          meta,
 		CreatedAt:         row.CreatedAt,
 		UpdatedAt:         row.UpdatedAt,
+		DeletedAt:         row.DeletedAt,
 	}
 }

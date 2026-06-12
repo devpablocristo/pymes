@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalconfig"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalconfig"
 )
 
 // Config centraliza la configuracion externa para mantener el mismo codigo entre ambientes.

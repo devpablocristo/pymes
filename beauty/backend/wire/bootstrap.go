@@ -8,16 +8,16 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/devpablocristo/pymes/beauty/backend/internal/salon/orchestration"
 	"github.com/devpablocristo/pymes/beauty/backend/internal/salon/public"
 	"github.com/devpablocristo/pymes/beauty/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/beauty/backend/internal/shared/pymescore"
 	"github.com/devpablocristo/pymes/beauty/backend/migrations"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalwire"
+	"github.com/devpablocristo/pymes/core/shared/backend/app"
+	"github.com/devpablocristo/pymes/core/shared/backend/auth"
+	"github.com/devpablocristo/pymes/core/shared/backend/store"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalwire"
 )
 
 func InitializeApp() *app.App {
@@ -35,6 +35,10 @@ func InitializeApp() *app.App {
 	cpClient := pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
 	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpClient.Client)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
+	tenantSlugBinding := auth.RequireTenantSlugBinding(
+		verticalwire.NewCoreTenantRefResolver(cpClient.Client),
+		verticalwire.NewTenantMembershipResolver(db),
+	)
 
 	orchestrationUC := orchestration.NewUsecases(cpClient)
 
@@ -43,7 +47,10 @@ func InitializeApp() *app.App {
 
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(ginmw.NewCORS(ginmw.CORSConfig{Origins: []string{cfg.FrontendURL}}))
+	router.Use(ginmw.NewCORS(ginmw.CORSConfig{
+		Origins:      []string{cfg.FrontendURL},
+		AllowHeaders: []string{auth.TenantSlugHeader},
+	}))
 	ginmw.RegisterHealthEndpoints(router, func(ctx context.Context) error { return store.Ping(ctx, db) })
 
 	v1 := router.Group("/v1")
@@ -52,7 +59,7 @@ func InitializeApp() *app.App {
 	publicHandler.RegisterRoutes(publicGroup)
 
 	authGroup := v1.Group("")
-	authGroup.Use(authMiddleware.RequireAuth())
+	authGroup.Use(authMiddleware.RequireAuth(), tenantSlugBinding)
 
 	beautyGroup := authGroup.Group("/beauty")
 	orchestrationHandler.RegisterRoutes(beautyGroup)

@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/workorders/usecases/domain"
 )
 
@@ -39,7 +39,7 @@ func NewUsecases(cp controlPlanePort, orders workOrderPort, audit auditPort) *Us
 
 func (u *Usecases) CreateBooking(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error) {
 	if strings.TrimSpace(orgID) == "" {
-		return nil, fmt.Errorf("org_id is required: %w", httperrors.ErrBadInput)
+		return nil, fmt.Errorf("tenant_id is required: %w", httperrors.ErrBadInput)
 	}
 	out := copyMap(payload)
 	out["org_id"] = orgID
@@ -47,17 +47,17 @@ func (u *Usecases) CreateBooking(ctx context.Context, orgID string, payload map[
 }
 
 func (u *Usecases) CreateQuoteFromWorkOrder(ctx context.Context, orgID string, workOrderID uuid.UUID, actor string) (map[string]any, error) {
-	orgUUID, err := uuid.Parse(strings.TrimSpace(orgID))
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
-		return nil, fmt.Errorf("org_id is invalid: %w", httperrors.ErrBadInput)
+		return nil, fmt.Errorf("tenant_id is invalid: %w", httperrors.ErrBadInput)
 	}
-	order, err := u.orders.GetByID(ctx, orgUUID, workOrderID)
+	order, err := u.orders.GetByID(ctx, tenantUUID, workOrderID)
 	if err != nil {
 		return nil, err
 	}
 	payload := map[string]any{
-		"org_id":        orgID,
-		"customer_name": fallback(order.CustomerName, order.TargetLabel),
+		"org_id":     orgID,
+		"customer_name": fallback(order.CustomerName, order.AssetLabel),
 		"notes":         order.Notes,
 		"items":         toCommercialItems(order.Items),
 	}
@@ -72,7 +72,7 @@ func (u *Usecases) CreateQuoteFromWorkOrder(ctx context.Context, orgID string, w
 		return nil, err
 	}
 	if quoteID := parseResultID(result["id"]); quoteID != nil {
-		_, _ = u.orders.SaveIntegrations(ctx, orgUUID, workOrderID, quoteID, nil, nil, actor)
+		_, _ = u.orders.SaveIntegrations(ctx, tenantUUID, workOrderID, quoteID, nil, nil, actor)
 	}
 	if u.audit != nil {
 		u.audit.Log(ctx, orgID, actor, "work_order.quote_created", "work_order", workOrderID.String(), map[string]any{"quote": result})
@@ -81,17 +81,17 @@ func (u *Usecases) CreateQuoteFromWorkOrder(ctx context.Context, orgID string, w
 }
 
 func (u *Usecases) CreateSaleFromWorkOrder(ctx context.Context, orgID string, workOrderID uuid.UUID, actor string) (map[string]any, error) {
-	orgUUID, err := uuid.Parse(strings.TrimSpace(orgID))
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
-		return nil, fmt.Errorf("org_id is invalid: %w", httperrors.ErrBadInput)
+		return nil, fmt.Errorf("tenant_id is invalid: %w", httperrors.ErrBadInput)
 	}
-	order, err := u.orders.GetByID(ctx, orgUUID, workOrderID)
+	order, err := u.orders.GetByID(ctx, tenantUUID, workOrderID)
 	if err != nil {
 		return nil, err
 	}
 	payload := map[string]any{
-		"org_id":         orgID,
-		"customer_name":  fallback(order.CustomerName, order.TargetLabel),
+		"org_id":      orgID,
+		"customer_name":  fallback(order.CustomerName, order.AssetLabel),
 		"payment_method": "transfer",
 		"notes":          order.Notes,
 		"items":          toCommercialItems(order.Items),
@@ -110,7 +110,7 @@ func (u *Usecases) CreateSaleFromWorkOrder(ctx context.Context, orgID string, wo
 	if parsed := parseResultID(result["id"]); parsed != nil {
 		saleID = parsed
 		status := "invoiced"
-		_, _ = u.orders.SaveIntegrations(ctx, orgUUID, workOrderID, nil, saleID, &status, actor)
+		_, _ = u.orders.SaveIntegrations(ctx, tenantUUID, workOrderID, nil, saleID, &status, actor)
 	}
 	if u.audit != nil {
 		u.audit.Log(ctx, orgID, actor, "work_order.sale_created", "work_order", workOrderID.String(), map[string]any{"sale": result})
@@ -119,11 +119,11 @@ func (u *Usecases) CreateSaleFromWorkOrder(ctx context.Context, orgID string, wo
 }
 
 func (u *Usecases) CreatePaymentLinkFromWorkOrder(ctx context.Context, orgID string, workOrderID uuid.UUID, actor string) (map[string]any, error) {
-	orgUUID, err := uuid.Parse(strings.TrimSpace(orgID))
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
-		return nil, fmt.Errorf("org_id is invalid: %w", httperrors.ErrBadInput)
+		return nil, fmt.Errorf("tenant_id is invalid: %w", httperrors.ErrBadInput)
 	}
-	order, err := u.orders.GetByID(ctx, orgUUID, workOrderID)
+	order, err := u.orders.GetByID(ctx, tenantUUID, workOrderID)
 	if err != nil {
 		return nil, err
 	}

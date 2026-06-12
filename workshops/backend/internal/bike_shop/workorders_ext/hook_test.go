@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 	bicyclesdomain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles/usecases/domain"
 	workordersdomain "github.com/devpablocristo/pymes/workshops/backend/internal/workorders/usecases/domain"
 )
@@ -39,16 +39,16 @@ func TestHookBeforeCreateSyncsBicycleData(t *testing.T) {
 		},
 	})
 	wo := &workordersdomain.WorkOrder{
-		OrgID:      uuid.New(),
-		TargetID:   uuid.New(),
-		TargetType: "bicycle",
+		OrgID:  uuid.New(),
+		AssetID:   uuid.New(),
+		AssetType: "bicycle",
 	}
 
 	if err := hook.BeforeCreate(context.Background(), wo); err != nil {
 		t.Fatalf("BeforeCreate() error = %v", err)
 	}
-	if wo.TargetLabel != "Trek Marlin 7" {
-		t.Fatalf("TargetLabel = %q, want Trek Marlin 7", wo.TargetLabel)
+	if wo.AssetLabel != "Trek Marlin 7" {
+		t.Fatalf("AssetLabel = %q, want Trek Marlin 7", wo.AssetLabel)
 	}
 	if wo.CustomerName != "Cliente Bici" {
 		t.Fatalf("CustomerName = %q, want Cliente Bici", wo.CustomerName)
@@ -61,9 +61,9 @@ func TestHookBeforeCreateSyncsBicycleData(t *testing.T) {
 func TestHookBeforeCreateRejectsUnknownBicycle(t *testing.T) {
 	hook := New(&fakeBicycleLookup{err: httperrors.ErrNotFound})
 	wo := &workordersdomain.WorkOrder{
-		OrgID:      uuid.New(),
-		TargetID:   uuid.New(),
-		TargetType: "bicycle",
+		OrgID:  uuid.New(),
+		AssetID:   uuid.New(),
+		AssetType: "bicycle",
 	}
 
 	err := hook.BeforeCreate(context.Background(), wo)

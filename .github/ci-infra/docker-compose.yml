@@ -1,0 +1,25 @@
+# Overlay compose usado por el CI y como fallback de `make up` cuando no hay repo `local-infra`:
+# Postgres (+ puerto host) y Mailhog. Axis Nexus corre en compose aparte (repo `axis`).
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: pymes
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # SMTP local esperado por cp-backend (`SMTP_HOST=mailhog`); sin esto el stack seguiría pero fallarían envíos de mail en dev.
+  mailhog:
+    image: mailhog/mailhog:latest
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"

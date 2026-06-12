@@ -1,0 +1,57 @@
+name: Preview Cleanup
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Número de PR a limpiar"
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  GCP_REGION: us-central1
+  GCP_PROJECT_ID: pymes-dev-352318
+  FIREBASE_HOSTING_SITE_ID: pymes-dev-352318
+  WIF_PROVIDER: ${{ vars.PYMES_STG_WIF_PROVIDER || 'projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider' }}
+  WIF_SERVICE_ACCOUNT: pymes-github-actions-stg@pymes-dev-352318.iam.gserviceaccount.com
+  FIREBASE_TOOLS_VERSION: "13"
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    environment: preview
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+      - name: Cleanup preview resources
+        run: |
+          set -euo pipefail
+          pr="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
+          services=(pymes-core pymes-workshops pymes-professionals pymes-beauty pymes-restaurants pymes-medical)
+          for service in "${services[@]}"; do
+            gcloud run services delete "${service}-pr-${pr}" --project="$GCP_PROJECT_ID" --region="$GCP_REGION" --quiet >/dev/null 2>&1 || true
+          done
+          npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" hosting:channel:delete "pr-${pr}" \
+            --project "$GCP_PROJECT_ID" \
+            --site "$FIREBASE_HOSTING_SITE_ID" \
+            --force \
+            --non-interactive >/dev/null 2>&1 || true
+          gcloud sql databases delete "pymes_preview_pr_${pr}" --instance=pymes-dev-db --project=pymes-dev-352318 --quiet >/dev/null 2>&1 || true
+          gcloud secrets delete "pymes-database-url-pr-${pr}" --project="$GCP_PROJECT_ID" --quiet >/dev/null 2>&1 || true

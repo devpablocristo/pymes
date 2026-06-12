@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/devpablocristo/core/concurrency/go/fsm"
+	"github.com/devpablocristo/platform/concurrency/go/fsm"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 )
 
 // WorkOrderFSM define las transiciones válidas para órdenes de trabajo.
@@ -23,7 +23,7 @@ var WorkOrderFSM = fsm.NewBuilder().
 	AllowAnyTo("cancelled").
 	Build()
 
-// NormalizeStatus mapea valores legacy y devuelve el estado canónico.
+// NormalizeStatus mapea aliases de estado y devuelve el estado canónico.
 func NormalizeStatus(raw string) string {
 	s := strings.TrimSpace(strings.ToLower(raw))
 	switch s {

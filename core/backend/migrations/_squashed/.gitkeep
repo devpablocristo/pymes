@@ -1,0 +1,9 @@
+# _squashed/ — Workspace temporal de la Fase B–G del plan de squash de migraciones.
+#
+# Contiene durante el refactor:
+# - _reference_schema.sql      → snapshot del schema actual (Fase C)
+# - _legacy_diff.sql           → tablas que desaparecen en el squash (review humano)
+# - 0001..0017 borradores antes de promoverlos a la raíz de migrations/
+#
+# Este directorio se elimina al cierre de la Fase H (cleanup).
+# Plan canónico: .claude/plans/tengo-un-bug-en-melodic-river.md

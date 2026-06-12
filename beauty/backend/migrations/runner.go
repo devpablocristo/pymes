@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
 
-	gormdb "github.com/devpablocristo/core/databases/postgres/go"
+	gormdb "github.com/devpablocristo/platform/databases/postgres/go"
 )
 
 //go:embed *.sql

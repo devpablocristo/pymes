@@ -2,28 +2,64 @@ name: CI
 
 on:
   pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
   workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 concurrency:
   group: pymes-ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  pymes-core-backend:
+  infra-registry:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate declarative vertical registry
+        run: |
+          python3 -m pip install --user pyyaml
+          python3 scripts/infra/validate_verticals.py
+          python3 scripts/infra/generate_firebase.py --check
+      - id: matrix
+        name: Generate deployable vertical matrix
+        run: |
+          set -euo pipefail
+          matrix="$(python3 scripts/infra/generate_vertical_matrix.py --mode deploy)"
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+          MATRIX="$matrix" python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          matrix = json.loads(os.environ["MATRIX"])
+          if not matrix.get("include"):
+              print("deploy matrix is empty", file=sys.stderr)
+              sys.exit(1)
+          print(f"deploy matrix contains {len(matrix['include'])} verticals")
+          PY
+
+  core-backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Verify pymes-core backend
+      - name: Verify core backend
         run: |
-          go vet ./pymes-core/backend/...
-          go test ./pymes-core/backend/...
-          go build ./pymes-core/backend/...
+          go vet ./core/backend/...
+          go test ./core/backend/...
+          go build ./core/backend/...
 
   professionals-backend:
     runs-on: ubuntu-latest
@@ -77,45 +113,33 @@ jobs:
           go test ./restaurants/backend/...
           go build ./restaurants/backend/...
 
-  ai:
+  medical-backend:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    # El runner no tiene .env; Settings valida Gemini al importar módulos durante pytest.
-    env:
-      GEMINI_API_KEY: ci-placeholder-not-used
-    defaults:
-      run:
-        working-directory: ai
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-go@v5
         with:
-          python-version: '3.12'
-          cache: 'pip'
-          cache-dependency-path: ai/requirements-dev.txt
-      - name: Install AI dependencies
-        run: python -m pip install --upgrade pip && pip install -r requirements-dev.txt
-      - name: Verify AI service
+          go-version-file: go.mod
+      - name: Verify medical backend
         run: |
-          python -m compileall -q src
-          ruff check src
-          pytest -q
+          go vet ./medical/backend/...
+          go test ./medical/backend/...
+          go build ./medical/backend/...
 
-  frontend:
+  ui:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     defaults:
       run:
-        working-directory: frontend
+        working-directory: ui
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20.19.0'
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: ui/package-lock.json
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -127,7 +151,7 @@ jobs:
       - name: Build
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL_DEV }}
-          VITE_AI_API_URL: ${{ secrets.VITE_AI_API_URL_DEV }}
+          VITE_COMPANION_BASE_URL: ${{ secrets.VITE_COMPANION_BASE_URL_DEV }}
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_DEV }}
           VITE_API_KEY: ${{ secrets.VITE_API_KEY_DEV }}
           VITE_API_ACTOR: ${{ secrets.VITE_API_ACTOR_DEV }}
@@ -137,18 +161,52 @@ jobs:
           VITE_WORKSHOPS_API_URL: ${{ secrets.VITE_WORKSHOPS_API_URL_DEV }}
           VITE_BEAUTY_API_URL: ${{ secrets.VITE_BEAUTY_API_URL_DEV }}
           VITE_RESTAURANTS_API_URL: ${{ secrets.VITE_RESTAURANTS_API_URL_DEV }}
+          VITE_MEDICAL_API_URL: ${{ secrets.VITE_MEDICAL_API_URL_DEV }}
         run: npm run build
 
-      # Obligatorio en el repo: Secret FIREBASE_SERVICE_ACCOUNT_PYMES_DEV = JSON de cuenta de servicio
-      # con permisos Firebase Hosting Admin en el proyecto pymes-dev-352318 (Firebase console → Project settings → Service accounts).
-      - name: Deploy Firebase Hosting (dev)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PYMES_DEV }}
-          projectId: pymes-dev-352318
-          entryPoint: .
+      # Hosting STG: solo en merge/push a `main` vía `.github/workflows/deploy-stg.yml`
+      # (WIF + smoke).
+
+  audits:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run architecture audits
+        run: |
+          make audit-debt
+          make audit-governance
+          make audit-crud-strict
+
+  docker-prod-builds:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production backend image
+        run: docker build -f core/backend/Dockerfile.prod -t core-prod-ci ..
+      # pymes-ai image builds eliminados: el chat lo sirve Companion (sibling
+      # repo, su propio CI/deploy). Ver modular-swinging-hummingbird Fase 4.
+
+  vertical-docker-prod-builds:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs:
+      - infra-registry
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.infra-registry.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build ${{ matrix.id }} production image
+        run: |
+          docker build \
+            -f "${{ matrix.path }}/${{ matrix.dockerfile }}" \
+            -t "${{ matrix.service }}-prod-ci" \
+            ..
 
   review-notifications-e2e:
     name: review-notifications-e2e
@@ -157,14 +215,14 @@ jobs:
     # El E2E real (Docker + callback Nexus→cp-backend) solo en workflow_dispatch: en PR compartidos no es estable.
     # El job sigue ejecutándose en pull_request con un paso no-op para que los checks requeridos no queden "Skipped".
     needs:
-      - pymes-core-backend
+      - core-backend
     permissions:
       contents: read
     steps:
       - name: Omitir E2E en pull_request (check requerido en verde)
         if: github.event_name != 'workflow_dispatch'
         run: |
-          echo "::notice::review-notifications E2E no corre en PR; ejecutar Actions → CI → Run workflow para el stack completo."
+          echo "::notice::governance-notifications E2E no corre en PR; ejecutar Actions → CI → Run workflow para el stack completo."
 
       - name: Checkout pymes
         if: github.event_name == 'workflow_dispatch'
@@ -172,12 +230,12 @@ jobs:
         with:
           path: pymes
 
-      - name: Checkout nexus
+      - name: Checkout axis
         if: github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v4
         with:
-          repository: devpablocristo/nexus
-          path: nexus
+          repository: devpablocristo/axis
+          path: axis
 
       - name: Create env file
         if: github.event_name == 'workflow_dispatch'
@@ -187,45 +245,154 @@ jobs:
           INTERNAL_SERVICE_TOKEN=local-internal-token
           AUTH_ENABLE_JWT=false
           AUTH_ALLOW_API_KEY=true
-          REVIEW_API_KEY=nexus-review-admin-dev-key
-          REVIEW_CALLBACK_TOKEN=local-review-callback-token
+          GOVERNANCE_ADMIN_API_KEY=nexus-admin-dev-key
+          GOVERNANCE_API_KEY=nexus-admin-dev-key
+          GOVERNANCE_CALLBACK_TOKEN=local-nexus-callback-token
+          GOVERNANCE_URL=http://host.docker.internal:18084
           EOF
 
-      - name: Build and start governance stack
+      - name: Start Axis Nexus
         if: github.event_name == 'workflow_dispatch'
-        working-directory: pymes
-        run: docker compose up -d --build review cp-backend
+        working-directory: axis
+        run: |
+          export NEXUS_APPROVAL_PENDING_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback
+          export NEXUS_APPROVAL_RESOLVED_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback
+          export NEXUS_CALLBACK_TOKEN=local-nexus-callback-token
+          docker compose up -d --build nexus nexus-postgres
 
-      - name: Wait for review and cp-backend
+      - name: Build and start cp-backend (compose Pymes)
         if: github.event_name == 'workflow_dispatch'
         working-directory: pymes
+        env:
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
+        run: |
+          docker compose \
+            --project-directory "$(pwd)" \
+            -f "$LOCAL_INFRA_DIR/docker-compose.yml" \
+            -f docker-compose.yml \
+            up -d --build cp-backend
+
+      - name: Wait for governance and cp-backend
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: pymes
+        env:
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
         run: |
           for attempt in $(seq 1 60); do
-            review_status=$(curl -fsS http://127.0.0.1:18084/readyz >/dev/null && echo ok || true)
+            governance_status=$(curl -fsS http://127.0.0.1:18084/readyz >/dev/null && echo ok || true)
             cp_status=$(curl -fsS http://127.0.0.1:8100/healthz >/dev/null && echo ok || true)
-            if [ "$review_status" = "ok" ] && [ "$cp_status" = "ok" ]; then
+            if [ "$governance_status" = "ok" ] && [ "$cp_status" = "ok" ]; then
               exit 0
             fi
             sleep 5
           done
-          echo "review/cp-backend did not become ready in time" >&2
-          docker compose ps
+          echo "governance/cp-backend did not become ready in time" >&2
+          docker compose \
+            --project-directory "$(pwd)" \
+            -f "$LOCAL_INFRA_DIR/docker-compose.yml" \
+            -f docker-compose.yml \
+            ps
           exit 1
 
-      - name: Run review notifications E2E
+      - name: Load core seeds (needed to have an ORG_ID for the E2E)
         if: github.event_name == 'workflow_dispatch'
         working-directory: pymes
         env:
-          # Runners compartidos: el callback review → cp-backend + persistencia en Postgres suele superar 20s.
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
+          AXIS_ROOT: ${{ github.workspace }}/axis
+          PYMES_SEED_DEMO_TENANT_EXTERNAL_ID: org_e2e_test
+          PYMES_SEED_DEMO_TENANT_NAME: "E2E Test Org"
+        run: |
+          # El E2E sólo necesita la org semilla. Los seeds de verticales requieren
+          # que esos backends hayan aplicado sus propias migraciones, cosa que no
+          # pasa acá porque la stack de E2E sólo levanta Axis Nexus + cp-backend de Pymes.
+          # Cargamos únicamente los seeds que dependen de core.
+          source scripts/seeds/lib.sh
+          ensure_seed_dbs_ready
+          require_seed_tenant_external_id
+          TARGET_TENANT_UUID="$(resolve_target_tenant_uuid)"
+          SEED_TENANT_EXTERNAL_ID="${PYMES_SEED_DEMO_TENANT_EXTERNAL_ID}"
+          SEED_TENANT_NAME="${PYMES_SEED_DEMO_TENANT_NAME:-Pymes Demo Org}"
+          SEED_TENANT_SLUG="${PYMES_SEED_DEMO_TENANT_SLUG:-$(derive_seed_tenant_slug "$SEED_TENANT_EXTERNAL_ID")}"
+          export TARGET_TENANT_UUID SEED_TENANT_EXTERNAL_ID SEED_TENANT_NAME SEED_TENANT_SLUG
+
+          for sql_file in \
+            "core/backend/seeds/01_clerk_prereqs.sql" \
+            "core/backend/seeds/03_rbac.sql"
+          do
+            run_pymes_sql_file "$sql_file"
+          done
+
+      - name: Resolve ORG_ID for E2E
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: pymes
+        env:
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
+        run: |
+          ORG_ID="$(docker compose \
+            --project-directory "$(pwd)" \
+            -f "$LOCAL_INFRA_DIR/docker-compose.yml" \
+            -f docker-compose.yml \
+            exec -T postgres \
+            psql -U postgres -d pymes -Atq -c "SELECT id FROM tenants WHERE external_id='org_e2e_test'")"
+          ORG_ID="$(printf '%s' "$ORG_ID" | tr -d '[:space:]')"
+          if [[ -z "$ORG_ID" ]]; then
+            echo "Could not resolve ORG_ID from seeded tenants table" >&2
+            exit 1
+          fi
+          echo "ORG_ID=$ORG_ID" >> "$GITHUB_ENV"
+
+      - name: Debug — Axis Nexus env + callback connectivity
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: axis
+        env:
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
+        run: |
+          set +e
+          echo "--- Axis Nexus env (callback vars) ---"
+          docker compose exec -T nexus \
+            printenv NEXUS_CALLBACK_TOKEN NEXUS_APPROVAL_PENDING_CALLBACK_URLS NEXUS_APPROVAL_RESOLVED_CALLBACK_URLS || true
+          echo "--- Axis Nexus → cp-backend connectivity (expect 401 without token) ---"
+          docker compose exec -T nexus \
+            wget -qSO- http://host.docker.internal:8100/v1/internal/v1/governance-callback --post-data='{}' --header='Content-Type: application/json' 2>&1 | head -20 || true
+          echo "--- Axis Nexus → cp-backend with token ---"
+          docker compose exec -T nexus \
+            wget -qSO- http://host.docker.internal:8100/v1/internal/v1/governance-callback \
+              --post-data='{"event":"approval_pending","request_id":"debug"}' \
+              --header='Content-Type: application/json' \
+              --header='Authorization: Bearer local-nexus-callback-token' \
+              2>&1 | head -20 || true
+          exit 0
+
+      - name: Run governance notifications E2E
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: pymes
+        env:
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
+          # Runners compartidos: el callback governance → cp-backend + persistencia en Postgres suele superar 20s.
           CALLBACK_TIMEOUT_SECONDS: "90"
-        run: make e2e-review-notifications
+        run: make e2e-governance-notifications
 
       - name: Print container logs on failure
         if: failure() && github.event_name == 'workflow_dispatch'
         working-directory: pymes
-        run: docker compose logs --no-color
+        env:
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
+        run: |
+          docker compose \
+            --project-directory "$(pwd)" \
+            -f "$LOCAL_INFRA_DIR/docker-compose.yml" \
+            -f docker-compose.yml \
+            logs --no-color
 
       - name: Stop stack
         if: always() && github.event_name == 'workflow_dispatch'
-        working-directory: pymes
-        run: docker compose down -v
+        env:
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
+        run: |
+          docker compose \
+            --project-directory "${{ github.workspace }}/pymes" \
+            -f "$LOCAL_INFRA_DIR/docker-compose.yml" \
+            -f "${{ github.workspace }}/pymes/docker-compose.yml" \
+            down -v || true
+          docker compose --project-directory "${{ github.workspace }}/axis" down -v || true

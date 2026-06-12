@@ -2,25 +2,91 @@
 # Verificación preferida: targets `*-docker-*`; `build` y `test` quedan como respaldo nativo.
 .PHONY: \
 	up down ps logs \
-	staticcheck ruff lint \
-	seed seed-clear modules-check cleanup-pablo e2e-review-notifications \
-	build-docker-frontend test-docker-frontend lint-docker-frontend test-docker-core test-docker-workshops \
-	build test test-frontend-e2e
+	go-compile staticcheck ruff lint companion-openapi-check \
+	audit audit-baseline audit-crud audit-crud-json audit-crud-strict audit-debt audit-governance axis-contracts-check ui-typecheck ai-test \
+	seed seed-clear seed-clear-verify seed-verify seed-reset modules-check cleanup-pablo e2e-governance-notifications e2e-axis-negative \
+	build-docker-ui test-docker-ui lint-docker-ui test-docker-core test-docker-workshops \
+	build test test-ui-e2e
 
 GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=https://proxy.golang.org,direct
-DC = docker compose --project-directory $(CURDIR) -f $(CURDIR)/docker-compose.yml
+GO_PACKAGES = ./core/backend/... ./core/shared/... ./workshops/backend/... ./professionals/backend/... ./restaurants/backend/... ./beauty/backend/... ./medical/backend/...
+# Repo hermano `local-infra`. Override por CLI: `make up LOCAL_INFRA_DIR=/ruta/al/local-infra`.
+#
+# GNU Make importa variables del shell; `?=´ respeta el entorno y un export viejo (p. ej. ruta de otra
+# máquina como /home/pablo/...) rompe `make up`. Si LOCAL_INFRA_DIR viene del entorno pero esa ruta
+# no existe, lo ignoramos y usamos ../local-infra portable.
+LOCAL_INFRA_DEFAULT := $(abspath $(CURDIR)/../local-infra)
+ifeq ($(origin LOCAL_INFRA_DIR),environment)
+  ifneq ($(strip $(LOCAL_INFRA_DIR)),)
+    ifeq ($(wildcard $(LOCAL_INFRA_DIR)/.),)
+      override LOCAL_INFRA_DIR := $(LOCAL_INFRA_DEFAULT)
+    endif
+  else
+    override LOCAL_INFRA_DIR := $(LOCAL_INFRA_DEFAULT)
+  endif
+endif
+ifndef LOCAL_INFRA_DIR
+  LOCAL_INFRA_DIR := $(LOCAL_INFRA_DEFAULT)
+endif
+
+# Compose padre: `local-infra` del ecosistema si existe; si no, overlay mínimo del repo (paridad con CI / sin checkout extra).
+LOCAL_INFRA_COMPOSE := $(LOCAL_INFRA_DIR)/docker-compose.yml
+ifeq ($(wildcard $(LOCAL_INFRA_COMPOSE)),)
+BASE_COMPOSE := $(abspath $(CURDIR)/.github/ci-infra/docker-compose.yml)
+else
+BASE_COMPOSE := $(abspath $(LOCAL_INFRA_COMPOSE))
+endif
+DC = docker compose --project-directory $(CURDIR) -f $(BASE_COMPOSE) -f $(CURDIR)/docker-compose.yml
 
 # Calidad
 
+# Compilacion rapida de todos los backends Go del monorepo, sin caer en ui/node_modules.
+go-compile:
+	$(GO_PRIVATE) go test $(GO_PACKAGES) -run '^$$'
+
 # Análisis estático Go (código muerto U1000, imports duplicados, etc.); versión alineada con go.mod
 staticcheck:
-	$(GO_PRIVATE) go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
-# Lint Python del servicio AI (ruff en ai/src); requiere `pip install -r ai/requirements-dev.txt` o ruff en PATH
-ruff:
-	cd ai && (test -x .venv/bin/ruff && .venv/bin/ruff check src || ruff check src || python3 -m ruff check src)
+	$(GO_PRIVATE) go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 $(GO_PACKAGES)
 
-# Go staticcheck + ruff AI
-lint: staticcheck ruff
+# Alias historico: el runtime IA vive en Axis Companion.
+ruff:
+	@echo "runtime IA retirado de Pymes; ejecutar checks en ../axis/companion"
+
+# Go staticcheck del monorepo Pymes.
+lint: staticcheck
+
+# Auditorias de saneamiento arquitectural: no cambian comportamiento productivo.
+audit: audit-crud audit-debt audit-governance
+
+# Baseline reproducible antes de refactors estructurales.
+audit-baseline: go-compile audit ui-typecheck companion-openapi-check axis-contracts-check
+
+audit-crud:
+	@python3 scripts/audit/crud_contract.py
+
+audit-crud-json:
+	@python3 scripts/audit/crud_contract.py --format json
+
+audit-crud-strict:
+	@python3 scripts/audit/crud_contract.py --strict
+
+audit-debt:
+	@python3 scripts/audit/debt_scan.py
+
+audit-governance:
+	@bash scripts/audit/governance_boundary.sh
+
+axis-contracts-check:
+	@python3 scripts/audit/axis_contracts_check.py
+
+ui-typecheck:
+	cd ui && npm run typecheck
+
+companion-openapi-check:
+	cd ui && npm run generate:ai-types
+
+ai-test:
+	@echo "runtime IA retirado de Pymes; ejecutar tests en ../axis/companion"
 
 # Seeds y utilidades
 
@@ -33,10 +99,29 @@ seed:
 seed-clear:
 	bash scripts/seeds/clear.sh
 
+# Verifica que seed-clear haya dejado vacias las pantallas operativas sin borrar bootstrap.
+seed-clear-verify:
+	bash scripts/seeds/verify.sh --cleared
+
+# Verifica que los seeds de pantallas operativas tengan al menos 10 registros visibles.
+seed-verify:
+	bash scripts/seeds/verify.sh
+
+# Flujo completo y repetible: limpiar, cargar y verificar.
+seed-reset:
+	bash scripts/seeds/clear.sh
+	bash scripts/seeds/verify.sh --cleared
+	bash scripts/seeds/load.sh
+	bash scripts/seeds/verify.sh
+
 # E2E del notification center gobernado por Review: request -> inbox -> approve/reject -> cleanup.
-# Uso: `make e2e-review-notifications` o `make e2e-review-notifications DECISION=reject`
-e2e-review-notifications:
-	bash scripts/e2e-review-notifications.sh "$(DECISION)"
+# Uso: `make e2e-governance-notifications` o `make e2e-governance-notifications DECISION=reject`
+e2e-governance-notifications:
+	bash scripts/e2e-governance-notifications.sh "$(DECISION)"
+
+# Negative/live smoke de contratos Axis Nexus/Companion consumidos por Pymes.
+e2e-axis-negative:
+	bash scripts/e2e-axis-negative.sh
 
 # Limpieza del árbol padre (p.ej. ~/Projects/Pablo): caches Python, vacíos, binarios Go sueltos bajo backend/cmd, dirs vacíos.
 # Simular: make cleanup-pablo DRY_RUN=1
@@ -50,9 +135,10 @@ modules-check:
 
 # Stack local
 
-# Levanta stack local (infra compartida + Review + cp-backend + 4 verticales Go + frontend + AI)
+# Stack local (compose Pymes). Axis Nexus corre en el compose del repo ../axis.
+# Levantá Axis antes con `make up` (o `docker compose up`) en ese repo.
 up:
-	$(DC) build review cp-backend prof-backend work-backend beauty-backend restaurants-backend frontend ai
+	$(DC) build cp-backend prof-backend work-backend beauty-backend restaurants-backend medical-backend ui
 	$(DC) up -d --no-build
 
 # Baja y elimina contenedores de la red del proyecto
@@ -71,14 +157,14 @@ logs:
 
 # --- Docker-first: requiere contenedores en marcha (`make up`) ---
 
-build-docker-frontend:
-	$(DC) exec -T frontend npm run build
+build-docker-ui:
+	$(DC) exec -T ui npm run build
 
-test-docker-frontend:
-	$(DC) exec -T frontend npm test
+test-docker-ui:
+	$(DC) exec -T ui npm test
 
-lint-docker-frontend:
-	$(DC) exec -T frontend npm run lint
+lint-docker-ui:
+	$(DC) exec -T ui npm run lint
 
 test-docker-core:
 	$(DC) exec -T cp-backend go test ./...
@@ -88,27 +174,24 @@ test-docker-workshops:
 
 # Respaldo nativo
 
-# Compila backends Go + build del frontend + chequeo básico del servicio AI (nativo en host)
+# Compila backends Go + build del frontend. Companion se valida en el repo Axis.
 build:
-	cd pymes-core/backend && $(GO_PRIVATE) go build ./...
+	cd core/backend && $(GO_PRIVATE) go build ./...
 	cd professionals/backend && $(GO_PRIVATE) go build ./...
 	cd workshops/backend && $(GO_PRIVATE) go build ./...
 	cd beauty/backend && $(GO_PRIVATE) go build ./...
 	cd restaurants/backend && $(GO_PRIVATE) go build ./...
-	cd frontend && npm run build
-	cd ai && _pc=$$(mktemp -d) && export PYTHONPYCACHEPREFIX=$$_pc && (test -x .venv/bin/python && .venv/bin/python -m compileall -q src || python3 -m compileall -q src); _e=$$?; rm -rf $$_pc; exit $$_e
+	cd ui && npm run build
 
-# Tests (Go en pymes-core + professionals + workshops + beauty + restaurants + frontend + AI)
+# Tests (Go en core + professionals + workshops + beauty + restaurants + ui)
 test:
-	cd pymes-core/backend && $(GO_PRIVATE) go test ./...
+	cd core/backend && $(GO_PRIVATE) go test ./...
 	cd professionals/backend && $(GO_PRIVATE) go test ./...
 	cd workshops/backend && $(GO_PRIVATE) go test ./...
 	cd beauty/backend && $(GO_PRIVATE) go test ./...
 	cd restaurants/backend && $(GO_PRIVATE) go test ./...
-	cd frontend && npm test
-	@$(MAKE) ruff
-	cd ai && (test -x .venv/bin/pytest && .venv/bin/pytest -q || pytest -q)
+	cd ui && npm test
 
-# E2E frontend (Playwright / Chromium)
-test-frontend-e2e:
-	cd frontend && npm run test:e2e
+# E2E UI (Playwright / Chromium)
+test-ui-e2e:
+	cd ui && npm run test:e2e

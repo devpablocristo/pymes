@@ -44,7 +44,7 @@ func (r *Repository) ReplaceForProfile(ctx context.Context, orgID, profileID uui
 			meta, _ := json.Marshal(link.Metadata)
 			row := models.ServiceLinkModel{
 				ID:                uuid.New(),
-				OrgID:             orgID,
+				OrgID:          orgID,
 				ProfileID:         profileID,
 				ServiceID:         link.ServiceID,
 				PublicDescription: link.PublicDescription,
@@ -66,7 +66,7 @@ func (r *Repository) ReplaceForProfile(ctx context.Context, orgID, profileID uui
 	return r.ListByProfile(ctx, orgID, profileID)
 }
 
-func (r *Repository) ListByOrg(ctx context.Context, orgID uuid.UUID) ([]domain.ServiceLink, error) {
+func (r *Repository) ListByTenant(ctx context.Context, orgID uuid.UUID) ([]domain.ServiceLink, error) {
 	var rows []models.ServiceLinkModel
 	err := r.db.WithContext(ctx).
 		Where("org_id = ?", orgID).
@@ -92,7 +92,7 @@ func toDomain(row models.ServiceLinkModel) domain.ServiceLink {
 	}
 	return domain.ServiceLink{
 		ID:                row.ID,
-		OrgID:             row.OrgID,
+		OrgID:          row.OrgID,
 		ProfileID:         row.ProfileID,
 		ServiceID:         row.ServiceID,
 		PublicDescription: row.PublicDescription,

@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 )
 
 // --- fakes ---
@@ -53,6 +54,38 @@ func (f *fakeRepo) Update(_ context.Context, in domain.Specialty) (domain.Specia
 	return in, nil
 }
 
+func (f *fakeRepo) Archive(_ context.Context, orgID, id uuid.UUID) error {
+	s, ok := f.specialties[id]
+	if !ok || s.OrgID != orgID {
+		return gorm.ErrRecordNotFound
+	}
+	if s.DeletedAt == nil {
+		now := time.Now().UTC()
+		s.DeletedAt = &now
+		f.specialties[id] = s
+	}
+	return nil
+}
+
+func (f *fakeRepo) Restore(_ context.Context, orgID, id uuid.UUID) error {
+	s, ok := f.specialties[id]
+	if !ok || s.OrgID != orgID {
+		return gorm.ErrRecordNotFound
+	}
+	s.DeletedAt = nil
+	f.specialties[id] = s
+	return nil
+}
+
+func (f *fakeRepo) Delete(_ context.Context, orgID, id uuid.UUID) error {
+	s, ok := f.specialties[id]
+	if !ok || s.OrgID != orgID || s.DeletedAt == nil {
+		return gorm.ErrRecordNotFound
+	}
+	delete(f.specialties, id)
+	return nil
+}
+
 func (f *fakeRepo) CodeExists(_ context.Context, _ uuid.UUID, _ string, _ *uuid.UUID) (bool, error) {
 	return f.codeExists, nil
 }
@@ -77,8 +110,8 @@ func TestCreate_HappyPath(t *testing.T) {
 
 	out, err := uc.Create(context.Background(), domain.Specialty{
 		OrgID: uuid.New(),
-		Code:  "TRAU",
-		Name:  "Traumatología",
+		Code:     "TRAU",
+		Name:     "Traumatología",
 	}, "tester")
 
 	if err != nil {
@@ -98,8 +131,8 @@ func TestCreate_CodeTooShort(t *testing.T) {
 
 	_, err := uc.Create(context.Background(), domain.Specialty{
 		OrgID: uuid.New(),
-		Code:  "X",
-		Name:  "Válido",
+		Code:     "X",
+		Name:     "Válido",
 	}, "tester")
 
 	if err == nil {
@@ -116,8 +149,8 @@ func TestCreate_NameTooShort(t *testing.T) {
 
 	_, err := uc.Create(context.Background(), domain.Specialty{
 		OrgID: uuid.New(),
-		Code:  "OK",
-		Name:  "A",
+		Code:     "OK",
+		Name:     "A",
 	}, "tester")
 
 	if err == nil {
@@ -136,8 +169,8 @@ func TestCreate_DuplicateCode(t *testing.T) {
 
 	_, err := uc.Create(context.Background(), domain.Specialty{
 		OrgID: uuid.New(),
-		Code:  "DUP",
-		Name:  "Duplicado",
+		Code:     "DUP",
+		Name:     "Duplicado",
 	}, "tester")
 
 	if err == nil {
@@ -156,8 +189,8 @@ func TestGetByID_HappyPath(t *testing.T) {
 	orgID := uuid.New()
 	created, err := uc.Create(context.Background(), domain.Specialty{
 		OrgID: orgID,
-		Code:  "ORT",
-		Name:  "Ortodoncia",
+		Code:     "ORT",
+		Name:     "Ortodoncia",
 	}, "tester")
 	if err != nil {
 		t.Fatalf("setup: %v", err)
@@ -194,8 +227,8 @@ func TestUpdate_HappyPath(t *testing.T) {
 	orgID := uuid.New()
 	created, err := uc.Create(context.Background(), domain.Specialty{
 		OrgID: orgID,
-		Code:  "FIS",
-		Name:  "Fisioterapia",
+		Code:     "FIS",
+		Name:     "Fisioterapia",
 	}, "tester")
 	if err != nil {
 		t.Fatalf("setup: %v", err)
@@ -235,8 +268,8 @@ func TestUpdate_DuplicateCode(t *testing.T) {
 	orgID := uuid.New()
 	created, err := uc.Create(context.Background(), domain.Specialty{
 		OrgID: orgID,
-		Code:  "ABC",
-		Name:  "Original",
+		Code:     "ABC",
+		Name:     "Original",
 	}, "tester")
 	if err != nil {
 		t.Fatalf("setup: %v", err)
@@ -263,8 +296,8 @@ func TestAssignProfessionals_HappyPath(t *testing.T) {
 	orgID := uuid.New()
 	created, err := uc.Create(context.Background(), domain.Specialty{
 		OrgID: orgID,
-		Code:  "PSI",
-		Name:  "Psicología",
+		Code:     "PSI",
+		Name:     "Psicología",
 	}, "tester")
 	if err != nil {
 		t.Fatalf("setup: %v", err)

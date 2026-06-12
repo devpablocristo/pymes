@@ -8,9 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
+	"github.com/devpablocristo/pymes/core/shared/backend/auth"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalgin"
 	"github.com/devpablocristo/pymes/restaurants/backend/internal/dining/sessions/handler/dto"
 	domain "github.com/devpablocristo/pymes/restaurants/backend/internal/dining/sessions/usecases/domain"
 )
@@ -34,7 +34,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, ok := verticalgin.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -46,13 +46,13 @@ func (h *Handler) List(c *gin.Context) {
 	if value := c.Query("table_id"); value != "" {
 		parsed, err := uuid.Parse(value)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid table_id"})
+			verticalgin.WriteValidation(c, "invalid table_id")
 			return
 		}
 		tableID = &parsed
 	}
 	items, total, err := h.uc.List(c.Request.Context(), ListParams{
-		OrgID:    orgID,
+		OrgID: orgID,
 		OpenOnly: openOnly,
 		TableID:  tableID,
 	})
@@ -69,18 +69,18 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Open(c *gin.Context) {
 	authCtx := auth.GetAuthContext(c)
-	orgID, ok := verticalgin.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
 	var req dto.OpenTableSessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	tableUUID, err := uuid.Parse(req.TableID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid table_id"})
+		verticalgin.WriteValidation(c, "invalid table_id")
 		return
 	}
 	guestCount := req.GuestCount
@@ -97,7 +97,7 @@ func (h *Handler) Open(c *gin.Context) {
 
 func (h *Handler) Close(c *gin.Context) {
 	authCtx := auth.GetAuthContext(c)
-	orgID, sessionID, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, sessionID, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -112,7 +112,7 @@ func (h *Handler) Close(c *gin.Context) {
 func toListItem(it domain.TableSessionListItem) dto.TableSessionItem {
 	return dto.TableSessionItem{
 		ID:         it.ID.String(),
-		OrgID:      it.OrgID.String(),
+		OrgID:   it.OrgID.String(),
 		TableID:    it.TableID.String(),
 		TableCode:  it.TableCode,
 		AreaName:   it.AreaName,
@@ -129,7 +129,7 @@ func toListItem(it domain.TableSessionListItem) dto.TableSessionItem {
 func toSessionItem(s domain.TableSession) dto.TableSessionItem {
 	return dto.TableSessionItem{
 		ID:         s.ID.String(),
-		OrgID:      s.OrgID.String(),
+		OrgID:   s.OrgID.String(),
 		TableID:    s.TableID.String(),
 		GuestCount: s.GuestCount,
 		PartyLabel: s.PartyLabel,

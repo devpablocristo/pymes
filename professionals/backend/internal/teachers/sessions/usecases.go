@@ -10,8 +10,9 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/sessions/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 )
 
 type RepositoryPort interface {
@@ -21,6 +22,9 @@ type RepositoryPort interface {
 	Update(ctx context.Context, in domain.Session) (domain.Session, error)
 	BookingSessionExists(ctx context.Context, orgID, bookingID uuid.UUID) (bool, error)
 	CreateNote(ctx context.Context, in domain.SessionNote) (domain.SessionNote, error)
+	Archive(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type AuditPort interface {
@@ -82,6 +86,16 @@ func normalizeServiceID(serviceID *uuid.UUID) *uuid.UUID {
 	return nil
 }
 
+type UpdateInput struct {
+	CustomerPartyID *uuid.UUID
+	ServiceID       *uuid.UUID
+	Status          *string
+	StartedAt       *time.Time
+	EndedAt         *time.Time
+	Summary         *string
+	Metadata        *map[string]any
+}
+
 func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Session, error) {
 	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
@@ -89,6 +103,58 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Ses
 			return domain.Session{}, fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Session{}, err
+	}
+	if err := archive.IfArchived(out.DeletedAt, "session"); err != nil {
+		return domain.Session{}, err
+	}
+	return out, nil
+}
+
+func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Session, error) {
+	current, err := u.repo.GetByID(ctx, orgID, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.Session{}, fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
+		}
+		return domain.Session{}, err
+	}
+	if err := archive.IfArchived(current.DeletedAt, "session"); err != nil {
+		return domain.Session{}, err
+	}
+	if in.CustomerPartyID != nil {
+		current.CustomerPartyID = in.CustomerPartyID
+	}
+	if in.ServiceID != nil {
+		current.ServiceID = normalizeServiceID(in.ServiceID)
+	}
+	if in.Status != nil {
+		status := strings.TrimSpace(*in.Status)
+		if !isValidSessionStatus(status) {
+			return domain.Session{}, fmt.Errorf("invalid status: %w", httperrors.ErrBadInput)
+		}
+		current.Status = status
+	}
+	if in.StartedAt != nil {
+		current.StartedAt = in.StartedAt
+	}
+	if in.EndedAt != nil {
+		current.EndedAt = in.EndedAt
+	}
+	if in.Summary != nil {
+		current.Summary = strings.TrimSpace(*in.Summary)
+	}
+	if in.Metadata != nil {
+		current.Metadata = *in.Metadata
+	}
+	out, err := u.repo.Update(ctx, current)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.Session{}, fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
+		}
+		return domain.Session{}, err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, out.OrgID.String(), actor, "session.updated", "session", out.ID.String(), map[string]any{"status": out.Status})
 	}
 	return out, nil
 }
@@ -99,6 +165,9 @@ func (u *Usecases) Complete(ctx context.Context, orgID, id uuid.UUID, actor stri
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Session{}, fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
 		}
+		return domain.Session{}, err
+	}
+	if err := archive.IfArchived(current.DeletedAt, "session"); err != nil {
 		return domain.Session{}, err
 	}
 	if current.Status == domain.SessionStatusCompleted {
@@ -125,10 +194,14 @@ func (u *Usecases) Complete(ctx context.Context, orgID, id uuid.UUID, actor stri
 }
 
 func (u *Usecases) CreateNote(ctx context.Context, orgID, sessionID uuid.UUID, noteType, title, body, actor string) (domain.SessionNote, error) {
-	if _, err := u.repo.GetByID(ctx, orgID, sessionID); err != nil {
+	session, err := u.repo.GetByID(ctx, orgID, sessionID)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.SessionNote{}, fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
 		}
+		return domain.SessionNote{}, err
+	}
+	if err := archive.IfArchived(session.DeletedAt, "session"); err != nil {
 		return domain.SessionNote{}, err
 	}
 
@@ -141,7 +214,7 @@ func (u *Usecases) CreateNote(ctx context.Context, orgID, sessionID uuid.UUID, n
 	}
 
 	note := domain.SessionNote{
-		OrgID:     orgID,
+		OrgID:  orgID,
 		SessionID: sessionID,
 		NoteType:  noteType,
 		Title:     strings.TrimSpace(title),
@@ -156,4 +229,52 @@ func (u *Usecases) CreateNote(ctx context.Context, orgID, sessionID uuid.UUID, n
 		u.audit.Log(ctx, orgID.String(), actor, "session_note.created", "session_note", out.ID.String(), map[string]any{"session_id": sessionID.String()})
 	}
 	return out, nil
+}
+
+func (u *Usecases) Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Archive(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "session.archived", "session", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "session.restored", "session", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Delete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "session.deleted", "session", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func isValidSessionStatus(status string) bool {
+	switch status {
+	case domain.SessionStatusScheduled, domain.SessionStatusActive, domain.SessionStatusCompleted, domain.SessionStatusCancelled:
+		return true
+	default:
+		return false
+	}
 }

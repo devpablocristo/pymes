@@ -7,12 +7,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// SendInternalWhatsAppText llama al endpoint interno de pymes-core (auth por token de servicio).
-func (c *Client) SendInternalWhatsAppText(ctx context.Context, orgID string, partyID uuid.UUID, body string) error {
+// SendInternalWhatsAppText llama al endpoint interno de core (auth por token de servicio).
+func (c *Client) SendInternalWhatsAppText(ctx context.Context, tenantID string, partyID uuid.UUID, body string) error {
 	if c == nil || c.Client == nil {
-		return fmt.Errorf("pymes-core client not configured")
+		return fmt.Errorf("core client not configured")
 	}
-	_, err := c.Post(ctx, "/v1/internal/v1/whatsapp/send-text", orgID, map[string]string{
+	_, err := c.Post(ctx, "/v1/internal/v1/whatsapp/send-text", tenantID, map[string]string{
 		"party_id": partyID.String(),
 		"body":     body,
 	})

@@ -1,0 +1,119 @@
+/* Badges de estado fino en tarjetas del Kanban de OT (columnas = fases macro) */
+
+.work-orders-kanban__board-only .m-kanban > .page-header.crud-page-shell__header {
+  display: none;
+}
+
+.wo-kanban__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.wo-kanban__badge {
+  display: inline-block;
+  font-size: var(--text-role-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+  padding: var(--space-1) var(--space-2);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  color: var(--color-primary);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 32%, transparent);
+}
+
+.wo-kanban__badge--hold {
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 35%, transparent);
+}
+
+.wo-kanban__badge--terminal-success {
+  background: var(--color-success-subtle);
+  color: var(--color-alert-success-text);
+  border: 1px solid color-mix(in srgb, var(--color-success) 30%, transparent);
+}
+
+.wo-kanban__badge--terminal-danger {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 28%, transparent);
+}
+
+/* Filtro estilo Jira por creador / actor (created_by) */
+.wo-kanban__creators {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.wo-kanban__pill {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.wo-kanban__pill:hover {
+  border-color: var(--color-text-muted);
+  color: var(--color-text);
+}
+
+.wo-kanban__pill--active {
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+  color: var(--color-text);
+}
+
+[data-theme='dark'] .wo-kanban__pill {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+[data-theme='dark'] .wo-kanban__pill:hover {
+  background: var(--color-border-subtle);
+  color: var(--color-text);
+}
+
+[data-theme='dark'] .wo-kanban__pill--active {
+  background: color-mix(in srgb, var(--color-primary) 22%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+  color: var(--color-text);
+}
+
+/* El tablero usa el mismo shell canónico que el resto; no ocultar ni rebajar el h1. */
+
+/**
+ * DragOverlay (@dnd-kit) hace portal a document.body: queda fuera de .m-kanban__board,
+ * donde viven las vars --kb-* del paquete modules-kanban-board. Sin esto, la tarjeta
+ * fantasma al arrastrar pierde fondo, borde y sombra al pasar a otra columna.
+ * Valores alineados con StatusKanbanBoard.css del paquete.
+ */
+.m-kanban__card--overlay {
+  --kb-list-bg: rgba(16, 18, 4, 0.78);
+  --kb-list-border: rgba(255, 255, 255, 0.1);
+  --kb-list-highlight: rgba(255, 255, 255, 0.06);
+  --kb-card-bg: #22272b;
+  --kb-card-border: rgba(255, 255, 255, 0.06);
+  --kb-text: #ffffff;
+  --kb-text-muted: #9fadbc;
+  --kb-accent-blue: #579dff;
+  --kb-count-bg: rgba(255, 255, 255, 0.14);
+  --kb-label-yellow: #f5cd47;
+  box-sizing: border-box;
+  min-width: min(12rem, 85vw);
+}

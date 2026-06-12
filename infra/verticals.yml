@@ -1,0 +1,64 @@
+version: 1
+
+platform:
+  firebase:
+    public: ui/dist
+    region: us-central1
+    core_service: pymes-core
+    ignore:
+      - firebase.generated.json
+      - firebase.json
+      - "**/.*"
+      - "**/node_modules/**"
+verticals:
+  workshops:
+    enabled: true
+    deploy: true
+    path: workshops/backend
+    dockerfile: Dockerfile.prod
+    service: pymes-workshops
+    route_prefix: /v1/workshops
+    api_prefixes:
+      - /v1/workshops
+      - /v1/bike-shop
+      - /v1/auto-repair
+    healthcheck: /readyz
+
+  professionals:
+    enabled: true
+    deploy: true
+    path: professionals/backend
+    dockerfile: Dockerfile.prod
+    service: pymes-professionals
+    route_prefix: /v1/professionals
+    api_prefixes:
+      - /v1/professionals
+      - /v1/teachers
+    healthcheck: /readyz
+
+  beauty:
+    enabled: true
+    deploy: true
+    path: beauty/backend
+    dockerfile: Dockerfile.prod
+    service: pymes-beauty
+    route_prefix: /v1/beauty
+    healthcheck: /readyz
+
+  restaurants:
+    enabled: true
+    deploy: true
+    path: restaurants/backend
+    dockerfile: Dockerfile.prod
+    service: pymes-restaurants
+    route_prefix: /v1/restaurants
+    healthcheck: /readyz
+
+  medical:
+    enabled: true
+    deploy: true
+    path: medical/backend
+    dockerfile: Dockerfile.prod
+    service: pymes-medical
+    route_prefix: /v1/medical
+    healthcheck: /readyz

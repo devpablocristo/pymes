@@ -1,0 +1,157 @@
+import type { CrudFormValues, CrudPageConfig } from '../components/CrudPage';
+import { confirmAction } from '@devpablocristo/platform-browser';
+import type { CSVColumn } from '@devpablocristo/platform-crud-ui/csv';
+import {
+  mergeCsvToolbarConfig,
+  type CrudCsvServerExportPort,
+  type CrudCsvServerImportPort,
+  type CrudCsvToolbarUiPort,
+  type CsvToolbarMergeMode,
+} from '@devpablocristo/platform-crud-ui';
+import { apiRequest, downloadAPIFile } from '../lib/api';
+
+export type CSVToolbarOptions = {
+  mode?: CsvToolbarMergeMode;
+  entity?: string;
+  allowImport?: boolean;
+  allowExport?: boolean;
+  /** Con `mode: 'client'`, import vía dataio usando `importEntity` (p. ej. inventario → catálogo products). */
+  importUsesServer?: boolean;
+  importEntity?: string;
+  importMode?: 'create_only' | 'upsert';
+  fileName?: string;
+  columns?: CSVColumn[];
+  /** Sustituye el export dataio del core (p. ej. auditoría). */
+  serverExport?: CrudCsvServerExportPort;
+  /** Sustituye import dataio del core. */
+  serverImport?: CrudCsvServerImportPort;
+};
+
+const pymesCsvUi: CrudCsvToolbarUiPort = {
+  confirmClientImport: (fileName, rowCount) =>
+    confirmAction({
+      title: 'Importar CSV',
+      description: `Se importaran ${rowCount} filas de ${fileName}. ¿Continuar?`,
+      confirmLabel: 'Importar',
+      cancelLabel: 'Cancelar',
+    }).then(Boolean),
+  confirmServerImport: (description) =>
+    confirmAction({
+      title: 'Confirmar importación',
+      description,
+      confirmLabel: 'Continuar',
+      cancelLabel: 'Cancelar',
+    }).then(Boolean),
+  notify: (message) => {
+    window.alert(message);
+  },
+};
+
+const spanishCsvMessages = {
+  importClientDone: (r: { created: number; failed: number }) =>
+    `Importacion completada. Creados: ${r.created}. Fallidos: ${r.failed}.`,
+  importServerDone: (r: { created: number; updated: number; skipped: number }) =>
+    `Importacion completada. Creados: ${r.created}. Actualizados: ${r.updated}. Omitidos: ${r.skipped}.`,
+};
+
+function createCoreDataioServerImportPort(): CrudCsvServerImportPort {
+  return {
+    preview: (entity, file) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return apiRequest(`/v1/import/${entity}/preview`, {
+        method: 'POST',
+        rawBody: formData,
+        skipJSONContentType: true,
+      });
+    },
+    confirm: (entity, previewId, mode) =>
+      apiRequest(`/v1/import/${entity}/confirm`, {
+        method: 'POST',
+        body: { preview_id: previewId, mode },
+      }),
+  };
+}
+
+function createCoreDataioServerExportPort(): CrudCsvServerExportPort {
+  return {
+    download: async (entity) => {
+      await downloadAPIFile(`/v1/export/${entity}?format=csv`);
+    },
+  };
+}
+
+async function createFromValues<T extends { id: string }>(
+  config: CrudPageConfig<T>,
+  values: CrudFormValues,
+): Promise<void> {
+  if (config.dataSource?.create) {
+    await config.dataSource.create(values);
+    return;
+  }
+  if (!config.basePath) {
+    throw new Error('El recurso no tiene endpoint de creación configurado');
+  }
+  await apiRequest(config.basePath, {
+    method: 'POST',
+    body: config.toBody ? config.toBody(values) : values,
+  });
+}
+
+function dedupeToolbarActions<T extends { id: string }>(
+  config: CrudPageConfig<T>,
+): CrudPageConfig<T> {
+  const actions = config.toolbarActions;
+  if (!actions?.length) {
+    return config;
+  }
+
+  const byId = new Map<string, (typeof actions)[number]>();
+  for (const action of actions) {
+    byId.set(action.id, action);
+  }
+  if (byId.size === actions.length) {
+    return config;
+  }
+
+  return {
+    ...config,
+    toolbarActions: Array.from(byId.values()),
+  };
+}
+
+export function withCSVToolbar<T extends { id: string }>(
+  resourceId: string,
+  config: CrudPageConfig<T>,
+  options: CSVToolbarOptions = {},
+): CrudPageConfig<T> {
+  const mode = options.mode ?? 'client';
+  const entity = options.entity ?? resourceId;
+  const defaultAllowImport = Boolean(config.dataSource?.create || config.basePath);
+  const allowImport = options.allowImport ?? defaultAllowImport;
+  const wantsServerImport =
+    allowImport && (mode === 'server' || Boolean(options.importUsesServer));
+
+  const serverImport =
+    options.serverImport ?? (wantsServerImport ? createCoreDataioServerImportPort() : undefined);
+  const serverExport =
+    options.serverExport ?? (mode === 'server' ? createCoreDataioServerExportPort() : undefined);
+
+  return dedupeToolbarActions(mergeCsvToolbarConfig({
+    config,
+    entity,
+    mode,
+    columns: options.columns,
+    allowImport: options.allowImport,
+    allowExport: options.allowExport,
+    importMode: options.importMode ?? 'upsert',
+    fileName: options.fileName,
+    serverImport,
+    serverExport,
+    importUsesServer: options.importUsesServer,
+    importEntity: options.importEntity,
+    ui: pymesCsvUi,
+    importClientRow: (values) => createFromValues(config, values),
+    messages: spanishCsvMessages,
+  }));
+}

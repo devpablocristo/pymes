@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	ctxkeys "github.com/devpablocristo/core/security/go/contextkeys"
+	ctxkeys "github.com/devpablocristo/platform/security/go/contextkeys"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/usecases/domain"
 )
 
@@ -82,7 +82,7 @@ func TestReplaceUsesServiceIDContract(t *testing.T) {
 
 func testVerticalAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Set(ctxkeys.CtxKeyOrgID, "00000000-0000-0000-0000-000000000001")
+		c.Set(ctxkeys.CtxKeyTenantID, "00000000-0000-0000-0000-000000000001")
 		c.Set(ctxkeys.CtxKeyActor, "tester")
 		c.Next()
 	}

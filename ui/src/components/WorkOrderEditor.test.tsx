@@ -1,0 +1,120 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { WorkOrder as AutoRepairWorkOrder } from '../lib/workOrdersApi';
+import { WorkOrderEditor } from '../modules/work-orders';
+
+const apiMocks = vi.hoisted(() => ({
+  getWorkOrder: vi.fn<() => Promise<AutoRepairWorkOrder>>(),
+  updateWorkOrder: vi.fn(),
+  archiveWorkOrder: vi.fn(),
+  restoreWorkOrder: vi.fn(),
+  confirmAction: vi.fn(),
+}));
+
+vi.mock('../lib/workOrdersApi', () => ({
+  getWorkOrder: () => apiMocks.getWorkOrder(),
+  updateWorkOrder: (...args: unknown[]) => apiMocks.updateWorkOrder(...args),
+  archiveWorkOrder: (...args: unknown[]) => apiMocks.archiveWorkOrder(...args),
+  restoreWorkOrder: (...args: unknown[]) => apiMocks.restoreWorkOrder(...args),
+}));
+
+vi.mock('@devpablocristo/platform-browser', () => ({
+  confirmAction: (options: unknown) => apiMocks.confirmAction(options),
+}));
+
+function buildWorkOrder(overrides?: Partial<AutoRepairWorkOrder>): AutoRepairWorkOrder {
+  return {
+    id: 'wo-1',
+    org_id: 'org-1',
+    number: 'OT-001',
+    asset_type: 'vehicle',
+    asset_id: 'veh-1',
+    asset_label: 'AAA111',
+    metadata: {},
+    customer_id: 'cust-1',
+    customer_name: 'Cliente original',
+    booking_id: undefined,
+    quote_id: undefined,
+    sale_id: undefined,
+    status: 'received',
+    requested_work: 'Cambio de aceite',
+    diagnosis: '',
+    notes: '',
+    internal_notes: '',
+    currency: 'ARS',
+    subtotal_services: 0,
+    subtotal_parts: 0,
+    tax_total: 0,
+    total: 0,
+    opened_at: '2026-04-02T10:00:00Z',
+    promised_at: undefined,
+    ready_at: undefined,
+    delivered_at: undefined,
+    ready_pickup_notified_at: undefined,
+    created_by: 'tech-1',
+    archived_at: null,
+    created_at: '2026-04-02T10:00:00Z',
+    updated_at: '2026-04-02T10:00:00Z',
+    items: [],
+    ...overrides,
+  };
+}
+
+describe('WorkOrderEditor', () => {
+  beforeEach(() => {
+    apiMocks.getWorkOrder.mockReset();
+    apiMocks.updateWorkOrder.mockReset();
+    apiMocks.archiveWorkOrder.mockReset();
+    apiMocks.restoreWorkOrder.mockReset();
+    apiMocks.confirmAction.mockReset();
+
+    apiMocks.getWorkOrder.mockResolvedValue(buildWorkOrder());
+  });
+
+  it('cierra sin confirmación cuando no hay cambios pendientes', async () => {
+    const onClose = vi.fn();
+
+    render(<WorkOrderEditor orderId="wo-1" variant="modal" onClose={onClose} onSaved={vi.fn()} />);
+
+    const customerInput = await screen.findByLabelText('Cliente');
+    await waitFor(() => {
+      expect(customerInput).toHaveValue('Cliente original');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+    expect(apiMocks.confirmAction).not.toHaveBeenCalled();
+  });
+
+  it('no cierra inmediatamente si hay cambios sin guardar', async () => {
+    const onClose = vi.fn();
+
+    render(<WorkOrderEditor orderId="wo-1" variant="modal" onClose={onClose} onSaved={vi.fn()} />);
+
+    const customerInput = await screen.findByLabelText('Cliente');
+    fireEvent.change(customerInput, { target: { value: 'Cliente editado' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+
+    await waitFor(() => {
+      expect(onClose).not.toHaveBeenCalled();
+    });
+  });
+
+  it('usa labels de bicicleta cuando la orden es de bike_shop', async () => {
+    apiMocks.getWorkOrder.mockResolvedValue(
+      buildWorkOrder({
+        asset_type: 'bicycle',
+        asset_id: 'bike-1',
+        asset_label: 'Trek Marlin 7',
+      }),
+    );
+
+    render(<WorkOrderEditor orderId="wo-1" variant="modal" targetType="bicycle" onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    expect(await screen.findByLabelText('Bicicleta (UUID)')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Vehículo (UUID)')).not.toBeInTheDocument();
+  });
+});

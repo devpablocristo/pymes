@@ -1,0 +1,2 @@
+-- Datos de demo movidos a core/backend/seeds/02_core_business.sql (vía PYMES_SEED_DEMO o make seed).
+SELECT 1;

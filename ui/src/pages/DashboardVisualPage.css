@@ -1,0 +1,785 @@
+/* Dashboard visual — Spike template */
+
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.page-stack.dash {
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.dash__empty-hint {
+  color: #adb5bd;
+  font-size: 13px;
+  margin: 0;
+}
+
+.dash__stat-value .spinner {
+  display: inline-flex;
+  --spinner-size: 20px;
+  --spinner-min-height: 0;
+  align-items: center;
+}
+
+/* La librería tiene .card + .card { margin-top: var(--space-4) }.
+   Dentro de grids las tarjetas quedan en columnas, no apiladas,
+   así que ese margen desalinea alturas. Lo anulamos aquí. */
+.spike-kpi-grid > .card + .card,
+.spike-grid-4 > .card + .card,
+.spike-grid-4 > .spike-col-2 + .card,
+.spike-grid-4 > .card + .spike-col-2,
+.spike-grid-3 > .card + .card,
+.spike-grid-3 > .spike-col-2 + .card,
+.spike-grid-2 > .card + .card,
+.spike-col-stack > .card + .card {
+  margin-top: 0 !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SPIKE GRID LAYOUTS
+   ═══════════════════════════════════════════════════════ */
+
+.spike-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 15px;
+  align-items: stretch;
+}
+
+.spike-grid-4 .spike-col-2 {
+  grid-column: span 2;
+}
+
+.spike-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 15px;
+  align-items: stretch;
+}
+
+.spike-grid-3 .spike-col-2 {
+  grid-column: span 2;
+}
+
+.spike-grid-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 15px;
+  align-items: stretch;
+}
+
+/* .spike-col-2 es un wrapper no-card: su .card hija debe llenarlo */
+.spike-col-2 > .card {
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* .spike-col-stack ocupa toda la altura de su celda grid;
+   sus tarjetas hijas toman altura natural (no se estiran) */
+.spike-col-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  height: 100%;
+  align-items: stretch;
+}
+
+@media (max-width: 1280px) {
+  .spike-grid-4 {
+    grid-template-columns: 1fr 1fr;
+  }
+  .spike-grid-4 .spike-col-2 {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 960px) {
+  .spike-grid-3,
+  .spike-grid-2 {
+    grid-template-columns: 1fr;
+  }
+  .spike-grid-3 .spike-col-2 {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .spike-grid-4,
+  .spike-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   KPI CARDS
+   ═══════════════════════════════════════════════════════ */
+
+.spike-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 15px;
+}
+
+@media (max-width: 1100px) {
+  .spike-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.spike-kpi-card {
+  padding: 0 !important;
+  /* overflow: visible para que el tooltip de ApexCharts no quede clippeado por la card */
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Contiene el gráfico de la card sin clipear el tooltip flotante */
+.sparkline-chart-wrap {
+  overflow: visible;
+  border-radius: 0 0 var(--radius-md, 12px) var(--radius-md, 12px);
+  line-height: 0;
+  display: block;
+}
+
+/* Tooltip de ApexCharts en las sparklines — estilo oscuro compacto */
+.spike-kpi-card .apexcharts-tooltip {
+  border-radius: 8px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22) !important;
+  font-size: 12px !important;
+  padding: 6px 10px !important;
+}
+
+.spike-kpi-card .apexcharts-tooltip-title {
+  font-size: 11px !important;
+  margin-bottom: 4px !important;
+  padding-bottom: 4px !important;
+}
+
+/* Punto de hover sobre la línea */
+.spike-kpi-card .apexcharts-tooltip-marker {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  margin-right: 5px !important;
+}
+
+.spike-kpi-body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 20px 0;
+  gap: 12px;
+  flex: 1;
+}
+
+.spike-kpi-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.spike-kpi-label {
+  font-size: 13px;
+  color: #8898aa;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.spike-kpi-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #2a3547;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.spike-kpi-sub {
+  font-size: 12px;
+  color: #adb5bd;
+  margin-bottom: 8px;
+}
+
+.spike-kpi-trend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.spike-kpi-trend-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.spike-kpi-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════
+   CARD BODY / SECTION HEADERS
+   ═══════════════════════════════════════════════════════ */
+
+.spike-card-body {
+  padding: 20px;
+}
+
+.spike-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.spike-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2a3547;
+  line-height: 1.3;
+}
+
+.spike-section-sub {
+  font-size: 12px;
+  color: #8898aa;
+  display: block;
+  margin-top: 2px;
+}
+
+.spike-section-action {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0085db;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.spike-section-action:hover { opacity: 0.8; }
+
+/* ═══════════════════════════════════════════════════════
+   LEGEND
+   ═══════════════════════════════════════════════════════ */
+
+.spike-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.spike-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #5a6a85;
+  font-weight: 500;
+}
+
+.spike-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+/* ═══════════════════════════════════════════════════════
+   DONUT LEGEND
+   ═══════════════════════════════════════════════════════ */
+
+.spike-donut-legend {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spike-donut-legend li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #5a6a85;
+}
+
+.spike-donut-legend li strong {
+  font-weight: 700;
+  color: #2a3547;
+  min-width: 24px;
+  text-align: right;
+}
+
+.spike-donut-legend-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   AGENDA DE HOY
+   ═══════════════════════════════════════════════════════ */
+
+.spike-agenda-date {
+  font-size: 12px;
+  color: #8898aa;
+  margin-bottom: 12px;
+  text-transform: capitalize;
+}
+
+.spike-agenda-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 16px;
+}
+
+.spike-agenda-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 0;
+  border-bottom: 1px solid #f0f5f9;
+}
+
+.spike-agenda-item:last-child {
+  border-bottom: none;
+}
+
+.spike-agenda-time {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2a3547;
+  min-width: 36px;
+  flex-shrink: 0;
+}
+
+.spike-agenda-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.spike-agenda-label {
+  font-size: 12px;
+  color: #5a6a85;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spike-agenda-footer {
+  display: flex;
+  gap: 0;
+  border-top: 1px solid #f0f5f9;
+  padding-top: 14px;
+  margin-top: 4px;
+}
+
+.spike-agenda-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: #8898aa;
+}
+
+.spike-agenda-stat strong {
+  font-size: 22px;
+  font-weight: 700;
+  color: #2a3547;
+  line-height: 1;
+}
+
+/* ═══════════════════════════════════════════════════════
+   TABLE
+   ═══════════════════════════════════════════════════════ */
+
+.spike-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.spike-table thead th {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8898aa;
+  padding: 8px 10px;
+  border-bottom: 2px solid #f0f5f9;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.spike-table tbody td {
+  padding: 10px;
+  border-bottom: 1px solid #f0f5f9;
+  vertical-align: middle;
+  color: #5a6a85;
+}
+
+.spike-table tbody tr:last-child td { border-bottom: none; }
+.spike-table tbody tr:hover td { background: #f8fbff; }
+
+/* ═══════════════════════════════════════════════════════
+   AVATARES
+   ═══════════════════════════════════════════════════════ */
+
+.spike-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.spike-avatar-sm {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.spike-avatar-name {
+  font-weight: 600;
+  color: #2a3547;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+
+.spike-cell-strong {
+  font-weight: 700;
+  color: #2a3547;
+}
+
+.spike-cell-meta {
+  font-size: 12px;
+  color: #adb5bd;
+}
+
+/* ═══════════════════════════════════════════════════════
+   BADGES
+   ═══════════════════════════════════════════════════════ */
+
+.spike-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 50px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+.spike-badge-teal   { background: #dffff3; color: #4bd08b; }
+.spike-badge-yellow { background: #fff6ea; color: #d7a564; }
+.spike-badge-red    { background: #ffede9; color: #fb977d; }
+.spike-badge-gray   { background: #f0f5f9; color: #8898aa; }
+.spike-badge-blue   { background: #e5f3fb; color: #0085db; }
+
+/* ═══════════════════════════════════════════════════════
+   PROGRESS BARS
+   ═══════════════════════════════════════════════════════ */
+
+.spike-progress-row {
+  margin-bottom: 14px;
+}
+
+.spike-progress-row:last-child { margin-bottom: 0; }
+
+.spike-progress-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 13px;
+  gap: 8px;
+}
+
+.spike-progress-bg {
+  height: 6px;
+  background: #f0f5f9;
+  border-radius: 50px;
+  overflow: hidden;
+}
+
+.spike-progress-fill {
+  height: 100%;
+  border-radius: 50px;
+  transition: width 0.4s ease;
+}
+
+/* ═══════════════════════════════════════════════════════
+   ROW ITEMS (deudores, clientes frecuentes)
+   ═══════════════════════════════════════════════════════ */
+
+.spike-row-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f5f9;
+}
+
+.spike-row-item:last-child { border-bottom: none; }
+
+/* ═══════════════════════════════════════════════════════
+   AGENDA ITEM — enriched (name + service + staff)
+   ═══════════════════════════════════════════════════════ */
+
+.spike-agenda-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.spike-agenda-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2a3547;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spike-agenda-service {
+  font-size: 11px;
+  color: #8898aa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spike-agenda-staff {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0085db;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SERVICIOS MÁS VENDIDOS — barras gruesas distribuidas
+   ═══════════════════════════════════════════════════════ */
+
+/* Las tarjetas dentro de spike-col-stack deben estirarse para igualar altura */
+.spike-col-stack > .card {
+  flex: 1;
+  min-height: 0;
+}
+
+.spike-services-card {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.spike-services-card .spike-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.spike-services-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-between;
+}
+
+.spike-services-list .spike-progress-row {
+  margin-bottom: 0;
+}
+
+.spike-services-list .spike-progress-bg {
+  height: 20px;
+  border-radius: 6px;
+}
+
+.spike-services-list .spike-progress-fill {
+  border-radius: 6px;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   DARK MODE — overrides de hardcoded colors al esquema oscuro.
+   Texto, bordes, fondos sutiles y badges adaptados a fondo dark.
+   El acento primario (#0085db) se cambia por var(--color-primary).
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Hint vacío y subtítulos */
+[data-theme="dark"] .dash__empty-hint,
+[data-theme="dark"] .spike-kpi-sub,
+[data-theme="dark"] .spike-cell-meta {
+  color: var(--color-text-muted) !important;
+}
+
+/* Labels y caption secundarios */
+[data-theme="dark"] .spike-kpi-label,
+[data-theme="dark"] .spike-section-sub,
+[data-theme="dark"] .spike-agenda-date,
+[data-theme="dark"] .spike-agenda-service,
+[data-theme="dark"] .spike-agenda-stat {
+  color: var(--color-text-muted) !important;
+}
+
+/* Valores e identificadores destacados (KPI value, section title, totals) */
+[data-theme="dark"] .spike-kpi-value,
+[data-theme="dark"] .spike-section-title,
+[data-theme="dark"] .spike-agenda-time,
+[data-theme="dark"] .spike-agenda-name,
+[data-theme="dark"] .spike-agenda-stat strong,
+[data-theme="dark"] .spike-avatar-name,
+[data-theme="dark"] .spike-cell-strong,
+[data-theme="dark"] .spike-donut-legend li strong {
+  color: var(--color-text) !important;
+}
+
+/* Texto secundario (legend, agenda label, donut, table cells) */
+[data-theme="dark"] .spike-legend-item,
+[data-theme="dark"] .spike-donut-legend li,
+[data-theme="dark"] .spike-agenda-label,
+[data-theme="dark"] .spike-table tbody td {
+  color: var(--color-text-secondary) !important;
+}
+
+/* Action links primarios y staff highlight */
+[data-theme="dark"] .spike-section-action,
+[data-theme="dark"] .spike-agenda-staff {
+  color: var(--color-primary) !important;
+}
+
+/* Borders de separación: agenda items, table, row items */
+[data-theme="dark"] .spike-agenda-item,
+[data-theme="dark"] .spike-agenda-footer,
+[data-theme="dark"] .spike-table thead th,
+[data-theme="dark"] .spike-table tbody td,
+[data-theme="dark"] .spike-row-item {
+  border-color: var(--color-border) !important;
+}
+
+/* Header table: el border-bottom-2 + text-muted */
+[data-theme="dark"] .spike-table thead th {
+  color: var(--color-text-muted) !important;
+}
+
+/* Hover row en tabla */
+[data-theme="dark"] .spike-table tbody tr:hover td {
+  background: var(--color-surface-hover) !important;
+}
+
+/* Progress bar background */
+[data-theme="dark"] .spike-progress-bg {
+  background: var(--color-surface-hover) !important;
+}
+
+/* Badges: invierten a tono oscuro con texto claro acento (los dot fills se mantienen) */
+[data-theme="dark"] .spike-badge-teal {
+  background: rgba(52, 211, 153, 0.15) !important;
+  color: #6ee7b7 !important;
+}
+
+[data-theme="dark"] .spike-badge-yellow {
+  background: rgba(251, 191, 36, 0.15) !important;
+  color: #fcd34d !important;
+}
+
+[data-theme="dark"] .spike-badge-red {
+  background: rgba(248, 113, 113, 0.15) !important;
+  color: #fca5a5 !important;
+}
+
+[data-theme="dark"] .spike-badge-gray {
+  background: var(--color-surface-hover) !important;
+  color: var(--color-text-muted) !important;
+}
+
+[data-theme="dark"] .spike-badge-blue {
+  background: var(--color-primary-subtle) !important;
+  color: var(--color-primary) !important;
+}
+
+/* Tooltip de ApexCharts: sombra más fuerte en dark */
+[data-theme="dark"] .spike-kpi-card .apexcharts-tooltip {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55) !important;
+}
+
+/* ────────────────────────────────────────────────────────────
+   Servicios más vendidos — labels inline-styled con #2a3547
+   (TSX usa style={{ color: '#2a3547' }} hardcoded en el span).
+   En dark, ese gris oscuro queda casi invisible sobre fondo dark.
+   ──────────────────────────────────────────────────────────── */
+[data-theme="dark"] .spike-services-list .spike-progress-label > span:first-child {
+  color: var(--color-text) !important;
+}
+
+/* ────────────────────────────────────────────────────────────
+   ApexCharts en dark — labels de ejes / leyendas / data labels.
+   ApexCharts pinta texto SVG con `fill`, no `color`.
+   Cubre x/y axis (Balance mensual, Egresos por categoría) y leyendas.
+   ──────────────────────────────────────────────────────────── */
+[data-theme="dark"] .apexcharts-xaxis-label,
+[data-theme="dark"] .apexcharts-yaxis-label,
+[data-theme="dark"] .apexcharts-xaxis text,
+[data-theme="dark"] .apexcharts-yaxis text,
+[data-theme="dark"] .apexcharts-text tspan,
+[data-theme="dark"] .apexcharts-legend-text {
+  fill: var(--color-text-secondary) !important;
+  color: var(--color-text-secondary) !important;
+}
+
+/* Texto central del donut (Total / count): debe usar el color principal */
+[data-theme="dark"] .apexcharts-datalabel-label,
+[data-theme="dark"] .apexcharts-datalabel-value,
+[data-theme="dark"] .apexcharts-datalabels text,
+[data-theme="dark"] .apexcharts-pie-label,
+[data-theme="dark"] .apexcharts-pie text {
+  fill: var(--color-text) !important;
+}
+
+/* Grid y axis lines del chart en dark: bordes apenas visibles */
+[data-theme="dark"] .apexcharts-gridline {
+  stroke: var(--color-border) !important;
+}
+
+[data-theme="dark"] .apexcharts-xaxis line,
+[data-theme="dark"] .apexcharts-yaxis line {
+  stroke: var(--color-border) !important;
+}

@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Limpia estado "dirty" de golang-migrate para pymes-core en la BD configurada en Secret Manager.
-# Pensado para dev (datos prescindibles). Solo toca la base indicada en DATABASE_URL (ej. .../pymes).
+# Limpia estado "dirty" de golang-migrate para core en la BD configurada en Secret Manager.
+# Pensado para non-prod (datos prescindibles). Solo toca la base indicada en el secret
+# DATABASE_URL_SECRET_NAME (default: DATABASE_URL; ej. .../pymes_stg).
 #
 # Requisitos: gcloud autenticado, Cloud SQL Client IAM sobre la instancia del secreto,
 # curl/psql, y cloud-sql-proxy en PATH o en CLOUD_SQL_PROXY_BIN.
 #
 # Uso:
 #   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh status
+#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh check-clean
 #   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh rewind-to 40
+#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh repair-known-dev-dirty
 #
 # rewind-to N: deja la tabla de migraciones en versión N sin dirty (el próximo arranque del backend
 # reaplicará N+1...). Si la migración N+1 quedó a medias, puede fallar hasta hacer DROP SCHEMA
@@ -20,6 +23,7 @@
 set -euo pipefail
 
 PROJECT_ID="${PROJECT_ID:-}"
+DATABASE_URL_SECRET_NAME="${DATABASE_URL_SECRET_NAME:-DATABASE_URL}"
 MODE="${1:-}"
 ARG="${2:-}"
 
@@ -41,7 +45,7 @@ if [[ -z "$PROXY_BIN" || ! -x "$PROXY_BIN" ]]; then
   exit 1
 fi
 
-DBRAW="$(gcloud secrets versions access latest --secret=DATABASE_URL --project="$PROJECT_ID")"
+DBRAW="$(gcloud secrets versions access latest --secret="$DATABASE_URL_SECRET_NAME" --project="$PROJECT_ID")"
 export DBRAW
 
 eval "$(python3 <<'PY'
@@ -69,9 +73,9 @@ echo "Base de datos: $PGDATABASE (usuario $PGUSER)"
 
 conn_project="${PGINSTANCE_CONN%%:*}"
 if [[ "$conn_project" != "$PROJECT_ID" ]]; then
-  echo "ERROR: DATABASE_URL apunta a Cloud SQL del proyecto '$conn_project', distinto de PROJECT_ID='$PROJECT_ID'." >&2
+  echo "ERROR: $DATABASE_URL_SECRET_NAME apunta a Cloud SQL del proyecto '$conn_project', distinto de PROJECT_ID='$PROJECT_ID'." >&2
   echo "No se ejecuta nada para evitar tocar infraestructura ajena (p. ej. Ponti)." >&2
-  echo "Corregí el secreto DATABASE_URL en este proyecto o exportá PYMES_SQL_FIX_ALLOW_FOREIGN_INSTANCE=yes si asumís el riesgo." >&2
+  echo "Corregí el secreto $DATABASE_URL_SECRET_NAME en este proyecto o exportá PYMES_SQL_FIX_ALLOW_FOREIGN_INSTANCE=yes si asumís el riesgo." >&2
   if [[ "${PYMES_SQL_FIX_ALLOW_FOREIGN_INSTANCE:-}" != "yes" ]]; then
     exit 2
   fi
@@ -94,9 +98,65 @@ show_status() {
   "${psql_cmd[@]}" -c "SELECT 'post_scheduling', version, dirty FROM pymes_core_post_scheduling_schema_migrations ORDER BY version;" 2>/dev/null || true
 }
 
+check_clean() {
+  # Si la tabla aún no existe (DB recién reseteada o nueva), no hay nada que chequear:
+  # el runner del backend la crea en su primer arranque cuando aplica 0001.
+  local table_exists
+  table_exists="$("${psql_cmd[@]}" -Atq -c "SELECT to_regclass('public.pymes_core_schema_migrations') IS NOT NULL;" 2>/dev/null || echo f)"
+  if [[ "$table_exists" != "t" ]]; then
+    echo "OK: pymes_core_schema_migrations no existe — DB fresca, el backend la creará en su primer arranque."
+    return
+  fi
+  local dirty_rows
+  dirty_rows="$("${psql_cmd[@]}" -Atq -c "SELECT 'pymes_core:' || version FROM pymes_core_schema_migrations WHERE dirty IS TRUE;" || true)"
+  dirty_rows="${dirty_rows}"$'\n'"$("${psql_cmd[@]}" -Atq -c "SELECT 'post_scheduling:' || version FROM pymes_core_post_scheduling_schema_migrations WHERE dirty IS TRUE;" 2>/dev/null || true)"
+  dirty_rows="$(printf '%s' "$dirty_rows" | sed '/^[[:space:]]*$/d')"
+  if [[ -n "$dirty_rows" ]]; then
+    echo "ERROR: migraciones dirty detectadas:" >&2
+    printf '%s\n' "$dirty_rows" >&2
+    show_status >&2
+    exit 3
+  fi
+  echo "OK: no hay migraciones dirty."
+}
+
+repair_known_dev_dirty() {
+  # Si la tabla aún no existe (DB fresca post-reset), no hay nada para reparar.
+  local table_exists
+  table_exists="$("${psql_cmd[@]}" -Atq -c "SELECT to_regclass('public.pymes_core_schema_migrations') IS NOT NULL;" 2>/dev/null || echo f)"
+  if [[ "$table_exists" != "t" ]]; then
+    echo "OK: pymes_core_schema_migrations no existe — DB fresca, nada para reparar."
+    return
+  fi
+  local version dirty has_tenants has_orgs
+  version="$("${psql_cmd[@]}" -Atq -c "SELECT version FROM pymes_core_schema_migrations LIMIT 1;")"
+  dirty="$("${psql_cmd[@]}" -Atq -c "SELECT dirty FROM pymes_core_schema_migrations LIMIT 1;")"
+  has_tenants="$("${psql_cmd[@]}" -Atq -c "SELECT to_regclass('public.tenants') IS NOT NULL;")"
+  has_orgs="$("${psql_cmd[@]}" -Atq -c "SELECT to_regclass('public.orgs') IS NOT NULL;")"
+
+  if [[ "$version" == "75" && "$dirty" == "t" && ( "$has_tenants" == "t" || "$has_orgs" == "t" ) ]]; then
+    echo "Reparando dirty conocido: migración 75 falló durante el rename/hardening tenant. Rewind a 74 para reejecutarla con SQL idempotente."
+    "${psql_cmd[@]}" -c "DELETE FROM pymes_core_schema_migrations;
+INSERT INTO pymes_core_schema_migrations (version, dirty) VALUES (74, false);"
+    show_status
+    return
+  fi
+
+  if [[ "$dirty" == "t" ]]; then
+    echo "ERROR: dirty state no reconocido para reparación automática: version=$version dirty=$dirty tenants=$has_tenants orgs=$has_orgs" >&2
+    show_status >&2
+    exit 4
+  fi
+
+  echo "OK: no hay dirty state conocido para reparar."
+}
+
 case "$MODE" in
   status)
     show_status
+    ;;
+  check-clean)
+    check_clean
     ;;
   clear-dirty)
     "${psql_cmd[@]}" -c "UPDATE pymes_core_schema_migrations SET dirty = false WHERE dirty = true;"
@@ -111,8 +171,11 @@ case "$MODE" in
 INSERT INTO pymes_core_schema_migrations (version, dirty) VALUES ($ARG, false);"
     show_status
     ;;
+  repair-known-dev-dirty)
+    repair_known_dev_dirty
+    ;;
   *)
-    echo "Modos: status | clear-dirty | rewind-to <n>" >&2
+    echo "Modos: status | check-clean | clear-dirty | rewind-to <n> | repair-known-dev-dirty" >&2
     exit 1
     ;;
 esac

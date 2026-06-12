@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 	vehiclesdomain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles/usecases/domain"
 	workordersdomain "github.com/devpablocristo/pymes/workshops/backend/internal/workorders/usecases/domain"
 )
@@ -38,16 +38,16 @@ func TestHookBeforeCreateSyncsVehicleData(t *testing.T) {
 		},
 	})
 	wo := &workordersdomain.WorkOrder{
-		OrgID:      uuid.New(),
-		TargetID:   uuid.New(),
-		TargetType: "vehicle",
+		OrgID:  uuid.New(),
+		AssetID:   uuid.New(),
+		AssetType: "vehicle",
 	}
 
 	if err := hook.BeforeCreate(context.Background(), wo); err != nil {
 		t.Fatalf("BeforeCreate() error = %v", err)
 	}
-	if wo.TargetLabel != "AB123CD" {
-		t.Fatalf("TargetLabel = %q, want AB123CD", wo.TargetLabel)
+	if wo.AssetLabel != "AB123CD" {
+		t.Fatalf("AssetLabel = %q, want AB123CD", wo.AssetLabel)
 	}
 	if wo.CustomerName != "Cliente Auto" {
 		t.Fatalf("CustomerName = %q, want Cliente Auto", wo.CustomerName)
@@ -60,9 +60,9 @@ func TestHookBeforeCreateSyncsVehicleData(t *testing.T) {
 func TestHookBeforeCreateRejectsUnknownVehicle(t *testing.T) {
 	hook := New(&fakeVehicleLookup{err: httperrors.ErrNotFound})
 	wo := &workordersdomain.WorkOrder{
-		OrgID:      uuid.New(),
-		TargetID:   uuid.New(),
-		TargetType: "vehicle",
+		OrgID:  uuid.New(),
+		AssetID:   uuid.New(),
+		AssetType: "vehicle",
 	}
 
 	err := hook.BeforeCreate(context.Background(), wo)

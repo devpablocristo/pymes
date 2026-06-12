@@ -1,0 +1,842 @@
+/**
+ * Toggle de tema en sidebar, ajustes dark, CRUD canónico y pantallas admin / tenant / API keys.
+ * Importado desde `styles.css`.
+ */
+
+/* ── Theme toggle ── */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-sidebar-text);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.theme-toggle:hover {
+  background: var(--color-sidebar-hover);
+  color: var(--color-sidebar-text-active);
+}
+
+/* ── Dark theme adjustments ── */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] table th {
+  background: var(--color-surface-hover);
+}
+
+/* Tablas de datos (CRUD): no aplicar celda “header” al perfil (th = etiqueta de fila). */
+[data-theme="dark"] .profile-session-table th {
+  background: transparent;
+}
+
+[data-theme='dark'] .weekly-cal-event--tone-3 {
+  background: var(--color-surface-hover);
+}
+
+/* Superficies CRUD (tabla bajo CrudPage + listados SimpleCrud / audit): misma fuente y tamaño que el modal */
+.crud-page-host,
+.products-crud-page {
+  font-family: var(--crud-ui-font-family);
+  font-size: var(--crud-ui-font-size);
+}
+
+.crud-page-host .m-kanban,
+.products-crud-page .m-kanban {
+  font-family: var(--crud-ui-font-family);
+  font-size: var(--crud-ui-font-size);
+}
+
+/* CRUD pages */
+.crud-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.crud-form-card {
+  margin-bottom: calc(var(--space-4) + var(--space-1));
+}
+
+.crud-form {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.crud-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.crud-form-grid .full-width {
+  grid-column: 1 / -1;
+}
+
+.crud-table {
+  width: 100%;
+  /* Distribuye las columnas uniformemente dentro de la caja contenedora.
+     `fixed` reparte el ancho proporcionalmente al valor calculado de la
+     primera fila, sin que el contenido largo reflote el layout. */
+  table-layout: fixed;
+}
+
+.crud-table--auto-layout {
+  table-layout: auto;
+}
+
+.crud-table th,
+.crud-table td {
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Espaciado de filas — más aire entre items */
+.crud-table th {
+  padding: 12px 16px !important;
+}
+
+.crud-table td {
+  padding: 14px 16px !important;
+}
+
+.crud-table tbody tr.crud-table__row-clickable {
+  cursor: pointer;
+}
+
+.crud-table tbody tr.crud-table__row-clickable:hover {
+  background: var(--color-surface-hover, rgba(0, 0, 0, 0.04));
+}
+
+/* Ordenación por cabecera (CrudPage) */
+.crud-table__sort-btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-1, 0.25rem);
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  vertical-align: bottom;
+}
+
+.crud-table__sort-icon:hover {
+  color: var(--color-primary, #2563eb);
+}
+
+.crud-table__sort-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--crud-ui-font-size);
+  font-weight: var(--font-weight-semibold, 600);
+  color: color-mix(in srgb, var(--color-text) 52%, transparent);
+}
+
+.crud-table__sort-icons {
+  display: inline-flex;
+  flex-direction: row;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* Ambas flechas ocultas por defecto; se reemplaza por ⇅ sutil via ::after */
+.crud-table__sort-icon {
+  display: none !important;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+}
+
+/* Flecha activa (ascendente o descendente) — sola, azul, visible */
+.crud-table__sort-icon--active {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px !important;
+  opacity: 1;
+  color: #0085db;
+}
+
+/* Columna sin orden activo: ícono ⇅ tenue */
+.crud-table__sort-icons:not(:has(.crud-table__sort-icon--active))::after {
+  content: '⇅';
+  font-size: 10px;
+  color: color-mix(in srgb, var(--color-text) 35%, transparent);
+  line-height: 1;
+}
+
+/* Tabla de consola: todo en una línea, misma fuente/tamaño/peso. Sin negrita,
+   sin color secundario ni apilado vertical dentro de la celda. Los column
+   renders heredados (title+subtítulo con <strong>+<div class="text-secondary">)
+   se aplanan aquí para uniformidad visual. */
+.crud-table td {
+  font-family: var(--crud-ui-font-family);
+  font-weight: var(--font-weight-regular, 400);
+  font-size: var(--crud-ui-font-size);
+  color: var(--color-text);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crud-table td strong,
+.crud-table td b {
+  font-weight: inherit;
+}
+
+.crud-table td .text-secondary {
+  color: inherit;
+}
+
+.crud-table td > div {
+  display: inline;
+}
+
+.crud-table td > div + div::before {
+  content: ' · ';
+  color: var(--color-text-muted);
+}
+
+.crud-table td.cell-notes {
+  max-width: 240px;
+}
+
+.crud-table .col-actions {
+  /* 1% + min-width: la columna crece con el contenido (varios botones en fila). */
+  width: 1%;
+  min-width: min(100%, calc(var(--space-4) * 22));
+  text-align: right;
+  vertical-align: top;
+}
+
+/* Flex en el interior del td evita romper el modelo de tabla (display:flex en td comprimía todo). */
+.crud-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.confirm-delete-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 18%, var(--color-border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-danger) 7%, var(--color-surface));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-danger) 8%, transparent);
+}
+
+.confirm-delete-copy {
+  min-width: min(220px, 100%);
+  flex: 1 1 220px;
+}
+
+.confirm-delete-hint {
+  font-size: var(--crud-ui-font-size);
+  color: var(--color-text);
+  line-height: var(--leading-normal);
+}
+
+.confirm-delete-input {
+  width: 136px;
+  min-height: 34px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-danger, #dc2626);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--crud-ui-font-size);
+}
+
+.confirm-delete-input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-danger) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.confirm-delete-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+/* ── Admin / tenant settings ── */
+input.input-readonly,
+textarea.input-readonly {
+  cursor: not-allowed;
+  opacity: 0.85;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+}
+
+.admin-currencies-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 520px;
+}
+
+.admin-currency-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.admin-currency-rank {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  min-width: calc(var(--space-8) + var(--space-6));
+}
+
+.admin-currency-input {
+  flex: 1;
+  min-width: calc(var(--space-8) * 2);
+  max-width: 120px;
+}
+
+.admin-currency-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.admin-currency-add {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+}
+
+.admin-settings-form {
+  padding: 0 0 var(--space-2);
+}
+
+.admin-settings-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.admin-settings-toolbar-bottom {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.admin-settings-section {
+  margin-top: var(--space-5);
+  padding-top: calc(var(--space-4) + var(--space-1));
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.admin-settings-section:first-of-type {
+  margin-top: var(--space-3);
+  border-top: none;
+  padding-top: 0;
+}
+
+.admin-settings-section h3 {
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--space-3);
+  color: var(--color-text);
+}
+
+.admin-settings-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: calc(-1 * var(--space-1)) 0 var(--space-3);
+  line-height: 1.45;
+}
+
+.admin-settings-hint code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.admin-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3) var(--space-4);
+  align-items: end;
+}
+
+.admin-settings-grid .form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.admin-checkbox-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-1);
+}
+
+.admin-checkbox-row label {
+  margin-bottom: 0;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.admin-textarea {
+  width: 100%;
+  min-height: calc(var(--space-8) + var(--space-6));
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  padding: var(--space-2) var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  resize: vertical;
+}
+
+.admin-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-subtle);
+}
+
+.admin-activity-wrap {
+  overflow-x: auto;
+  padding: 0 0 var(--space-3);
+}
+
+.commercial-chat-log {
+  max-height: calc(var(--space-4) * 24);
+  overflow-y: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+
+.admin-activity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.admin-activity-table th,
+.admin-activity-table td {
+  text-align: left;
+  padding: var(--space-2) var(--space-2);
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: top;
+}
+
+.admin-activity-table th {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-activity-table tbody tr:hover {
+  background: var(--color-surface-hover);
+}
+
+.admin-code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  word-break: break-all;
+}
+
+.admin-activity-id {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-row-subtext {
+  margin-top: 0.25rem;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+/* Cabecera de card en auditoría: título + acciones en varias líneas si hace falta */
+.card-header.admin-card-header--wrap {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.admin-audit-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* RBAC: bloques con separación vertical */
+.admin-rbac-block-mt {
+  margin-top: var(--space-4);
+}
+
+.admin-pre-permissions {
+  white-space: pre-wrap;
+  min-height: calc(var(--space-4) * 6);
+}
+
+.admin-rbac-assign-form {
+  margin-top: var(--space-4);
+}
+
+.admin-rbac-form-actions {
+  align-self: end;
+}
+
+/* API keys: permisos con checkboxes en lugar de texto crudo */
+.api-keys-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.api-keys-field-name input {
+  width: 100%;
+  max-width: 420px;
+}
+
+.api-keys-scopes-fieldset {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  margin: 0;
+  max-width: 640px;
+}
+
+.api-keys-scopes-legend {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  padding: 0 var(--space-2);
+}
+
+.api-keys-scope-row {
+  display: flex;
+  gap: calc(var(--space-2) + var(--space-1));
+  align-items: flex-start;
+  margin-top: calc(var(--space-2) + var(--space-1));
+  cursor: pointer;
+}
+
+.api-keys-scope-row:first-of-type {
+  margin-top: var(--space-2);
+}
+
+.api-keys-scope-row input {
+  margin-top: var(--space-1);
+  flex-shrink: 0;
+}
+
+.api-keys-scope-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.api-keys-scope-label {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  font-size: var(--text-md);
+}
+
+.api-keys-scope-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.api-keys-create-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* ── Kanban / Tablero — tema claro (estilo app) ── */
+
+/* Board: alinear columnas al tope */
+.m-kanban__board {
+  gap: 12px !important;
+  align-items: flex-start !important;
+}
+
+/* Columna: fondo gris azulado muy suave */
+.m-kanban__column-body {
+  background: #f0f5fb !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(0, 100, 200, 0.09) !important;
+  padding: 0 10px 10px !important;
+  min-width: 220px !important;
+}
+
+/* Cabecera de columna */
+.m-kanban__column-head {
+  background: transparent !important;
+  padding: 12px 8px 10px !important;
+}
+
+/* Nombre de columna — texto oscuro */
+.m-kanban__column-label {
+  color: #1e293b !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+/* Badge de conteo */
+.m-kanban__column-count {
+  background: rgba(0, 133, 219, 0.1) !important;
+  color: #0085db !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  font-size: 11px !important;
+}
+
+/* Menú de columna (···) */
+.m-kanban__column-menu {
+  color: #7a8fa6 !important;
+}
+
+/* Scroll interno de columna */
+.m-kanban__column-scroll {
+  gap: 8px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Card — blanca, línea corta centrada (igual que gallery cards), sombra sutil */
+.m-kanban__card {
+  background: #fff !important;
+  border: 1px solid #e8eef5 !important;
+  border-left: none !important;
+  border-radius: 10px !important;
+  box-shadow: 0 1px 4px rgba(0, 60, 120, 0.05) !important;
+  color: #1e293b !important;
+  padding: 14px 16px 14px 22px !important;
+  cursor: pointer !important;
+  transition: box-shadow 0.15s, transform 0.12s !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+/* Línea de acento lateral — ocupa toda la altura de la card */
+.m-kanban__card::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 3px !important;
+  height: auto !important;
+  border-radius: 0 3px 3px 0 !important;
+  background: #0085db !important;
+  transition: background 0.15s !important;
+}
+
+.m-kanban__card:hover {
+  box-shadow: 0 4px 12px rgba(0, 60, 120, 0.1) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Meta info (subtítulo, fecha, etc.) */
+.m-kanban__card-meta {
+  color: #7a8fa6 !important;
+  font-size: 12px !important;
+}
+
+/* Botón "Añadir X" al pie de columna */
+.m-kanban__column-add {
+  color: #7a8fa6 !important;
+  background: rgba(0, 100, 200, 0.04) !important;
+  border: 1px dashed rgba(0, 100, 200, 0.18) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  margin-top: 4px !important;
+  font-size: 13px !important;
+  width: 100% !important;
+  text-align: left !important;
+}
+
+.m-kanban__column-add:hover {
+  background: rgba(0, 100, 200, 0.08) !important;
+  color: #0085db !important;
+}
+
+/* ── Kanban: color de la línea ::before por estado ── */
+.m-kanban__card:has(.crud-state-badge--success)::before {
+  background: #22c55e !important;
+}
+.m-kanban__card:has(.crud-state-badge--warning)::before {
+  background: #f59e0b !important;
+}
+.m-kanban__card:has(.crud-state-badge--danger)::before {
+  background: #ef4444 !important;
+}
+.m-kanban__card:has(.crud-state-badge--info)::before {
+  background: #3b82f6 !important;
+}
+.m-kanban__card:has(.crud-state-badge--neutral)::before {
+  background: #94a3b8 !important;
+}
+
+/* Columna con tinte sutil según estado dominante */
+.m-kanban__column-body:has(.crud-state-badge--success) {
+  border-top: 3px solid #22c55e !important;
+  border-top-left-radius: 14px !important;
+  border-top-right-radius: 14px !important;
+}
+.m-kanban__column-body:has(.crud-state-badge--warning) {
+  border-top: 3px solid #f59e0b !important;
+  border-top-left-radius: 14px !important;
+  border-top-right-radius: 14px !important;
+}
+.m-kanban__column-body:has(.crud-state-badge--danger) {
+  border-top: 3px solid #ef4444 !important;
+  border-top-left-radius: 14px !important;
+  border-top-right-radius: 14px !important;
+}
+
+/* ── Kanban: overrides para dark mode ── */
+
+/* Columna: surface oscuro con borde sutil. En dark sacamos la franja superior
+   de color por estado (success/warning/danger) — es ruido visual sobre dark. */
+[data-theme="dark"] .m-kanban__column-body,
+[data-theme="dark"] .m-kanban__column-body:has(.crud-state-badge--success),
+[data-theme="dark"] .m-kanban__column-body:has(.crud-state-badge--warning),
+[data-theme="dark"] .m-kanban__column-body:has(.crud-state-badge--danger) {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 14px !important;
+}
+
+/* Etiqueta de la columna */
+[data-theme="dark"] .m-kanban__column-label {
+  color: var(--color-text) !important;
+}
+
+/* Badge de conteo */
+[data-theme="dark"] .m-kanban__column-count {
+  background: rgba(96, 165, 250, 0.18) !important;
+  color: var(--color-primary) !important;
+}
+
+/* Menú · · · */
+[data-theme="dark"] .m-kanban__column-menu {
+  color: var(--color-text-muted) !important;
+}
+
+/* Cards: surface-hover (un escalón más claro que la columna) */
+[data-theme="dark"] .m-kanban__card {
+  background: var(--color-surface-hover) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .m-kanban__card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme="dark"] .m-kanban__card strong {
+  color: var(--color-text) !important;
+}
+
+[data-theme="dark"] .m-kanban__card-meta {
+  color: var(--color-text-secondary) !important;
+}
+
+/* Botón "Añadir X" al pie */
+[data-theme="dark"] .m-kanban__column-add {
+  background: rgba(96, 165, 250, 0.06) !important;
+  border-color: rgba(96, 165, 250, 0.22) !important;
+  color: var(--color-text-secondary) !important;
+}
+
+[data-theme="dark"] .m-kanban__column-add:hover {
+  background: rgba(96, 165, 250, 0.14) !important;
+  color: var(--color-primary) !important;
+}
+
+/* ── Lista: badge de estado en celda (inyectado por useStatusColors) ── */
+
+/* Oculta el texto plano y muestra el badge via ::after con el label del atributo */
+.crud-table td[data-status] {
+  color: transparent !important;
+  position: relative !important;
+  white-space: nowrap !important;
+}
+
+/* Badge base: usa data-status-label como texto */
+.crud-table td[data-status]::after {
+  content: attr(data-status-label) !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 16px !important;
+  transform: translateY(-50%) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 3px 10px !important;
+  border-radius: 20px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* Colores por variante */
+.crud-table td[data-status="success"]::after {
+  background: #dcfce7 !important;
+  color: #16a34a !important;
+}
+.crud-table td[data-status="warning"]::after {
+  background: #fef3c7 !important;
+  color: #ca8a04 !important;
+}
+.crud-table td[data-status="danger"]::after {
+  background: #fee2e2 !important;
+  color: #dc2626 !important;
+}
+.crud-table td[data-status="info"]::after {
+  background: #dbeafe !important;
+  color: #2563eb !important;
+}
+.crud-table td[data-status="neutral"]::after {
+  background: #f1f5f9 !important;
+  color: #64748b !important;
+}

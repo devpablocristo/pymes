@@ -5,18 +5,19 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gin-gonic/gin"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalgin"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/pymescore"
+	"github.com/gin-gonic/gin"
 )
 
-// coreServicesPort expone el catálogo público de servicios servido por pymes-core.
+// coreServicesPort expone el catálogo público de servicios servido por core.
 type coreServicesPort interface {
-	ListPublicServices(ctx context.Context, orgRef, vertical, segment, search string) ([]pymescore.CoreService, error)
+	ListPublicServices(ctx context.Context, tenantRef, vertical, segment, search string) ([]pymescore.CoreService, error)
 }
 
 type bookingPort interface {
-	BookScheduling(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error)
+	BookScheduling(ctx context.Context, tenantRef string, payload map[string]any) (map[string]any, error)
 }
 
 type Handler struct {
@@ -32,34 +33,34 @@ func NewHandler(coreServices coreServicesPort, bookings bookingPort) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
-	group.GET("/public/:org_slug/auto-repair/services", h.ListServices)
-	group.POST("/public/:org_slug/auto-repair/bookings", h.BookScheduling)
+	group.GET("/public/:tenant_slug/auto-repair/services", h.ListServices)
+	group.POST("/public/:tenant_slug/auto-repair/bookings", h.BookScheduling)
 
-	group.GET("/public/:org_slug/workshops/services", h.ListServices)
-	group.POST("/public/:org_slug/workshops/bookings", h.BookScheduling)
+	group.GET("/public/:tenant_slug/workshops/services", h.ListServices)
+	group.POST("/public/:tenant_slug/workshops/bookings", h.BookScheduling)
 }
 
-func (h *Handler) resolveOrgRef(c *gin.Context) (string, bool) {
-	orgSlug := strings.TrimSpace(c.Param("org_slug"))
-	if orgSlug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "org_slug is required"})
+func (h *Handler) resolveTenantRef(c *gin.Context) (string, bool) {
+	tenantSlug := strings.TrimSpace(c.Param("tenant_slug"))
+	if tenantSlug == "" {
+		verticalgin.WriteValidation(c, "tenant_slug is required")
 		return "", false
 	}
-	return orgSlug, true
+	return tenantSlug, true
 }
 
 func (h *Handler) listSegmentServices(c *gin.Context, segment string) {
-	orgRef, ok := h.resolveOrgRef(c)
+	tenantRef, ok := h.resolveTenantRef(c)
 	if !ok {
 		return
 	}
 	if h.coreServices == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "core services not configured"})
+		verticalgin.WriteError(c, http.StatusServiceUnavailable, "UPSTREAM_UNAVAILABLE", "core services not configured")
 		return
 	}
 	items, err := h.coreServices.ListPublicServices(
 		c.Request.Context(),
-		orgRef,
+		tenantRef,
 		"workshops",
 		segment,
 		strings.TrimSpace(c.Query("search")),
@@ -82,7 +83,7 @@ func (h *Handler) listSegmentServices(c *gin.Context, segment string) {
 			"tax_rate":        item.TaxRate,
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"items": publicItems})
+	verticalgin.WriteListResponse(c, publicItems, int64(len(publicItems)), false, "")
 }
 
 func (h *Handler) ListServices(c *gin.Context) {
@@ -105,22 +106,22 @@ func estimatedHoursFromMetadata(svc pymescore.CoreService) float64 {
 
 func (h *Handler) BookScheduling(c *gin.Context) {
 	if h.bookings == nil {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "booking not configured"})
+		verticalgin.WriteError(c, http.StatusNotImplemented, "UPSTREAM_UNAVAILABLE", "booking not configured")
 		return
 	}
-	orgSlug, ok := h.resolveOrgRef(c)
+	tenantRef, ok := h.resolveTenantRef(c)
 	if !ok {
 		return
 	}
 	var payload map[string]any
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	if payload == nil {
 		payload = map[string]any{}
 	}
-	out, err := h.bookings.BookScheduling(c.Request.Context(), orgSlug, payload)
+	out, err := h.bookings.BookScheduling(c.Request.Context(), tenantRef, payload)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

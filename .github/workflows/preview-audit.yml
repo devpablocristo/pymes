@@ -1,0 +1,44 @@
+name: Preview Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 8 * * 1-5"
+
+permissions:
+  contents: read
+  pull-requests: read
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  GCP_REGION: us-central1
+  GCP_PROJECT_ID: pymes-dev-352318
+  WIF_PROVIDER: ${{ vars.PYMES_STG_WIF_PROVIDER || 'projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider' }}
+  WIF_SERVICE_ACCOUNT: pymes-github-actions-stg@pymes-dev-352318.iam.gserviceaccount.com
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+      - name: List orphan previews
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          open_prs="$(gh pr list --state open --json number --jq '.[].number' | sort -n)"
+          preview_prs="$(gcloud run services list --project="$GCP_PROJECT_ID" --region="$GCP_REGION" --filter='metadata.labels.environment=preview' --format='value(metadata.labels.preview-pr)' | sort -n | uniq)"
+          echo "Open PRs:"
+          printf '%s\n' "$open_prs"
+          echo "Preview PRs:"
+          printf '%s\n' "$preview_prs"
+          echo "Orphan previews:"
+          comm -13 <(printf '%s\n' "$open_prs") <(printf '%s\n' "$preview_prs") || true

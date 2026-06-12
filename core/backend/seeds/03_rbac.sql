@@ -1,0 +1,133 @@
+-- Roles, permissions, user_roles, default price list (demo).
+-- Role/list IDs per org (uuid v5) for multi-tenant.
+
+DO $$
+DECLARE
+    v_tenant uuid := '__SEED_TENANT_ID__';
+
+    r_admin uuid;
+    r_seller uuid;
+    r_cashier uuid;
+    r_accountant uuid;
+    r_warehouse uuid;
+
+    pl_default uuid;
+    pl_wholesale uuid;
+    pl_vip uuid;
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_tenant) THEN
+        RETURN;
+    END IF;
+
+    r_admin := uuid_generate_v5(v_tenant, 'pymes-seed/v1/role/admin');
+    r_seller := uuid_generate_v5(v_tenant, 'pymes-seed/v1/role/vendedor');
+    r_cashier := uuid_generate_v5(v_tenant, 'pymes-seed/v1/role/cajero');
+    r_accountant := uuid_generate_v5(v_tenant, 'pymes-seed/v1/role/contador');
+    r_warehouse := uuid_generate_v5(v_tenant, 'pymes-seed/v1/role/almacenero');
+    pl_default := uuid_generate_v5(v_tenant, 'pymes-seed/v1/price-list/default');
+    pl_wholesale := uuid_generate_v5(v_tenant, 'pymes-seed/v1/price-list/wholesale');
+    pl_vip := uuid_generate_v5(v_tenant, 'pymes-seed/v1/price-list/vip');
+
+    INSERT INTO roles (id, org_id, name, description, is_system)
+    VALUES
+        (r_admin, v_tenant, 'admin', 'Full access', true),
+        (r_seller, v_tenant, 'seller', 'Sales and commercial management', true),
+        (r_cashier, v_tenant, 'cashier', 'Payments and cash register', true),
+        (r_accountant, v_tenant, 'accountant', 'Reports and accounting', true),
+        (r_warehouse, v_tenant, 'warehouse', 'Inventory and products', true)
+    ON CONFLICT (id) DO NOTHING;
+
+    INSERT INTO role_permissions (id, role_id, resource, action)
+    VALUES
+        (gen_random_uuid(), r_admin, '*', '*'),
+
+        (gen_random_uuid(), r_seller, 'customers', 'read'),
+        (gen_random_uuid(), r_seller, 'customers', 'create'),
+        (gen_random_uuid(), r_seller, 'customers', 'update'),
+        (gen_random_uuid(), r_seller, 'products', 'read'),
+        (gen_random_uuid(), r_seller, 'sales', 'read'),
+        (gen_random_uuid(), r_seller, 'sales', 'create'),
+        (gen_random_uuid(), r_seller, 'sales', 'update'),
+        (gen_random_uuid(), r_seller, 'quotes', 'read'),
+        (gen_random_uuid(), r_seller, 'quotes', 'create'),
+        (gen_random_uuid(), r_seller, 'quotes', 'update'),
+        (gen_random_uuid(), r_seller, 'inventory', 'read'),
+        (gen_random_uuid(), r_seller, 'scheduling', 'read'),
+        (gen_random_uuid(), r_seller, 'scheduling', 'create'),
+        (gen_random_uuid(), r_seller, 'scheduling', 'update'),
+        (gen_random_uuid(), r_seller, 'returns', 'read'),
+        (gen_random_uuid(), r_seller, 'returns', 'create'),
+        (gen_random_uuid(), r_seller, 'accounts', 'read'),
+        (gen_random_uuid(), r_seller, 'price_lists', 'read'),
+
+        (gen_random_uuid(), r_cashier, 'sales', 'read'),
+        (gen_random_uuid(), r_cashier, 'sales', 'create'),
+        (gen_random_uuid(), r_cashier, 'sales', 'update'),
+        (gen_random_uuid(), r_cashier, 'cashflow', 'read'),
+        (gen_random_uuid(), r_cashier, 'cashflow', 'create'),
+        (gen_random_uuid(), r_cashier, 'customers', 'read'),
+        (gen_random_uuid(), r_cashier, 'payments', 'read'),
+        (gen_random_uuid(), r_cashier, 'payments', 'create'),
+        (gen_random_uuid(), r_cashier, 'returns', 'read'),
+        (gen_random_uuid(), r_cashier, 'returns', 'create'),
+        (gen_random_uuid(), r_cashier, 'accounts', 'read'),
+        (gen_random_uuid(), r_cashier, 'scheduling', 'read'),
+        (gen_random_uuid(), r_cashier, 'scheduling', 'operate'),
+
+        (gen_random_uuid(), r_accountant, 'reports', 'read'),
+        (gen_random_uuid(), r_accountant, 'cashflow', 'read'),
+        (gen_random_uuid(), r_accountant, 'sales', 'read'),
+        (gen_random_uuid(), r_accountant, 'billing', 'read'),
+        (gen_random_uuid(), r_accountant, 'audit', 'read'),
+        (gen_random_uuid(), r_accountant, 'audit', 'export'),
+        (gen_random_uuid(), r_accountant, 'purchases', 'read'),
+        (gen_random_uuid(), r_accountant, 'accounts', 'read'),
+        (gen_random_uuid(), r_accountant, 'payments', 'read'),
+        (gen_random_uuid(), r_accountant, 'returns', 'read'),
+        (gen_random_uuid(), r_accountant, 'recurring', 'read'),
+        (gen_random_uuid(), r_accountant, 'price_lists', 'read'),
+        (gen_random_uuid(), r_accountant, 'procurement_requests', 'read'),
+        (gen_random_uuid(), r_accountant, 'procurement_requests', 'approve'),
+        (gen_random_uuid(), r_accountant, 'procurement_requests', 'reject'),
+        (gen_random_uuid(), r_accountant, 'procurement_policies', 'read'),
+
+        (gen_random_uuid(), r_warehouse, 'inventory', 'read'),
+        (gen_random_uuid(), r_warehouse, 'inventory', 'create'),
+        (gen_random_uuid(), r_warehouse, 'inventory', 'update'),
+        (gen_random_uuid(), r_warehouse, 'products', 'read'),
+        (gen_random_uuid(), r_warehouse, 'purchases', 'read'),
+        (gen_random_uuid(), r_warehouse, 'returns', 'read'),
+        (gen_random_uuid(), r_warehouse, 'procurement_requests', 'read'),
+        (gen_random_uuid(), r_warehouse, 'procurement_requests', 'create'),
+        (gen_random_uuid(), r_warehouse, 'procurement_requests', 'update'),
+        (gen_random_uuid(), r_warehouse, 'procurement_requests', 'submit'),
+        (gen_random_uuid(), r_warehouse, 'procurement_policies', 'read'),
+        (gen_random_uuid(), r_warehouse, 'procurement_policies', 'create'),
+        (gen_random_uuid(), r_warehouse, 'procurement_policies', 'update'),
+        (gen_random_uuid(), r_warehouse, 'procurement_policies', 'delete')
+    ON CONFLICT (role_id, resource, action) DO NOTHING;
+
+    -- Asigna el rol admin a todos los miembros admin/owner del org. Funciona
+    -- tanto con Clerk (admins vienen de webhooks/onboarding) como con cualquier
+    -- otro provisionamiento manual.
+    INSERT INTO user_roles (user_id, org_id, role_id, assigned_by)
+    SELECT DISTINCT om.user_id, v_tenant, r_admin, 'seed'
+    FROM org_members om
+    WHERE om.org_id = v_tenant
+      AND om.status = 'active'
+      AND om.role IN ('admin', 'owner')
+    ON CONFLICT (user_id, org_id) DO UPDATE
+        SET role_id = EXCLUDED.role_id,
+            assigned_by = EXCLUDED.assigned_by,
+            assigned_at = now();
+
+    INSERT INTO price_lists (id, org_id, name, description, is_default, markup, is_active)
+    VALUES (pl_default, v_tenant, 'Retail', 'Default local price list', true, 0, true)
+    ON CONFLICT (id) DO NOTHING;
+
+    INSERT INTO price_lists (id, org_id, name, description, is_default, markup, is_active)
+    VALUES
+        (pl_wholesale, v_tenant, 'Mayorista', 'Lista demo mayorista', false, -5, true),
+        (pl_vip, v_tenant, 'VIP', 'Lista demo clientes VIP', false, -10, true)
+    ON CONFLICT (id) DO NOTHING;
+END $$;

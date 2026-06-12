@@ -1,0 +1,339 @@
+name: Preview Deploy
+
+on:
+  workflow_call:
+    inputs:
+      pr_number:
+        required: true
+        type: number
+      ref:
+        required: true
+        type: string
+      product:
+        required: false
+        default: all
+        type: string
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Número de PR"
+        required: true
+        type: number
+      ref:
+        description: "Rama, tag o SHA"
+        required: true
+      product:
+        description: "Producto a desplegar"
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - core
+          - ui
+          - verticals
+          - workshops
+          - professionals
+          - beauty
+          - restaurants
+          - medical
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  GCP_REGION: us-central1
+  GCP_PROJECT_ID: pymes-dev-352318
+  ARTIFACT_REGISTRY: pymes
+  CLOUDSQL_INSTANCE: pymes-dev-352318:us-central1:pymes-dev-db
+  FIREBASE_HOSTING_SITE_ID: pymes-dev-352318
+  WIF_PROVIDER: ${{ vars.PYMES_STG_WIF_PROVIDER || 'projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider' }}
+  WIF_SERVICE_ACCOUNT: pymes-github-actions-stg@pymes-dev-352318.iam.gserviceaccount.com
+  CORE_RUNTIME_SERVICE_ACCOUNT: pymes-core-runtime-stg@pymes-dev-352318.iam.gserviceaccount.com
+  VERTICAL_RUNTIME_SERVICE_ACCOUNT: pymes-vertical-runtime-stg@pymes-dev-352318.iam.gserviceaccount.com
+  PREVIEW_DB_PASSWORD_SECRET_NAME: pymes-preview-app-password
+  SQL_ADMIN_USER: nonprd_sql_admin
+  SQL_ADMIN_PASSWORD_SECRET_NAME: nonprd-sql-admin-password
+  INTERNAL_SERVICE_TOKEN_SECRET_NAME: pymes-internal-service-token-stg
+  CLERK_SECRET_KEY_SECRET_NAME: pymes-clerk-secret-key-stg
+  GOVERNANCE_API_KEY_SECRET_NAME: pymes-governance-api-key-stg
+  COMPANION_API_KEY_SECRET_NAME: pymes-companion-api-key-stg
+  COMPANION_INTERNAL_JWT_SECRET_NAME: pymes-companion-internal-jwt-secret-stg
+  GOVERNANCE_URL: https://axis-nexus-7laivodnma-uc.a.run.app
+  COMPANION_INTERNAL_URL: https://axis-companion-7laivodnma-uc.a.run.app
+  COMPANION_INTERNAL_JWT_ISSUER: axis-bff
+  COMPANION_INTERNAL_JWT_AUDIENCE: companion
+  JWKS_URL: ${{ vars.PYMES_STG_JWKS_URL }}
+  JWT_ISSUER: ${{ vars.PYMES_STG_JWT_ISSUER }}
+  FRONTEND_CLERK_PUBLISHABLE_KEY: ${{ vars.PYMES_STG_CLERK_PUBLISHABLE_KEY }}
+  FIREBASE_TOOLS_VERSION: "13"
+
+concurrency:
+  group: pymes-preview-deploy-${{ inputs.pr_number || github.event.inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: preview
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: core
+            path: core/backend
+            dockerfile: Dockerfile.prod
+            image: core
+            service: pymes-core
+            runtime: core
+            healthcheck: /readyz
+          - id: workshops
+            path: workshops/backend
+            dockerfile: Dockerfile.prod
+            image: pymes-workshops
+            service: pymes-workshops
+            runtime: vertical
+            healthcheck: /readyz
+          - id: professionals
+            path: professionals/backend
+            dockerfile: Dockerfile.prod
+            image: pymes-professionals
+            service: pymes-professionals
+            runtime: vertical
+            healthcheck: /readyz
+          - id: beauty
+            path: beauty/backend
+            dockerfile: Dockerfile.prod
+            image: pymes-beauty
+            service: pymes-beauty
+            runtime: vertical
+            healthcheck: /readyz
+          - id: restaurants
+            path: restaurants/backend
+            dockerfile: Dockerfile.prod
+            image: pymes-restaurants
+            service: pymes-restaurants
+            runtime: vertical
+            healthcheck: /readyz
+          - id: medical
+            path: medical/backend
+            dockerfile: Dockerfile.prod
+            image: pymes-medical
+            service: pymes-medical
+            runtime: vertical
+            healthcheck: /readyz
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.event.inputs.ref }}
+      - name: Decide product
+        id: product
+        run: |
+          set -euo pipefail
+          product="${{ inputs.product || github.event.inputs.product || 'all' }}"
+          include=false
+          case "$product:${{ matrix.id }}" in
+            all:*|core:core|verticals:workshops|verticals:professionals|verticals:beauty|verticals:restaurants|verticals:medical|workshops:workshops|professionals:professionals|beauty:beauty|restaurants:restaurants|medical:medical) include=true ;;
+          esac
+          echo "include=$include" >> "$GITHUB_OUTPUT"
+      - uses: google-github-actions/auth@v2
+        if: steps.product.outputs.include == 'true'
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+        if: steps.product.outputs.include == 'true'
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+      - name: Configure Docker auth
+        if: steps.product.outputs.include == 'true'
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+      - name: Prepare preview DB secret
+        if: steps.product.outputs.include == 'true' && matrix.id == 'core'
+        run: |
+          set -euo pipefail
+          pr="${{ inputs.pr_number || github.event.inputs.pr_number }}"
+          db_name="pymes_preview_pr_${pr}"
+          secret_name="pymes-database-url-pr-${pr}"
+          password="$(gcloud secrets versions access latest --secret="$PREVIEW_DB_PASSWORD_SECRET_NAME" --project="$GCP_PROJECT_ID")"
+          password_encoded="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$password")"
+          gcloud sql databases create "$db_name" --instance=pymes-dev-db --project=pymes-dev-352318 >/dev/null 2>&1 || true
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          curl -fsSL -o /tmp/cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.18.3/cloud-sql-proxy.linux.amd64
+          chmod +x /tmp/cloud-sql-proxy
+          /tmp/cloud-sql-proxy --address 127.0.0.1 --port 15434 "$CLOUDSQL_INSTANCE" &
+          proxy_pid=$!
+          cleanup() { kill "$proxy_pid" 2>/dev/null || true; wait "$proxy_pid" 2>/dev/null || true; }
+          trap cleanup EXIT
+          sleep 2
+          admin_password="$(gcloud secrets versions access latest --secret="$SQL_ADMIN_PASSWORD_SECRET_NAME" --project=pymes-dev-352318)"
+          PGPASSWORD="$admin_password" psql -h 127.0.0.1 -p 15434 -U "$SQL_ADMIN_USER" -d "$db_name" -v ON_ERROR_STOP=1 <<SQL
+          GRANT ALL PRIVILEGES ON DATABASE ${db_name} TO pymes_preview_app;
+          GRANT USAGE, CREATE ON SCHEMA public TO pymes_preview_app;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO pymes_preview_app;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO pymes_preview_app;
+          SQL
+          db_url="postgres://pymes_preview_app:${password_encoded}@/${db_name}?host=/cloudsql/${CLOUDSQL_INSTANCE}"
+          if gcloud secrets describe "$secret_name" --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
+            printf '%s' "$db_url" | gcloud secrets versions add "$secret_name" --data-file=- --project="$GCP_PROJECT_ID"
+          else
+            printf '%s' "$db_url" | gcloud secrets create "$secret_name" --replication-policy=automatic --data-file=- --project="$GCP_PROJECT_ID"
+          fi
+      - name: Stage build context
+        if: steps.product.outputs.include == 'true'
+        run: |
+          set -euo pipefail
+          build_root="${RUNNER_TEMP}/pymes-preview-${{ matrix.id }}-build"
+          rm -rf "$build_root"
+          mkdir -p "$build_root/pymes"
+          rsync -a --exclude '.git/' --exclude 'node_modules/' --exclude 'ui/node_modules/' --exclude 'ai/.venv/' ./ "$build_root/pymes/"
+          echo "BUILD_ROOT=$build_root" >> "$GITHUB_ENV"
+          echo "DEPLOY_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Build and push image
+        if: steps.product.outputs.include == 'true'
+        run: |
+          set -euo pipefail
+          pr="${{ inputs.pr_number || github.event.inputs.pr_number }}"
+          image_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY}/${{ matrix.image }}:pr-${pr}-${DEPLOY_SHA}"
+          docker build -f "${BUILD_ROOT}/pymes/${{ matrix.path }}/${{ matrix.dockerfile }}" -t "$image_uri" "$BUILD_ROOT"
+          docker push "$image_uri"
+          echo "IMAGE_URI=$image_uri" >> "$GITHUB_ENV"
+      - name: Resolve core URL
+        if: steps.product.outputs.include == 'true' && matrix.id != 'core'
+        run: |
+          set -euo pipefail
+          pr="${{ inputs.pr_number || github.event.inputs.pr_number }}"
+          core_url=""
+          for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            core_url="$(gcloud run services describe "pymes-core-pr-${pr}" --project="$GCP_PROJECT_ID" --region="$GCP_REGION" --format='value(status.url)' 2>/dev/null || true)"
+            [[ -n "$core_url" ]] && break
+            sleep 10
+          done
+          if [[ -z "$core_url" ]]; then
+            echo "::error::No se pudo resolver pymes-core-pr-${pr}; desplegá core primero o usá product=all."
+            exit 1
+          fi
+          echo "PYMES_CORE_URL=$core_url" >> "$GITHUB_ENV"
+      - name: Deploy preview service
+        if: steps.product.outputs.include == 'true'
+        run: |
+          set -euo pipefail
+          pr="${{ inputs.pr_number || github.event.inputs.pr_number }}"
+          service="${{ matrix.service }}-pr-${pr}"
+          db_secret="pymes-database-url-pr-${pr}"
+          frontend_url="https://${FIREBASE_HOSTING_SITE_ID}--pr-${pr}.web.app"
+          secret_flags="DATABASE_URL=${db_secret}:latest,INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN_SECRET_NAME}:latest"
+          env_vars="ENVIRONMENT=preview,PREVIEW_PR=${pr},AUTH_ENABLE_JWT=true,AUTH_ALLOW_API_KEY=true,FRONTEND_URL=${frontend_url}"
+          runtime_sa="$VERTICAL_RUNTIME_SERVICE_ACCOUNT"
+          if [[ "${{ matrix.id }}" == "core" ]]; then
+            runtime_sa="$CORE_RUNTIME_SERVICE_ACCOUNT"
+            secret_flags="${secret_flags},CLERK_SECRET_KEY=${CLERK_SECRET_KEY_SECRET_NAME}:latest,GOVERNANCE_API_KEY=${GOVERNANCE_API_KEY_SECRET_NAME}:latest,COMPANION_API_KEY=${COMPANION_API_KEY_SECRET_NAME}:latest,COMPANION_INTERNAL_JWT_SECRET=${COMPANION_INTERNAL_JWT_SECRET_NAME}:latest"
+            env_vars="${env_vars},NOTIFICATION_BACKEND=noop,GOVERNANCE_URL=${GOVERNANCE_URL},COMPANION_INTERNAL_URL=${COMPANION_INTERNAL_URL},COMPANION_INTERNAL_JWT_ISSUER=${COMPANION_INTERNAL_JWT_ISSUER},COMPANION_INTERNAL_JWT_AUDIENCE=${COMPANION_INTERNAL_JWT_AUDIENCE}"
+          else
+            env_vars="${env_vars},PYMES_CORE_URL=${PYMES_CORE_URL}"
+          fi
+          [[ -n "${JWKS_URL}" ]] && env_vars="${env_vars},JWKS_URL=${JWKS_URL}"
+          [[ -n "${JWT_ISSUER}" ]] && env_vars="${env_vars},JWT_ISSUER=${JWT_ISSUER}"
+          gcloud run deploy "$service" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --image="$IMAGE_URI" \
+            --service-account="$runtime_sa" \
+            --add-cloudsql-instances="$CLOUDSQL_INSTANCE" \
+            --allow-unauthenticated \
+            --port=8080 \
+            --memory=512Mi \
+            --cpu=1 \
+            --min-instances=0 \
+            --max-instances=1 \
+            --timeout=300 \
+            --labels="app=pymes,environment=preview,preview-pr=${pr},component=${{ matrix.id }}" \
+            --set-env-vars="$env_vars" \
+            --update-secrets="$secret_flags"
+      - name: Smoke preview service
+        if: steps.product.outputs.include == 'true'
+        run: |
+          set -euo pipefail
+          pr="${{ inputs.pr_number || github.event.inputs.pr_number }}"
+          service_url="$(gcloud run services describe "${{ matrix.service }}-pr-${pr}" --project="$GCP_PROJECT_ID" --region="$GCP_REGION" --format='value(status.url)')"
+          for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            curl -fsS "${service_url}${{ matrix.healthcheck }}" | grep -q '"status":"ready"' && exit 0
+            sleep 10
+          done
+          echo "::error::${{ matrix.service }}-pr-${pr}${{ matrix.healthcheck }} no respondió ready."
+          exit 1
+
+  ui:
+    if: ${{ inputs.product == 'all' || inputs.product == 'ui' || github.event.inputs.product == 'all' || github.event.inputs.product == 'ui' || github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    needs: deploy
+    environment: preview
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.event.inputs.ref }}
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Build UI
+        run: |
+          set -euo pipefail
+          cd ui
+          npm ci
+          VITE_API_URL="/" \
+          VITE_COMPANION_BASE_URL="/" \
+          VITE_WORKSHOPS_API_URL="/" \
+          VITE_PROFESSIONALS_API_URL="/" \
+          VITE_BEAUTY_API_URL="/" \
+          VITE_RESTAURANTS_API_URL="/" \
+          VITE_MEDICAL_API_URL="/" \
+          VITE_CLERK_PUBLISHABLE_KEY="${FRONTEND_CLERK_PUBLISHABLE_KEY}" \
+          npm run build
+      - name: Write Firebase target config
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          project = os.environ["GCP_PROJECT_ID"]
+          site = os.environ["FIREBASE_HOSTING_SITE_ID"]
+          data = {"projects": {"default": project}, "targets": {project: {"hosting": {"default": [site]}}}}
+          open(".firebaserc", "w", encoding="utf-8").write(json.dumps(data, indent=2) + "\n")
+          PY
+      - name: Deploy UI preview channel
+        run: |
+          set -euo pipefail
+          pr="${{ inputs.pr_number || github.event.inputs.pr_number }}"
+          python3 - "$pr" <<'PY'
+          import json
+          import os
+          import sys
+
+          pr = sys.argv[1]
+          with open("firebase.generated.json", "r", encoding="utf-8") as fh:
+              config = json.load(fh)
+          config.setdefault("hosting", {})["site"] = os.environ["FIREBASE_HOSTING_SITE_ID"]
+          for rewrite in config.get("hosting", {}).get("rewrites", []):
+              run = rewrite.get("run")
+              if run and run.get("serviceId", "").startswith("pymes-"):
+                  run["serviceId"] = f"{run['serviceId']}-pr-{pr}"
+          with open("firebase.preview.generated.json", "w", encoding="utf-8") as fh:
+              json.dump(config, fh, indent=2)
+              fh.write("\n")
+          PY
+          npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" hosting:channel:deploy "pr-${pr}" \
+            --project "$GCP_PROJECT_ID" \
+            --config firebase.preview.generated.json \
+            --expires 14d \
+            --non-interactive

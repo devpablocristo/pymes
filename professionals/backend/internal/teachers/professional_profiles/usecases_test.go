@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 )
 
 // --- fakes ---
@@ -66,6 +67,38 @@ func (f *fakeRepo) Update(_ context.Context, in domain.ProfessionalProfile) (dom
 	return in, nil
 }
 
+func (f *fakeRepo) Archive(_ context.Context, orgID, id uuid.UUID) error {
+	p, ok := f.profiles[id]
+	if !ok || p.OrgID != orgID {
+		return gorm.ErrRecordNotFound
+	}
+	if p.DeletedAt == nil {
+		now := time.Now().UTC()
+		p.DeletedAt = &now
+		f.profiles[id] = p
+	}
+	return nil
+}
+
+func (f *fakeRepo) Restore(_ context.Context, orgID, id uuid.UUID) error {
+	p, ok := f.profiles[id]
+	if !ok || p.OrgID != orgID {
+		return gorm.ErrRecordNotFound
+	}
+	p.DeletedAt = nil
+	f.profiles[id] = p
+	return nil
+}
+
+func (f *fakeRepo) Delete(_ context.Context, orgID, id uuid.UUID) error {
+	p, ok := f.profiles[id]
+	if !ok || p.OrgID != orgID || p.DeletedAt == nil {
+		return gorm.ErrRecordNotFound
+	}
+	delete(f.profiles, id)
+	return nil
+}
+
 func (f *fakeRepo) ListPublic(_ context.Context, orgID uuid.UUID) ([]domain.ProfessionalProfile, error) {
 	var out []domain.ProfessionalProfile
 	for _, p := range f.profiles {
@@ -92,7 +125,7 @@ func TestCreate_HappyPath(t *testing.T) {
 	orgID := uuid.New()
 	partyID := uuid.New()
 	out, err := uc.Create(context.Background(), domain.ProfessionalProfile{
-		OrgID:    orgID,
+		OrgID: orgID,
 		PartyID:  partyID,
 		Headline: "Dr. García",
 	}, "tester")
@@ -135,7 +168,7 @@ func TestCreate_DuplicateSlug(t *testing.T) {
 	uc := NewUsecases(repo, nil)
 
 	_, err := uc.Create(context.Background(), domain.ProfessionalProfile{
-		OrgID:      uuid.New(),
+		OrgID:   uuid.New(),
 		PartyID:    uuid.New(),
 		PublicSlug: "duplicated",
 	}, "tester")
@@ -169,8 +202,8 @@ func TestGetByID_HappyPath(t *testing.T) {
 
 	orgID := uuid.New()
 	created, err := uc.Create(context.Background(), domain.ProfessionalProfile{
-		OrgID:   orgID,
-		PartyID: uuid.New(),
+		OrgID: orgID,
+		PartyID:  uuid.New(),
 	}, "tester")
 	if err != nil {
 		t.Fatalf("setup: %v", err)
@@ -193,7 +226,7 @@ func TestUpdate_HappyPath(t *testing.T) {
 
 	orgID := uuid.New()
 	created, err := uc.Create(context.Background(), domain.ProfessionalProfile{
-		OrgID:    orgID,
+		OrgID: orgID,
 		PartyID:  uuid.New(),
 		Headline: "Original",
 	}, "tester")
@@ -235,7 +268,7 @@ func TestGetBySlug_NotPublic(t *testing.T) {
 
 	orgID := uuid.New()
 	created, err := uc.Create(context.Background(), domain.ProfessionalProfile{
-		OrgID:      orgID,
+		OrgID:   orgID,
 		PartyID:    uuid.New(),
 		PublicSlug: "private-prof",
 		IsPublic:   false,
@@ -261,7 +294,7 @@ func TestGetBySlug_HappyPath(t *testing.T) {
 
 	orgID := uuid.New()
 	_, err := uc.Create(context.Background(), domain.ProfessionalProfile{
-		OrgID:      orgID,
+		OrgID:   orgID,
 		PartyID:    uuid.New(),
 		PublicSlug: "dr-garcia",
 		IsPublic:   true,
@@ -287,7 +320,7 @@ func TestListPublic(t *testing.T) {
 	orgID := uuid.New()
 	// Crear uno público y uno privado
 	_, err := uc.Create(context.Background(), domain.ProfessionalProfile{
-		OrgID:      orgID,
+		OrgID:   orgID,
 		PartyID:    uuid.New(),
 		PublicSlug: "public-one",
 		IsPublic:   true,
@@ -298,7 +331,7 @@ func TestListPublic(t *testing.T) {
 
 	repo.slugExists = false
 	_, err = uc.Create(context.Background(), domain.ProfessionalProfile{
-		OrgID:      orgID,
+		OrgID:   orgID,
 		PartyID:    uuid.New(),
 		PublicSlug: "private-one",
 		IsPublic:   false,

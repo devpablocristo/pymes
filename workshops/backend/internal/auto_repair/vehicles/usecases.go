@@ -1,24 +1,25 @@
 package vehicles
 
 import (
-	"errors"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/core/shared/backend/vertvalues"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles/usecases/domain"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
 )
 
 type ListParams struct {
-	OrgID  uuid.UUID
-	Limit  int
-	After  *uuid.UUID
-	Search string
+	OrgID uuid.UUID
+	Limit    int
+	After    *uuid.UUID
+	Search   string
 }
 
 type UpdateInput struct {
@@ -32,6 +33,8 @@ type UpdateInput struct {
 	Kilometers   *int
 	Color        *string
 	Notes        *string
+	IsFavorite   *bool
+	Tags         *[]string
 }
 
 type RepositoryPort interface {
@@ -108,8 +111,8 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		}
 		return domain.Vehicle{}, err
 	}
-	if current.ArchivedAt != nil {
-		return domain.Vehicle{}, fmt.Errorf("vehicle is archived: %w", httperrors.ErrBadInput)
+	if err := archive.IfArchived(current.ArchivedAt, "vehicle"); err != nil {
+		return domain.Vehicle{}, err
 	}
 	if in.CustomerID != nil {
 		current.CustomerID = vertvalues.ParseOptionalUUID(*in.CustomerID)
@@ -140,6 +143,12 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	if in.Notes != nil {
 		current.Notes = strings.TrimSpace(*in.Notes)
+	}
+	if in.IsFavorite != nil {
+		current.IsFavorite = *in.IsFavorite
+	}
+	if in.Tags != nil {
+		current.Tags = *in.Tags
 	}
 	if err := u.enrichCustomer(ctx, &current); err != nil {
 		return domain.Vehicle{}, err

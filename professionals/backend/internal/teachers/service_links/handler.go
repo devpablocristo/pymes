@@ -10,9 +10,9 @@ import (
 
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/handler/dto"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/usecases/domain"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
+	"github.com/devpablocristo/pymes/core/shared/backend/auth"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalgin"
 )
 
 type usecasesPort interface {
@@ -32,7 +32,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, profileID, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, profileID, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -50,13 +50,13 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Replace(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, profileID, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, profileID, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
 	var req dto.ReplaceServiceLinksRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	inputs := req.Links
@@ -64,14 +64,14 @@ func (h *Handler) Replace(c *gin.Context) {
 		inputs = req.Items
 	}
 	if inputs == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "links or items is required"})
+		verticalgin.WriteValidation(c, "links or items is required")
 		return
 	}
 	links := make([]domain.ServiceLink, 0, len(inputs))
 	for _, l := range inputs {
 		serviceID, err := uuid.Parse(l.ServiceID)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service_id: " + l.ServiceID})
+			verticalgin.WriteValidation(c, "invalid service_id: "+l.ServiceID)
 			return
 		}
 		meta := l.Metadata
@@ -101,7 +101,7 @@ func (h *Handler) Replace(c *gin.Context) {
 func toServiceLinkItem(in domain.ServiceLink) dto.ServiceLinkItem {
 	item := dto.ServiceLinkItem{
 		ID:                in.ID.String(),
-		OrgID:             in.OrgID.String(),
+		OrgID:          in.OrgID.String(),
 		ProfileID:         in.ProfileID.String(),
 		ServiceID:         in.ServiceID.String(),
 		PublicDescription: in.PublicDescription,

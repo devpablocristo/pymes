@@ -1,0 +1,5 @@
+.crud-resource-shell-header .page-header.crud-page-shell__header .crud-page-shell__header-actions input[type='search'],
+.crud-resource-shell-header .page-header.crud-page-shell__header .crud-page-shell__header-actions .m-kanban__search {
+  max-width: min(30rem, 100%);
+  box-sizing: border-box;
+}

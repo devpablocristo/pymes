@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Convierte un dump SQL de WooCommerce (WordPress) a CSV compatible con
-el importador de productos de pymes-core (/v1/data-io/import/products).
+el importador de productos de core (/v1/data-io/import/products).
 
 Uso:
     python3 -u scripts/woocommerce_to_pymes_csv.py ~/Downloads/startlap_wp_qbduv.sql -o startlap_productos.csv

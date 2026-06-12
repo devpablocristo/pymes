@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalconfig"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalconfig"
 )
 
 type Config = verticalconfig.Config

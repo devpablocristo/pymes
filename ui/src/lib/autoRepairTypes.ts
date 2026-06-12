@@ -1,0 +1,22 @@
+export type AutoRepairVehicle = {
+  id: string;
+  org_id: string;
+  customer_id?: string;
+  customer_name: string;
+  license_plate: string;
+  vin: string;
+  make: string;
+  model: string;
+  year: number;
+  kilometers: number;
+  color: string;
+  notes: string;
+  is_favorite?: boolean;
+  tags?: string[];
+  archived_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// Nombre neutro usado por resourceConfigs.workshops.tsx.
+export type WorkshopVehicle = AutoRepairVehicle;

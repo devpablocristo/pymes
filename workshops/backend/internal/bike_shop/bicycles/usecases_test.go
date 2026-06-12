@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles/usecases/domain"
 )
 
@@ -101,7 +101,7 @@ func TestCreateAutofillsCustomerNameFromPymesCore(t *testing.T) {
 	customerID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 
 	out, err := uc.Create(context.Background(), domain.Bicycle{
-		OrgID:       orgID,
+		OrgID:    orgID,
 		CustomerID:  &customerID,
 		FrameNumber: " bike-123 ",
 		Brand:       "Trek",
@@ -130,7 +130,7 @@ func TestCreateRejectsInvalidCustomerReference(t *testing.T) {
 	customerID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 
 	_, err := uc.Create(context.Background(), domain.Bicycle{
-		OrgID:       orgID,
+		OrgID:    orgID,
 		CustomerID:  &customerID,
 		FrameNumber: "BIKE-123",
 		Brand:       "Specialized",

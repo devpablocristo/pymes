@@ -3,9 +3,9 @@ package pymescore
 import (
 	"context"
 
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescoreops"
+	"github.com/devpablocristo/pymes/core/shared/backend/pymescoreops"
 )
 
-func (c *Client) GetProduct(ctx context.Context, orgID, productID string) (map[string]any, error) {
-	return pymescoreops.GetProduct(ctx, c.Client, orgID, productID)
+func (c *Client) GetProduct(ctx context.Context, tenantID, productID string) (map[string]any, error) {
+	return pymescoreops.GetProduct(ctx, c.Client, tenantID, productID)
 }

@@ -1,4 +1,4 @@
-// Package orchestration exposes HTTP bridges from professionals to pymes-core workflows.
+// Package orchestration exposes HTTP bridges from professionals to core workflows.
 package orchestration
 
 import (
@@ -8,8 +8,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/core/shared/backend/auth"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalgin"
 )
 
 type usecasesPort interface {
@@ -72,7 +73,7 @@ func (h *Handler) CreateQuote(c *gin.Context) {
 func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
 	saleID := strings.TrimSpace(c.Param("sale_id"))
 	if saleID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "sale_id is required"})
+		verticalgin.WriteValidation(c, "sale_id is required")
 		return
 	}
 	out, err := h.uc.CreateSalePaymentLink(c.Request.Context(), auth.GetAuthContext(c).OrgID, saleID)
@@ -86,7 +87,7 @@ func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
 func bindJSONMap(c *gin.Context) (map[string]any, bool) {
 	var payload map[string]any
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return nil, false
 	}
 	if payload == nil {

@@ -1,4 +1,4 @@
-// Package public exposes public professionals routes and bridges to pymes-core where needed.
+// Package public exposes public professionals routes and bridges to core where needed.
 package public
 
 import (
@@ -14,7 +14,8 @@ import (
 	corepublic "github.com/devpablocristo/pymes/professionals/backend/internal/shared/pymescore"
 	profdomain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/usecases/domain"
 	sldomain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalgin"
 )
 
 type profilePort interface {
@@ -23,76 +24,76 @@ type profilePort interface {
 }
 
 type serviceLinkPort interface {
-	ListByOrg(ctx context.Context, orgID uuid.UUID) ([]sldomain.ServiceLink, error)
+	ListByTenant(ctx context.Context, orgID uuid.UUID) ([]sldomain.ServiceLink, error)
 }
 
 type bookingPort interface {
-	GetAvailability(ctx context.Context, orgRef string, params corepublic.AvailabilityParams) (map[string]any, error)
-	BookScheduling(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error)
+	GetAvailability(ctx context.Context, tenantRef string, params corepublic.AvailabilityParams) (map[string]any, error)
+	BookScheduling(ctx context.Context, tenantRef string, payload map[string]any) (map[string]any, error)
 }
 
-type orgResolver interface {
-	ResolveOrgID(ctx context.Context, orgSlug string) (uuid.UUID, error)
+type tenantResolver interface {
+	ResolveOrgID(ctx context.Context, tenantSlug string) (uuid.UUID, error)
 }
 
 type Handler struct {
 	profiles     profilePort
 	serviceLinks serviceLinkPort
 	bookings     bookingPort
-	orgs         orgResolver
+	tenants      tenantResolver
 }
 
-func NewHandler(profiles profilePort, serviceLinks serviceLinkPort, bookings bookingPort, orgs orgResolver) *Handler {
+func NewHandler(profiles profilePort, serviceLinks serviceLinkPort, bookings bookingPort, tenants tenantResolver) *Handler {
 	return &Handler{
 		profiles:     profiles,
 		serviceLinks: serviceLinks,
 		bookings:     bookings,
-		orgs:         orgs,
+		tenants:      tenants,
 	}
 }
 
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
-	group.GET("/public/:org_slug/teachers", h.ListProfessionals)
-	group.GET("/public/:org_slug/teachers/:slug", h.GetProfessional)
-	group.GET("/public/:org_slug/teachers/catalog", h.ListCatalog)
-	group.GET("/public/:org_slug/teachers/availability", h.GetAvailability)
-	group.POST("/public/:org_slug/teachers/bookings", h.BookScheduling)
+	group.GET("/public/:tenant_slug/teachers", h.ListProfessionals)
+	group.GET("/public/:tenant_slug/teachers/:slug", h.GetProfessional)
+	group.GET("/public/:tenant_slug/teachers/catalog", h.ListCatalog)
+	group.GET("/public/:tenant_slug/teachers/availability", h.GetAvailability)
+	group.POST("/public/:tenant_slug/teachers/bookings", h.BookScheduling)
 
-	group.GET("/public/:org_slug/professionals", h.ListProfessionals)
-	group.GET("/public/:org_slug/professionals/:slug", h.GetProfessional)
-	group.GET("/public/:org_slug/catalog", h.ListCatalog)
-	group.GET("/public/:org_slug/availability", h.GetAvailability)
-	group.POST("/public/:org_slug/bookings", h.BookScheduling)
+	group.GET("/public/:tenant_slug/professionals", h.ListProfessionals)
+	group.GET("/public/:tenant_slug/professionals/:slug", h.GetProfessional)
+	group.GET("/public/:tenant_slug/catalog", h.ListCatalog)
+	group.GET("/public/:tenant_slug/availability", h.GetAvailability)
+	group.POST("/public/:tenant_slug/bookings", h.BookScheduling)
 }
 
-func (h *Handler) resolveOrgID(c *gin.Context) (uuid.UUID, bool) {
-	orgSlug := strings.TrimSpace(c.Param("org_slug"))
-	if orgSlug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "org_slug is required"})
+func (h *Handler) resolveTenantID(c *gin.Context) (uuid.UUID, bool) {
+	tenantSlug := strings.TrimSpace(c.Param("tenant_slug"))
+	if tenantSlug == "" {
+		verticalgin.WriteValidation(c, "tenant_slug is required")
 		return uuid.Nil, false
 	}
 
-	// Try parsing as UUID first for backward compatibility
-	if orgID, err := uuid.Parse(orgSlug); err == nil {
+	// Try parsing as UUID first; public routes also accept the stable slug form.
+	if orgID, err := uuid.Parse(tenantSlug); err == nil {
 		return orgID, true
 	}
 
-	// Then try slug resolution via pymes-core
-	if h.orgs != nil {
-		orgID, err := h.orgs.ResolveOrgID(c.Request.Context(), orgSlug)
+	// Then try slug resolution via core
+	if h.tenants != nil {
+		orgID, err := h.tenants.ResolveOrgID(c.Request.Context(), tenantSlug)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "organization not found"})
+			verticalgin.WriteError(c, http.StatusNotFound, "NOT_FOUND", "tenant not found")
 			return uuid.Nil, false
 		}
 		return orgID, true
 	}
 
-	c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org identifier"})
+	verticalgin.WriteValidation(c, "invalid tenant identifier")
 	return uuid.Nil, false
 }
 
 func (h *Handler) ListProfessionals(c *gin.Context) {
-	orgID, ok := h.resolveOrgID(c)
+	orgID, ok := h.resolveTenantID(c)
 	if !ok {
 		return
 	}
@@ -105,17 +106,17 @@ func (h *Handler) ListProfessionals(c *gin.Context) {
 	for _, p := range profiles {
 		items = append(items, publicProfileMap(p))
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	verticalgin.WriteListResponse(c, items, int64(len(items)), false, "")
 }
 
 func (h *Handler) GetProfessional(c *gin.Context) {
-	orgID, ok := h.resolveOrgID(c)
+	orgID, ok := h.resolveTenantID(c)
 	if !ok {
 		return
 	}
 	slug := strings.TrimSpace(c.Param("slug"))
 	if slug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "slug is required"})
+		verticalgin.WriteValidation(c, "slug is required")
 		return
 	}
 	profile, err := h.profiles.GetBySlug(c.Request.Context(), orgID, slug)
@@ -127,11 +128,11 @@ func (h *Handler) GetProfessional(c *gin.Context) {
 }
 
 func (h *Handler) ListCatalog(c *gin.Context) {
-	orgID, ok := h.resolveOrgID(c)
+	orgID, ok := h.resolveTenantID(c)
 	if !ok {
 		return
 	}
-	links, err := h.serviceLinks.ListByOrg(c.Request.Context(), orgID)
+	links, err := h.serviceLinks.ListByTenant(c.Request.Context(), orgID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -149,29 +150,29 @@ func (h *Handler) ListCatalog(c *gin.Context) {
 		}
 		items = append(items, item)
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	verticalgin.WriteListResponse(c, items, int64(len(items)), false, "")
 }
 
 func (h *Handler) GetAvailability(c *gin.Context) {
 	if h.bookings == nil {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "availability not configured"})
+		verticalgin.WriteError(c, http.StatusNotImplemented, "UPSTREAM_UNAVAILABLE", "availability not configured")
 		return
 	}
-	orgSlug := strings.TrimSpace(c.Param("org_slug"))
-	if orgSlug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "org_slug is required"})
+	tenantSlug := strings.TrimSpace(c.Param("tenant_slug"))
+	if tenantSlug == "" {
+		verticalgin.WriteValidation(c, "tenant_slug is required")
 		return
 	}
 	duration := 0
 	if raw := strings.TrimSpace(c.Query("duration")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "duration must be an integer"})
+			verticalgin.WriteValidation(c, "duration must be an integer")
 			return
 		}
 		duration = parsed
 	}
-	out, err := h.bookings.GetAvailability(c.Request.Context(), orgSlug, corepublic.AvailabilityParams{
+	out, err := h.bookings.GetAvailability(c.Request.Context(), tenantSlug, corepublic.AvailabilityParams{
 		Date:       strings.TrimSpace(c.Query("date")),
 		Duration:   duration,
 		BranchID:   strings.TrimSpace(c.Query("branch_id")),
@@ -187,23 +188,23 @@ func (h *Handler) GetAvailability(c *gin.Context) {
 
 func (h *Handler) BookScheduling(c *gin.Context) {
 	if h.bookings == nil {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "booking not configured"})
+		verticalgin.WriteError(c, http.StatusNotImplemented, "UPSTREAM_UNAVAILABLE", "booking not configured")
 		return
 	}
-	orgSlug := strings.TrimSpace(c.Param("org_slug"))
-	if orgSlug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "org_slug is required"})
+	tenantSlug := strings.TrimSpace(c.Param("tenant_slug"))
+	if tenantSlug == "" {
+		verticalgin.WriteValidation(c, "tenant_slug is required")
 		return
 	}
 	var payload map[string]any
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	if payload == nil {
 		payload = map[string]any{}
 	}
-	out, err := h.bookings.BookScheduling(c.Request.Context(), orgSlug, payload)
+	out, err := h.bookings.BookScheduling(c.Request.Context(), tenantSlug, payload)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

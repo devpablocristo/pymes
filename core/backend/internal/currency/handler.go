@@ -1,0 +1,85 @@
+package currency
+
+import (
+	"context"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/devpablocristo/platform/http/go/pagination"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
+	"github.com/devpablocristo/pymes/core/backend/internal/currency/handler/dto"
+	currencydomain "github.com/devpablocristo/pymes/core/backend/internal/currency/usecases/domain"
+	"github.com/devpablocristo/pymes/core/backend/internal/shared/handlers"
+	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
+)
+
+type usecasesPort interface {
+	ListLatest(ctx context.Context, orgID uuid.UUID, fromCurrency, toCurrency string, limit int) ([]currencydomain.ExchangeRate, error)
+	Upsert(ctx context.Context, in currencydomain.ExchangeRate) (currencydomain.ExchangeRate, error)
+}
+
+type Handler struct{ uc usecasesPort }
+
+func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
+
+func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
+	auth.GET("/exchange-rates", rbac.RequirePermission("currency", "read"), h.List)
+	auth.POST("/exchange-rates", rbac.RequirePermission("currency", "update"), h.Upsert)
+}
+
+func (h *Handler) List(c *gin.Context) {
+	authCtx := handlers.GetAuthContext(c)
+	orgID, err := uuid.Parse(authCtx.OrgID)
+	if err != nil {
+		handlers.WriteValidation(c, "invalid tenant")
+		return
+	}
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	items, err := h.uc.ListLatest(c.Request.Context(), orgID, strings.TrimSpace(c.Query("from_currency")), strings.TrimSpace(c.Query("to_currency")), limit)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+func (h *Handler) Upsert(c *gin.Context) {
+	authCtx := handlers.GetAuthContext(c)
+	orgID, err := uuid.Parse(authCtx.OrgID)
+	if err != nil {
+		handlers.WriteValidation(c, "invalid tenant")
+		return
+	}
+	var req dto.CreateExchangeRateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handlers.WriteValidation(c, "invalid request body")
+		return
+	}
+	rateDate := time.Now().UTC()
+	if strings.TrimSpace(req.RateDate) != "" {
+		parsed, err := time.Parse("2006-01-02", strings.TrimSpace(req.RateDate))
+		if err != nil {
+			handlers.WriteValidation(c, "invalid rate_date")
+			return
+		}
+		rateDate = parsed.UTC()
+	}
+	out, err := h.uc.Upsert(c.Request.Context(), currencydomain.ExchangeRate{
+		OrgID:     orgID,
+		FromCurrency: strings.ToUpper(strings.TrimSpace(req.FromCurrency)),
+		ToCurrency:   strings.ToUpper(strings.TrimSpace(req.ToCurrency)),
+		RateType:     strings.ToLower(strings.TrimSpace(req.RateType)),
+		BuyRate:      req.BuyRate,
+		SellRate:     req.SellRate,
+		Source:       strings.ToLower(strings.TrimSpace(req.Source)),
+		RateDate:     rateDate,
+	})
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, out)
+}

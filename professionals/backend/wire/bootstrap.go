@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/pymescore"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes"
@@ -22,11 +22,11 @@ import (
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/sessions"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties"
 	"github.com/devpablocristo/pymes/professionals/backend/migrations"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalaudit"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalwire"
+	"github.com/devpablocristo/pymes/core/shared/backend/app"
+	"github.com/devpablocristo/pymes/core/shared/backend/auth"
+	"github.com/devpablocristo/pymes/core/shared/backend/store"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalaudit"
+	"github.com/devpablocristo/pymes/core/shared/backend/verticalwire"
 )
 
 func InitializeApp() *app.App {
@@ -48,6 +48,10 @@ func InitializeApp() *app.App {
 	// Auth middleware shared with the other Go backends.
 	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpClient.Client)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
+	tenantSlugBinding := auth.RequireTenantSlugBinding(
+		verticalwire.NewCoreTenantRefResolver(cpClient.Client),
+		verticalwire.NewTenantMembershipResolver(db),
+	)
 
 	// Audit logger (lightweight, log-only implementation)
 	auditLog := verticalaudit.NewLogger(logger)
@@ -79,7 +83,10 @@ func InitializeApp() *app.App {
 	// Router
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(ginmw.NewCORS(ginmw.CORSConfig{Origins: []string{"http://localhost:5174", "http://localhost:5181", cfg.FrontendURL}}))
+	router.Use(ginmw.NewCORS(ginmw.CORSConfig{
+		Origins:      []string{"http://localhost:5174", "http://localhost:5181", cfg.FrontendURL},
+		AllowHeaders: []string{auth.TenantSlugHeader},
+	}))
 	ginmw.RegisterHealthEndpoints(router, func(ctx context.Context) error { return store.Ping(ctx, db) })
 
 	v1 := router.Group("/v1")
@@ -91,7 +98,7 @@ func InitializeApp() *app.App {
 
 	// Auth-protected routes
 	authGroup := v1.Group("")
-	authGroup.Use(authMiddleware.RequireAuth())
+	authGroup.Use(authMiddleware.RequireAuth(), tenantSlugBinding)
 
 	teachersGroup := authGroup.Group("/teachers")
 	profilesHandler.RegisterRoutes(teachersGroup)
@@ -110,19 +117,19 @@ func setupLogger() zerolog.Logger {
 	return logger.With().Timestamp().Logger()
 }
 
-// cpOrgResolver resolves org slugs via the pymes-core client.
+// cpOrgResolver resolves org slugs via the core client.
 type cpOrgResolver struct {
 	client *pymescore.Client
 }
 
-func (r *cpOrgResolver) ResolveOrgID(ctx context.Context, orgSlug string) (uuid.UUID, error) {
-	result, err := r.client.GetBusinessInfo(ctx, orgSlug)
+func (r *cpOrgResolver) ResolveOrgID(ctx context.Context, tenantSlug string) (uuid.UUID, error) {
+	result, err := r.client.GetBusinessInfo(ctx, tenantSlug)
 	if err != nil {
 		return uuid.Nil, err
 	}
 	orgIDStr, ok := result["org_id"].(string)
 	if !ok {
-		return uuid.Nil, fmt.Errorf("org_id not found in business info response")
+		return uuid.Nil, fmt.Errorf("tenant_id not found in business info response")
 	}
 	return uuid.Parse(orgIDStr)
 }

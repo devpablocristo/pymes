@@ -1,0 +1,565 @@
+import { parsePaginatedResponse } from '@devpablocristo/platform-browser/crud';
+import { useCallback, useMemo } from 'react';
+import './PymesSimpleCrudListModeContent.css';
+import { apiRequest } from '../lib/api';
+import { useOptionalBranchSelection } from '../lib/useBranchSelection';
+import { readActiveBranchId } from '../lib/branchSelectionStorage';
+import { useI18n } from '../lib/i18n';
+import { PymesCrudResourceShellHeader } from './PymesCrudResourceShellHeader';
+import { appendBranchIdToCrudListQuery, isBranchScopedCrudResource } from './branchScopedCrud';
+import {
+  activeFields,
+  buildEditorBlocks,
+  buildEditorMediaUrls,
+  buildEditorSections,
+  buildEditorStats,
+  buildEmptyFormValues,
+  buildFallbackFormValuesFromRow,
+  buildTableColumns,
+  crudRecordItemPath,
+  normalizeError,
+  pickStringValue,
+  resolveEditorSectionId,
+  toDialogField,
+  type CrudListResponse,
+} from './PymesSimpleCrudListModeContent.helpers';
+import { usePymesCrudConfigQuery } from './usePymesCrudConfigQuery';
+import { usePymesCrudHeaderFeatures } from './usePymesCrudHeaderFeatures';
+import {
+  CrudGallerySurface,
+  CrudKanbanColumnCreateButton,
+  CrudPaginationBar,
+  CrudTableSurface,
+  CrudValueKanbanSurface,
+  isDisplayableCrudImageSrc,
+  getCrudStateMachineColumnDefaultState,
+  openCrudFormDialog,
+  buildFreeMovementStateMachine,
+  useCrudArchivedSearchParam,
+  useCrudConfiguredValueKanban,
+  useCrudRemoteGalleryPage,
+} from '../modules/crud';
+import type {
+  CrudHelpers,
+  CrudFormField,
+  CrudFormValues,
+  CrudPageConfig,
+  CrudRowAction,
+  CrudViewModeId,
+} from '../components/CrudPage';
+
+function listGalleryDisplayableImageUrls<T extends { id: string }>(row: T): string[] {
+  const urls = buildEditorMediaUrls(row);
+  return (urls ?? []).filter(isDisplayableCrudImageSrc);
+}
+
+export function PymesSimpleCrudListModeContent<T extends { id: string }>({
+  resourceId,
+  mode = 'list',
+  onRowClick,
+}: {
+  resourceId: string;
+  mode?: CrudViewModeId;
+  onRowClick?: (row: T) => void;
+}) {
+  const { t } = useI18n();
+  const crudConfigQuery = usePymesCrudConfigQuery<T>(resourceId);
+  const crudConfig = crudConfigQuery.data as CrudPageConfig<T> | null;
+  const branchSelection = useOptionalBranchSelection();
+  const selectedBranchId = isBranchScopedCrudResource(resourceId)
+    ? branchSelection?.selectedBranchId ?? readActiveBranchId()
+    : null;
+  const { archived } = useCrudArchivedSearchParam();
+
+  const fetchPage = useCallback(
+    async ({
+      limit,
+      search,
+      archived: pageArchived,
+      after,
+      signal: _signal,
+    }: {
+      limit: number;
+      search: string;
+      archived: boolean;
+      after: string | null;
+      signal: AbortSignal;
+    }) => {
+      void _signal;
+      if (!crudConfig?.basePath) {
+        if (crudConfig?.dataSource?.list) {
+          const rows = await crudConfig.dataSource.list({ archived: pageArchived });
+          return { items: rows as T[], has_more: false, next_cursor: null };
+        }
+        return { items: [], has_more: false, next_cursor: null };
+      }
+      const query = new URLSearchParams(crudConfig.listQuery ?? '');
+      const archivedBasePath =
+        pageArchived && crudConfig.supportsArchived ? `${crudConfig.basePath}/archived` : crudConfig.basePath;
+      appendBranchIdToCrudListQuery(resourceId, query, selectedBranchId);
+      query.set('limit', String(limit));
+      if (search) query.set('search', search);
+      if (after) query.set('after', after);
+      const queryString = query.toString();
+      const data = await apiRequest<unknown>(queryString ? `${archivedBasePath}?${queryString}` : archivedBasePath);
+      const page = parsePaginatedResponse<T>(data);
+      return { items: page.items, has_more: page.hasMore, next_cursor: page.nextCursor } satisfies CrudListResponse<T>;
+    },
+    [crudConfig, resourceId, selectedBranchId],
+  );
+
+  const {
+    items,
+    loading,
+    error,
+    setError,
+    total,
+    hasMore,
+    loadingMore,
+    loadMore,
+    setItems,
+    search: remoteSearch,
+    setSearch: setRemoteSearch,
+    selectedId,
+    selectItem,
+    reload,
+    handleArchiveToggle,
+  } = useCrudRemoteGalleryPage<T>({
+    pageSize: 100,
+    fetchPage,
+  });
+
+  const { search, setSearch, visibleItems, headerLeadSlot, searchInlineActions } = usePymesCrudHeaderFeatures<T>({
+    resourceId,
+    crudConfigOverride: crudConfig,
+    items,
+    search: remoteSearch,
+    setSearch: setRemoteSearch,
+    matchesSearch: (row, query) => {
+      const searchText = crudConfig?.searchText?.(row) ?? '';
+      return String(searchText).toLowerCase().includes(query);
+    },
+  });
+  const kanbanReadyConfig = useMemo(() => {
+    if (!crudConfig) return crudConfig;
+    if (crudConfig.stateMachine) {
+      if (crudConfig.kanban?.persistMove) return crudConfig;
+      return {
+        ...crudConfig,
+        kanban: {
+          ...crudConfig.kanban,
+          persistMove: async ({ row, field: f, nextValue }: { row: T; field: keyof T & string; nextValue: string }) =>
+            ({ ...row, [f]: nextValue }) as T,
+        },
+      };
+    }
+    const allValues = items.map((r) => {
+      const rec = r as Record<string, unknown>;
+      if (typeof rec.status === 'string') return { field: 'status' as keyof T & string, value: rec.status };
+      return { field: 'is_active' as keyof T & string, value: String(rec.is_active ?? 'true') };
+    });
+    const field = allValues[0]?.field ?? ('status' as keyof T & string);
+    const uniqueValues = [...new Set(allValues.map((v) => v.value))];
+    if (uniqueValues.length === 0) uniqueValues.push('unknown');
+    return {
+      ...crudConfig,
+      stateMachine: buildFreeMovementStateMachine<T>(field, uniqueValues.map((v) => ({
+        value: v,
+        label: v.charAt(0).toUpperCase() + v.slice(1),
+      }))),
+      kanban: {
+        ...crudConfig.kanban,
+        persistMove: async ({ row, field: f, nextValue }) =>
+          ({ ...row, [f]: nextValue }) as T,
+      },
+    };
+  }, [crudConfig, items]);
+
+  const valueKanban = useCrudConfiguredValueKanban<T>({
+    crudConfig: kanbanReadyConfig,
+    items,
+    setItems,
+    reload,
+    setError,
+    archived,
+  });
+
+  const columns = useMemo(() => {
+    if (!crudConfig) return [];
+    return buildTableColumns(crudConfig, archived);
+  }, [archived, crudConfig]);
+
+  const runCreateOrEdit = useCallback(
+    async (row?: T, createDefaults: CrudFormValues = {}) => {
+      if (!crudConfig) return;
+      const editing = Boolean(row);
+      let editorRow = row;
+      if (editing && row && crudConfig.editorModal?.loadRecord) {
+        try {
+          editorRow = await crudConfig.editorModal.loadRecord(row);
+        } catch (loadError) {
+          setError(normalizeError(loadError, `No se pudo cargar ${crudConfig.label}.`));
+          return;
+        }
+      }
+      // Si no hay formFields declarados (p. ej. vistas derivadas puntuales),
+      // generamos fields read-only desde columns para
+      // que todos los CRUDs abran el mismo Editor modal. En create no aplica.
+      const declaredFields = crudConfig.formFields ?? [];
+      const effectiveFields: CrudFormField[] =
+        declaredFields.length > 0
+          ? declaredFields
+          : crudConfig.columns.map<CrudFormField>((column) => ({
+              key: String(column.key),
+              label: String(column.header ?? column.key),
+              readOnly: true,
+            }));
+      const fields = activeFields(effectiveFields, editing);
+      const blocks = buildEditorBlocks(crudConfig);
+      if (!editing && fields.length === 0 && !(blocks?.length)) return;
+      const createInitialValues = {
+        ...buildEmptyFormValues(fields),
+        ...createDefaults,
+      };
+      // Cuando el CRUD no declara formFields, los campos se generan read-only
+      // desde columns. En ese caso preferimos
+      // readValue para que los valores mostrados pasen por column.render
+      // (ej. "is_low_stock=false" → "Normal") en vez de exponer el bool crudo.
+      const useColumnFallback = declaredFields.length === 0;
+      let currentValues = editing && editorRow
+        ? useColumnFallback
+          ? buildFallbackFormValuesFromRow(crudConfig, editorRow)
+          : crudConfig.toFormValues(editorRow)
+        : createInitialValues;
+      if (editing && editorRow && Object.keys(currentValues).length === 0) {
+        currentValues = buildFallbackFormValuesFromRow(crudConfig, editorRow);
+      }
+      const dialogTitle =
+        editing && editorRow
+          ? pickStringValue(editorRow as Record<string, unknown>, ['number', 'name', 'title']) || `Detalle de ${crudConfig.label}`
+          : crudConfig.createLabel ?? `Nuevo ${crudConfig.label}`;
+      const allowEditRecord =
+        !editing || !editorRow
+          ? true
+          : crudConfig.editorModal?.canEdit
+            ? crudConfig.editorModal.canEdit(editorRow)
+            : (crudConfig.allowEdit ?? false);
+      const visibleFields = fields.filter(
+        (field) => !crudConfig.editorModal?.fieldConfig?.[field.key]?.hidden,
+      );
+      const values = await openCrudFormDialog({
+        title: editing ? '' : dialogTitle,
+        subtitle: undefined,
+        eyebrow: editing ? undefined : crudConfig.editorModal?.eyebrow ?? crudConfig.labelPluralCap,
+        allowEdit: allowEditRecord,
+        mediaUrls:
+          editing && !crudConfig.editorModal?.disableBuiltInMedia ? buildEditorMediaUrls(editorRow) : undefined,
+        mediaFieldId: crudConfig.editorModal?.disableBuiltInMedia ? undefined : crudConfig.editorModal?.mediaFieldKey,
+        dialogMode: editing ? 'update' : 'create',
+        submitLabel: editing ? 'Guardar' : 'Crear',
+        editLabel: 'Editar',
+        cancelEditLabel: 'Cerrar',
+        closeLabel: archived ? 'Salir' : 'Cerrar',
+        initialValues: currentValues,
+        fields: visibleFields.map((field) =>
+          toDialogField(
+            field,
+            currentValues,
+            crudConfig.editorModal?.fieldConfig?.[field.key],
+            resolveEditorSectionId(crudConfig, field.key),
+          ),
+        ),
+        blocks,
+        sections: buildEditorSections(crudConfig),
+        stats: buildEditorStats(crudConfig, editorRow, editing),
+        row: editorRow,
+        confirmDiscard: crudConfig.editorModal?.confirmDiscard,
+        archiveAction:
+          editing && editorRow && !archived && crudConfig.supportsArchived && crudConfig.allowDelete !== false
+            ? {
+                label: 'Archivar',
+                busyLabel: 'Archivando…',
+                confirm: {
+                  title: `Archivar ${crudConfig.label}`,
+                  description: `Este ${crudConfig.label} va a dejar de verse en los listados activos.`,
+                  confirmLabel: 'Archivar',
+                  cancelLabel: 'Cancelar',
+                },
+                onArchive: async () => {
+                  try {
+                    setError(null);
+                    if (crudConfig.dataSource?.deleteItem) {
+                      await crudConfig.dataSource.deleteItem(editorRow);
+                    } else if (crudConfig.basePath) {
+                      await apiRequest(crudRecordItemPath(crudConfig.basePath, editorRow.id), { method: 'DELETE' });
+                    }
+                    setItems((current) => current.filter((item) => item.id !== editorRow!.id));
+                    selectItem(null);
+                    await reload();
+                  } catch (archiveError) {
+                    setError(normalizeError(archiveError, `No se pudo archivar ${crudConfig.label}.`));
+                    throw archiveError;
+                  }
+                },
+              }
+            : undefined,
+        restoreAction:
+          editing && editorRow && archived && crudConfig.supportsArchived
+            ? {
+                label: 'Restaurar',
+                busyLabel: 'Restaurando…',
+                onRestore: async () => {
+                  try {
+                    setError(null);
+                    if (crudConfig.dataSource?.restore) {
+                      await crudConfig.dataSource.restore(editorRow);
+                    } else if (crudConfig.basePath) {
+                      await apiRequest(`${crudRecordItemPath(crudConfig.basePath, editorRow.id)}/restore`, { method: 'POST', body: {} });
+                    }
+                    setItems((current) => current.filter((item) => item.id !== editorRow!.id));
+                    selectItem(null);
+                    await reload();
+                  } catch (restoreError) {
+                    setError(normalizeError(restoreError, `No se pudo restaurar ${crudConfig.label}.`));
+                    throw restoreError;
+                  }
+                },
+              }
+            : undefined,
+        deleteAction:
+          editing && editorRow && archived
+            ? {
+                label: 'Eliminar definitivo',
+                busyLabel: 'Eliminando definitivamente…',
+                confirm: {
+                  title: `Eliminar ${crudConfig.label}`,
+                  description: `Esta acción elimina definitivamente ${crudConfig.label} y no se puede deshacer.`,
+                  confirmLabel: 'Eliminar definitivo',
+                  cancelLabel: 'Cancelar',
+                },
+                onDelete: async () => {
+                  try {
+                    setError(null);
+                    if (crudConfig.dataSource?.hardDelete) {
+                      await crudConfig.dataSource.hardDelete(editorRow);
+                    } else if (crudConfig.basePath) {
+                      await apiRequest(`${crudRecordItemPath(crudConfig.basePath, editorRow.id)}/hard`, { method: 'DELETE' });
+                    }
+                    setItems((current) => current.filter((item) => item.id !== editorRow!.id));
+                    selectItem(null);
+                    await reload();
+                  } catch (deleteError) {
+                    setError(normalizeError(deleteError, `No se pudo eliminar ${crudConfig.label}.`));
+                    throw deleteError;
+                  }
+                },
+              }
+            : undefined,
+        onSubmit: async (submittedValues) => {
+          const nextValues = editing ? { ...currentValues, ...submittedValues } : { ...createInitialValues, ...submittedValues };
+          if (!crudConfig.isValid(nextValues)) {
+            throw new Error(`Revisá los campos de ${crudConfig.label}.`);
+          }
+
+          setError(null);
+          if (editing && row) {
+            if (crudConfig.dataSource?.update) {
+              await crudConfig.dataSource.update(row, nextValues);
+            } else if (crudConfig.basePath) {
+              await apiRequest(crudRecordItemPath(crudConfig.basePath, row.id), {
+                method: 'PATCH',
+                body: crudConfig.toBody ? crudConfig.toBody(nextValues) : (nextValues as Record<string, unknown>),
+              });
+            }
+          } else if (crudConfig.dataSource?.create) {
+            await crudConfig.dataSource.create(nextValues);
+          } else if (crudConfig.basePath) {
+            await apiRequest(crudConfig.basePath, {
+              method: 'POST',
+              body: crudConfig.toBody ? crudConfig.toBody(nextValues) : (nextValues as Record<string, unknown>),
+            });
+          }
+          await reload();
+        },
+      });
+      if (!values) return;
+    },
+    [archived, crudConfig, reload, selectItem, setError, setItems],
+  );
+
+  const canCreate = crudConfig?.allowCreate ?? Boolean(crudConfig?.formFields.length);
+  const paginationEnabled = crudConfig?.featureFlags?.pagination !== false;
+  const kanbanCreateFooterLabel = crudConfig?.kanban?.createFooterLabel ?? `Añadir ${crudConfig?.label ?? 'registro'}`;
+  const getKanbanCreateDefaults = useCallback(
+    (columnId: string): CrudFormValues => {
+      if (!crudConfig?.stateMachine) return {};
+      const nextState = getCrudStateMachineColumnDefaultState(crudConfig.stateMachine, columnId);
+      if (!nextState) return {};
+      return { [crudConfig.stateMachine.field]: nextState };
+    },
+    [crudConfig],
+  );
+
+  const resolvedTableRowClick = useMemo(() => {
+    if (onRowClick) return onRowClick;
+    // Todo click abre el Editor modal. Si `allowEdit=false` o `formFields=[]`,
+    // `runCreateOrEdit` arma fields read-only desde `columns` automáticamente.
+    return (row: T) => {
+      void runCreateOrEdit(row);
+    };
+  }, [onRowClick, runCreateOrEdit]);
+
+  const rowRecordValues = (row: T) => row as Record<string, unknown>;
+  const tableRowActions = useMemo(() => {
+    if (!crudConfig?.rowActions?.length) {
+      return [];
+    }
+    const helpers: CrudHelpers<T> = {
+      items,
+      reload,
+      setError: (message) => setError(message),
+    };
+    return crudConfig.rowActions.map((action: CrudRowAction<T>) => ({
+      id: action.id,
+      label: action.label,
+      kind: action.kind,
+      isVisible: (row: T) => action.isVisible?.(row, { archived }) ?? true,
+      onClick: (row: T) => action.onClick(row, helpers),
+    }));
+  }, [archived, crudConfig?.rowActions, items, reload, setError]);
+  const kanbanCardConfig = crudConfig?.kanban?.card;
+  const cardTitle = (row: T) =>
+    (
+      kanbanCardConfig?.title?.(row) ??
+      pickStringValue(rowRecordValues(row), ['name', 'number', 'description', 'title', 'code', 'id'])
+    ) || row.id;
+  const cardSubtitle = (row: T) => {
+    if (kanbanCardConfig?.subtitle) {
+      return kanbanCardConfig.subtitle(row);
+    }
+    const stateField = crudConfig?.stateMachine?.field;
+    const candidates = ['status', 'customer_name', 'supplier_name', 'contact_name', 'category', 'type'].filter(
+      (key) => key !== stateField,
+    );
+    return pickStringValue(rowRecordValues(row), candidates);
+  };
+  const cardMeta = (row: T) =>
+    kanbanCardConfig?.meta?.(row) ??
+    pickStringValue(rowRecordValues(row), ['total', 'amount', 'price', 'created_at', 'valid_until', 'next_due_date']);
+
+  if (!crudConfig) {
+    return (
+      <div className="empty-state">
+        <p>Cargando configuración…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="products-crud-page">
+      <PymesCrudResourceShellHeader<T>
+        resourceId={resourceId}
+        headerLeadSlot={headerLeadSlot}
+        items={visibleItems}
+        subtitleCount={visibleItems.length}
+        loading={loading}
+        error={error}
+        setError={setError}
+        reload={reload}
+        searchValue={search}
+        onSearchChange={setSearch}
+        onArchiveToggle={handleArchiveToggle}
+        searchInlineActions={searchInlineActions}
+        extraHeaderActions={
+          !archived && canCreate && crudConfig.featureFlags?.createAction !== false ? (
+            <button type="button" className="btn-primary btn-sm" onClick={() => void runCreateOrEdit()}>
+              {crudConfig.createLabel ?? `+ Nuevo ${crudConfig.label}`}
+            </button>
+          ) : null
+        }
+      />
+
+      {loading ? (
+        <div className="empty-state">
+          <p>{t('crud.viewMode.gallery.loading')}</p>
+        </div>
+      ) : visibleItems.length === 0 ? (
+        <div className="empty-state">
+          <p>{archived ? crudConfig.archivedEmptyState ?? 'No hay archivados para mostrar.' : crudConfig.emptyState ?? 'No hay datos para mostrar.'}</p>
+        </div>
+      ) : mode === 'gallery' ? (
+        <CrudGallerySurface
+          items={visibleItems}
+          loading={loading}
+          emptyLabel={crudConfig.emptyState ?? 'No hay datos para mostrar.'}
+          loadingLabel={t('crud.viewMode.gallery.loading')}
+          ariaLabel={crudConfig.labelPluralCap}
+          card={{
+            title: cardTitle,
+            subtitle: (row) => cardSubtitle(row),
+            meta: (row) => cardMeta(row),
+            imageUrls: (row) => listGalleryDisplayableImageUrls(row),
+          }}
+          onSelect={(row) => {
+            selectItem(row.id);
+            void runCreateOrEdit(row);
+          }}
+        />
+      ) : mode === 'kanban' ? (
+        <CrudValueKanbanSurface<T>
+          items={visibleItems}
+          loading={loading}
+          title={crudConfig.labelPluralCap}
+          emptyLabel={archived ? crudConfig.archivedEmptyState ?? 'No hay archivados para mostrar.' : crudConfig.emptyState ?? 'No hay datos para mostrar.'}
+          stateMachine={kanbanReadyConfig?.stateMachine}
+          onCardOpen={(row) => {
+            selectItem(row.id);
+            void runCreateOrEdit(row);
+          }}
+          getCardTitle={cardTitle}
+          getCardSubtitle={cardSubtitle}
+          getCardMeta={cardMeta}
+          disableDrag={archived}
+          onMoveCard={valueKanban.enabled ? valueKanban.onMoveCard : undefined}
+          isRowDraggable={valueKanban.enabled ? valueKanban.isRowDraggable : undefined}
+          isColumnDroppable={valueKanban.enabled ? valueKanban.isColumnDroppable : undefined}
+          columnFooter={
+            !archived && canCreate
+              ? (columnId) => (
+                  <CrudKanbanColumnCreateButton
+                    label={kanbanCreateFooterLabel}
+                    onClick={() => {
+                      void runCreateOrEdit(undefined, getKanbanCreateDefaults(columnId));
+                    }}
+                  />
+                )
+              : undefined
+          }
+        />
+      ) : (
+        <CrudTableSurface
+          items={visibleItems}
+          columns={columns}
+          rowActions={tableRowActions}
+          onRowClick={resolvedTableRowClick}
+          selectedId={selectedId}
+          sortable={crudConfig.featureFlags?.columnSort !== false}
+          tableClassName={resourceId === 'carWorkOrders' || resourceId === 'bikeWorkOrders' ? 'crud-table--auto-layout' : undefined}
+        />
+      )}
+
+      {!loading && visibleItems.length > 0 ? (
+        <CrudPaginationBar
+          visibleCount={visibleItems.length}
+          totalCount={total || items.length}
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={() => {
+            void loadMore();
+          }}
+          hidden={!paginationEnabled}
+        />
+      ) : null}
+    </div>
+  );
+}

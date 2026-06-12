@@ -17,7 +17,7 @@ WORKDIR /workspace/pymes/beauty/backend
 RUN go mod download
 
 COPY pymes/beauty/backend /workspace/pymes/beauty/backend
-COPY pymes/pymes-core/shared/backend /workspace/pymes/pymes-core/shared/backend
+COPY pymes/core/shared/backend /workspace/pymes/core/shared/backend
 
 EXPOSE 8083
 

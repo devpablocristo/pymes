@@ -1,0 +1,65 @@
+package dto
+
+import "encoding/json"
+
+type NullableStringField struct {
+	Set   bool
+	Value *string
+}
+
+func (f *NullableStringField) UnmarshalJSON(data []byte) error {
+	f.Set = true
+	if string(data) == "null" {
+		f.Value = nil
+		return nil
+	}
+	var value string
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	f.Value = &value
+	return nil
+}
+
+type UpdateTenantSettingsRequest struct {
+	PlanCode                *string             `json:"plan_code,omitempty"`
+	HardLimits              map[string]any      `json:"hard_limits,omitempty"`
+	Currency                *string             `json:"currency,omitempty"`
+	SupportedCurrencies     *[]string           `json:"supported_currencies,omitempty"`
+	TaxRate                 *float64            `json:"tax_rate,omitempty"`
+	QuotePrefix             *string             `json:"quote_prefix,omitempty"`
+	SalePrefix              *string             `json:"sale_prefix,omitempty"`
+	AllowNegativeStock      *bool               `json:"allow_negative_stock,omitempty"`
+	PurchasePrefix          *string             `json:"purchase_prefix,omitempty"`
+	ReturnPrefix            *string             `json:"return_prefix,omitempty"`
+	CreditNotePrefix        *string             `json:"credit_note_prefix,omitempty"`
+	BusinessName            *string             `json:"business_name,omitempty"`
+	BusinessTaxID           *string             `json:"business_tax_id,omitempty"`
+	BusinessAddress         *string             `json:"business_address,omitempty"`
+	BusinessPhone           *string             `json:"business_phone,omitempty"`
+	BusinessEmail           *string             `json:"business_email,omitempty"`
+	TeamSize                *string             `json:"team_size,omitempty"`
+	Sells                   *string             `json:"sells,omitempty"`
+	ClientLabel             *string             `json:"client_label,omitempty"`
+	UsesBilling             *bool               `json:"uses_billing,omitempty"`
+	PaymentMethod           *string             `json:"payment_method,omitempty"`
+	Vertical                *string             `json:"vertical,omitempty"`
+	OnboardingCompletedAt   NullableStringField `json:"onboarding_completed_at,omitempty"`
+	WAQuoteTemplate         *string             `json:"wa_quote_template,omitempty"`
+	WAReceiptTemplate       *string             `json:"wa_receipt_template,omitempty"`
+	WADefaultCountryCode    *string             `json:"wa_default_country_code,omitempty"`
+	SchedulingEnabled       *bool               `json:"scheduling_enabled,omitempty"`
+	SchedulingLabel         *string             `json:"scheduling_label,omitempty"`
+	SchedulingReminderHours *int                `json:"scheduling_reminder_hours,omitempty"`
+	SecondaryCurrency       *string             `json:"secondary_currency,omitempty"`
+	DefaultRateType         *string             `json:"default_rate_type,omitempty"`
+	AutoFetchRates          *bool               `json:"auto_fetch_rates,omitempty"`
+	ShowDualPrices          *bool               `json:"show_dual_prices,omitempty"`
+	BankHolder              *string             `json:"bank_holder,omitempty"`
+	BankCBU                 *string             `json:"bank_cbu,omitempty"`
+	BankAlias               *string             `json:"bank_alias,omitempty"`
+	BankName                *string             `json:"bank_name,omitempty"`
+	ShowQRInPDF             *bool               `json:"show_qr_in_pdf,omitempty"`
+	WAPaymentTemplate       *string             `json:"wa_payment_template,omitempty"`
+	WAPaymentLinkTemplate   *string             `json:"wa_payment_link_template,omitempty"`
+}

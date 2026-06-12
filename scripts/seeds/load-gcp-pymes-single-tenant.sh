@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Carga seeds del monorepo contra SOLO la base PostgreSQL `pymes` en GCP (proyecto Pymes).
-# No toca Review/Nexus ni bases de otros proyectos.
+# No toca Governance/Nexus ni bases de otros proyectos.
 #
 # Requisitos:
 #   - gcloud autenticado con acceso al proyecto y Secret Manager.
@@ -13,12 +13,12 @@
 # Uso típico (reemplazá org por tu Clerk Organization ID):
 #
 #   export GCP_PROJECT_ID=pymes-dev-352318
-#   export PYMES_SEED_DEMO_ORG_EXTERNAL_ID='org_xxxxxxxx'
-#   export PYMES_SEED_DEMO_ORG_NAME='Bicimax QA'
-#   export PYMES_SEED_DEMO_ORG_SLUG='bicimax'
+#   export PYMES_SEED_DEMO_TENANT_EXTERNAL_ID='org_xxxxxxxx'
+#   export PYMES_SEED_DEMO_TENANT_NAME='Bicimax QA'
+#   export PYMES_SEED_DEMO_TENANT_SLUG='bicimax'
 #   ./scripts/seeds/load-gcp-pymes-single-tenant.sh
 #
-# Por defecto: solo seeds de pymes-core (Cloud Run GCP no crea esquema workshops.*).
+# Por defecto: solo seeds de core (Cloud Run GCP no crea esquema workshops.*).
 # Incluir seeds workshops (tablas workshops.*): solo si ese esquema existe en la BD
 # (p. ej. migraste también el backend workshops contra esta misma DB).
 #   export PYMES_GCP_INCLUDE_WORKSHOPS_SEEDS=1
@@ -121,26 +121,26 @@ ensure_seed_dbs_ready() {
   :
 }
 
-resolve_target_org_uuid() {
-  require_seed_org_external_id
-  local external_id="${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}"
+resolve_target_tenant_uuid() {
+  require_seed_tenant_external_id
+  local external_id="${PYMES_SEED_DEMO_TENANT_EXTERNAL_ID:-}"
   local external_id_sql="${external_id//\'/\'\'}"
-  local org_uuid
-  org_uuid="$(psql "$PYMES_SEED_DATABASE_URI" -Atq -v ON_ERROR_STOP=1 \
-    -c "SELECT cast(id as text) FROM orgs WHERE external_id = '$external_id_sql';")"
-  org_uuid="$(printf '%s' "$org_uuid" | tr -d '[:space:]')"
-  if [[ -n "$org_uuid" ]]; then
-    printf '%s\n' "$org_uuid"
+  local tenant_uuid
+  tenant_uuid="$(psql "$PYMES_SEED_DATABASE_URI" -Atq -v ON_ERROR_STOP=1 \
+    -c "SELECT cast(id as text) FROM tenants WHERE external_id = '$external_id_sql';")"
+  tenant_uuid="$(printf '%s' "$tenant_uuid" | tr -d '[:space:]')"
+  if [[ -n "$tenant_uuid" ]]; then
+    printf '%s\n' "$tenant_uuid"
     return 0
   fi
-  org_uuid="$(psql "$PYMES_SEED_DATABASE_URI" -Atq -v ON_ERROR_STOP=1 \
-    -c "SELECT cast(uuid_generate_v5(uuid_ns_url(), 'pymes-seed/org/' || '$external_id_sql') as text);")"
-  org_uuid="$(printf '%s' "$org_uuid" | tr -d '[:space:]')"
-  if [[ -z "$org_uuid" ]]; then
-    echo "No se pudo resolver org uuid para external_id=$external_id" >&2
+  tenant_uuid="$(psql "$PYMES_SEED_DATABASE_URI" -Atq -v ON_ERROR_STOP=1 \
+    -c "SELECT cast(uuid_generate_v5(uuid_ns_url(), 'pymes-seed/tenant/' || '$external_id_sql') as text);")"
+  tenant_uuid="$(printf '%s' "$tenant_uuid" | tr -d '[:space:]')"
+  if [[ -z "$tenant_uuid" ]]; then
+    echo "No se pudo resolver tenant uuid para external_id=$external_id" >&2
     exit 1
   fi
-  printf '%s\n' "$org_uuid"
+  printf '%s\n' "$tenant_uuid"
 }
 
 run_pymes_sql_file() {
@@ -148,22 +148,22 @@ run_pymes_sql_file() {
   render_seed_sql "$file" | psql "$PYMES_SEED_DATABASE_URI" -v ON_ERROR_STOP=1
 }
 
-require_seed_org_external_id
-TARGET_ORG_UUID="$(resolve_target_org_uuid)"
-SEED_ORG_EXTERNAL_ID="${PYMES_SEED_DEMO_ORG_EXTERNAL_ID}"
-SEED_ORG_NAME="${PYMES_SEED_DEMO_ORG_NAME:-Pymes Demo Org}"
-SEED_ORG_SLUG="${PYMES_SEED_DEMO_ORG_SLUG:-$(derive_seed_org_slug "$SEED_ORG_EXTERNAL_ID")}"
-export TARGET_ORG_UUID SEED_ORG_EXTERNAL_ID SEED_ORG_NAME SEED_ORG_SLUG
+require_seed_tenant_external_id
+TARGET_TENANT_UUID="$(resolve_target_tenant_uuid)"
+SEED_TENANT_EXTERNAL_ID="${PYMES_SEED_DEMO_TENANT_EXTERNAL_ID}"
+SEED_TENANT_NAME="${PYMES_SEED_DEMO_TENANT_NAME:-Pymes Demo Tenant}"
+SEED_TENANT_SLUG="${PYMES_SEED_DEMO_TENANT_SLUG:-$(derive_seed_tenant_slug "$SEED_TENANT_EXTERNAL_ID")}"
+export TARGET_TENANT_UUID SEED_TENANT_EXTERNAL_ID SEED_TENANT_NAME SEED_TENANT_SLUG
 
 echo "→ BD destino (solo URI local vía proxy si aplica); proyecto GCP declarado: ${GCP_PROJECT_ID:-URI externa}"
-echo "→ Org externa: $SEED_ORG_EXTERNAL_ID | UUID seed: $TARGET_ORG_UUID | slug: $SEED_ORG_SLUG"
+echo "→ Tenant externo: $SEED_TENANT_EXTERNAL_ID | UUID seed: $TARGET_TENANT_UUID | slug: $SEED_TENANT_SLUG"
 
 files=(
-  "pymes-core/backend/seeds/01_clerk_prereqs.sql"
-  "pymes-core/backend/seeds/02_core_business.sql"
-  "pymes-core/backend/seeds/03_rbac.sql"
-  "pymes-core/backend/seeds/04_full_demo.sql"
-  "pymes-core/backend/seeds/05_scheduling_demo.sql"
+  "core/backend/seeds/01_clerk_prereqs.sql"
+  "core/backend/seeds/02_core_business.sql"
+  "core/backend/seeds/03_rbac.sql"
+  "core/backend/seeds/04_full_demo.sql"
+  "core/backend/seeds/05_scheduling_demo.sql"
 )
 if [[ "${PYMES_GCP_INCLUDE_WORKSHOPS_SEEDS:-}" == "1" ]]; then
   files+=(
@@ -183,4 +183,4 @@ for sql_file in "${files[@]}"; do
   run_pymes_sql_file "$sql_file"
 done
 
-echo "OK — seeds aplicados en una sola org. Review/Nexus no fue tocado."
+echo "OK — seeds aplicados en una sola tenant. Governance/Nexus no fue tocado."

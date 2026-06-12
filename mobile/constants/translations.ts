@@ -1,0 +1,67 @@
+export const t = {
+  common: {
+    errors: {
+      generic: 'Algo salió mal. Intentá de nuevo.',
+    },
+  },
+  login: {
+    appName: 'Pymes App',
+    subtitle: 'Iniciá sesión para continuar',
+    email: 'Email',
+    emailPlaceholder: 'tu@email.com',
+    password: 'Contraseña',
+    passwordPlaceholder: '••••••••',
+    submit: 'Iniciar sesión',
+    errors: {
+      emptyFields: 'Por favor completá todos los campos.',
+      loginFailed: 'No se pudo iniciar sesión.',
+    },
+  },
+  notifications: {
+    empty: 'Sin notificaciones',
+  },
+  home: {
+    title: 'Inicio',
+    metrics: {
+      sales: 'Ventas del mes',
+      salesSub: 'operaciones',
+      avgTicket: 'Ticket promedio',
+      avgTicketSub: 'Por operación',
+      income: 'Ingresos',
+      incomeSub: 'Cobros del período',
+      expenses: 'Egresos',
+      expensesSub: 'Gastos del período',
+      vsPrev: 'vs mes anterior',
+    },
+  },
+  drawer: {
+    logout: 'Cerrar sesión',
+    home: 'Inicio',
+    explore: 'Explorar',
+    sections: {
+      inicio: 'INICIO',
+      diaDia: 'DÍA A DÍA',
+      comercial: 'COMERCIAL',
+      whatsapp: 'WHATSAPP',
+      operaciones: 'OPERACIONES',
+    },
+    items: {
+      agenda: 'Agenda',
+      asistente: 'Asistente',
+      notificaciones: 'Notificaciones',
+      facturacion: 'Facturación',
+      clientes: 'Clientes',
+      presupuestos: 'Presupuestos',
+      productos: 'Productos',
+      proveedores: 'Proveedores',
+      servicios: 'Servicios',
+      ventas: 'Ventas',
+      bandejaWhatsapp: 'Bandeja whatsapp',
+      campanasWhatsapp: 'Campañas whatsapp',
+      caja: 'Caja',
+      compras: 'Compras',
+      inventario: 'Inventario',
+      reportes: 'Reportes',
+    },
+  },
+} as const;

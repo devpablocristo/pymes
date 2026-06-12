@@ -1,0 +1,97 @@
+/* Notifications center — feed unificado de avisos y aprobaciones.
+   Las cards usan los mismos tokens que el resto de la app (kanban/CRUD).
+   Botones: .btn-success / .btn-danger / .btn-secondary (globales).
+   Badge de riesgo: <CrudStateBadge />. */
+
+.notifications-feed {
+  --m-notification-feed-paper: var(--color-surface);
+  --m-notification-feed-ink: var(--color-text);
+  --m-notification-feed-muted: var(--color-text-secondary);
+  --m-notification-feed-line: var(--color-border);
+  --m-notification-feed-shadow: var(--shadow-z8);
+}
+
+.notifications-feed .m-notification-feed__summary {
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-z4);
+}
+
+.notifications-feed .m-notification-feed__empty {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.notifications-feed .m-notification-feed__card {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.notifications-feed .m-notification-feed__card--default::before {
+  background: var(--color-primary);
+}
+
+.notifications-feed .m-notification-feed__card--attention::before {
+  background: var(--color-warning);
+}
+
+.notifications-feed .m-notification-feed__card--critical::before {
+  background: var(--color-danger);
+}
+
+.notifications-feed .m-notification-feed__card--success::before {
+  background: var(--color-success);
+}
+
+.notifications-feed .m-notification-feed__card--unread {
+  border-color: color-mix(in srgb, var(--color-primary) 32%, var(--color-border));
+}
+
+.notifications-feed .m-notification-feed__card--unread::after {
+  background: var(--color-primary);
+}
+
+.notifications-feed .m-notification-feed__eyebrow {
+  color: var(--color-text-secondary);
+}
+
+.approval-reason {
+  font-size: var(--text-role-body);
+  color: var(--color-text);
+  margin-bottom: var(--space-1);
+}
+
+.approval-summary {
+  font-size: var(--text-role-body);
+  color: var(--color-text-secondary);
+  font-style: italic;
+  margin-bottom: var(--space-3);
+  padding: var(--space-2);
+  background: var(--color-surface-hover);
+  border-radius: var(--radius-sm);
+}
+
+.approval-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.note-input {
+  flex: 1;
+  min-width: 16rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-role-body);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.note-input::placeholder {
+  color: var(--color-text-muted);
+}

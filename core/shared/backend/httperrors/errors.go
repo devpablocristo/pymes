@@ -1,0 +1,39 @@
+// Package httperrors es un wrapper fino de core/http/go/gin para Gin.
+// Mantiene el punto de import compartido por core y verticales.
+// Los sentinels, Respond y Write delegan a core.
+package httperrors
+
+import (
+	corepostgres "github.com/devpablocristo/platform/databases/postgres/go"
+	"github.com/gin-gonic/gin"
+
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
+)
+
+// Sentinel errors — domainerr.Error, soportan errors.Is por Kind.
+var (
+	ErrNotFound  = ginmw.ErrNotFound
+	ErrConflict  = ginmw.ErrConflict
+	ErrForbidden = ginmw.ErrForbidden
+	ErrBadInput  = ginmw.ErrBadInput
+	ErrNotDraft  = domainerr.Conflict("resource is not in draft status")
+)
+
+// ErrorResponse re-exporta el tipo de core.
+type ErrorResponse = ginmw.ErrorResponse
+
+// IsUniqueViolation detecta errores de constraint UNIQUE de PostgreSQL.
+func IsUniqueViolation(err error) bool {
+	return corepostgres.IsUniqueViolation(err)
+}
+
+// Write escribe un error HTTP a Gin. Delega a ginmw.WriteError.
+func Write(c *gin.Context, status int, code, message string) {
+	ginmw.WriteError(c, status, code, message)
+}
+
+// Respond mapea un error a respuesta HTTP en Gin. Delega a ginmw.Respond.
+func Respond(c *gin.Context, err error) {
+	ginmw.Respond(c, err)
+}

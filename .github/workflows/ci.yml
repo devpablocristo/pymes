@@ -208,8 +208,8 @@ jobs:
             -t "${{ matrix.service }}-prod-ci" \
             ..
 
-  governance-notifications-e2e:
-    name: governance-notifications-e2e
+  review-notifications-e2e:
+    name: review-notifications-e2e
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # El E2E real (Docker + callback Nexus→cp-backend) solo en workflow_dispatch: en PR compartidos no es estable.

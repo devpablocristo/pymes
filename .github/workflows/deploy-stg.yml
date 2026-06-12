@@ -382,10 +382,20 @@ jobs:
           PY
       - name: Deploy UI to Firebase Hosting STG
         run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open("firebase.generated.json", "r", encoding="utf-8") as fh:
+              config = json.load(fh)
+          config.setdefault("hosting", {})["site"] = os.environ["FIREBASE_HOSTING_SITE_ID"]
+          with open("firebase.stg.generated.json", "w", encoding="utf-8") as fh:
+              json.dump(config, fh, indent=2)
+              fh.write("\n")
+          PY
           npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" deploy \
             --project "$GCP_PROJECT_ID" \
-            --config firebase.generated.json \
-            --only hosting \
+            --config firebase.stg.generated.json \
             --non-interactive
       - name: Smoke UI
         run: |

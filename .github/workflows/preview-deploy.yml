@@ -317,11 +317,13 @@ jobs:
           pr="${{ inputs.pr_number || github.event.inputs.pr_number }}"
           python3 - "$pr" <<'PY'
           import json
+          import os
           import sys
 
           pr = sys.argv[1]
           with open("firebase.generated.json", "r", encoding="utf-8") as fh:
               config = json.load(fh)
+          config.setdefault("hosting", {})["site"] = os.environ["FIREBASE_HOSTING_SITE_ID"]
           for rewrite in config.get("hosting", {}).get("rewrites", []):
               run = rewrite.get("run")
               if run and run.get("serviceId", "").startswith("pymes-"):
@@ -333,6 +335,5 @@ jobs:
           npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" hosting:channel:deploy "pr-${pr}" \
             --project "$GCP_PROJECT_ID" \
             --config firebase.preview.generated.json \
-            --only hosting \
             --expires 14d \
             --non-interactive

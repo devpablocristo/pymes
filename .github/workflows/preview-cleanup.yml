@@ -18,10 +18,10 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   GCP_REGION: us-central1
-  GCP_PROJECT_ID: pymes-stg-352318
-  FIREBASE_HOSTING_SITE_ID: pymes-stg-352318
+  GCP_PROJECT_ID: pymes-dev-352318
+  FIREBASE_HOSTING_SITE_ID: pymes-dev-352318
   WIF_PROVIDER: ${{ vars.PYMES_STG_WIF_PROVIDER || 'projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider' }}
-  WIF_SERVICE_ACCOUNT: pymes-github-actions-stg@pymes-stg-352318.iam.gserviceaccount.com
+  WIF_SERVICE_ACCOUNT: pymes-github-actions-stg@pymes-dev-352318.iam.gserviceaccount.com
   FIREBASE_TOOLS_VERSION: "13"
 
 jobs:

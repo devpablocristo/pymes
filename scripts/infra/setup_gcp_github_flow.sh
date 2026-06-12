@@ -8,17 +8,18 @@
 #
 # Variables principales:
 #   BILLING_ACCOUNT_ID        Requerido si el proyecto STG/PRD no existe.
-#   STG_FOLDER_ID             Folder destino para pymes-stg-352318.
+#   STG_FOLDER_ID             Folder destino para pymes-dev-352318.
 #   PRD_FOLDER_ID             Folder destino para pymes-prd-352318.
-#   NONPRD_DBS_FOLDER_ID      Folder "Pymes > Dev" a renombrar a "NONPRD DBs".
+#   NONPRD_DBS_FOLDER_ID      Folder de DBs non-prod si es distinto de STG.
 #   WIF_PRINCIPAL_SET         Principal set del repo para Workload Identity Federation.
+#   WIF_PROVIDER_PROJECT_ID   Opcional; si se define, sincroniza la condicion OIDC.
 #
 # Este script NO crea Cloud SQL instances. Usa:
 #   pymes-dev-352318:us-central1:pymes-dev-db
 set -euo pipefail
 
 REGION="${REGION:-us-central1}"
-STG_PROJECT_ID="${STG_PROJECT_ID:-pymes-stg-352318}"
+STG_PROJECT_ID="${STG_PROJECT_ID:-pymes-dev-352318}"
 PRD_PROJECT_ID="${PRD_PROJECT_ID:-pymes-prd-352318}"
 NONPRD_DB_PROJECT_ID="${NONPRD_DB_PROJECT_ID:-pymes-dev-352318}"
 NONPRD_SQL_INSTANCE="${NONPRD_SQL_INSTANCE:-pymes-dev-db}"
@@ -33,6 +34,10 @@ STG_DB_NAME="${STG_DB_NAME:-pymes_stg}"
 STG_DB_USER="${STG_DB_USER:-pymes_stg_app}"
 PREVIEW_DB_USER="${PREVIEW_DB_USER:-pymes_preview_app}"
 SQL_ADMIN_USER="${SQL_ADMIN_USER:-nonprd_sql_admin}"
+WIF_PROVIDER_PROJECT_ID="${WIF_PROVIDER_PROJECT_ID:-}"
+WIF_POOL_ID="${WIF_POOL_ID:-github-actions-pool}"
+WIF_PROVIDER_ID="${WIF_PROVIDER_ID:-github-actions-provider}"
+WIF_PROVIDER_CONDITION="${WIF_PROVIDER_CONDITION:-((assertion.repository=='devpablocristo/pymes' || assertion.repository=='devpablocristo/companion' || assertion.repository=='devpablocristo/nexus' || assertion.repository=='devpablocristo/axis') && assertion.ref=='refs/heads/develop') || (assertion.repository=='devpablocristo/pymes' && assertion.event_name=='pull_request' && assertion.base_ref=='main')}"
 
 required_apis=(
   run.googleapis.com
@@ -194,13 +199,16 @@ SQL
 }
 
 main() {
-  if [[ -n "${NONPRD_DBS_FOLDER_ID:-}" ]]; then
+  if [[ "$STG_PROJECT_ID" == "$NONPRD_DB_PROJECT_ID" ]]; then
+    log "STG y DBs non-prod usan $STG_PROJECT_ID; manteniendo display name Pymes STG"
+    gcloud projects update "$STG_PROJECT_ID" --name="Pymes STG"
+  elif [[ -n "${NONPRD_DBS_FOLDER_ID:-}" ]]; then
     log "Renombrando folder $NONPRD_DBS_FOLDER_ID a NONPRD DBs"
     gcloud resource-manager folders update "$NONPRD_DBS_FOLDER_ID" --display-name="NONPRD DBs"
-  fi
 
-  log "Renombrando display name de $NONPRD_DB_PROJECT_ID a NONPRD DBs"
-  gcloud projects update "$NONPRD_DB_PROJECT_ID" --name="NONPRD DBs"
+    log "Renombrando display name de $NONPRD_DB_PROJECT_ID a NONPRD DBs"
+    gcloud projects update "$NONPRD_DB_PROJECT_ID" --name="NONPRD DBs"
+  fi
 
   ensure_project "$STG_PROJECT_ID" "${STG_FOLDER_ID:-}"
   ensure_project "$PRD_PROJECT_ID" "${PRD_FOLDER_ID:-}"
@@ -241,10 +249,23 @@ main() {
       --role=roles/iam.workloadIdentityUser
   fi
 
-  log "Validando que STG no tenga Cloud SQL instances"
-  if [[ -n "$(gcloud sql instances list --project="$STG_PROJECT_ID" --format='value(name)')" ]]; then
-    echo "ERROR: $STG_PROJECT_ID tiene Cloud SQL instances; el plan exige no crear instancias SQL en STG." >&2
-    exit 2
+  if [[ -n "$WIF_PROVIDER_PROJECT_ID" ]]; then
+    log "Sincronizando condicion del Workload Identity Provider $WIF_PROVIDER_ID"
+    gcloud iam workload-identity-pools providers update-oidc "$WIF_PROVIDER_ID" \
+      --project="$WIF_PROVIDER_PROJECT_ID" \
+      --location=global \
+      --workload-identity-pool="$WIF_POOL_ID" \
+      --attribute-condition="$WIF_PROVIDER_CONDITION"
+  fi
+
+  if [[ "$STG_PROJECT_ID" != "$NONPRD_DB_PROJECT_ID" ]]; then
+    log "Validando que STG no tenga Cloud SQL instances"
+    if [[ -n "$(gcloud sql instances list --project="$STG_PROJECT_ID" --format='value(name)')" ]]; then
+      echo "ERROR: $STG_PROJECT_ID tiene Cloud SQL instances; el plan exige no crear instancias SQL en STG." >&2
+      exit 2
+    fi
+  else
+    log "STG usa el proyecto historico con Cloud SQL compartido; no se crean instancias nuevas."
   fi
   gcloud sql instances describe "$NONPRD_SQL_INSTANCE" --project="$NONPRD_DB_PROJECT_ID" >/dev/null
 

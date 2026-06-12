@@ -42,6 +42,7 @@ env:
   CORE_RUNTIME_SERVICE_ACCOUNT: pymes-core-runtime-stg@pymes-dev-352318.iam.gserviceaccount.com
   VERTICAL_RUNTIME_SERVICE_ACCOUNT: pymes-vertical-runtime-stg@pymes-dev-352318.iam.gserviceaccount.com
   DATABASE_URL_SECRET_NAME: pymes-database-url-stg
+  INTERNAL_SERVICE_TOKEN_SECRET_NAME: pymes-internal-service-token-stg
   CLERK_SECRET_KEY_SECRET_NAME: pymes-clerk-secret-key-stg
   GOVERNANCE_API_KEY_SECRET_NAME: pymes-governance-api-key-stg
   COMPANION_API_KEY_SECRET_NAME: pymes-companion-api-key-stg
@@ -156,10 +157,10 @@ jobs:
       - name: Resolve required GCP secrets
         run: |
           set -euo pipefail
-          for secret_name in "$DATABASE_URL_SECRET_NAME" "$CLERK_SECRET_KEY_SECRET_NAME" "$GOVERNANCE_API_KEY_SECRET_NAME" "$COMPANION_API_KEY_SECRET_NAME" "$COMPANION_INTERNAL_JWT_SECRET_NAME"; do
+          for secret_name in "$DATABASE_URL_SECRET_NAME" "$INTERNAL_SERVICE_TOKEN_SECRET_NAME" "$CLERK_SECRET_KEY_SECRET_NAME" "$GOVERNANCE_API_KEY_SECRET_NAME" "$COMPANION_API_KEY_SECRET_NAME" "$COMPANION_INTERNAL_JWT_SECRET_NAME"; do
             gcloud secrets versions access latest --secret="$secret_name" --project="$GCP_PROJECT_ID" >/dev/null
           done
-          echo "SECRET_FLAGS=DATABASE_URL=${DATABASE_URL_SECRET_NAME}:latest,CLERK_SECRET_KEY=${CLERK_SECRET_KEY_SECRET_NAME}:latest,GOVERNANCE_API_KEY=${GOVERNANCE_API_KEY_SECRET_NAME}:latest,COMPANION_API_KEY=${COMPANION_API_KEY_SECRET_NAME}:latest,COMPANION_INTERNAL_JWT_SECRET=${COMPANION_INTERNAL_JWT_SECRET_NAME}:latest" >> "$GITHUB_ENV"
+          echo "SECRET_FLAGS=DATABASE_URL=${DATABASE_URL_SECRET_NAME}:latest,INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN_SECRET_NAME}:latest,CLERK_SECRET_KEY=${CLERK_SECRET_KEY_SECRET_NAME}:latest,GOVERNANCE_API_KEY=${GOVERNANCE_API_KEY_SECRET_NAME}:latest,COMPANION_API_KEY=${COMPANION_API_KEY_SECRET_NAME}:latest,COMPANION_INTERNAL_JWT_SECRET=${COMPANION_INTERNAL_JWT_SECRET_NAME}:latest" >> "$GITHUB_ENV"
       - name: Deploy core to Cloud Run STG
         run: |
           set -euo pipefail
@@ -294,7 +295,7 @@ jobs:
           core_url="$(gcloud run services describe pymes-core --project="$GCP_PROJECT_ID" --region="$GCP_REGION" --format='value(status.url)')"
           gcloud secrets versions access latest --secret="$DATABASE_URL_SECRET_NAME" --project="$GCP_PROJECT_ID" >/dev/null
           echo "PYMES_CORE_URL=$core_url" >> "$GITHUB_ENV"
-          echo "SECRET_FLAGS=DATABASE_URL=${DATABASE_URL_SECRET_NAME}:latest" >> "$GITHUB_ENV"
+          echo "SECRET_FLAGS=DATABASE_URL=${DATABASE_URL_SECRET_NAME}:latest,INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN_SECRET_NAME}:latest" >> "$GITHUB_ENV"
       - name: Deploy vertical to Cloud Run STG
         if: ${{ github.event_name == 'push' || github.event.inputs.product == 'all' || github.event.inputs.product == 'verticals' || github.event.inputs.product == matrix.id }}
         run: |

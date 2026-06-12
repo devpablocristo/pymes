@@ -272,9 +272,11 @@ main() {
   local admin_password="${NONPRD_SQL_ADMIN_PASSWORD:-$(random_password)}"
   local stg_password="${PYMES_STG_APP_PASSWORD:-$(random_password)}"
   local preview_password="${PYMES_PREVIEW_APP_PASSWORD:-$(random_password)}"
+  local internal_service_token="${PYMES_INTERNAL_SERVICE_TOKEN_STG:-$(random_password)}"
 
   ensure_secret "$NONPRD_DB_PROJECT_ID" nonprd-sql-admin-password "$admin_password"
   ensure_secret "$STG_PROJECT_ID" pymes-preview-app-password "$preview_password"
+  ensure_secret "$STG_PROJECT_ID" pymes-internal-service-token-stg "$internal_service_token"
 
   ensure_sql_user "$SQL_ADMIN_USER" "$admin_password"
   ensure_sql_user "$STG_DB_USER" "$stg_password"

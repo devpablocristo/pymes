@@ -56,6 +56,7 @@ env:
   PREVIEW_DB_PASSWORD_SECRET_NAME: pymes-preview-app-password
   SQL_ADMIN_USER: nonprd_sql_admin
   SQL_ADMIN_PASSWORD_SECRET_NAME: nonprd-sql-admin-password
+  INTERNAL_SERVICE_TOKEN_SECRET_NAME: pymes-internal-service-token-stg
   CLERK_SECRET_KEY_SECRET_NAME: pymes-clerk-secret-key-stg
   GOVERNANCE_API_KEY_SECRET_NAME: pymes-governance-api-key-stg
   COMPANION_API_KEY_SECRET_NAME: pymes-companion-api-key-stg
@@ -224,7 +225,7 @@ jobs:
           service="${{ matrix.service }}-pr-${pr}"
           db_secret="pymes-database-url-pr-${pr}"
           frontend_url="https://${FIREBASE_HOSTING_SITE_ID}--pr-${pr}.web.app"
-          secret_flags="DATABASE_URL=${db_secret}:latest"
+          secret_flags="DATABASE_URL=${db_secret}:latest,INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN_SECRET_NAME}:latest"
           env_vars="ENVIRONMENT=preview,PREVIEW_PR=${pr},AUTH_ENABLE_JWT=true,AUTH_ALLOW_API_KEY=true,FRONTEND_URL=${frontend_url}"
           runtime_sa="$VERTICAL_RUNTIME_SERVICE_ACCOUNT"
           if [[ "${{ matrix.id }}" == "core" ]]; then

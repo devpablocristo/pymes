@@ -1,0 +1,64 @@
+# GitHub Flow Environments
+
+Pymes deploya desde GitHub Flow:
+
+- PR contra `main`: CI y preview efímero.
+- Push a `main`: deploy automático a STG.
+- PRD: workflow manual con `environment: prd`.
+
+## Proyectos
+
+- STG: `pymes-stg-352318`
+- PRD preparado: `pymes-prd-352318`
+- DBs non-prod compartidas: `pymes-dev-352318`
+
+La instancia Cloud SQL compartida es:
+
+```text
+pymes-dev-352318:us-central1:pymes-dev-db
+```
+
+No se crean instancias Cloud SQL en STG ni en PRD desde estos workflows.
+
+## Bases Non-Prod
+
+- Legacy: `pymes`
+- STG: `pymes_stg`
+- Preview: `pymes_preview_pr_<PR>`
+
+STG usa el secret `pymes-database-url-stg` en `pymes-stg-352318`.
+Preview crea el secret `pymes-database-url-pr-<PR>` en `pymes-stg-352318`
+y lo elimina en `preview-cleanup.yml`.
+
+## Workflows
+
+- `ci.yml`: corre en PRs a `main` y pushes a `main`.
+- `deploy-stg.yml`: despliega `all`, `core`, `ui`, `verticals` o una vertical puntual.
+- `deploy-prd.yml`: valida que PRD no use proyectos ni DB non-prod; no trae default productivo.
+- `preview-pr.yml`: dispara preview en PRs no draft.
+- `preview-deploy.yml`: reusable/manual para previews.
+- `preview-cleanup.yml`: borra Cloud Run preview, Firebase channel, DB preview y secret preview.
+- `preview-audit.yml`: lista previews sin PR abierto.
+
+## Preparacion GCP
+
+El script idempotente está en:
+
+```bash
+scripts/infra/setup_gcp_github_flow.sh
+```
+
+Variables habituales:
+
+```bash
+export BILLING_ACCOUNT_ID=...
+export STG_FOLDER_ID=...
+export PRD_FOLDER_ID=...
+export NONPRD_DBS_FOLDER_ID=...
+export WIF_PRINCIPAL_SET='principalSet://iam.googleapis.com/projects/.../locations/global/workloadIdentityPools/github-actions-pool/attribute.repository/devpablocristo/pymes'
+scripts/infra/setup_gcp_github_flow.sh
+```
+
+El script renombra `pymes-dev-352318` a `NONPRD DBs`, prepara STG/PRD,
+crea SAs, roles, secrets y bases lógicas, y aborta si STG tiene Cloud SQL
+instances.

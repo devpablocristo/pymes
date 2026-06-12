@@ -1,0 +1,25 @@
+name: Preview PR
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+  id-token: write
+
+concurrency:
+  group: pymes-preview-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    if: ${{ !github.event.pull_request.draft }}
+    uses: ./.github/workflows/preview-deploy.yml
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+      ref: ${{ github.event.pull_request.head.sha }}
+      product: all
+    secrets: inherit

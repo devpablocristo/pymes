@@ -2,10 +2,11 @@ name: CI
 
 on:
   pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
-      - develop
   workflow_dispatch:
 
 env:
@@ -163,8 +164,8 @@ jobs:
           VITE_MEDICAL_API_URL: ${{ secrets.VITE_MEDICAL_API_URL_DEV }}
         run: npm run build
 
-      # Hosting DEV: solo en merge/push a `develop` vía `.github/workflows/deploy-dev-ui.yml`
-      # (WIF + smoke). No desplegar DEV desde pushes a `main`.
+      # Hosting STG: solo en merge/push a `main` vía `.github/workflows/deploy-stg.yml`
+      # (WIF + smoke).
 
   audits:
     runs-on: ubuntu-latest

@@ -11,6 +11,7 @@
 set -euo pipefail
 
 PROJECT_ID="${PROJECT_ID:-}"
+DATABASE_URL_SECRET_NAME="${DATABASE_URL_SECRET_NAME:-DATABASE_URL}"
 MODE="${1:-}"
 
 if [[ -z "$PROJECT_ID" ]]; then
@@ -31,7 +32,7 @@ if [[ -z "$PROXY_BIN" || ! -x "$PROXY_BIN" ]]; then
   exit 1
 fi
 
-DBRAW="$(gcloud secrets versions access latest --secret=DATABASE_URL --project="$PROJECT_ID")"
+DBRAW="$(gcloud secrets versions access latest --secret="$DATABASE_URL_SECRET_NAME" --project="$PROJECT_ID")"
 export DBRAW
 
 eval "$(python3 <<'PY'
@@ -59,7 +60,7 @@ echo "Base de datos: $PGDATABASE (usuario $PGUSER)"
 
 conn_project="${PGINSTANCE_CONN%%:*}"
 if [[ "$conn_project" != "$PROJECT_ID" ]]; then
-  echo "ERROR: DATABASE_URL apunta a Cloud SQL del proyecto '$conn_project', distinto de PROJECT_ID='$PROJECT_ID'." >&2
+  echo "ERROR: $DATABASE_URL_SECRET_NAME apunta a Cloud SQL del proyecto '$conn_project', distinto de PROJECT_ID='$PROJECT_ID'." >&2
   if [[ "${PYMES_SQL_FIX_ALLOW_FOREIGN_INSTANCE:-}" != "yes" ]]; then
     exit 2
   fi

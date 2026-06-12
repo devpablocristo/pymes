@@ -1,0 +1,99 @@
+name: Deploy PRD
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Tag, SHA o rama a desplegar"
+        required: true
+      product:
+        description: "Producto a desplegar"
+        required: true
+        type: choice
+        options:
+          - all
+          - core
+          - ui
+          - verticals
+          - workshops
+          - professionals
+          - beauty
+          - restaurants
+          - medical
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  GCP_REGION: us-central1
+  GCP_PROJECT_ID: ${{ vars.PYMES_PRD_PROJECT_ID }}
+  ARTIFACT_REGISTRY: ${{ vars.PYMES_PRD_ARTIFACT_REGISTRY || 'pymes' }}
+  CLOUDSQL_INSTANCE: ${{ vars.PYMES_PRD_CLOUDSQL_INSTANCE }}
+  FIREBASE_HOSTING_SITE_ID: ${{ vars.PYMES_PRD_FIREBASE_HOSTING_SITE_ID }}
+  WIF_PROVIDER: ${{ vars.PYMES_PRD_WIF_PROVIDER }}
+  WIF_SERVICE_ACCOUNT: ${{ vars.PYMES_PRD_WIF_SERVICE_ACCOUNT }}
+  CORE_RUNTIME_SERVICE_ACCOUNT: ${{ vars.PYMES_PRD_CORE_RUNTIME_SERVICE_ACCOUNT }}
+  VERTICAL_RUNTIME_SERVICE_ACCOUNT: ${{ vars.PYMES_PRD_VERTICAL_RUNTIME_SERVICE_ACCOUNT }}
+  DATABASE_URL_SECRET_NAME: ${{ vars.PYMES_PRD_DATABASE_URL_SECRET_NAME }}
+  CLERK_SECRET_KEY_SECRET_NAME: ${{ vars.PYMES_PRD_CLERK_SECRET_KEY_SECRET_NAME }}
+  GOVERNANCE_API_KEY_SECRET_NAME: ${{ vars.PYMES_PRD_GOVERNANCE_API_KEY_SECRET_NAME }}
+  COMPANION_API_KEY_SECRET_NAME: ${{ vars.PYMES_PRD_COMPANION_API_KEY_SECRET_NAME }}
+  COMPANION_INTERNAL_JWT_SECRET_NAME: ${{ vars.PYMES_PRD_COMPANION_INTERNAL_JWT_SECRET_NAME }}
+  GOVERNANCE_URL: ${{ vars.PYMES_PRD_GOVERNANCE_URL }}
+  COMPANION_INTERNAL_URL: ${{ vars.PYMES_PRD_COMPANION_INTERNAL_URL }}
+  JWKS_URL: ${{ vars.PYMES_PRD_JWKS_URL }}
+  JWT_ISSUER: ${{ vars.PYMES_PRD_JWT_ISSUER }}
+  FRONTEND_CLERK_PUBLISHABLE_KEY: ${{ vars.PYMES_PRD_CLERK_PUBLISHABLE_KEY }}
+  FIREBASE_TOOLS_VERSION: "13"
+
+concurrency:
+  group: pymes-deploy-prd
+  cancel-in-progress: false
+
+jobs:
+  guardrails:
+    runs-on: ubuntu-latest
+    environment: prd
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+      - name: Refuse non-prod defaults
+        run: |
+          set -euo pipefail
+          required=(GCP_PROJECT_ID CLOUDSQL_INSTANCE FIREBASE_HOSTING_SITE_ID WIF_PROVIDER WIF_SERVICE_ACCOUNT CORE_RUNTIME_SERVICE_ACCOUNT VERTICAL_RUNTIME_SERVICE_ACCOUNT DATABASE_URL_SECRET_NAME GOVERNANCE_URL COMPANION_INTERNAL_URL JWKS_URL JWT_ISSUER FRONTEND_CLERK_PUBLISHABLE_KEY)
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::$name debe estar configurado en vars del environment prd."
+              exit 1
+            fi
+          done
+          if [[ "$GCP_PROJECT_ID" == "pymes-dev-352318" || "$GCP_PROJECT_ID" == "pymes-stg-352318" || "$CLOUDSQL_INSTANCE" == pymes-dev-352318:* ]]; then
+            echo "::error::PRD no puede usar proyectos ni Cloud SQL non-prod por default."
+            exit 1
+          fi
+          python3 -m pip install --user pyyaml
+          python3 scripts/infra/validate_verticals.py
+          python3 scripts/infra/generate_firebase.py --check
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: guardrails
+    environment: prd
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+      - name: Deployment intentionally gated
+        run: |
+          echo "::notice::PRD guardrails passed. Configure concrete PRD DB/secrets and split deploy steps before enabling production traffic."
+          echo "::notice::No non-prod DB fallback was used."

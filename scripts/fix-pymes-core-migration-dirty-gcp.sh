@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Limpia estado "dirty" de golang-migrate para core en la BD configurada en Secret Manager.
-# Pensado para dev (datos prescindibles). Solo toca la base indicada en DATABASE_URL (ej. .../pymes).
+# Pensado para non-prod (datos prescindibles). Solo toca la base indicada en el secret
+# DATABASE_URL_SECRET_NAME (default: DATABASE_URL; ej. .../pymes_stg).
 #
 # Requisitos: gcloud autenticado, Cloud SQL Client IAM sobre la instancia del secreto,
 # curl/psql, y cloud-sql-proxy en PATH o en CLOUD_SQL_PROXY_BIN.
@@ -22,6 +23,7 @@
 set -euo pipefail
 
 PROJECT_ID="${PROJECT_ID:-}"
+DATABASE_URL_SECRET_NAME="${DATABASE_URL_SECRET_NAME:-DATABASE_URL}"
 MODE="${1:-}"
 ARG="${2:-}"
 
@@ -43,7 +45,7 @@ if [[ -z "$PROXY_BIN" || ! -x "$PROXY_BIN" ]]; then
   exit 1
 fi
 
-DBRAW="$(gcloud secrets versions access latest --secret=DATABASE_URL --project="$PROJECT_ID")"
+DBRAW="$(gcloud secrets versions access latest --secret="$DATABASE_URL_SECRET_NAME" --project="$PROJECT_ID")"
 export DBRAW
 
 eval "$(python3 <<'PY'
@@ -71,9 +73,9 @@ echo "Base de datos: $PGDATABASE (usuario $PGUSER)"
 
 conn_project="${PGINSTANCE_CONN%%:*}"
 if [[ "$conn_project" != "$PROJECT_ID" ]]; then
-  echo "ERROR: DATABASE_URL apunta a Cloud SQL del proyecto '$conn_project', distinto de PROJECT_ID='$PROJECT_ID'." >&2
+  echo "ERROR: $DATABASE_URL_SECRET_NAME apunta a Cloud SQL del proyecto '$conn_project', distinto de PROJECT_ID='$PROJECT_ID'." >&2
   echo "No se ejecuta nada para evitar tocar infraestructura ajena (p. ej. Ponti)." >&2
-  echo "Corregí el secreto DATABASE_URL en este proyecto o exportá PYMES_SQL_FIX_ALLOW_FOREIGN_INSTANCE=yes si asumís el riesgo." >&2
+  echo "Corregí el secreto $DATABASE_URL_SECRET_NAME en este proyecto o exportá PYMES_SQL_FIX_ALLOW_FOREIGN_INSTANCE=yes si asumís el riesgo." >&2
   if [[ "${PYMES_SQL_FIX_ALLOW_FOREIGN_INSTANCE:-}" != "yes" ]]; then
     exit 2
   fi

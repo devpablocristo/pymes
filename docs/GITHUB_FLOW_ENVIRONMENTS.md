@@ -69,9 +69,9 @@ script no renombra el proyecto a `NONPRD DBs`; lo mantiene como `Pymes STG`.
 Prepara SAs, roles, secrets y bases logicas, y valida que se use la instancia
 existente `pymes-dev-db`.
 
-El Workload Identity Provider debe aceptar el flujo historico por `develop` y
+El Workload Identity Provider debe aceptar el deploy STG/PRD desde `main` y
 los previews de PR contra `main`:
 
 ```text
-((assertion.repository=='devpablocristo/pymes' || assertion.repository=='devpablocristo/companion' || assertion.repository=='devpablocristo/nexus' || assertion.repository=='devpablocristo/axis') && assertion.ref=='refs/heads/develop') || (assertion.repository=='devpablocristo/pymes' && assertion.event_name=='pull_request' && assertion.base_ref=='main')
+assertion.repository=='devpablocristo/pymes' && (assertion.ref=='refs/heads/main' || (assertion.event_name=='pull_request' && assertion.base_ref=='main'))
 ```

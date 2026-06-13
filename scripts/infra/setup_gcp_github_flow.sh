@@ -37,7 +37,7 @@ SQL_ADMIN_USER="${SQL_ADMIN_USER:-nonprd_sql_admin}"
 WIF_PROVIDER_PROJECT_ID="${WIF_PROVIDER_PROJECT_ID:-}"
 WIF_POOL_ID="${WIF_POOL_ID:-github-actions-pool}"
 WIF_PROVIDER_ID="${WIF_PROVIDER_ID:-github-actions-provider}"
-WIF_PROVIDER_CONDITION="${WIF_PROVIDER_CONDITION:-((assertion.repository=='devpablocristo/pymes' || assertion.repository=='devpablocristo/companion' || assertion.repository=='devpablocristo/nexus' || assertion.repository=='devpablocristo/axis') && assertion.ref=='refs/heads/develop') || (assertion.repository=='devpablocristo/pymes' && assertion.event_name=='pull_request' && assertion.base_ref=='main')}"
+WIF_PROVIDER_CONDITION="${WIF_PROVIDER_CONDITION:-assertion.repository=='devpablocristo/pymes' && (assertion.ref=='refs/heads/main' || (assertion.event_name=='pull_request' && assertion.base_ref=='main'))}"
 
 required_apis=(
   run.googleapis.com

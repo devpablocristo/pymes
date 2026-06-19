@@ -1,3 +1,6 @@
+import { PendingConfirmationsPanel } from '@devpablocristo/platform-chat-ui';
+import '@devpablocristo/platform-chat-ui/styles.css';
+
 type ChatComposerProps = {
   input: string;
   busy: boolean;
@@ -21,14 +24,13 @@ export function ChatComposer({
 }: ChatComposerProps) {
   return (
     <>
-      {pendingConfirmations.length > 0 ? (
-        <div className="cht__pending-bar">
-          <span>Pendientes: {pendingConfirmations.join(', ')}</span>
-          <button type="button" className="btn-secondary btn-sm" disabled={busy} onClick={onConfirmPending}>
-            Confirmar acciones
-          </button>
-        </div>
-      ) : null}
+      <PendingConfirmationsPanel
+        items={pendingConfirmations}
+        busy={busy}
+        title="Pendientes"
+        confirmLabel="Confirmar acciones"
+        onConfirm={onConfirmPending}
+      />
       <div className="cht__input-bar">
         <input
           aria-label={inputPrompt}

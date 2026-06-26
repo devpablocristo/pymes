@@ -61,8 +61,8 @@ env:
   GOVERNANCE_API_KEY_SECRET_NAME: pymes-governance-api-key-stg
   COMPANION_API_KEY_SECRET_NAME: pymes-companion-api-key-stg
   COMPANION_INTERNAL_JWT_SECRET_NAME: pymes-companion-internal-jwt-secret-stg
-  GOVERNANCE_URL: https://axis-nexus-7laivodnma-uc.a.run.app
-  COMPANION_INTERNAL_URL: https://axis-companion-7laivodnma-uc.a.run.app
+  GOVERNANCE_URL: https://axis-nexus-sir42f2ama-uc.a.run.app
+  COMPANION_INTERNAL_URL: https://axis-companion-sir42f2ama-uc.a.run.app
   COMPANION_INTERNAL_JWT_ISSUER: axis-bff
   COMPANION_INTERNAL_JWT_AUDIENCE: companion
   JWKS_URL: ${{ vars.PYMES_STG_JWKS_URL }}

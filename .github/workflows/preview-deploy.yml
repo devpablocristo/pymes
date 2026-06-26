@@ -45,17 +45,17 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   GCP_REGION: us-central1
-  GCP_PROJECT_ID: pymes-dev-352318
-  ARTIFACT_REGISTRY: pymes
-  CLOUDSQL_INSTANCE: pymes-dev-352318:us-central1:pymes-dev-db
-  FIREBASE_HOSTING_SITE_ID: pymes-dev-352318
-  WIF_PROVIDER: ${{ vars.PYMES_STG_WIF_PROVIDER || 'projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider' }}
-  WIF_SERVICE_ACCOUNT: pymes-github-actions-stg@pymes-dev-352318.iam.gserviceaccount.com
-  CORE_RUNTIME_SERVICE_ACCOUNT: pymes-core-runtime-stg@pymes-dev-352318.iam.gserviceaccount.com
-  VERTICAL_RUNTIME_SERVICE_ACCOUNT: pymes-vertical-runtime-stg@pymes-dev-352318.iam.gserviceaccount.com
+  GCP_PROJECT_ID: new-ponti-dev
+  ARTIFACT_REGISTRY: pymes-preview
+  CLOUDSQL_INSTANCE: new-ponti-dev:us-central1:new-ponti-db-dev
+  FIREBASE_HOSTING_SITE_ID: pymes-preview-dev
+  WIF_PROVIDER: ${{ vars.PYMES_STG_WIF_PROVIDER || 'projects/1087442197188/locations/global/workloadIdentityPools/github-actions-pool/providers/github-pymes' }}
+  WIF_SERVICE_ACCOUNT: github-actions@new-ponti-dev.iam.gserviceaccount.com
+  CORE_RUNTIME_SERVICE_ACCOUNT: cloudrun-sa@new-ponti-dev.iam.gserviceaccount.com
+  VERTICAL_RUNTIME_SERVICE_ACCOUNT: cloudrun-sa@new-ponti-dev.iam.gserviceaccount.com
   PREVIEW_DB_PASSWORD_SECRET_NAME: pymes-preview-app-password
-  SQL_ADMIN_USER: nonprd_sql_admin
-  SQL_ADMIN_PASSWORD_SECRET_NAME: nonprd-sql-admin-password
+  SQL_ADMIN_USER: pymes_preview_admin
+  SQL_ADMIN_PASSWORD_SECRET_NAME: pymes-sql-admin-password-preview
   INTERNAL_SERVICE_TOKEN_SECRET_NAME: pymes-internal-service-token-stg
   CLERK_SECRET_KEY_SECRET_NAME: pymes-clerk-secret-key-stg
   GOVERNANCE_API_KEY_SECRET_NAME: pymes-governance-api-key-stg
@@ -159,7 +159,6 @@ jobs:
           secret_name="pymes-database-url-pr-${pr}"
           password="$(gcloud secrets versions access latest --secret="$PREVIEW_DB_PASSWORD_SECRET_NAME" --project="$GCP_PROJECT_ID")"
           password_encoded="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$password")"
-          gcloud sql databases create "$db_name" --instance=pymes-dev-db --project=pymes-dev-352318 >/dev/null 2>&1 || true
           sudo apt-get update
           sudo apt-get install -y postgresql-client
           curl -fsSL -o /tmp/cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.18.3/cloud-sql-proxy.linux.amd64
@@ -168,8 +167,15 @@ jobs:
           proxy_pid=$!
           cleanup() { kill "$proxy_pid" 2>/dev/null || true; wait "$proxy_pid" 2>/dev/null || true; }
           trap cleanup EXIT
-          sleep 2
-          admin_password="$(gcloud secrets versions access latest --secret="$SQL_ADMIN_PASSWORD_SECRET_NAME" --project=pymes-dev-352318)"
+          admin_password="$(gcloud secrets versions access latest --secret="$SQL_ADMIN_PASSWORD_SECRET_NAME" --project=new-ponti-dev)"
+          for _ in $(seq 1 30); do
+            PGPASSWORD="$admin_password" psql -h 127.0.0.1 -p 15434 -U "$SQL_ADMIN_USER" -d postgres -c 'select 1' >/dev/null 2>&1 && break
+            sleep 2
+          done
+          db_exists="$(PGPASSWORD="$admin_password" psql -h 127.0.0.1 -p 15434 -U "$SQL_ADMIN_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${db_name}'")"
+          if [[ "$db_exists" != "1" ]]; then
+            PGPASSWORD="$admin_password" psql -h 127.0.0.1 -p 15434 -U "$SQL_ADMIN_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"${db_name}\""
+          fi
           PGPASSWORD="$admin_password" psql -h 127.0.0.1 -p 15434 -U "$SQL_ADMIN_USER" -d "$db_name" -v ON_ERROR_STOP=1 <<SQL
           GRANT ALL PRIVILEGES ON DATABASE ${db_name} TO pymes_preview_app;
           GRANT USAGE, CREATE ON SCHEMA public TO pymes_preview_app;

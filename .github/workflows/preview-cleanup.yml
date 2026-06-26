@@ -18,11 +18,14 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   GCP_REGION: us-central1
-  GCP_PROJECT_ID: pymes-dev-352318
-  FIREBASE_HOSTING_SITE_ID: pymes-dev-352318
-  WIF_PROVIDER: ${{ vars.PYMES_STG_WIF_PROVIDER || 'projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider' }}
-  WIF_SERVICE_ACCOUNT: pymes-github-actions-stg@pymes-dev-352318.iam.gserviceaccount.com
+  GCP_PROJECT_ID: new-ponti-dev
+  FIREBASE_HOSTING_SITE_ID: pymes-preview-dev
+  WIF_PROVIDER: ${{ vars.PYMES_STG_WIF_PROVIDER || 'projects/1087442197188/locations/global/workloadIdentityPools/github-actions-pool/providers/github-pymes' }}
+  WIF_SERVICE_ACCOUNT: github-actions@new-ponti-dev.iam.gserviceaccount.com
   FIREBASE_TOOLS_VERSION: "13"
+  CLOUDSQL_INSTANCE: new-ponti-dev:us-central1:new-ponti-db-dev
+  SQL_ADMIN_USER: pymes_preview_admin
+  SQL_ADMIN_SECRET: pymes-sql-admin-password-preview
 
 jobs:
   cleanup:
@@ -53,5 +56,16 @@ jobs:
             --site "$FIREBASE_HOSTING_SITE_ID" \
             --force \
             --non-interactive >/dev/null 2>&1 || true
-          gcloud sql databases delete "pymes_preview_pr_${pr}" --instance=pymes-dev-db --project=pymes-dev-352318 --quiet >/dev/null 2>&1 || true
+          db="pymes_preview_pr_${pr}"
+          if [[ "$db" =~ ^pymes_preview_pr_[1-9][0-9]*$ ]]; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+            curl -fsSL -o /tmp/cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.18.3/cloud-sql-proxy.linux.amd64
+            chmod +x /tmp/cloud-sql-proxy
+            /tmp/cloud-sql-proxy --address 127.0.0.1 --port 15434 "$CLOUDSQL_INSTANCE" &
+            proxy_pid=$!; trap 'kill "$proxy_pid" 2>/dev/null || true' EXIT
+            admin_password="$(gcloud secrets versions access latest --secret="$SQL_ADMIN_SECRET" --project="$GCP_PROJECT_ID")"
+            export PGPASSWORD="$admin_password"
+            for _ in $(seq 1 30); do psql -h 127.0.0.1 -p 15434 -U "$SQL_ADMIN_USER" -d postgres -c 'select 1' >/dev/null 2>&1 && break; sleep 2; done
+            psql -h 127.0.0.1 -p 15434 -U "$SQL_ADMIN_USER" -d postgres -c "DROP DATABASE IF EXISTS \"$db\" WITH (FORCE);" >/dev/null 2>&1 || true
+          fi
           gcloud secrets delete "pymes-database-url-pr-${pr}" --project="$GCP_PROJECT_ID" --quiet >/dev/null 2>&1 || true

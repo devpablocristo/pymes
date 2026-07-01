@@ -81,5 +81,13 @@ export function getVisibleModuleIds(): Set<string> {
     visible.add('reports');
   }
 
+  // Contabilidad y Fiscal (ARCA): transversales (no atados a una vertical).
+  // Requieren actividad comercial (billing) para tener sentido.
+  if (profile.usesBilling || exploring) {
+    visible.add('ledgerAccounts');
+    visible.add('ledger');
+    visible.add('fiscal');
+  }
+
   return visible;
 }

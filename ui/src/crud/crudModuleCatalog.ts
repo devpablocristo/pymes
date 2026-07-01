@@ -31,7 +31,8 @@ type CrudModuleId =
   | 'bikeWorkOrders'
   | 'restaurantDiningAreas'
   | 'restaurantDiningTables'
-  | 'occupationalHealthExams';
+  | 'occupationalHealthExams'
+  | 'ledgerAccounts';
 
 type CrudModuleDefaults = {
   title: string;
@@ -89,6 +90,11 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
     title: 'Medicina laboral',
     navLabel: 'Exámenes laborales',
     labelPlural: 'exámenes laborales',
+  },
+  ledgerAccounts: {
+    title: 'Plan de cuentas',
+    navLabel: 'Plan de cuentas',
+    labelPlural: 'cuentas contables',
   },
 };
 
@@ -294,6 +300,11 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     group: 'medical',
     icon: 'ML',
     summary: 'Exámenes preocupacionales, periódicos, reintegros y egresos para medicina laboral.',
+  },
+  ledgerAccounts: {
+    group: 'accounting',
+    icon: 'PC',
+    summary: 'Plan de cuentas contable (activo/pasivo/patrimonio/ingreso/egreso). Base de las posting rules.',
   },
 };
 

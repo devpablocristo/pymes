@@ -9,7 +9,8 @@ type CrudModule =
   | typeof import('./resourceConfigs.professionals')
   | typeof import('./resourceConfigs.medical')
   | typeof import('./resourceConfigs.workshops')
-  | typeof import('./resourceConfigs.restaurants');
+  | typeof import('./resourceConfigs.restaurants')
+  | typeof import('./resourceConfigs.accounting');
 
 /** Clave del bundle lazy (`resourceConfigs.*`). Debe cubrir todo recurso con entrada en `defineCrudDomain`. */
 type CrudLazyChunk =
@@ -21,6 +22,7 @@ type CrudLazyChunk =
   | 'medical'
   | 'workshops'
   | 'restaurants'
+  | 'accounting'
   | 'common';
 
 const COMMERCIAL_CRUD_IDS = new Set<string>([
@@ -62,6 +64,8 @@ const WORKSHOPS_CRUD_IDS = new Set<string>(['workshopVehicles', 'carWorkOrders',
 
 const RESTAURANTS_CRUD_IDS = new Set<string>(['restaurantDiningAreas', 'restaurantDiningTables']);
 
+const ACCOUNTING_CRUD_IDS = new Set<string>(['ledgerAccounts']);
+
 function resolveCrudLazyChunk(resourceId: string): CrudLazyChunk {
   if (COMMERCIAL_CRUD_IDS.has(resourceId)) return 'commercial';
   if (OPERATIONS_CRUD_IDS.has(resourceId)) return 'operations';
@@ -71,6 +75,7 @@ function resolveCrudLazyChunk(resourceId: string): CrudLazyChunk {
   if (MEDICAL_CRUD_IDS.has(resourceId)) return 'medical';
   if (WORKSHOPS_CRUD_IDS.has(resourceId)) return 'workshops';
   if (RESTAURANTS_CRUD_IDS.has(resourceId)) return 'restaurants';
+  if (ACCOUNTING_CRUD_IDS.has(resourceId)) return 'accounting';
   return 'common';
 }
 
@@ -107,6 +112,9 @@ function loadCrudModule(resourceId: string): Promise<CrudModule> {
       break;
     case 'restaurants':
       promise = import('./resourceConfigs.restaurants');
+      break;
+    case 'accounting':
+      promise = import('./resourceConfigs.accounting');
       break;
     default:
       promise = import('./resourceConfigs');

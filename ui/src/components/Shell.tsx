@@ -47,6 +47,9 @@ const PRIMARY_SIDEBAR_MODULE_IDS = new Set([
   'inventory',
   'cashflow',
   'reports',
+  'ledgerAccounts',
+  'ledger',
+  'fiscal',
 ]);
 
 // Tabler icon helper
@@ -66,6 +69,9 @@ const MODULE_ICON_MAP: Record<string, string> = {
   inventory:  'box',
   cashflow:   'chart-bar',
   reports:    'chart-line',
+  ledgerAccounts: 'list-numbers',
+  ledger:     'book-2',
+  fiscal:     'receipt-2',
 };
 
 export function Shell({ children }: { children: ReactNode }) {

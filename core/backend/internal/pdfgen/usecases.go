@@ -32,10 +32,21 @@ type Usecases struct {
 	quotes QuotePort
 	sales  SalePort
 	admin  AdminPort
+	fiscal FiscalPort
 }
 
-func NewUsecases(quotes QuotePort, sales SalePort, admin AdminPort) *Usecases {
-	return &Usecases{quotes: quotes, sales: sales, admin: admin}
+// Option configura dependencias opcionales sin romper la firma del constructor.
+type Option func(*Usecases)
+
+// WithFiscal cablea el lector de comprobantes fiscales (necesario para el PDF fiscal).
+func WithFiscal(f FiscalPort) Option { return func(u *Usecases) { u.fiscal = f } }
+
+func NewUsecases(quotes QuotePort, sales SalePort, admin AdminPort, opts ...Option) *Usecases {
+	u := &Usecases{quotes: quotes, sales: sales, admin: admin}
+	for _, opt := range opts {
+		opt(u)
+	}
+	return u
 }
 
 func (u *Usecases) RenderQuotePDF(ctx context.Context, tenantID, quoteID uuid.UUID) ([]byte, string, error) {

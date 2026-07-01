@@ -8,9 +8,19 @@ import (
 	"github.com/google/uuid"
 
 	admindomain "github.com/devpablocristo/pymes/core/backend/internal/admin/usecases/domain"
+	fiscaldomain "github.com/devpablocristo/pymes/core/backend/internal/fiscal/usecases/domain"
 	quotedomain "github.com/devpablocristo/pymes/core/backend/internal/quotes/usecases/domain"
 	saledomain "github.com/devpablocristo/pymes/core/backend/internal/sales/usecases/domain"
 )
+
+type fakeFiscal struct {
+	voucher fiscaldomain.FiscalVoucher
+	err     error
+}
+
+func (f *fakeFiscal) GetVoucher(_ context.Context, _, _ uuid.UUID) (fiscaldomain.FiscalVoucher, error) {
+	return f.voucher, f.err
+}
 
 type fakeQuotes struct {
 	quote quotedomain.Quote
@@ -122,6 +132,65 @@ func TestRenderSaleReceiptHappyPath(t *testing.T) {
 	}
 	if len(pdf) < 100 {
 		t.Fatalf("expected valid PDF bytes, got %d bytes", len(pdf))
+	}
+}
+
+func TestRenderFiscalVoucherHappyPath(t *testing.T) {
+	t.Parallel()
+	orgID := uuid.New()
+	voucherID := uuid.New()
+	emitted := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
+
+	uc := NewUsecases(
+		&fakeQuotes{}, &fakeSales{}, // sin venta asociada: se renderiza solo con datos del voucher
+		&fakeAdmin{settings: admindomain.TenantSettings{
+			BusinessName: "Estudio Fiscal SA", BusinessTaxID: "20111111112", Currency: "ARS",
+		}},
+		WithFiscal(&fakeFiscal{voucher: fiscaldomain.FiscalVoucher{
+			ID: voucherID, OrgID: orgID, VoucherType: 6, PointOfSale: 3, CbteNro: 11,
+			DocTipo: 99, DocNro: "0", CondicionIVAReceptor: 5, Currency: "PES", ExchangeRate: 1,
+			ImpNeto: 100, ImpIVA: 21, ImpTotal: 121, Status: "authorized",
+			CAE: "75000000000001", CAEVto: "20260801", EmittedAt: &emitted,
+			QRURL: "https://www.afip.gob.ar/fe/qr/?p=eyJ2ZXIiOjF9",
+		}}),
+	)
+
+	pdf, filename, err := uc.RenderFiscalVoucher(context.Background(), orgID, voucherID)
+	if err != nil {
+		t.Fatalf("RenderFiscalVoucher() error = %v", err)
+	}
+	if filename != "comprobante-B-0003-00000011.pdf" {
+		t.Fatalf("unexpected filename: %s", filename)
+	}
+	if len(pdf) < 100 || string(pdf[:5]) != "%PDF-" {
+		t.Fatalf("expected valid PDF, got %d bytes", len(pdf))
+	}
+}
+
+func TestRenderFiscalVoucherNoFiscalPort(t *testing.T) {
+	t.Parallel()
+	uc := NewUsecases(&fakeQuotes{}, &fakeSales{}, &fakeAdmin{})
+	if _, _, err := uc.RenderFiscalVoucher(context.Background(), uuid.New(), uuid.New()); err == nil {
+		t.Fatal("expected error when fiscal port not configured")
+	}
+}
+
+func TestFiscalPresentationHelpers(t *testing.T) {
+	t.Parallel()
+	if voucherLetter(1) != "A" || voucherLetter(6) != "B" || voucherLetter(11) != "C" || voucherLetter(19) != "E" {
+		t.Fatalf("voucherLetter wrong")
+	}
+	if voucherTitle(8) != "NOTA DE CREDITO" || voucherTitle(6) != "FACTURA" || voucherTitle(7) != "NOTA DE DEBITO" {
+		t.Fatalf("voucherTitle wrong")
+	}
+	if fiscalNumber(fiscaldomain.FiscalVoucher{PointOfSale: 3, CbteNro: 11}) != "0003-00000011" {
+		t.Fatalf("fiscalNumber wrong")
+	}
+	if condIVALabel(1) != "Responsable Inscripto" || condIVALabel(5) != "Consumidor Final" || condIVALabel(6) != "Monotributo" {
+		t.Fatalf("condIVALabel wrong")
+	}
+	if fiscalCAEVto(fiscaldomain.FiscalVoucher{CAEVto: "20260801"}) != "01/08/2026" {
+		t.Fatalf("fiscalCAEVto wrong")
 	}
 }
 

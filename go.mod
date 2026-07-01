@@ -30,6 +30,7 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/xuri/excelize/v2 v2.10.1
+	go.mozilla.org/pkcs7 v0.9.0
 	golang.org/x/text v0.35.0
 	gorm.io/datatypes v1.2.7
 	gorm.io/gorm v1.31.1

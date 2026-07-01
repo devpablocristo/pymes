@@ -34,6 +34,8 @@ import (
 	"github.com/devpablocristo/pymes/core/backend/internal/dashboard"
 	"github.com/devpablocristo/pymes/core/backend/internal/dataio"
 	"github.com/devpablocristo/pymes/core/backend/internal/employees"
+	"github.com/devpablocristo/pymes/core/backend/internal/fiscal"
+	"github.com/devpablocristo/pymes/core/backend/internal/fiscal/arca"
 	"github.com/devpablocristo/pymes/core/backend/internal/governanceproxy"
 	"github.com/devpablocristo/pymes/core/backend/internal/inappnotifications"
 	"github.com/devpablocristo/pymes/core/backend/internal/internalapi"
@@ -191,6 +193,12 @@ func InitializeApp() *app.App {
 		logger.Warn().Err(err).Msg("invalid PAYMENT_GATEWAY_ENCRYPTION_KEY; mercado pago integration disabled")
 	}
 
+	fiscalRepo := fiscal.NewRepository(db)
+	fiscalUC := fiscal.NewUsecases(fiscalRepo, paymentGatewayCrypto, arca.NewClient(),
+		fiscal.WithSalesReader(fiscal.NewSalesReader(db)),
+		fiscal.WithReturnReader(fiscal.NewReturnReader(db)))
+	fiscalHandler := fiscal.NewHandler(fiscalUC)
+
 	// Cliente OAuth Google para sync de calendario. Si las env vars no están
 	// (caso típico en dev sin credenciales), el usecase queda con un cliente
 	// configurado pero `Validate()` falla en el primer call → el endpoint
@@ -284,7 +292,7 @@ func InitializeApp() *app.App {
 	employeesUC := employees.NewUsecases(employeesRepo, auditUC, employees.WithLifecycle(pymesLifecycle))
 
 	partyUC := party.NewUsecases(partyRepo, auditUC, party.WithTimeline(timelineUC), party.WithWebhooks(outwebhooksUC))
-	pdfgenUC := pdfgen.NewUsecases(quotesUC, salesUC, adminUC)
+	pdfgenUC := pdfgen.NewUsecases(quotesUC, salesUC, adminUC, pdfgen.WithFiscal(fiscalUC))
 
 	agentHandler := agent.NewHandler(agentUC, rbacUC)
 	auditHandler := audit.NewHandler(auditUC)
@@ -391,6 +399,7 @@ func InitializeApp() *app.App {
 			outwebhooksHandler,
 			accountsHandler,
 			ledgerHandler,
+			fiscalHandler,
 			customersHandler,
 			currencyHandler,
 			dashboardHandler,

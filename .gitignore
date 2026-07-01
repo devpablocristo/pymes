@@ -52,3 +52,7 @@ pymes-app/android/app/build/
 # Trabajo externo del diseñador (fork visual sobre main vieja). Source of
 # truth visual parcial — ver plan UI migration. NO debe commitearse al repo.
 wooko.com/
+
+# Referencia externa (GPLv2) estudiada para extrapolar el motor contable a core.
+# NO es parte del producto ni compatible en licencia — no debe trackearse.
+LedgerSMB-master/

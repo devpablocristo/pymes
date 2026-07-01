@@ -91,8 +91,6 @@ github.com/devpablocristo/platform/lifecycle/go v0.2.0 h1:yPqGPfZSu0KaRvU72dtet8
 github.com/devpablocristo/platform/lifecycle/go v0.2.0/go.mod h1:8XcEUg6JKgzL+Bg0widQ5kUenQ/ZbY2zWaTEkHJGg9Y=
 github.com/devpablocristo/platform/notifications/go v0.1.1 h1:UZGEIE/Js7K1DKMlNH/ceiVMXjXWwoALaqVgdqSlLUI=
 github.com/devpablocristo/platform/notifications/go v0.1.1/go.mod h1:+aS6MQQLfTzt3DWdqlZe/haUXG5Omc7tT56JGvcAX2U=
-github.com/devpablocristo/platform/observability/go v0.2.1 h1:lu5nefAmX6NTHbjRs4lhx6WUyvG2ubE3Jw1vP7q0Oec=
-github.com/devpablocristo/platform/observability/go v0.2.1/go.mod h1:5wQDDBbjRN2m1S1rcmZzfavQeXN6CPnDvGpgF19uU38=
 github.com/devpablocristo/platform/sdks/google-calendar/go v0.1.0 h1:yX+kfHQJ/8rw7bgk5hrNBh5eyvWBQLhm2AuPKIYvzHg=
 github.com/devpablocristo/platform/sdks/google-calendar/go v0.1.0/go.mod h1:1aS1asRsZolPxiFDTRaSgeYEywClx/F25YGgmRxDpSg=
 github.com/devpablocristo/platform/security/go v0.2.2 h1:qVHSXm659qnzUf4qCFFf4WD1aVWnAz5TWgkKinknvyk=

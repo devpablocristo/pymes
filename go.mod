@@ -73,7 +73,6 @@ require (
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/devpablocristo/platform/jobs/go v0.1.0 // indirect
 	github.com/devpablocristo/platform/lifecycle/go v0.2.0
-	github.com/devpablocristo/platform/observability/go v0.2.1 // indirect; pins platform/kernels/saas zero pseudo-version
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect

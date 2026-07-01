@@ -56,3 +56,8 @@ wooko.com/
 # Referencia externa (GPLv2) estudiada para extrapolar el motor contable a core.
 # NO es parte del producto ni compatible en licencia — no debe trackearse.
 LedgerSMB-master/
+
+# Referencias externas para extrapolar la capa fiscal AFIP/ARCA (WSAA/WSFEv1/CAE/QR).
+# arca-facturacion = MIT (fuente primaria); pyafipws = LGPL/GPL (oráculo). Solo referencia local.
+arca-facturacion/
+pyafipws/

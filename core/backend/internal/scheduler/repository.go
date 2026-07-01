@@ -16,7 +16,7 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) ListAutoFetchRateOrgs(ctx context.Context) ([]uuid.UUID, error) {
 	var ids []uuid.UUID
-	err := r.db.WithContext(ctx).Table("tenant_settings").Select("org_id").Where("auto_fetch_rates = true").Scan(&ids).Error
+	err := r.db.WithContext(ctx).Table("org_settings").Select("org_id").Where("auto_fetch_rates = true").Scan(&ids).Error
 	return ids, err
 }
 
@@ -72,7 +72,7 @@ func (r *Repository) ListDueSchedulingReminders(ctx context.Context, now time.Ti
 			b.start_at
 		FROM scheduling_bookings b
 		JOIN orgs o ON o.id = b.org_id
-		JOIN tenant_settings ts ON ts.org_id = b.org_id
+		JOIN org_settings ts ON ts.org_id = b.org_id
 		LEFT JOIN scheduling_services s ON s.id = b.service_id
 		LEFT JOIN scheduling_branches br ON br.id = b.branch_id
 		WHERE ts.scheduling_enabled = true

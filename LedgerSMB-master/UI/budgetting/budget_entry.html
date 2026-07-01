@@ -1,0 +1,181 @@
+[% PROCESS elements.html;
+       PROCESS report_base.html; %]
+<body class="lsmb [% dojo_theme %]">
+<div id="budgets">
+<form data-dojo-type="lsmb/Form" method="post" action="[% request.script %]">
+<div id="budget-header">
+<div class="listtop">[% IF id ; text('Edit budget'); ELSE ; text('Add budget') ; END %]</div>
+<div class="input_row" id = "reference_row">
+<div class="input_group">
+       [% INCLUDE input element_data = {
+                        name = "reference",
+                        value = reference,
+                        type = "text",
+                        size = "20",
+                        class = 'reference',
+                        label = text('Reference')
+        } %]
+</div>
+<div class="input_group">
+          [% INCLUDE input element_data = {
+                              name = "description",
+                              value = description,
+                              type = "text",
+                              size = "50",
+                              class = 'description'
+                              label = text('Description')
+                                                                      }
+           %]
+</div></div>
+<div class="input_row" id = "date_row">
+<div class="input_group">
+        [% INCLUDE input element_data = {
+                name = "start_date"
+                value = start_date
+                size = "11"
+                type = "date"
+                label = text('Start Date') #'
+        } %]
+</div>
+<div class="input_group">
+        [% INCLUDE input element_data = {
+                name = "end_date"
+                value = end_date
+                size = "11"
+                type = "date"
+                label = text('End Date') #'
+        } %]
+</div>
+
+</div></div>
+[% PROCESS business_classes_div %]
+
+      <table width="100%">
+          <tr class="listheading">
+          <th class="listheading">[% text('Account') %]</th>
+          [% IF transfer == 1 %]
+             <th class="listheading">[% text('FX') %]</th>
+          [% END %]
+          <th class="listheading">[% text('Debit') %]</th>
+          <th class="listheading">[% text('Credit') %]</th>
+          <th class="listheading">[% text('Description') %]</th>
+        </tr>
+        [% FOREACH displayrow IN lines %]
+        <tr>
+                [% INDEX= loop.count %]
+                  <td>
+                        [% IF displayrow.accnoset == 0 %]
+                           <lsmb-account-select name="accno_[% INDEX %]"
+                                                id="accno-[% INDEX %]"
+                                                value="[% displayrow.accno %]">
+                          </lsmb-account-select>
+
+                          [% ELSE %]
+
+                              [% PROCESS input element_data = {
+                                        label = displayrow.accno _ '--' _ displayrow.acc_desc
+                                        type = "hidden"
+                                        value = displayrow.accno
+                                        name = "accno_$INDEX"
+                                        id = "acc_$INDEX"
+                                      } %]
+
+                        [% END %]
+
+                 </td>
+
+                  <td>
+                          [% PROCESS input element_data = {
+                                  value = displayrow.debit
+                                  name = "debit_$INDEX"
+                                  type = "text"
+                                  size = 12
+                          }  %]
+
+                   </td>
+
+                  <td>
+                          [% PROCESS input element_data = {
+                                  value = displayrow.credit
+                                  name = "credit_$INDEX"
+                                  type = "text"
+                                  size = 12
+                          }  %]
+
+                   </td>
+
+                    <td>
+                          [% PROCESS input element_data = {
+                                  value = displayrow.description
+                                  name = "description_$INDEX"
+                                  type = "text"
+                                  size = 30
+                          }  %]
+
+                   </td>
+        </tr>
+        [% END %]
+     </table>
+    <hr size="3">
+
+[% FOREACH hidden IN hiddens.keys;
+        PROCESS input element_data={
+                type = 'hidden',
+                name = hidden,
+                value = hiddens.item(hidden)
+                }; END %]
+
+[% FOREACH button IN buttons; PROCESS button element_data=button; END %]
+</form>
+[% IF id %]
+<form data-dojo-type="lsmb/Form" name="note" action="[% request.script %]" method="POST">
+[% PROCESS input element_data = {
+       name = "id"
+      value = id
+       type = "hidden"
+} %]
+<div class="inputrow">
+<div class="inputgroup">
+[% PROCESS input element_data = {
+        type = "text"
+        name = "subject"
+        size = "64"
+       label = text('Subject')
+}
+%]
+</div></div>
+<div class="inputrow">
+<div class="inputgroup">
+[% PROCESS textarea element_data = {
+        name = "note"
+        cols = '64'
+        rows = '5'
+       label = text('Content')
+}
+%]
+</div></div>
+<div class="inputrow">
+[% PROCESS button element_data = {
+        name = "__action"
+       value = 'add_note'
+        type = "submit"
+       class = "submit"
+        text = text('Add Note') #'
+}
+%]
+</div>
+</form>
+[% END # IF id %]
+[% FOREACH note IN notes %]
+<div class="note">
+<div class="note_subject"><label>[% text('Subject') %]:</label>
+[% note.subject %]</div>
+<div class="note_entry_info"><label>&nbsp;:</label>
+[% note.created_by %]:[% note.created %]
+</div>
+<div class="note_content"><label>[% text('Content') %]:</label>
+[% note.note %]
+</div>
+[% END # FOREACH Note %]
+</div>
+</body>

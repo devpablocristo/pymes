@@ -1,0 +1,364 @@
+[% PROCESS 'elements.html';
+       PROCESS 'report_base.html'; %]
+
+<body class="lsmb [% dojo_theme %]">
+<div id="purchase_history_search">
+<form data-dojo-type="lsmb/Form" method="get" action="contact_reports.pl">
+<table width=100%>
+  <tr>
+   <th class=listtop>[% text('Purchase History') %]</th>
+  </tr>
+  <tr height="5"></tr>
+  <tr valign=top>
+    <td>
+      <table>
+        <tr valign=top>
+          <td>
+            <table>
+              [% PROCESS entity_class %]
+              <tr>
+                <th align=right nowrap>[% text('Entity Name') %]</th>
+                <td>[% INCLUDE input element_data = {
+                           size = 32,
+                           name = "name_part",
+                           type = "text"
+                    } %]</td>
+              </tr>
+              <tr>
+                <th align=right nowrap>[% text('Contact Info') %]</th>
+                <td>[% INCLUDE input element_data = {
+                           size = 32
+                           name = "contact_info"
+                           type = "text"
+                     } %]</td>
+              </tr>
+              <tr>
+                  <th align=right nowrap>Salesperson</th>
+                  <td>[% INCLUDE input element_data = {
+                                   size = 32
+                                   name = "salesperson"
+                                   type = "text"
+                      } %]</td>
+              </tr> <!--
+              <tr>
+                <th align=right nowrap>Notes</th>
+                <td colspan=3><textarea name=notes rows=3 cols=32></textarea></td>
+              </tr>  -->
+            </table>
+          </td>
+
+          <td>
+            <table>
+              <tr>
+                [% IF account_class == 1;
+                          number_desc = text('Vendor Number'); #'
+                       ELSE;
+                          number_desc = text('Customer Number'); #'
+                       END;
+                 %]
+                <th align=right nowrap>[% number_desc %]</th>
+                <td>[% INCLUDE input element_data = {
+                         name = "meta_number",
+                         size = "32",
+                         type = "text"
+                    } %]</td>
+              </tr>
+              <tr>
+                <th align=right nowrap>[% text('Address') %]</th>
+                <td>[% INCLUDE input element_data = {
+                         name = "address_line",
+                         size = "32",
+                         type = "text"
+                    } %] </td>
+              </tr>
+              <tr>
+                <th align=right nowrap>[% text('City') %]</th>
+                <td>[% INCLUDE input element_data = {
+                         name = "city",
+                         size = "32",
+                         type = "text"
+                    } %]</td>
+              </tr>
+              <tr>
+                <th align=right nowrap>[% text('State/Province') %]</th>
+                <td>[% INCLUDE input element_data = {
+                         name = "state",
+                         size = "32",
+                         type = "text"
+                    } %]</td>
+              </tr>
+              <tr>
+                <th align=right nowrap>[% text('Zip/Postal Code') %]</th>
+                <td>[% INCLUDE input element_data = {
+                         name = "zip",
+                         size = "10",
+                         type = "text"
+                    } %]</td>
+              </tr>
+              <tr>
+                <th align=right nowrap>[% text('Country') %]</th>
+                <td>[%
+                     INCLUDE select element_data = {
+                         name = "country_id",
+                         text_attr = 'name',
+                         value_attr = 'id',
+                         options = country_list,
+                         default_blank = 1,
+                    } %]</td>
+              </tr>
+              <tr>
+                <th align=right nowrap>[% text('Startdate') %]</th>
+                <td>[% INCLUDE input element_data = {
+                         name = "startdate_from",
+                         size = "11",
+                         type = "date",
+                         title = user.dateformat,
+                         label = text('From')
+                    };
+                    INCLUDE input element_data = {
+                         name = "startdate_to",
+                         size = "11",
+                         type = "date",
+                         title = user.dateformat,
+                         label = text('To')
+                  } %]</td>
+               </tr>
+              <tr>
+                  <th>[% text('Transaction Date') %]</th>
+                  <td> [%
+                     INCLUDE input element_data = {
+                         name = "from_date",
+                         size = "11",
+                         type = "date",
+                         title = user.dateformat,
+                         label = text('From')
+                  } ;
+                     INCLUDE input element_data = {
+                         name = "to_date",
+                         size = "11",
+                         type = "date",
+                         title = user.dateformat,
+                         label = text('To')
+                  } %]</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td>
+      <table class="criteria">
+        <tr>
+          <th align="right" nowrap rowspan="9">
+               [% text('Include in Report') %]</th>
+        </tr>
+                    <tr>
+                      <td>
+                         [% INCLUDE input element_data = {
+                                checked = 'CHECKED',
+                                name    = 'type',
+                                id      = 'type-i',
+                                type    = 'radio',
+                                class   = 'radio',
+                                value   = 'i'
+                                label   = text('Invoices'),
+                         } %]</td>
+                    <td>
+                         [% INCLUDE input element_data = {
+                                name    = 'type',
+                                id      = 'type-o',
+                                type    = 'radio',
+                                class   = 'radio',
+                                value   = 'o'
+                                label   = text('Orders'),
+                         } %]</td>
+                    <td>
+                         [% INCLUDE input element_data = {
+                                name    = 'type',
+                                id      = 'type-q',
+                                type    = 'radio',
+                                class   = 'radio',
+                                value   = 'q'
+                                label   = text('Quotations'),
+                         } %]</td>
+
+                    </tr>
+                    <tr>
+                      <td>
+                      [%
+                      INCLUDE input element_data = {
+                              type = 'checkbox',
+                              name = 'inc_open',
+                              value = '1',
+                              label = text('Open'),
+                              class = 'checkbox',
+                              checked = 'CHECKED'
+                      } %]</td>
+                      <td> [%
+                      INCLUDE input element_data = {
+                              type = 'checkbox',
+                              name = 'inc_closed',
+                              value = '1',
+                              label = text('Closed'),
+                              class = 'checkbox',
+                              checked = 'CHECKED'
+                      }; %]
+                      </td>
+                    </tr>
+              <tr>
+                <td>[%
+                     INCLUDE input element_data= {
+                             label = text('Summary'),
+                             name  = 'is_summary',
+                             id    = 'is_summary-1',
+                             type  = 'radio',
+                             value = '1',
+                             class = 'radio',
+                           checked = 'CHECKED'
+                    } %]</td>
+                <td>[%
+                     INCLUDE input element_data= {
+                             label = text('Detail'),
+                             name  = 'is_summary',
+                             id    = 'is_summary-0',
+                             type  = 'radio',
+                             value = '0',
+                             class = 'radio',
+                    } %]</td>
+              </tr>
+              <tr><td colspan=3><hr /></td></tr>
+              <tr>
+                <td>[%
+                       INCLUDE input element_data = {
+                              type = 'checkbox',
+                              name = 'l_partnumber',
+                              value = '1',
+                              label = text('Part Number'), #'
+                              class = 'checkbox',
+                              checked = 'CHECKED'
+                      }; %]
+                </td>
+                <td>[%
+                       INCLUDE input element_data = {
+                              type = 'checkbox',
+                              name = 'l_description',
+                              value = '1',
+                              label = text('Description'),
+                              class = 'checkbox',
+                              checked = 'CHECKED'
+                      }; %]
+                </td>
+                <td>[%
+                       INCLUDE input element_data = {
+                              type = 'checkbox',
+                              name = 'l_sellprice',
+                              value = '1',
+                              label = text('Sell Price'), #'
+                              class = 'checkbox',
+                      }; %]
+                </td>
+                <td>[%
+                       INCLUDE input element_data = {
+                              type = 'checkbox',
+                              name = 'l_curr',
+                              value = '1',
+                              label = text('Currency'),
+                              class = 'checkbox',
+                      }; %]
+                </td>
+              </tr>
+              <tr>
+                <td>[%
+                       INCLUDE input element_data = {
+                              type = 'checkbox',
+                              name = 'l_qty',
+                              value = '1',
+                              label = text('Qty'),
+                              class = 'checkbox',
+                            checked = 'CHECKED'
+                      }; %]
+                </td>
+                <td>[%
+                       INCLUDE input element_data = {
+                              type = 'checkbox',
+                              name = 'l_unit',
+                              value = '1',
+                              label = text('Unit'),
+                              class = 'checkbox',
+                            checked = 'CHECKED'
+                      }; %]
+                </td>
+                <td>[%
+                       INCLUDE input element_data = {
+                              type = 'checkbox',
+                              name = 'l_discount',
+                              value = '1',
+                              label = text('Discount'),
+                              class = 'checkbox',
+                      }; %]
+                </td>
+              <tr>
+              </tr>
+                <td>[%
+                       INCLUDE input element_data = {
+                              type = 'checkbox',
+                              name = 'l_deliverydate',
+                              value = '1',
+                              label = text('Delivery Date'), #'
+                              class = 'checkbox',
+                      }; %]
+                </td>
+                <td>[%
+                       INCLUDE input element_data = {
+                              type = 'checkbox',
+                              name = 'l_projectnumber',
+                              value = '1',
+                              label = text('Project Number'), #'
+                              class = 'checkbox',
+                      }; %]
+                </td>
+                <td>[%
+                       INCLUDE input element_data = {
+                              type = 'checkbox',
+                              name = 'l_serialnumber',
+                              value = '1',
+                              label = text('Serial Number'), #'
+                              class = 'checkbox',
+                      }; %]
+                </td>
+                <td>
+                   [%
+                       INCLUDE input element_data = {
+                              type = 'checkbox',
+                              name = 'l_transdate',
+                              value = '1',
+                              label = text('Transaction Date'), #'
+                              class = 'checkbox',
+                      }; %]
+                </td>
+              </tr>
+
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td><hr size=3 noshade></td>
+  </tr>
+</table>
+
+
+<br>
+[% INCLUDE button element_data = {
+       text = text('Continue'),
+       value = 'history',
+       type  = 'submit',
+       class = 'submit',
+       name = '__action'
+} %]
+</form>
+</div>
+</body>

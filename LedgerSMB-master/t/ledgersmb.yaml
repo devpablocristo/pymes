@@ -1,0 +1,23 @@
+
+default_locale:
+  class: LedgerSMB::LanguageResolver
+  args:
+    directory:
+      $ref: paths/locale
+
+paths:
+  $class: Beam::Wire
+  config:
+    locale: ./locale/po/
+    UI: ./UI/
+    UI_cache: lsmb_templates/
+
+ui:
+  class: LedgerSMB::Template::UI
+  method: new_UI
+  lifecycle: eager
+  args:
+    cache:
+      $ref: paths/UI_cache
+    root:
+      $ref: paths/UI

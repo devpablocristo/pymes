@@ -1,0 +1,138 @@
+<div id="contact_info_div"
+     title="[% text('Contact Info') %]"
+     data-dojo-type="dijit/layout/ContentPane"
+     [% IF request.target_div == 'contact_info_div' %]data-dojo-props="selected:true"[% END %]
+     >
+<div class="listtop">[% text('Contact Information') %]</div>
+[%
+
+FOREACH ROW IN contacts;
+    ROW.edit = '[' _ text('Edit') _ ']';
+    ROW.delete = '[' _ text('Delete') _ ']';
+    base_suffix =
+               "$request.script?entity_id=$entity_id&amp;" _
+               "contact=" _ ROW.contact _
+               "&amp;class_id=$ROW.class_id&amp;" _
+               "description=" _ ROW.description _
+               "&amp;credit_id=$credit_act.id&amp;for_credit=$ROW.credit_id&amp;target_div=contact_info_div";
+    ROW.edit_href_suffix = base_suffix _ '&amp;__action=edit';
+    ROW.delete_href_suffix = base_suffix _ '&amp;__action=delete_contact';
+    IF ROW.credit_id;
+         ROW.for_credit = 'X';
+    END;
+END;
+PROCESS dynatable
+        attributes = {id = 'contact-list' }
+        tbody = {rows = contacts}
+        columns = [
+         {col_id='for_credit', type='text', name=text('This Account') }, #'
+         {col_id='class', type='text', name=text('Type') },
+         {col_id='description', type='text', name=text('Description') },
+         {col_id='contact', type='text', name=text('Contact Info') } #'
+         {col_id='edit', type='href', href_base='', name='' }
+         {col_id='delete', type='href', href_base='', name='' }
+        ] %]
+<form data-dojo-type="lsmb/Form" action="[% request.script %]" method="post">
+  [%
+  PROCESS input element_data = {
+                type = "hidden"
+                name = "form_id"
+                value = form_id
+        };
+
+  PROCESS input element_data = {
+                type="hidden"
+                name="entity_class"
+                value=entity_class
+  };
+
+  PROCESS input element_data = {
+                type="hidden"
+                name="entity_id"
+                value=entity_id
+  };
+
+  PROCESS input element_data = {
+                type="hidden"
+                name="credit_id"
+                value=credit_act.id
+  };
+
+  PROCESS input element_data = {
+                type="hidden"
+                name="old_class_id"
+                value=request.class_id
+  };
+
+  PROCESS input element_data = {
+                type="hidden"
+                name="old_contact"
+                value=request.contact
+  };
+
+  PROCESS input element_data = {
+                type="hidden"
+                name="contact_id"
+                value=request.contact_id
+  };
+  %]
+  <div class="two-column-grid" style="width: fit-content">
+             [% IF credit_act.id;
+                    IF request.for_credit;
+                       attach_to = 3;
+                    ELSE;
+                       attach_to = 1;
+                    END;
+                       INCLUDE select element_data = {
+                          name            = "attach_to"
+                          id              = 'attach-contact-to'
+                          default_values  = [attach_to]
+                          options         = attach_level_options
+                          label = text('Attach To') #'
+                       };
+                     ELSE %]
+             <label>[% text('Attach to Entity'); %]</label><div>&nbsp;</div>
+                   [% END; %]
+                [% PROCESS select element_data = {
+                        name = "class_id"
+                        label = "Type"
+                        text_attr = "class"
+                        value_attr = "id"
+                        default_values = [request.class_id]
+                        options = contact_class_list
+                } %]
+                [% PROCESS input element_data = {
+                        label = text('Description'),
+                        name = "description"
+                        id   = 'contact_description'
+                        value = request.description
+                        type = "text"
+                        size = "20"
+                }  %]
+                [% PROCESS input element_data = {
+                        label = text('Contact Info'),
+                        name = "contact"
+                        value = request.contact
+                        type = "text"
+                        size = "20"
+                        required = 'true'
+                } #' %]
+</div>
+        <div>[% PROCESS button element_data = {
+                name = "__action",
+                value = "save_contact",
+                text =  text('Save Contact'),
+                class = "submit"
+                } #' %]
+        [% IF request.contact.defined %]
+        [% PROCESS button element_data = {
+                name = "__action",
+                value = "save_contact_new",
+                text =  text('Save As New'),
+                class = "submit"
+                } #' %]
+        [% END # IF old_contact.defined %]
+        </div>
+        </form>
+
+</div>

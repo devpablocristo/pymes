@@ -1,0 +1,124 @@
+
+package LedgerSMB::Entity::Payroll::Deduction;
+
+=head1 NAME
+
+LedgerSMB::Entity::Payroll::Deduction - Payroll Deduction handling for
+LedgerSMB
+
+=head1 DESCRIPTION
+
+Implements a database mapping for 'deduction instance' attributes.
+
+=head1 SYNPOSIS
+
+To retrieve a list of deductions for an entity:
+
+  my @deducts = LedgerSMB::Entity::Person::Deductions->list(
+             $entity_id
+  );
+
+To retrieve a list of deduction categories for selection:
+  my @types = LedgerSMB::Entity::Person::Deduction->types(
+              $country_id
+  );
+
+To save a new deduction:
+
+  my $deduct= LedgerSMB::Entity::Person::Deduction->new(%$request);
+  $deduct->save;
+
+=cut
+
+use Moose;
+use namespace::autoclean;
+use LedgerSMB::MooseTypes;
+with 'LedgerSMB::PGObject';
+
+=head1 PROPERTIES
+
+=over
+
+=item entry_id
+
+This is the entry id (when set) of the deduction.
+
+=cut
+
+has entry_id => (is => 'rw', isa => 'Int', required => 0);
+
+=item type_id
+
+This is the class id of the deduction
+
+=cut
+
+has type_id => (is => 'rw', isa => 'Int', required => 1);
+
+=item rate
+
+The rate handling here is deduction class specific.  Some deductions may be
+percentages of income, they may be fixed amounts, or they may be calculated on
+some other basis.  Therefore.....
+
+=cut
+
+has rate => (is => 'rw', isa => 'LedgerSMB::PGNumber', required => 1);
+
+=back
+
+=head1 METHODS
+
+=over
+
+=item list($entity_id)
+
+Retrns a list of  deduction objects for entity
+
+=cut
+
+sub list {
+    my ($self, $entity_id) = @_;
+    return __PACKAGE__->call_procedure(funcname => 'deduction__list_for_entity',
+                                     args => [$entity_id]);
+}
+
+=item types($country_id)
+
+Returns a list of deduction classes
+
+=cut
+
+sub types {
+    my ($self, $country_id) = @_;
+    return __PACKAGE__->call_procedure(funcname => 'deduction__list_types',
+                                     args => [$country_id]);
+}
+
+=item save
+
+Saves the deduction and attaches to the entity record
+
+=cut
+
+sub save {
+    my ($self) = @_;
+    my ($ref) = $self->call_dbmethod(funcname => 'deduction__save');
+    return $self->entry_id($ref->{entry_id});
+}
+
+=back
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) 2018 The LedgerSMB Core Team
+
+This file is licensed under the GNU General Public License version 2, or at your
+option any later version.  A copy of the license should have been included with
+your software.
+
+=cut
+
+__PACKAGE__->meta->make_immutable;
+
+1;

@@ -1,0 +1,39 @@
+# Place this in /etc/systemd/system/ledgersmb_plackup.service
+# systemctl enable ledgersmb_plackup
+# service start ledgersmb_plackup
+
+[Unit]
+Description=LedgerSMB Plack
+After=network.target
+
+[Service]
+WorkingDirectory=WORKING_DIR
+
+#If you do not want a log file, comment this and remove the access_log option below
+Environment=LOG=/var/log/ledgersmb/ledgersmb_plackup.log
+
+# In case you installed dependencies into a 'local::lib'
+# make sure you set the PERL5LIB environment variable
+#Environment=PERL5LIB=/path/to/local-lib/lib/perl5
+
+# Be sure to set a user and group below
+# which don't have write access to the directories
+# holding the LedgerSMB sources
+User=ledgersmb
+Group=ledgersmb
+
+# Use -R to monitor files changes and restart the server
+ExecStart=/usr/bin/plackup   \
+    --listen localhost:5762  \
+    -I lib/                  \
+    -I old/lib/              \
+    --workers 3              \
+    --access-log $LOG        \
+    --server Starman         \
+    -R "bin, lib, old/lib"   \
+    bin/ledgersmb-server.psgi
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

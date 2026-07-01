@@ -1,0 +1,103 @@
+[% PROCESS elements.html;
+       PROCESS report_base.html;
+%]
+<body class="lsmb [% dojo_theme %]">
+[%
+IF !entity_class;
+   DIV_ID = 'search-contact';
+   search_action = "search";
+   title = text('Contact Search');
+ELSIF entity_class == 3;
+   DIV_ID = 'search-employee';
+   search_action = "employee_search";
+   title = text('Employee Search');
+ELSE;
+   title = text('Unsupported.  Expect errors');
+END
+-%]
+  <form data-dojo-type="lsmb/Form"
+        method="get"
+        action="contact_reports.pl"
+        id="[% DIV_ID %]">
+  [% IF entity_class.defined %]
+    <input type="hidden" name="entity_class" value="[% entity_class %]">
+  [% END %]
+    <div class="listtop">[% title %]</div>
+    <div class="two-column-grid" style="width: fit-content">
+      <lsmb-text
+        name="name_part"
+        size="32"
+        label="[% text('Name') %]"
+      ></lsmb-text>
+      <lsmb-text
+        name="control_code"
+        size="32"
+        label="[% text('Control Code') %]"
+      ></lsmb-text>
+      <lsmb-country
+        name="country"
+        default_blank
+        label="[% text('Country') %]"
+      ></lsmb-country>
+      <lsmb-text
+        name="email"
+        size="32"
+        label="[% text('E-mail') %]"
+      ></lsmb-text>
+      <lsmb-text
+        name="address"
+        size="32"
+        label="[% text('Address') %]"
+      ></lsmb-text>
+      <lsmb-text
+        name="city"
+        size="32"
+        label="[% text('City') %]"
+      ></lsmb-text>
+      <lsmb-text
+        name="state"
+        size="32"
+        label="[% text('State/Province') %]"
+      ></lsmb-text>
+      <lsmb-text
+        name="mail_code"
+        size="10"
+        label="[% text('Zip/Postal Code') %]"
+      ></lsmb-text>
+      <lsmb-text
+        name="phone"
+        size="20"
+        label="[% text('Phone') %]"
+      ></lsmb-text>
+      <lsmb-text
+        name="contact"
+        size="20"
+        label="[% text('Contact') %]"
+      ></lsmb-text>
+      <lsmb-checkbox
+        name="users"
+        value="1"
+        label="[% text('Only Users') %]"
+      ></lsmb-checkbox>
+      <lsmb-text
+        name="notes"
+        size="32"
+        label="[% text('Notes') %]"
+      ></lsmb-text>
+      <lsmb-date
+        name="active_date_from"
+        label="[% text('Active after') %]"
+      ></lsmb-date>
+      <lsmb-date
+        name="active_date_to"
+        label="[% text('Active until') %]"
+      ></lsmb-date>
+    </div>
+    <hr size="3" noshade="noshade" />
+    <lsmb-button
+        name="__action"
+        value="[% search_action %]"
+        type="submit"
+    >[% text('Search') %]</lsmb-button>
+  </form>
+</body>

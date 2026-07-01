@@ -1,0 +1,37 @@
+<?lsmb#   This is a comment block; it's ignored by the template engine.
+
+   Version:  1.1
+   Date:     2022-07-22
+   File:     envelope.tex
+   Set:      demo
+
+Template version numbers are explicitly not aligned across templates or
+releases. No explicit versioning was applied before 2021-01-04.
+
+Version   Changes
+1.1       Merged xelatex targetting templates with those targetting pdflatex
+
+-?>
+<?lsmb FILTER latex { format="$FORMAT($PROCESSOR)" } ?>
+\documentclass{scrartcl}
+\usepackage{iftex}
+\ifpdftex
+  %% (pdf)latex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+\else
+  \usepackage{fontspec}
+\fi
+\usepackage{tabularx}
+\usepackage[paperheight=11cm, paperwidth=23cm,top=3.5cm,bottom=3cm,left=12cm,right=1cm]{geometry}
+\begin{document}
+\thispagestyle{empty}
+\noindent <?lsmb name ?>\\
+<?lsmb address1 ?> \\
+<?lsmb- IF address2 ?>
+<?lsmb address2 ?> \\
+<?lsmb- END ?>
+<?lsmb city ?>
+<?lsmb- IF state -?>, <?lsmb state ?> <?lsmb END ?> <?lsmb zipcode ?>\\
+\end{document}
+<?lsmb END -?>

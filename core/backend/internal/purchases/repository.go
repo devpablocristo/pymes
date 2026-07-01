@@ -103,7 +103,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (purchasesdomai
 				return err
 			}
 		}
-		if err := tx.Table("tenant_settings").Where("org_id = ?", in.OrgID).Updates(map[string]any{"next_purchase_number": tenant.NextPurchaseNumber + 1, "updated_at": gorm.Expr("now()")}).Error; err != nil {
+		if err := tx.Table("org_settings").Where("org_id = ?", in.OrgID).Updates(map[string]any{"next_purchase_number": tenant.NextPurchaseNumber + 1, "updated_at": gorm.Expr("now()")}).Error; err != nil {
 			return err
 		}
 		if in.Status == "received" {
@@ -343,7 +343,7 @@ func (r *Repository) GetTaxRate(ctx context.Context, orgID uuid.UUID) float64 {
 
 func (r *Repository) loadTenant(ctx context.Context, db *gorm.DB, orgID uuid.UUID) (tenantSettings, error) {
 	var row tenantSettings
-	err := db.WithContext(ctx).Table("tenant_settings").Select("purchase_prefix, next_purchase_number, currency, tax_rate").Where("org_id = ?", orgID).Take(&row).Error
+	err := db.WithContext(ctx).Table("org_settings").Select("purchase_prefix, next_purchase_number, currency, tax_rate").Where("org_id = ?", orgID).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return tenantSettings{PurchasePrefix: "CPA", NextPurchaseNumber: 1, Currency: "ARS", TaxRate: 21}, nil
@@ -370,7 +370,7 @@ func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx 
 	if err == nil {
 		return row, nil
 	}
-	if err := tx.WithContext(ctx).Exec(`INSERT INTO tenant_settings (org_id, plan_code, hard_limits, currency, tax_rate, purchase_prefix, next_purchase_number, created_at, updated_at) VALUES (?, 'starter', '{}'::jsonb, 'ARS', 21.0, 'CPA', 1, now(), now()) ON CONFLICT (org_id) DO NOTHING`, orgID).Error; err != nil {
+	if err := tx.WithContext(ctx).Exec(`INSERT INTO org_settings (org_id, plan_code, hard_limits, currency, tax_rate, purchase_prefix, next_purchase_number, created_at, updated_at) VALUES (?, 'starter', '{}'::jsonb, 'ARS', 21.0, 'CPA', 1, now(), now()) ON CONFLICT (org_id) DO NOTHING`, orgID).Error; err != nil {
 		return tenantSettings{}, err
 	}
 	return r.loadTenant(ctx, tx.Clauses(clause.Locking{Strength: "UPDATE"}), orgID)

@@ -1,0 +1,93 @@
+\[% PROCESS "elements.html" -%]
+<body class="lsmb [% dojo_theme %]">
+<div id="assets">
+<form data-dojo-type="lsmb/Form" action="[% request.script %]" method="GET">
+<div class="listtop">[% text('New Asset Report Search') %]</div>
+<div class="inputrow" id="classrow"><div class="inputgroup" id="classgrp">
+[% PROCESS select element_data = {
+     name = "asset_class"
+     default_values = [asset_report.asset_class]
+     default_blank = 1
+     options = asset_report.asset_classes
+     text_attr = "label"
+     value_attr = "id"
+     label = text('Asset Class') #'
+} %]
+</div></div>
+<div class="inputrow" id="daterow"><div class="inputgroup" id="startdategrp">
+[% PROCESS input element_data = {
+     name = "start_date"
+     type = "date"
+     value = asset_report.start_date
+     label = text("From")
+} %]
+</div>
+<div class="inputgroup" id="todategroup">
+[% PROCESS input element_data = {
+     name = "end_date"
+     type = "date"
+     value = asset_report.end_date
+     label = text("To")
+} %]
+</div>
+</div>
+<div class="inputrow" id="accountrow">
+[% IF request.depreciation %]
+<!-- moved expense acct drop down to asset screen -->
+[% ELSE %]
+<div class="inputgroup" id="gaingroup">
+[% PROCESS select element_data = {
+     name = "gain_acct"
+     class = "account"
+     value_attr = "id"
+     options = asset_report.gain_accounts
+     default_values = [asset_report.gain_acct]
+     label = text('Gain Account') #'
+} %]
+</div>
+<div class="inputgroup" id="lossgroup">
+[% PROCESS select element_data = {
+     name = "loss_acct"
+     class = "account"
+     options = asset_report.loss_accounts
+     value_attr = "id"
+     default_values = [asset_report.loss_acct]
+     label = text('Loss Account') #'
+} %]
+</div>
+<div class="inputgroup" id="cashgroup">
+[% PROCESS select element_data = {
+     name = "cash_acct"
+     class = "account"
+     options = asset_report.cash_accounts
+     value_attr = "id"
+     default_blank = 1
+     label = text('Cash Account') #'
+} %]
+</div>
+[% END %]
+</div>
+<div class="inputrow" id="buttonrow">
+<div class="inputgroup" id="buttongroupnext">
+<label>&nbsp;</label>
+[% PROCESS button element_data = {
+     name = "__action"
+     text = text("Continue")
+     value = "report_results"
+     type = "submit"
+     class = "submit"
+} %]
+</div></div>
+[% PROCESS input element_data = {
+     name = "approved"
+     type = "hidden"
+     value = "0"
+} %]
+[% PROCESS input element_data = {
+     name = "depreciation"
+     type = "hidden"
+     value = asset_report.depreciation
+} %]
+</form>
+</div>
+</body>

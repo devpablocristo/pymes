@@ -18,6 +18,10 @@ func userDTOFromRow(row pymesUserRow) tenantUserDTO {
 		value := strings.TrimSpace(row.AvatarURL)
 		avatarURL = &value
 	}
+	status := "active"
+	if row.DeletedAt != nil {
+		status = "archived"
+	}
 	return tenantUserDTO{
 		ID:         row.ID.String(),
 		ExternalID: row.ExternalID,
@@ -26,6 +30,7 @@ func userDTOFromRow(row pymesUserRow) tenantUserDTO {
 		GivenName:  row.GivenName,
 		FamilyName: row.FamilyName,
 		AvatarURL:  avatarURL,
+		Status:     status,
 		DeletedAt:  row.DeletedAt,
 		CreatedAt:  row.CreatedAt,
 		UpdatedAt:  row.UpdatedAt,
@@ -35,7 +40,7 @@ func userDTOFromRow(row pymesUserRow) tenantUserDTO {
 func memberDTOFromRow(row pymesTenantMembershipRow) tenantMemberDTO {
 	return tenantMemberDTO{
 		ID:       row.ID.String(),
-		OrgID: row.OrgID.String(),
+		OrgID:    row.OrgID.String(),
 		UserID:   row.UserID.String(),
 		Role:     row.Role,
 		Status:   row.Status,

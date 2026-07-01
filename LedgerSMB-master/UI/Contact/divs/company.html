@@ -1,0 +1,161 @@
+<div id="company_div"
+     title="[% text('Company') %]"
+     data-dojo-type="dijit/layout/ContentPane"
+     [% IF request.target_div == 'company_div' %]data-dojo-props="selected:true"[% END %]
+
+     >
+  <div class="listtop"><strong>[%
+      IF entity_id.defined ;
+      text("Edit Company");
+      ELSE ;
+      text("Add Company");
+      END;
+    %]</strong></div>
+<form data-dojo-type="lsmb/Form" id="company" method="post" action="[% request.script %]">
+[% PROCESS input element_data = {
+                  id = 'company-target-div'
+                type = "hidden"
+                name = "target_div"
+                value = 'company_div'
+        } %]
+        [% PROCESS input element_data = {
+                  id = 'company-entity-id'
+                type = "hidden"
+                name = "entity_id"
+                value = entity_id
+        } %]
+        [% PROCESS input element_data = {
+                  id = 'company-entity-class'
+                type = "hidden"
+                name = "entity_class"
+                value = entity_class
+        } %]
+        [% PROCESS input element_data = {
+                  id = 'company-company-id'
+                type = "hidden"
+                name = "id"
+                value = company.id
+        } %]
+        [% PROCESS input element_data = {
+                  id = 'company-form-id'
+                type = "hidden"
+                name = "form_id"
+                value = form_id
+        } %]
+        [% PROCESS input element_data = {
+                  id = 'company-account-class'
+                type = "hidden"
+                name = "account_class"
+                value = account_class
+        } %]
+  <div class="two-column-grid" style="width:fit-content">
+        [% PROCESS input element_data = {
+                label = text('Control Code') #'
+                  id = 'company-control-code'
+                type = "text"
+                name = "control_code"
+                value = company.control_code
+                size = "20"
+        } %]
+        [% PROCESS input element_data = {
+                label = text('Name')
+                type= "text"
+                name = "legal_name"
+                value = company.legal_name
+                size = "20"
+                required = 'true'
+        } %]
+       [%
+                company_country_id = company.country_id;
+                IF !company_country_id;
+                          company_country_id = default_country;
+                END;
+                INCLUDE select_country element_data = {
+                        id = 'company-country-id'
+                        text_attr = "name"
+                        value_attr = "id"
+                        default_values = [company_country_id]
+                        options = country_list
+                        name = "country_id"
+                        label = text('Country')
+                        required = 'true'
+                        default_blank = 1
+        } %]
+                [% INCLUDE input element_data = {
+                        label = text('Tax Number/SSN'),
+                        name = "tax_id",
+                        value = company.tax_id,
+                        type = "text",
+                        size = "19"
+                } #' %]
+[% IF sic_list.size > 0 %]
+                [% INCLUDE select element_data = {
+                        label = text('SIC'),
+                        name = "sic_code",
+                        options = sic_list
+                        default_values = [ company.sic_code ],
+                        default_blank = 1
+                        class = 'sic'
+                } %]
+[% END %]
+     [% INCLUDE input element_data = {
+         label = text('Sales Tax ID')
+          name = 'sales_tax_id'
+          type = 'text'
+         class = 'taxnumber'
+          size = '19'
+         value = company.sales_tax_id
+     } %]
+     [% INCLUDE input element_data = {
+         label = text('License Number')
+          name = 'license_number'
+          type = 'text'
+         class = 'taxnumber'
+          size = '19'
+         value = company.license_number
+     } %]
+</div>
+  <hr/>
+<div class="input_group1">
+        [% PROCESS button element_data = {
+                text = text('Generate Control Code')
+                  id = 'company-generate-control-code'
+                type = "submit"
+                name = "__action"
+                value = "generate_control_code"
+                class = "submit"
+        } %]
+        [% PROCESS button element_data = {
+                  id = 'company-action-retrieve'
+                text = text('Retrieve')
+                type = 'submit'
+                name = '__action'
+               value = 'get_by_cc'
+               class = 'submit'
+        } %]
+        [% INCLUDE button element_data = {
+                        text = text('Save')
+                        id = 'company-action-save'
+                        class="submit"
+                        type="submit"
+                        name="__action"
+                        value="save_company"
+        };
+        IF may_delete AND entity_id.defined AND NOT company.is_used ;
+        INCLUDE button element_data = {
+               text = text('Delete')
+                 id = 'company-action-delete'
+               class="submit"
+                type="submit"
+                name="__action"
+               value="delete_entity"
+        };
+        END %]
+</div>
+</form>
+[% FOREACH n = notes %]
+<div class="note">
+<div class="note_contents">[% n.note %]</div>
+</div>
+[% END %]
+</div>

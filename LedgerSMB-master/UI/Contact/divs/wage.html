@@ -1,0 +1,91 @@
+<div id="wage_div"
+     title='[% text("Wages and Deductions") %]'
+     data-dojo-type="dijit/layout/ContentPane"
+     [% IF request.target_div == 'wage_div' %]data-dojo-props="selected:true"[% END %]
+     >
+[%
+columns = [{ col_id = 'type', name = text('Type'), type = 'text' },
+           { col_id = 'rate', name = text('Amount/Rate'), type = 'text' }];
+
+PROCESS dynatable
+        columns = columns
+        attributes = {id = 'wage-table', width='100%' }
+        t_body = {rows = wages};
+
+PROCESS dynatable
+        columns = columns
+        attributes = {id = 'deduction-table', width='100%' }
+        t_body = {rows = deductions}; %]
+
+<table>
+<tr>
+<form data-dojo-type="lsmb/Form" action="[% request.script %]" method="post" name="wage">
+<td>[%
+  PROCESS input element_data = {
+  type = 'hidden'
+  id = 'wage-entity-class'
+  name = 'entity_class'
+  value = entity_class } ;
+  PROCESS select element_data = {
+                options = wage_types
+             value_attr = 'id'
+              text_attr = 'label'
+                   name = 'type_id'
+                     id = 'wage_type_id'
+} %]</td>
+<td>[% PROCESS input element_data = {
+              name = 'rate'
+             value = rate
+             class = 'number'
+              type = 'text'
+                id = 'wage_rate'
+} %]</td>
+[% PROCESS input element_data = {
+          name = 'entity_id'
+          type = 'hidden'
+         value = entity_id
+} %]
+<td>[% PROCESS button element_data = {
+          text = text('Add/Change Wage') #'
+          name = '__action'
+          type = 'submit'
+         class = 'submit'
+} %]</td>
+</form>
+</tr>
+<tr>
+<form data-dojo-type="lsmb/Form" action="[% request.script %]" method="post" name="deduction">
+<td>[% PROCESS select element_data = {
+                options = deduction_types
+             value_attr = 'id'
+              text_attr = 'label'
+                   name = 'type_id'
+                     id = 'deduction_type_id'
+} %]</td>
+<td>[% PROCESS input element_data = {
+              name = 'rate'
+             value = rate
+             class = 'number'
+              type = 'text'
+                id = 'deduction_rate'
+} %]</td>
+[% PROCESS input element_data = {
+          name = 'entity_id'
+          type = 'hidden'
+         value = entity_id
+} %]
+<td>[% PROCESS button element_data = {
+          text = text('Add/Change Deductions') #'
+          name = '__action'
+          type = 'submit'
+         class = 'submit'
+} %]</td>
+</form>
+</tr>
+</table>
+<div>
+  The project is looking to partner with subject matter experts to
+  expand the functionality on these screens.
+</div>
+
+</div>

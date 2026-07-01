@@ -1,0 +1,130 @@
+[% PROCESS elements.html %]
+<body class="lsmb [% dojo_theme %]">
+  <form data-dojo-type="lsmb/Form"
+        id="gl-yearend"
+        method="post"
+        action="[% request.script %]">
+    <table style="width:100%">
+      <thead>
+         <tr>
+          <th colspan="3" class="listtop">Period closing dates</th>
+        </tr>
+        <tr>
+          <th colspan="3">
+            Post year closing
+          </th>
+        </tr>
+        <tr>
+          <td colspan="3">
+            <table style="margin-top:2em;margin-bottom:2em">
+              <tr>
+                <td>
+                  <label for='end-date'>[% text('Yearend') %]</label>
+                </td>
+                <td>[% PROCESS input element_data={
+                  type = 'date',
+                  name = 'end_date',
+                  size = 11,
+                  title = user.dateformat,
+                  } -%]</td>
+              </tr>
+              <tr>
+                <td>
+                  <label for="reference">[% text('Reference') %]</label>
+                </td>
+                <td>[% PROCESS input element_data={
+                  name = 'reference',
+                  size = 20,
+                  value = text('Yearend'),
+                  } -%]</td>
+              </tr>
+              <tr>
+                <td>
+                  <label for="description">[% text('Description') %]</label>
+                </td>
+                <td>[% PROCESS textarea element_data={
+                  name = 'description',
+                  rows = 3,
+                  cols = 50,
+                  } -%]</td>
+              </tr>
+              <tr>
+                <td>
+                  <label for="retention-acc-id">[% text('Retained Earnings') %]</label>
+                </td>
+                [% FOREACH opt = eoy.earnings_accounts;
+                opt.text = opt.accno _ '--' _ opt.description;
+                END -%]
+                <td>[% PROCESS select element_data={
+                  name = "retention_acc_id"
+                  options = eoy.earnings_accounts
+                  value_attr = "id"
+                  } -%]</td>
+                <td>
+                  [% FOREACH hidden IN eoy.hiddens.keys;
+                  PROCESS input element_data={
+                  type = 'hidden',
+                  name = hidden,
+                  value = hiddens.item(hidden)
+                  }; END %]
+                  [% PROCESS button element_data = {
+                  name = "__action"
+                  type = "submit"
+                  class = "submit"
+                  value = "post_yearend"
+                  text = text('Post Yearend') #'
+                  } %]</td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <th>Date</th>
+          <th>Is Year-end</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>[% PROCESS input element_data={
+                  type = 'date',
+                  name = 'period_close_date',
+                  size = 11,
+                  title = 'Close As-Of'
+            } -%]</td>
+          <td>
+            no
+          </td>
+          <td>
+            [% PROCESS button element_data={
+                  name = '__action'
+                  value = 'close_period'
+                  text = 'Close Period'
+                  title = 'Close only, no year-end'
+                  } %]
+          </td>
+        </tr>
+        [% FOREACH closing IN eoy.closing_dates -%]
+        <tr>
+          <td>[% closing.end_date %]</td>
+          <td>[% IF closing.is_yearend %]yes[% ELSE %]no[% END %]</td>
+          <td>[% IF loop.first;
+            PROCESS input element_data = {
+            name = 'reopen_date'
+            value = closing.end_date
+            type = 'hidden'
+            };
+            PROCESS button element_data = {
+            text = "Re-open Period"
+            value = 'reopen_books'
+            name = '__action'
+            id = '__action-' _ loop.count
+            };
+            END %]</td>
+        </tr>
+        [% END %]
+      </tbody>
+      <tfoot>
+      </tfoot>
+    </table>
+  </form>
+</body>

@@ -142,10 +142,10 @@ func NewHandler(
 }
 
 func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
-	internal.GET("/tenants/:org_id/bootstrap", h.GetBootstrap)
-	internal.GET("/tenants/:org_id/settings", h.GetSettings)
+	internal.GET("/orgs/:org_id/bootstrap", h.GetBootstrap)
+	internal.GET("/orgs/:org_id/settings", h.GetSettings)
 	if h.resolveTenantRef != nil {
-		internal.GET("/tenants/resolve-ref", h.ResolveOrgRef)
+		internal.GET("/orgs/resolve-ref", h.ResolveOrgRef)
 	}
 	internal.POST("/api-keys/resolve", h.ResolveAPIKey)
 	internal.GET("/parties/:party_id", h.GetParty)
@@ -232,9 +232,9 @@ func (h *Handler) ResolveAPIKey(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"id":        key.ID.String(),
+		"id":     key.ID.String(),
 		"org_id": key.OrgID.String(),
-		"scopes":    key.Scopes,
+		"scopes": key.Scopes,
 	})
 }
 
@@ -329,9 +329,9 @@ func (h *Handler) ResolveCustomer(c *gin.Context) {
 		return
 	}
 	results, _, _, _, err := h.customers.List(c.Request.Context(), customers.ListParams{
-		OrgID: orgID,
-		Search:   strings.TrimSpace(req.Name),
-		Limit:    1,
+		OrgID:  orgID,
+		Search: strings.TrimSpace(req.Name),
+		Limit:  1,
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -343,9 +343,9 @@ func (h *Handler) ResolveCustomer(c *gin.Context) {
 	}
 	created, err := h.customers.Create(c.Request.Context(), customerdomain.Customer{
 		OrgID: orgID,
-		Name:     strings.TrimSpace(req.Name),
-		Phone:    strings.TrimSpace(req.Phone),
-		Email:    strings.TrimSpace(req.Email),
+		Name:  strings.TrimSpace(req.Name),
+		Phone: strings.TrimSpace(req.Phone),
+		Email: strings.TrimSpace(req.Email),
 	}, "internal-service")
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -370,13 +370,13 @@ func (h *Handler) GetCustomer(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"id":        item.ID.String(),
+		"id":     item.ID.String(),
 		"org_id": item.OrgID.String(),
-		"type":      item.Type,
-		"name":      item.Name,
-		"tax_id":    item.TaxID,
-		"email":     item.Email,
-		"phone":     item.Phone,
+		"type":   item.Type,
+		"name":   item.Name,
+		"tax_id": item.TaxID,
+		"email":  item.Email,
+		"phone":  item.Phone,
 		"address": gin.H{
 			"street":   item.Address.Street,
 			"city":     item.Address.City,
@@ -400,9 +400,9 @@ func (h *Handler) ListProducts(c *gin.Context) {
 	query := c.Query("q")
 	limit := handlers.ParseLimitQuery(c, "limit", "50", pagination.Config{DefaultLimit: 50, MaxLimit: 100})
 	items, total, hasMore, next, err := h.products.List(c.Request.Context(), products.ListParams{
-		OrgID: orgID,
-		Search:   query,
-		Limit:    limit,
+		OrgID:  orgID,
+		Search: query,
+		Limit:  limit,
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -432,7 +432,7 @@ func (h *Handler) GetProduct(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"id":          item.ID.String(),
-		"org_id":   item.OrgID.String(),
+		"org_id":      item.OrgID.String(),
 		"sku":         item.SKU,
 		"name":        item.Name,
 		"description": item.Description,
@@ -467,7 +467,7 @@ func (h *Handler) GetService(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"id":                       item.ID.String(),
-		"org_id":                item.OrgID.String(),
+		"org_id":                   item.OrgID.String(),
 		"code":                     item.Code,
 		"name":                     item.Name,
 		"description":              item.Description,
@@ -534,7 +534,7 @@ func (h *Handler) CreateQuote(c *gin.Context) {
 		validUntil = &t
 	}
 	out, err := h.quotes.Create(c.Request.Context(), quotes.CreateQuoteInput{
-		OrgID:     orgID,
+		OrgID:        orgID,
 		CustomerID:   customerID,
 		CustomerName: strings.TrimSpace(req.CustomerName),
 		Items:        items,
@@ -598,7 +598,7 @@ func (h *Handler) CreateSale(c *gin.Context) {
 		})
 	}
 	out, err := h.sales.Create(c.Request.Context(), sales.CreateSaleInput{
-		OrgID:      orgID,
+		OrgID:         orgID,
 		CustomerID:    customerID,
 		CustomerName:  strings.TrimSpace(req.CustomerName),
 		QuoteID:       quoteID,
@@ -667,10 +667,10 @@ func (h *Handler) InternalSendWhatsAppText(c *gin.Context) {
 		return
 	}
 	_, err = h.customerMessaging.SendText(c.Request.Context(), domain.SendTextRequest{
-		OrgID: orgID,
-		PartyID:  partyID,
-		Body:     strings.TrimSpace(req.Body),
-		Actor:    "internal-service:workshops",
+		OrgID:   orgID,
+		PartyID: partyID,
+		Body:    strings.TrimSpace(req.Body),
+		Actor:   "internal-service:workshops",
 	})
 	if err != nil {
 		httperrors.Respond(c, err)

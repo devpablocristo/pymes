@@ -1,0 +1,553 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SIC - register as a component > should show dialog 1`] = `
+<div
+  data-v-app=""
+>
+  
+  <h1
+    class="listtop"
+    data-v-95052b7f=""
+  >
+    Configure Standard Industry Codes (SIC)
+  </h1>
+  
+  <div>
+    <table
+      class="dynatable"
+    >
+      <thead>
+        <tr>
+          <!--v-if-->
+          
+          <th>
+            Code
+          </th>
+          <th>
+            Description
+          </th>
+          
+          <th />
+        </tr>
+      </thead>
+      
+      <tbody
+        class="dynatableData"
+      >
+        
+        
+        <!-- eslint-disable prettier/prettier -->
+        <tr
+          class="data-row"
+        >
+          <!--v-if-->
+          
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="code"
+              readonly=""
+              type="text"
+              value="541330"
+            />
+          </td>
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="description"
+              readonly=""
+              type="text"
+              value="Engineering service"
+            />
+          </td>
+          
+          <td>
+            <!--v-if-->
+            <!--v-if-->
+          </td>
+        </tr>
+        
+        
+        <!-- eslint-disable prettier/prettier -->
+        <tr
+          class="data-row"
+        >
+          <!--v-if-->
+          
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="code"
+              readonly=""
+              type="text"
+              value="611430"
+            />
+          </td>
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="description"
+              readonly=""
+              type="text"
+              value="Professional and management development training"
+            />
+          </td>
+          
+          <td>
+            <!--v-if-->
+            <!--v-if-->
+          </td>
+        </tr>
+        
+        
+      </tbody>
+      <!--v-if-->
+      
+    </table>
+  </div>
+  <div>
+    <span>
+      Download: 
+    </span>
+    
+    <span>
+      <a
+        href="http://localhost/erp/api/v0/contacts/sic?format=HTML"
+        target="_blank"
+      >
+        [ HTML ]
+      </a>
+    </span>
+    
+  </div>
+  
+  <div
+    class="import-section"
+    data-v-95052b7f=""
+  >
+    <h2
+      class="listheading"
+      data-v-95052b7f=""
+    >
+      Import
+    </h2>
+    <div
+      data-v-622eda4c=""
+      data-v-95052b7f=""
+      id="import-sic"
+    >
+      
+      <!-- eslint-disable prettier/prettier -->
+      <div
+        data-v-58373c58=""
+        data-v-622eda4c=""
+        id="sic"
+      >
+        <!--v-if-->
+        <form
+          data-v-58373c58=""
+          name="csvupload"
+        >
+          <input
+            data-v-58373c58=""
+            name="type"
+            type="hidden"
+            value="sic"
+          />
+          <!--v-if-->
+          <div
+            class="non-grid"
+            data-v-58373c58=""
+            style="width: fit-content;"
+          >
+            <!--v-if-->
+            <div
+              data-v-58373c58=""
+            >
+              <label>
+                From File
+              </label>
+              <span>
+                <input
+                  accept=".csv"
+                  name="import_file"
+                  required=""
+                  type="file"
+                />
+              </span>
+            </div>
+          </div>
+          <div
+            class="inputrow non-grid"
+            data-v-58373c58=""
+            id="buttonrow"
+          >
+            <input
+              data-v-58373c58=""
+              name="trans_type"
+              type="hidden"
+            />
+            <button
+              class="submit"
+              data-v-58373c58=""
+              disabled=""
+              name="action"
+            >
+              
+              Save
+              
+            </button>
+          </div>
+          <div
+            class="details"
+            data-v-58373c58=""
+          >
+            
+             The following fields are expected (in this order): 
+            <dl
+              data-v-622eda4c=""
+            >
+              <dt
+                data-v-622eda4c=""
+              >
+                code
+              </dt>
+              <dd
+                data-v-622eda4c=""
+              />
+              <dt
+                data-v-622eda4c=""
+              >
+                sictype
+              </dt>
+              <dd
+                data-v-622eda4c=""
+              />
+              <dt
+                data-v-622eda4c=""
+              >
+                description
+              </dt>
+              <dd
+                data-v-622eda4c=""
+              />
+            </dl>
+            
+          </div>
+        </form>
+      </div>
+      
+    </div>
+  </div>
+  
+</div>
+`;
+
+exports[`SIC - register as a component > should show dialog with editable data 1`] = `
+<div
+  data-v-app=""
+>
+  
+  <h1
+    class="listtop"
+    data-v-95052b7f=""
+  >
+    Configure Standard Industry Codes (SIC)
+  </h1>
+  
+  <div>
+    <table
+      class="dynatable"
+    >
+      <thead>
+        <tr>
+          <!--v-if-->
+          
+          <th>
+            Code
+          </th>
+          <th>
+            Description
+          </th>
+          
+          <th />
+        </tr>
+      </thead>
+      
+      <tbody
+        class="dynatableData"
+      >
+        
+        
+        <!-- eslint-disable prettier/prettier -->
+        <tr
+          class="data-row"
+        >
+          <!--v-if-->
+          
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="code"
+              readonly=""
+              type="text"
+              value="541330"
+            />
+          </td>
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="description"
+              readonly=""
+              type="text"
+              value="Engineering service"
+            />
+          </td>
+          
+          <td>
+            
+            <button
+              name="modify"
+            >
+              
+              Modify
+              
+            </button>
+            <button
+              disabled=""
+              name="save"
+            >
+              
+              Save
+              
+            </button>
+            <button
+              disabled=""
+              name="cancel"
+            >
+              
+              Cancel
+              
+            </button>
+            <!--v-if-->
+            
+            <!--v-if-->
+          </td>
+        </tr>
+        
+        
+        <!-- eslint-disable prettier/prettier -->
+        <tr
+          class="data-row"
+        >
+          <!--v-if-->
+          
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="code"
+              readonly=""
+              type="text"
+              value="611430"
+            />
+          </td>
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="description"
+              readonly=""
+              type="text"
+              value="Professional and management development training"
+            />
+          </td>
+          
+          <td>
+            
+            <button
+              name="modify"
+            >
+              
+              Modify
+              
+            </button>
+            <button
+              disabled=""
+              name="save"
+            >
+              
+              Save
+              
+            </button>
+            <button
+              disabled=""
+              name="cancel"
+            >
+              
+              Cancel
+              
+            </button>
+            <!--v-if-->
+            
+            <!--v-if-->
+          </td>
+        </tr>
+        
+        
+      </tbody>
+      <!--v-if-->
+      
+    </table>
+  </div>
+  <div>
+    <span>
+      Download: 
+    </span>
+    
+    <span>
+      <a
+        href="http://localhost/erp/api/v0/contacts/sic?format=HTML"
+        target="_blank"
+      >
+        [ HTML ]
+      </a>
+    </span>
+    
+  </div>
+  
+  <div
+    class="import-section"
+    data-v-95052b7f=""
+  >
+    <h2
+      class="listheading"
+      data-v-95052b7f=""
+    >
+      Import
+    </h2>
+    <div
+      data-v-622eda4c=""
+      data-v-95052b7f=""
+      id="import-sic"
+    >
+      
+      <!-- eslint-disable prettier/prettier -->
+      <div
+        data-v-58373c58=""
+        data-v-622eda4c=""
+        id="sic"
+      >
+        <!--v-if-->
+        <form
+          data-v-58373c58=""
+          name="csvupload"
+        >
+          <input
+            data-v-58373c58=""
+            name="type"
+            type="hidden"
+            value="sic"
+          />
+          <!--v-if-->
+          <div
+            class="non-grid"
+            data-v-58373c58=""
+            style="width: fit-content;"
+          >
+            <!--v-if-->
+            <div
+              data-v-58373c58=""
+            >
+              <label>
+                From File
+              </label>
+              <span>
+                <input
+                  accept=".csv"
+                  name="import_file"
+                  required=""
+                  type="file"
+                />
+              </span>
+            </div>
+          </div>
+          <div
+            class="inputrow non-grid"
+            data-v-58373c58=""
+            id="buttonrow"
+          >
+            <input
+              data-v-58373c58=""
+              name="trans_type"
+              type="hidden"
+            />
+            <button
+              class="submit"
+              data-v-58373c58=""
+              disabled=""
+              name="action"
+            >
+              
+              Save
+              
+            </button>
+          </div>
+          <div
+            class="details"
+            data-v-58373c58=""
+          >
+            
+             The following fields are expected (in this order): 
+            <dl
+              data-v-622eda4c=""
+            >
+              <dt
+                data-v-622eda4c=""
+              >
+                code
+              </dt>
+              <dd
+                data-v-622eda4c=""
+              />
+              <dt
+                data-v-622eda4c=""
+              >
+                sictype
+              </dt>
+              <dd
+                data-v-622eda4c=""
+              />
+              <dt
+                data-v-622eda4c=""
+              >
+                description
+              </dt>
+              <dd
+                data-v-622eda4c=""
+              />
+            </dl>
+            
+          </div>
+        </form>
+      </div>
+      
+    </div>
+  </div>
+  
+</div>
+`;

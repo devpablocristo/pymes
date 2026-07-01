@@ -1,0 +1,48 @@
+[% WRAPPER "ui-header.html"
+          stylesheet="ledgersmb.css"
+          include_stylesheet=["system/setup.css"]
+       %]
+[% PROCESS elements.html %]
+<body id="setup-system-info" class="lsmb [% dojo_theme %]">
+<div><div class="setupconsole">
+<h2>[% text('System Information') %]</h2>
+[% INCLUDE 'setup/ui-db-credentials.html' %]
+<p>[% text('LedgerSMB has detected the following system components'); %]</p>
+
+<table>
+  <caption>[% text('Database component') %]</caption>
+  <tbody>
+    [% FOR item IN info.db.keys.sort %]
+    <tr>
+      <th>[% item %]</th><td style="text-align: right">[% info.db.$item %]</td>
+    </tr>
+    [% END %]
+  </tbody>
+</table>
+
+<table>
+  <caption>[% text('Base system') %]</caption>
+  <tbody>
+    [% FOR item IN info.system.keys.sort %]
+    <tr>
+      <th>[% item %]</th><td style="text-align: right">[% info.system.$item %]</td>
+    </tr>
+    [% END %]
+  </tbody>
+</table>
+
+<table>
+  <caption>[% text('Environment') %]</caption>
+  <tbody>
+    [% FOR item IN info.environment.keys.sort %]
+    <tr>
+      <th>[% item %]</th><td style="text-align: left">[% info.environment.$item %]</td>
+    </tr>
+    [% END %]
+  </tbody>
+</table>
+
+
+</div></div>
+</body>
+[% END %]

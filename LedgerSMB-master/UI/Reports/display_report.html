@@ -1,0 +1,75 @@
+[%
+
+PROCESS "elements.html";
+
+PROCESS "dynatable.html";
+
+FORMATS = LIST_FORMATS();
+
+%]
+<body class="lsmb [% dojo_theme %]">
+<form data-dojo-type="lsmb/Form"
+      method="post"
+      action="[% SCRIPT %]"
+      id="search-report-dynatable" >
+  <div class="heading_section">
+    <div class="report_header"><label>[% text('Report Name') %]:</label>
+      <span class="report_header">[% name %]</span>
+    </div>
+    <div class="report_header"><label>[% text('Company') %]:</label>
+      <span class="report_header">[% SETTINGS.company_name %]</span>
+    </div>
+    [% FOREACH LINE IN hlines %]
+    <div class="report_header"><label>[% LINE.text %]:</label>
+      <span class="report_header"> [% LINE.value %] </span>
+    </div>
+    [% END %]
+  </div>
+  [% content %]
+  [% PROCESS input element_data = {
+         name = 'form_id'
+         value = FORM_ID
+         type = 'hidden'
+      } %]
+  [% FOREACH K IN HIDDENS.keys;
+         PROCESS input element_data = {
+         name = K
+         type = 'hidden'
+         value = HIDDENS.$K
+         };
+         END; %]
+  [% PROCESS dynatable tbody = {rows = rows }
+                 attributes = {class = 'report', order_url = order_url } %]
+<div id="options">
+[%
+FOREACH OPTION IN options;
+  PROCESS select element_data = OPTION;
+END; %]
+</div>
+[%
+FOREACH BUTTON IN buttons;
+  PROCESS button element_data = BUTTON;
+END; %]<br />
+<a href="[% REPORT_LINK %]">[[% text('permalink') %]]</a>&nbsp;
+[% IF FORMATS.grep('PDF').size() %]
+<a target="_blank" rel="noopener noreferrer"
+   href="[% REPORT_LINK _ '&amp;format=PDF' %]">[[% text('PDF') %]]</a>&nbsp;
+[% END;
+IF FORMATS.grep('TXT').size(); %]
+<a target="_blank" rel="noopener noreferrer"
+   href="[% REPORT_LINK _ '&amp;format=CSV' %]">[[% text('CSV') %]]</a>&nbsp;
+[% END;
+IF FORMATS.grep('ODS').size() %]
+<a target="_blank" rel="noopener noreferrer"
+   href="[% REPORT_LINK _ '&amp;format=ODS' %]">[[% text('ODS') %]]</a>&nbsp;
+[% END;
+IF FORMATS.grep('XLS').size(); %]
+<a target="_blank" rel="noopener noreferrer"
+   href="[% REPORT_LINK _ '&amp;format=XLS' %]">[[% text('XLS') %]]</a>&nbsp;
+[% END;
+IF FORMATS.grep('XLSX').size(); %]
+<a target="_blank" rel="noopener noreferrer"
+   href="[% REPORT_LINK _ '&amp;format=XLSX' %]">[[% text('XLSX') %]]</a>&nbsp;
+[% END; %]
+</form>
+</body>

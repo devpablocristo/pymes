@@ -1,372 +1,301 @@
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CrudPage, type CrudHttpClient } from '../components/CrudPage';
 import {
-  assignRbacRole,
-  createTenantInvite,
-  getUserEffectivePermissions,
-  listTenantInvites,
+  apiRequest,
+  createOrg,
+  createOrgUser,
+  listOrgUsers,
+  listOrgs,
   listTenantMembers,
-  listRbacRoles,
-  removeRbacRoleAssignment,
-  resendTenantInvite,
-  revokeTenantInvite,
-  type TenantMemberRow,
+  removeTenantMember,
+  updateOrgUser,
+  type OrgMemberRow,
+  type OrgSummary,
+  type OrgUser,
 } from '../lib/api';
-import { formatFetchErrorForUser } from '../lib/formatFetchError';
-import { queryKeys } from '../lib/queryKeys';
 
-function memberLabel(m: TenantMemberRow): string {
-  const name = m.user?.name?.trim();
-  const email = m.user?.email?.trim();
-  if (name && email) return `${name} (${email})`;
-  return name || email || m.user_id;
-}
+type IAMTab = 'orgs' | 'users' | 'members';
+type CrudLifecycleView = 'active' | 'archived';
+
+type MemberRow = OrgMemberRow & {
+  member_name: string;
+  member_email: string;
+  status: string;
+};
+
+type PymesIAMCrudPath = {
+  resource: IAMTab;
+  view: CrudLifecycleView;
+  id: string;
+  action: 'archive' | 'unarchive' | 'trash' | 'restore' | '';
+  limit: number;
+  cursor: number;
+};
 
 export function AdminRbacSection({ tenantId }: { tenantId: string }) {
-  const [error, setError] = useState('');
-  const [selectedRoleId, setSelectedRoleId] = useState('');
-  const [selectedUserId, setSelectedUserId] = useState('');
-  const [permUserId, setPermUserId] = useState<string | null>(null);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'member' | 'admin'>('member');
-  const queryClient = useQueryClient();
-  const membersQuery = useQuery({
-    queryKey: queryKeys.rbac.members(tenantId),
-    queryFn: () => listTenantMembers(tenantId),
-  });
-  const rolesQuery = useQuery({
-    queryKey: queryKeys.rbac.roles,
-    queryFn: listRbacRoles,
-  });
-  const invitesQuery = useQuery({
-    queryKey: queryKeys.rbac.invites(tenantId),
-    queryFn: () => listTenantInvites(tenantId),
-  });
-  const permissionsQuery = useQuery({
-    queryKey: queryKeys.rbac.permissions(permUserId ?? ''),
-    queryFn: () => getUserEffectivePermissions(permUserId ?? ''),
-    enabled: permUserId !== null,
-  });
-  const assignMutation = useMutation({
-    mutationFn: ({ roleId, userId }: { roleId: string; userId: string }) => assignRbacRole(roleId, userId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.rbac.members(tenantId) });
-    },
-  });
-  const removeMutation = useMutation({
-    mutationFn: ({ roleId, userId }: { roleId: string; userId: string }) => removeRbacRoleAssignment(roleId, userId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.rbac.members(tenantId) });
-    },
-  });
-  const inviteMutation = useMutation({
-    mutationFn: ({ email, role }: { email: string; role: string }) => createTenantInvite(tenantId, { email, role }),
-    onSuccess: async () => {
-      setInviteEmail('');
-      setInviteRole('member');
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.rbac.members(tenantId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.rbac.invites(tenantId) }),
-      ]);
-    },
-  });
-  const revokeInviteMutation = useMutation({
-    mutationFn: (inviteId: string) => revokeTenantInvite(inviteId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.rbac.invites(tenantId) });
-    },
-  });
-  const resendInviteMutation = useMutation({
-    mutationFn: (inviteId: string) => resendTenantInvite(inviteId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.rbac.invites(tenantId) });
-    },
-  });
-  const members = membersQuery.data?.items ?? [];
-  const invites = invitesQuery.data?.items ?? [];
-  const roles = rolesQuery.data?.items ?? [];
-  const loading = membersQuery.isLoading || rolesQuery.isLoading || invitesQuery.isLoading;
-  const busy =
-    assignMutation.isPending ||
-    removeMutation.isPending ||
-    inviteMutation.isPending ||
-    revokeInviteMutation.isPending ||
-    resendInviteMutation.isPending;
-  const queryError = membersQuery.error || rolesQuery.error || invitesQuery.error;
-  const permLines = useMemo(() => {
-    const permissions = permissionsQuery.data?.permissions ?? {};
-    const lines: string[] = [];
-    const keys = Object.keys(permissions).sort();
-    for (const resource of keys) {
-      const actions = permissions[resource] ?? [];
-      lines.push(`${resource}: ${actions.join(', ')}`);
-    }
-    return lines.length ? lines.join('\n') : '(sin permisos efectivos)';
-  }, [permissionsQuery.data]);
-
-  async function onShowPermissions(userId: string): Promise<void> {
-    try {
-      setPermUserId(userId);
-      setError('');
-    } catch (err) {
-      setError(formatFetchErrorForUser(err, 'No se pudieron leer los permisos.'));
-    }
-  }
-
-  async function handleAssign(): Promise<void> {
-    if (!selectedRoleId || !selectedUserId) {
-      setError('Elegí un rol y un miembro.');
-      return;
-    }
-    try {
-      await assignMutation.mutateAsync({ roleId: selectedRoleId, userId: selectedUserId });
-      setError('');
-    } catch (err) {
-      setError(formatFetchErrorForUser(err, 'No se pudo asignar el rol.'));
-    }
-  }
-
-  async function handleRemove(): Promise<void> {
-    if (!selectedRoleId || !selectedUserId) {
-      setError('Elegí un rol y un miembro para quitar.');
-      return;
-    }
-    try {
-      await removeMutation.mutateAsync({ roleId: selectedRoleId, userId: selectedUserId });
-      setError('');
-    } catch (err) {
-      setError(formatFetchErrorForUser(err, 'No se pudo quitar la asignación.'));
-    }
-  }
-
-  async function handleInvite(): Promise<void> {
-    const email = inviteEmail.trim();
-    if (!email) {
-      setError('Ingresá un email para invitar.');
-      return;
-    }
-    try {
-      await inviteMutation.mutateAsync({ email, role: inviteRole });
-      setError('');
-    } catch (err) {
-      setError(formatFetchErrorForUser(err, 'No se pudo enviar la invitación.'));
-    }
-  }
+  const [tab, setTab] = useState<IAMTab>('users');
+  const httpClient = useMemo(() => createPymesIAMHttpClient(tenantId), [tenantId]);
 
   return (
     <section className="card admin-settings-section">
       <div className="card-header">
-        <h2>Miembros y roles (RBAC)</h2>
-        <span className="badge badge-neutral">Solo administradores de consola</span>
+        <h2>IAM</h2>
       </div>
-      <p className="admin-settings-hint">
-        Asigná roles personalizados del catálogo <code>/v1/roles</code> a usuarios del tenant y consultá
-        permisos efectivos.
-      </p>
-      {error ? <p className="form-error">{error}</p> : null}
-      {!error && queryError ? (
-        <p className="form-error">{formatFetchErrorForUser(queryError, 'No se pudieron cargar miembros o roles.')}</p>
-      ) : null}
-      {loading ? (
-        <p className="text-secondary">Cargando…</p>
-      ) : (
-        <>
-          <form
-            className="admin-settings-grid admin-rbac-assign-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleInvite();
-            }}
-          >
-            <div className="form-group">
-              <label htmlFor="tenant-invite-email">Invitar por email</label>
-              <input
-                id="tenant-invite-email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="persona@empresa.com"
-                disabled={busy}
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="tenant-invite-role">Rol</label>
-              <select
-                id="tenant-invite-role"
-                value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value === 'admin' ? 'admin' : 'member')}
-                disabled={busy}
-              >
-                <option value="member">Miembro</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-            <div className="form-group admin-settings-toolbar-bottom admin-rbac-form-actions">
-              <button type="submit" className="btn-primary btn-sm" disabled={busy}>
-                Enviar invitación
-              </button>
-            </div>
-          </form>
 
-          {invites.length > 0 ? (
-            <div className="admin-settings-section admin-rbac-block-mt">
-              <h3>Invitaciones</h3>
-              <div className="admin-activity-wrap">
-                <table className="admin-activity-table">
-                  <thead>
-                    <tr>
-                      <th>Email</th>
-                      <th>Rol</th>
-                      <th>Estado</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invites.map((invite) => (
-                      <tr key={invite.id}>
-                        <td>{invite.email}</td>
-                        <td>
-                          <code className="admin-code">{invite.role}</code>
-                        </td>
-                        <td>
-                          <code className="admin-code">{invite.status}</code>
-                        </td>
-                        <td>
-                          {invite.status === 'pending' ? (
-                            <>
-                              <button
-                                type="button"
-                                className="btn-sm btn-secondary"
-                                disabled={busy}
-                                onClick={() => void resendInviteMutation.mutateAsync(invite.id)}
-                              >
-                                Reenviar
-                              </button>{' '}
-                              <button
-                                type="button"
-                                className="btn-sm btn-danger"
-                                disabled={busy}
-                                onClick={() => void revokeInviteMutation.mutateAsync(invite.id)}
-                              >
-                                Revocar
-                              </button>
-                            </>
-                          ) : null}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : null}
+      <nav className="screen-nav" aria-label="IAM screens">
+        {[
+          ['orgs', 'Organizaciones'],
+          ['users', 'Usuarios'],
+          ['members', 'Miembros'],
+        ].map(([id, label]) => (
+          <button key={id} type="button" className={tab === id ? 'active' : ''} onClick={() => setTab(id as IAMTab)}>
+            {label}
+          </button>
+        ))}
+      </nav>
 
-          <div className="admin-activity-wrap">
-            <table className="admin-activity-table">
-              <thead>
-                <tr>
-                  <th>Miembro</th>
-                  <th>User ID</th>
-                  <th>Rol org.</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((m) => (
-                  <tr key={m.id}>
-                    <td>{memberLabel(m)}</td>
-                    <td className="admin-activity-id">
-                      <code className="admin-code">{m.user_id}</code>
-                    </td>
-                    <td>
-                      <code className="admin-code">{m.role ?? '—'}</code>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn-sm btn-secondary"
-                        disabled={busy}
-                        onClick={() => {
-                          void onShowPermissions(m.user_id);
-                        }}
-                      >
-                        Permisos efectivos
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {tab === 'orgs' && (
+        <CrudPage<OrgSummary>
+          key="pymes-iam-orgs"
+          basePath="/v1/iam-crud/orgs"
+          httpClient={httpClient}
+          allowCreate
+          allowEdit={false}
+          allowDelete={false}
+          allowRestore={false}
+          allowHardDelete={false}
+          supportsArchived={false}
+          label="organización"
+          labelPlural="organizaciones"
+          labelPluralCap="Organizaciones"
+          createLabel="Nueva organización"
+          columns={[
+            { key: 'name', header: 'Nombre' },
+            { key: 'slug', header: 'Slug' },
+            { key: 'role', header: 'Rol' },
+          ]}
+          formFields={[
+            { key: 'name', label: 'Nombre', required: true },
+            { key: 'slug', label: 'Slug' },
+          ]}
+          searchText={(row) => [row.name, row.slug, row.id].join(' ')}
+          toFormValues={(row) => ({ name: row.name, slug: row.slug ?? '' })}
+          toBody={(values) => ({ name: stringValue(values.name), slug: stringValue(values.slug) })}
+          isValid={(values) => stringValue(values.name).length > 0}
+          emptyState="Sin organizaciones"
+          searchPlaceholder="Buscar organizaciones"
+          featureFlags={{ csvToolbar: false }}
+        />
+      )}
 
-          {permUserId ? (
-            <div className="admin-settings-section admin-rbac-block-mt">
-              <h3>Permisos efectivos</h3>
-              <p className="text-secondary">
-                Usuario: <code className="admin-code">{permUserId}</code>
-              </p>
-              {permissionsQuery.isLoading ? <p className="text-secondary">Cargando permisos…</p> : null}
-              {permissionsQuery.error ? (
-                <p className="form-error">
-                  {formatFetchErrorForUser(permissionsQuery.error, 'No se pudieron leer los permisos.')}
-                </p>
-              ) : null}
-              <pre className="admin-textarea admin-pre-permissions">{permLines}</pre>
-              <button type="button" className="btn-sm btn-secondary" onClick={() => setPermUserId(null)}>
-                Cerrar
-              </button>
-            </div>
-          ) : null}
+      {tab === 'users' && (
+        <CrudPage<OrgUser>
+          key="pymes-iam-users"
+          basePath="/v1/iam-crud/users"
+          httpClient={httpClient}
+          supportsArchived
+          allowCreate
+          allowEdit
+          allowDelete
+          allowRestore
+          allowHardDelete={false}
+          label="usuario"
+          labelPlural="usuarios"
+          labelPluralCap="Usuarios"
+          createLabel="Nuevo usuario"
+          columns={[
+            { key: 'name', header: 'Nombre' },
+            { key: 'email', header: 'Email' },
+            { key: 'status', header: 'Estado', render: (value) => formatStatus(String(value ?? '')) },
+          ]}
+          formFields={[
+            { key: 'email', label: 'Email', type: 'email', required: true },
+            { key: 'name', label: 'Nombre' },
+          ]}
+          searchText={(row) => [row.name, row.email, row.external_id, row.id].join(' ')}
+          toFormValues={(row) => ({ email: row.email, name: row.name })}
+          toBody={(values) => ({ email: stringValue(values.email), name: stringValue(values.name) })}
+          isValid={(values) => stringValue(values.email).length > 0}
+          emptyState="Sin usuarios"
+          archivedEmptyState="Sin usuarios archivados"
+          searchPlaceholder="Buscar usuarios"
+          featureFlags={{ csvToolbar: false }}
+        />
+      )}
 
-          <form
-            className="admin-settings-grid admin-rbac-assign-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleAssign();
-            }}
-          >
-            <div className="form-group">
-              <label htmlFor="rbac-role">Rol (catálogo)</label>
-              <select
-                id="rbac-role"
-                value={selectedRoleId}
-                onChange={(e) => setSelectedRoleId(e.target.value)}
-                disabled={busy}
-              >
-                <option value="">— Elegir —</option>
-                {roles.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label htmlFor="rbac-user">Miembro</label>
-              <select
-                id="rbac-user"
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                disabled={busy}
-              >
-                <option value="">— Elegir —</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.user_id}>
-                    {memberLabel(m)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group admin-settings-toolbar-bottom admin-rbac-form-actions">
-              <button type="submit" className="btn-primary btn-sm" disabled={busy}>
-                Asignar rol
-              </button>
-              <button type="button" className="btn-danger btn-sm" disabled={busy} onClick={() => void handleRemove()}>
-                Quitar asignación
-              </button>
-            </div>
-          </form>
-        </>
+      {tab === 'members' && (
+        <CrudPage<MemberRow>
+          key={`pymes-iam-members-${tenantId}`}
+          basePath="/v1/iam-crud/members"
+          httpClient={httpClient}
+          supportsArchived={false}
+          allowCreate={false}
+          allowEdit
+          allowDelete
+          allowRestore={false}
+          allowHardDelete={false}
+          label="miembro"
+          labelPlural="miembros"
+          labelPluralCap="Miembros"
+          columns={[
+            { key: 'member_name', header: 'Miembro' },
+            { key: 'member_email', header: 'Email' },
+            { key: 'role', header: 'Rol' },
+            { key: 'status', header: 'Estado', render: (value) => formatStatus(String(value ?? '')) },
+          ]}
+          formFields={[
+            {
+              key: 'role',
+              label: 'Rol',
+              type: 'select',
+              required: true,
+              options: [
+                { label: 'owner', value: 'owner' },
+                { label: 'admin', value: 'admin' },
+                { label: 'member', value: 'member' },
+              ],
+            },
+          ]}
+          searchText={(row) => [row.member_name, row.member_email, row.role, row.user_id].join(' ')}
+          toFormValues={(row) => ({ role: row.role ?? 'member' })}
+          toBody={(values) => ({ role: stringValue(values.role) })}
+          isValid={(values) => stringValue(values.role).length > 0}
+          emptyState="Sin miembros"
+          searchPlaceholder="Buscar miembros"
+          featureFlags={{ csvToolbar: false }}
+        />
       )}
     </section>
   );
+}
+
+function createPymesIAMHttpClient(tenantId: string): CrudHttpClient {
+  return {
+    json: async <TResponse,>(path: string, init: { method?: string; body?: Record<string, unknown> } = {}) => {
+      const parsed = parsePymesIAMCrudPath(path);
+      const method = init.method ?? 'GET';
+      const body = init.body ?? {};
+
+      if (method === 'GET') {
+        return listPymesIAMRows(parsed, tenantId) as Promise<TResponse>;
+      }
+      return mutatePymesIAMRow(parsed, tenantId, method, body) as Promise<TResponse>;
+    },
+  };
+}
+
+async function listPymesIAMRows(parsed: PymesIAMCrudPath, tenantId: string): Promise<{ items: Array<OrgSummary | OrgUser | MemberRow>; has_more: boolean; next_cursor: string }> {
+  const allRows = await loadPymesIAMRows(parsed.resource, tenantId);
+  const rows = allRows.filter((row) => lifecycleBucket('status' in row ? String(row.status ?? 'active') : 'active') === parsed.view);
+  const page = rows.slice(parsed.cursor, parsed.cursor + parsed.limit);
+  const nextCursor = parsed.cursor + parsed.limit;
+  return {
+    items: page,
+    has_more: nextCursor < rows.length,
+    next_cursor: nextCursor < rows.length ? String(nextCursor) : '',
+  };
+}
+
+async function loadPymesIAMRows(resource: IAMTab, tenantId: string): Promise<Array<OrgSummary | OrgUser | MemberRow>> {
+  if (resource === 'orgs') {
+    const response = await listOrgs();
+    return response.items;
+  }
+  if (resource === 'users') {
+    const response = await listOrgUsers();
+    return response.items;
+  }
+  const response = await listTenantMembers(tenantId);
+  return response.items.map(toMemberRow);
+}
+
+async function mutatePymesIAMRow(parsed: PymesIAMCrudPath, tenantId: string, method: string, body: Record<string, unknown>): Promise<unknown> {
+  if (parsed.resource === 'orgs') {
+    if (!parsed.id) {
+      return createOrg({ name: stringValue(body.name), slug: stringValue(body.slug) });
+    }
+    return { ok: true };
+  }
+
+  if (parsed.resource === 'users') {
+    if (!parsed.id) {
+      return createOrgUser({ email: stringValue(body.email), name: stringValue(body.name) });
+    }
+    const status = method === 'DELETE' ? 'archived' : statusForAction(parsed.action, 'archived');
+    return updateOrgUser(parsed.id, status ? { status } : { email: stringValue(body.email), name: stringValue(body.name) });
+  }
+
+  if (method === 'DELETE') {
+    await removeTenantMember(tenantId, parsed.id);
+    return { ok: true };
+  }
+  return apiRequest(`/v1/orgs/${encodeURIComponent(tenantId)}/members/${encodeURIComponent(parsed.id)}`, {
+    method: 'PATCH',
+    body: { role: stringValue(body.role) },
+  });
+}
+
+function parsePymesIAMCrudPath(path: string): PymesIAMCrudPath {
+  const url = new URL(path, window.location.origin);
+  const segments = url.pathname.split('/').filter(Boolean);
+  const rootIndex = segments.indexOf('iam-crud');
+  const resource = segments[rootIndex + 1] as IAMTab;
+  const rest = segments.slice(rootIndex + 2);
+  const view = rest[0] === 'archived' ? 'archived' : 'active';
+  const id = view === 'active' ? rest[0] ?? '' : '';
+  const action = view === 'active' ? rest[1] ?? '' : '';
+  const rawLimit = Number.parseInt(url.searchParams.get('limit') || '100', 10);
+  const rawCursor = Number.parseInt(url.searchParams.get('cursor') || '0', 10);
+  return {
+    resource,
+    view,
+    id: decodeURIComponent(id),
+    action: action as PymesIAMCrudPath['action'],
+    limit: Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : 100,
+    cursor: Number.isFinite(rawCursor) && rawCursor > 0 ? rawCursor : 0,
+  };
+}
+
+function toMemberRow(member: OrgMemberRow): MemberRow {
+  const name = member.user?.name?.trim() || [member.user?.given_name, member.user?.family_name].filter(Boolean).join(' ').trim();
+  const email = member.user?.email?.trim() || '';
+  return {
+    ...member,
+    member_name: name || email || member.user_id,
+    member_email: email || '-',
+    status: member.status || 'active',
+  };
+}
+
+function lifecycleBucket(status: string): CrudLifecycleView {
+  const normalized = status.trim().toLowerCase();
+  if (normalized === 'archived') return 'archived';
+  if (normalized === 'deleted' || normalized === 'removed' || normalized === 'disabled') return 'archived';
+  return 'active';
+}
+
+function statusForAction(action: PymesIAMCrudPath['action'], trashStatus: string): string {
+  if (action === 'archive') return 'archived';
+  if (action === 'trash') return trashStatus;
+  if (action === 'unarchive' || action === 'restore') return 'active';
+  return '';
+}
+
+function formatStatus(status: string): string {
+  switch (status.trim().toLowerCase()) {
+    case 'active':
+      return 'activo';
+    case 'archived':
+      return 'archivado';
+    case 'deleted':
+    case 'removed':
+    case 'disabled':
+      return 'papelera';
+    default:
+      return status || '-';
+  }
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
 }

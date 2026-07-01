@@ -1,0 +1,166 @@
+[% WRAPPER "ui-header.html"
+stylesheet="ledgersmb.css"
+include_stylesheet=["system/setup.css"];
+       PROCESS "elements.html";
+       PROCESS "dynatable.html"; %]
+<body id="setup-edit-user" class="[% dojo_theme %]">
+ <div><div class="setupconsole">
+        <div class="listtop">
+            [%
+               IF request.pls_import;
+                       text('Duplicate User Found: Importing User');
+                       action = 'save_user';
+                ELSIF user.user_id;
+                      text('Editing User');
+                      action = 'edit_user';
+                ELSE;
+                      text('New User');
+                      action = 'save_user';
+                END %]
+        </div>
+
+    <form data-dojo-type="lsmb/SimpleForm" method="POST" action="[% request.script %]">
+      <input type="hidden" name="csrf_token" value="[% csrf_token %]" />
+      <input type="hidden" name="id" value="[% request.id %]" />
+      <input type="hidden" name="database" value="[% request.database %]" />
+        <table id="user-data">
+
+            [% IF user.user_id and not request.pls_import %]
+            <tr>
+                <td>[% text('Username') %]</td>
+                <td>
+                    [% user.username;
+                    INCLUDE input element_data = {
+                            name  = 'username'
+                            type  = 'hidden'
+                            value = user.username
+                    } %]
+                </td>
+            </tr>
+
+            [% ELSE %]
+            <tr>
+                <td>[% text('Username') %]</td>
+                <td>
+                    <input type="text" name="username" value="[% user.username %]" required/>
+                </td>
+            </tr>
+            [% END %]
+            <tr>
+                <td><label for="password">[% text('Password') %]</label>
+                </td>
+                <td>
+                  [% PROCESS input element_data = {
+                               type = "password"
+                               id   = "password"
+                               name = "password"
+                               autocomplete = "off"
+                  } %]
+                </td>
+            </tr>
+
+            [% IF (request.pls_import == 1) OR !user.username %]
+            <tr>
+                <td>[% text('Import') %]</td>
+                [%
+                  IF request.pls_import;
+                      importc1 = 'CHECKED';
+                      importc0 = '';
+                  ELSE;
+                      importc1 = '';
+                      importc0 = 'CHECKED';
+                  END; %]
+                <td><div class="input_line"><div overflow="auto" class="input_group">
+                  [% INCLUDE input element_data = {
+                           label   = 'Yes'
+                           value   = '1'
+                           checked = importc1
+                           name    = 'pls_import'
+                           type    = 'radio'
+                   } %]</div><div overflow="auto" class="input_group">[%
+                   INCLUDE input element_data = {
+                           label   = 'No'
+                           value   = '0'
+                           checked = importc0
+                           name    = 'pls_import'
+                           type    = 'radio'
+                   } %]</div></div></td>
+            </tr>
+            [% END # unless employee.entity_id %]
+        </table>
+           [% IF user.username and not request.pls_import;
+                PROCESS button element_data  = {
+                         text = text('Reset Password') #'
+                         name = '__action'
+                         type = 'submit'
+                        class = 'submit'
+                  value = 'reset_password'
+                  attributes = { autocomplete = "off" }
+                };
+           ELSE;
+                PROCESS button element_data  = {
+                         text = text('Add User') #'
+                         name = '__action'
+                         type = 'submit'
+                        class = 'submit'
+                        value = 'create_user'
+                };
+           END;
+    %]
+    </form>
+    [% IF user.user_id and not request.pls_import%]
+        <hr />
+        <form data-dojo-type="lsmb/SimpleForm" name="groups" method="POST" action="[% request.script %]">
+          <input type="hidden" name="csrf_token" value="[% csrf_token %]" />
+            <input type="hidden" name="database" value="[% request.database %]" />
+            [% PROCESS input element_data = {
+               type="hidden"
+               name="id"
+               value=request.id
+              };
+           %]
+        <input type="hidden" name="entity_id" value="[% entity_id %]"/>
+           <div>
+            <table id="user-roles">
+                <!-- Groups section -->
+                <tr>
+                [% FOREACH role IN roles %]
+                    <td>
+                        [% rolcheck = undef;
+                           IF user.roles.grep(role.name).size;
+                              rolcheck = "checked";
+                           END %]
+                        [% PROCESS input element_data = {
+                               type = "checkbox"
+                               label = role.description
+                               value = 1
+                               name = role.name
+                               id = role.name
+                               checked = rolcheck
+                         }, label_pos = 1 %]
+                    </td>
+                [% IF loop.even() %]
+                </tr>
+                <tr>
+                [% END %]
+                [% END %]
+                </tr>
+            </table>
+
+            <table>
+                <tr>
+                    <td>[% PROCESS button element_data = {
+                          text = text('Save Groups') #'
+                          class = "submit"
+                          name = "__action"
+                          value = "save_user_roles"
+                          'data-lsmb-doing' = text('Saving...')
+                          'data-lsmb-done' = text('Saved')
+                    } %]</td>
+                </tr>
+            </table></div>
+        </form>
+[% END %]
+</div></div>
+</body>
+[% END %]

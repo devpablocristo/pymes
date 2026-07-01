@@ -113,7 +113,7 @@ func (r *Repository) GetPartyByPhone(ctx context.Context, orgID uuid.UUID, phone
 
 func (r *Repository) GetTemplates(ctx context.Context, orgID uuid.UUID) (Templates, error) {
 	var row waTemplatesRow
-	err := r.db.WithContext(ctx).Table("tenant_settings").Select("wa_quote_template, wa_receipt_template, wa_default_country_code").Where("org_id = ?", orgID).Take(&row).Error
+	err := r.db.WithContext(ctx).Table("org_settings").Select("wa_quote_template, wa_receipt_template, wa_default_country_code").Where("org_id = ?", orgID).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return Templates{DefaultCountryCode: "54"}, nil

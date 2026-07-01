@@ -1,0 +1,70 @@
+div.login {
+    background-color: white;
+    border: #e6e6e6 1px solid;
+    border-radius: 12px;
+    box-shadow: 6px 6px 4px black;
+    margin-left: auto;
+    margin-right: auto;
+    min-width: 25em;
+    padding: 2em;
+}
+
+div.login div.login {
+    border-style: solid;
+    border-width: 1px;
+    height: 23em;
+    max-width: fit-content;
+    padding-bottom: 2em;
+}
+
+div.labelledinput {
+    clear: both;
+    width: 100%;
+}
+
+div.label {
+    border-width: 1px;
+    float: left;
+    margin: 0;
+    margin-top: 0.5em;
+    padding-right: 0.5em;
+    text-align: right;
+    width: 5em;
+}
+
+div.input {
+    border-width: 3px;
+    float: left;
+    margin: 0;
+    margin-top: 0.5em;
+    text-align: left;
+    width: 14em;
+}
+
+img.logo {
+    border-style: none;
+    height: 8em;
+    width: 16em;
+}
+
+input {
+    width: 16em;
+}
+
+button {
+    margin-top: 10px;
+}
+
+div#login-indicator {
+    font-size: x-large;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+    visibility: hidden;
+    width: 100%;
+}
+
+#widget_password,
+#widget_company {
+    width: 100%;
+}

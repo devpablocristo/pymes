@@ -1,0 +1,89 @@
+[% PROCESS 'elements.html'  # Include form elements helper. %]
+<body class="lsmb [% dojo_theme %]">
+[% IF id;
+          title = text('Edit Tax Form'); #'
+       ELSE;
+          title = text('Create New Tax Form'); #'
+       END %]
+<div class="listtop">[% title %]</div>
+<form data-dojo-type="lsmb/Form"
+      name="add_taxform"
+      method="post"
+      action="[% script %]">
+[% PROCESS input element_data = {
+    type = "hidden"
+    name = "id"
+   value = id
+}; %]
+<div class="two-column-grid" style="width: fit-content">
+
+    [% IF countries %]
+        [% IF !country_id; country_id = default_country; END %]
+        [% PROCESS select_country element_data = {
+                        name = "country_id"
+                        default_values = [country_id]
+                        options = countries
+                        value_attr = "id"
+                        text_attr = "name"
+                        label = text('Country:')
+                } %]
+    [% END %]
+
+     [% PROCESS input element_data = {
+        name = "form_name"
+        type = "text"
+        value = form_name
+        label = text("Description:")
+        size = '15'
+                                         }
+     %]
+
+     [% IF default_reportable; CHECKED = 'CHECKED';
+            ELSE; CHECKED = '';
+            END;
+        PROCESS input element_data = {
+        name = "default_reportable"
+        type = "checkbox"
+        value = "1"
+        label = text("Select by Default:")
+        checked = CHECKED
+                                         }
+     %]
+
+     [% IF is_accrual; CHECKED = 'CHECKED';
+            ELSE; CHECKED = '';
+            END;
+        PROCESS input element_data = {
+        name = "is_accrual"
+        type = "checkbox"
+        value = "1"
+        label = text("Accrual Basis:")
+        checked = CHECKED
+                                         }
+     %]
+</div>
+
+<div id="buttons">
+
+[% INCLUDE button element_data = {
+        type = "submit"
+        name = "__action"
+        text = text('Save')
+        id   = 'taxform-add-action'
+        class = "submit"
+        value = "save"
+       'data-lsmb-doing' = text('Saving...')
+       'data-lsmb-done' = text('Saved')
+} %]
+
+</div>
+
+[% FOREACH item = hidden %]
+[% PROCESS input element_data = {
+                 type="hidden"
+                 name=item.name
+                 value=item.value } %]
+[% END %]
+
+</form>
+</body>

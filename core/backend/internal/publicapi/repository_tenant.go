@@ -18,7 +18,7 @@ type tenantResolveBySlugRow struct {
 }
 
 type businessInfoRow struct {
-	OrgID          uuid.UUID
+	OrgID             uuid.UUID
 	Name              string
 	Slug              string
 	BusinessName      string
@@ -76,7 +76,7 @@ func (r *Repository) GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (Busi
 			COALESCE(ts.business_email, '') as business_email,
 			COALESCE(ts.scheduling_enabled, false) as scheduling_enabled
 		`).
-		Joins("LEFT JOIN tenant_settings ts ON ts.org_id = o.id").
+		Joins("LEFT JOIN org_settings ts ON ts.org_id = o.id").
 		Where("o.id = ?", orgID).
 		Take(&row).Error
 	if err != nil {
@@ -92,7 +92,7 @@ func (r *Repository) GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (Busi
 	}
 
 	return BusinessInfo{
-		OrgID:          row.OrgID,
+		OrgID:             row.OrgID,
 		Name:              row.Name,
 		Slug:              row.Slug,
 		BusinessName:      businessName,

@@ -24,7 +24,7 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 type paymentRow struct {
 	ID            uuid.UUID      `gorm:"column:id"`
-	OrgID      uuid.UUID      `gorm:"column:org_id"`
+	OrgID         uuid.UUID      `gorm:"column:org_id"`
 	ReferenceType string         `gorm:"column:reference_type"`
 	ReferenceID   uuid.UUID      `gorm:"column:reference_id"`
 	Method        string         `gorm:"column:method"`
@@ -41,7 +41,7 @@ type paymentRow struct {
 func (p paymentRow) toDomain() paymentsdomain.Payment {
 	return paymentsdomain.Payment{
 		ID:            p.ID,
-		OrgID:      p.OrgID,
+		OrgID:         p.OrgID,
 		ReferenceType: p.ReferenceType,
 		ReferenceID:   p.ReferenceID,
 		Method:        p.Method,
@@ -64,6 +64,23 @@ func (r *Repository) ListSalePayments(ctx context.Context, orgID, saleID uuid.UU
 		WHERE org_id = ? AND reference_type = 'sale' AND reference_id = ? AND archived_at IS NULL
 		ORDER BY created_at DESC
 	`, orgID, saleID).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]paymentsdomain.Payment, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, row.toDomain())
+	}
+	return out, nil
+}
+
+func (r *Repository) ListPurchasePayments(ctx context.Context, orgID, purchaseID uuid.UUID) ([]paymentsdomain.Payment, error) {
+	var rows []paymentRow
+	if err := r.db.WithContext(ctx).Raw(`
+		SELECT id, org_id, reference_type, reference_id, method, amount, notes, received_at, is_favorite, tags, archived_at, created_by, created_at
+		FROM payments
+		WHERE org_id = ? AND reference_type = 'purchase' AND reference_id = ? AND archived_at IS NULL
+		ORDER BY created_at DESC
+	`, orgID, purchaseID).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]paymentsdomain.Payment, 0, len(rows))
@@ -215,6 +232,61 @@ func (r *Repository) CreateSalePayment(ctx context.Context, orgID, saleID uuid.U
 			return err
 		}
 		out = paymentsdomain.Payment{ID: paymentID, OrgID: orgID, ReferenceType: "sale", ReferenceID: saleID, Method: in.Method, Amount: in.Amount, Notes: in.Notes, ReceivedAt: in.ReceivedAt.UTC(), IsFavorite: in.IsFavorite, Tags: append([]string(nil), utils.NormalizeTags(in.Tags)...), CreatedBy: in.CreatedBy, CreatedAt: createdAt}
+		return nil
+	})
+	if err != nil {
+		return paymentsdomain.Payment{}, err
+	}
+	return out, nil
+}
+
+func (r *Repository) CreatePurchasePayment(ctx context.Context, orgID, purchaseID uuid.UUID, in paymentsdomain.Payment) (paymentsdomain.Payment, error) {
+	var out paymentsdomain.Payment
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var purchase struct {
+			BranchID *uuid.UUID `gorm:"column:branch_id"`
+			Total    float64
+			Currency string
+		}
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("purchases").Select("branch_id, total, currency").Where("org_id = ? AND id = ?", orgID, purchaseID).Take(&purchase).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.NotFoundf("purchase", purchaseID.String())
+			}
+			return err
+		}
+		var paidSoFar float64
+		if err := tx.Raw(`SELECT COALESCE(SUM(amount), 0) FROM payments WHERE org_id = ? AND reference_type = 'purchase' AND reference_id = ? AND archived_at IS NULL`, orgID, purchaseID).Scan(&paidSoFar).Error; err != nil {
+			return err
+		}
+		pending := purchase.Total - paidSoFar
+		if pending <= 0 {
+			return domainerr.Conflict("purchase is already fully paid")
+		}
+		if in.Amount > pending {
+			return domainerr.BusinessRule(fmt.Sprintf("payment exceeds pending balance %.2f", pending))
+		}
+		paymentID := uuid.New()
+		createdAt := time.Now().UTC()
+		if err := tx.Exec(`
+			INSERT INTO payments (id, org_id, reference_type, reference_id, method, amount, notes, received_at, is_favorite, tags, created_by, created_at)
+			VALUES (?, ?, 'purchase', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, paymentID, orgID, purchaseID, in.Method, in.Amount, in.Notes, in.ReceivedAt.UTC(), in.IsFavorite, pq.StringArray(utils.NormalizeTags(in.Tags)), in.CreatedBy, createdAt).Error; err != nil {
+			return err
+		}
+		paymentStatus := "partial"
+		if paidSoFar+in.Amount >= purchase.Total {
+			paymentStatus = "paid"
+		}
+		if err := tx.Exec(`UPDATE purchases SET payment_status = ? WHERE org_id = ? AND id = ?`, paymentStatus, orgID, purchaseID).Error; err != nil {
+			return err
+		}
+		if err := tx.Exec(`
+			INSERT INTO cash_movements (id, org_id, branch_id, type, amount, currency, category, description, payment_method, reference_type, reference_id, created_by, created_at)
+			VALUES (gen_random_uuid(), ?, ?, 'expense', ?, ?, 'purchase', ?, ?, 'purchase', ?, ?, now())
+		`, orgID, purchase.BranchID, in.Amount, purchase.Currency, defaultString(in.Notes, "purchase payment"), in.Method, purchaseID, in.CreatedBy).Error; err != nil {
+			return err
+		}
+		out = paymentsdomain.Payment{ID: paymentID, OrgID: orgID, ReferenceType: "purchase", ReferenceID: purchaseID, Method: in.Method, Amount: in.Amount, Notes: in.Notes, ReceivedAt: in.ReceivedAt.UTC(), IsFavorite: in.IsFavorite, Tags: append([]string(nil), utils.NormalizeTags(in.Tags)...), CreatedBy: in.CreatedBy, CreatedAt: createdAt}
 		return nil
 	})
 	if err != nil {

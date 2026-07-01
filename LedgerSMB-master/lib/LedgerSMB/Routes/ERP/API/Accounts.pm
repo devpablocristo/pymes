@@ -1,0 +1,90 @@
+package LedgerSMB::Routes::ERP::API::Accounts;
+
+=head1 NAME
+
+LedgerSMB::Routes::ERP::API::Accounts - Webservice routes for GL accounts
+
+=head1 DESCRIPTION
+
+Webservice routes for General Ledger accounts
+
+=head1 SYNOPSIS
+
+  use LedgerSMB::Routes::ERP::API::Accounts;
+
+=head1 METHODS
+
+This module doesn't export any methods.
+
+=cut
+
+use strict;
+use warnings;
+
+use LedgerSMB::Company::Configuration;
+use LedgerSMB::Router appname => 'erp/api';
+
+use HTTP::Status qw( HTTP_OK );
+use Plack::Request::WithEncoding;
+
+set logger => 'erp.api.accounts';
+
+
+get '/accounts/', sub {
+    my ($env) = @_;
+    my $req = Plack::Request::WithEncoding->new($env);
+    my $label = $req->parameters->{label} // '';
+    $label =~ s/\*//g;
+
+    my @accounts = LedgerSMB::Company::Configuration->new(
+        dbh => $env->{'lsmb.app'}
+        )->coa_nodes->get(filter => q{not is_heading});
+    return [ HTTP_OK,
+             [ 'Content-Type' => '' ],
+             [ json()->encode(
+                   [
+                    # if there's a $label, non-matching items are filtered
+                    # meaning that it doesn't matter that index() returns -1
+                    # on no match...
+                    # a lower index means higher relevance
+                    sort {
+                        index($a->{label},$label) <=> index($b->{label},$label)
+                            || ($a->{label} cmp $b->{label})
+                    }
+                    grep { (! $label) || $_->{label} =~ m/\Q$label\E/i }
+                    grep { not $_->{obsolete} }
+                    map {
+                        $_->{label} = $_->{accno} . '--' . $_->{description};
+                        +{ %$_ }
+                    } @accounts
+                   ])
+             ]
+        ];
+};
+
+
+get '/accounts/{id}', sub {
+    my ($env, %p) = @_;
+};
+
+post '/accounts/', sub {
+
+};
+
+del '/accounts/{id}', sub {
+
+};
+
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) 2020 The LedgerSMB Core Team
+
+This file is licensed under the GNU General Public License version 2, or at your
+option any later version.  A copy of the license should have been included with
+your software.
+
+=cut
+
+
+1;

@@ -1,0 +1,146 @@
+[% PROCESS 'elements.html' %]
+<body class="lsmb [% dojo_theme %]">
+
+<form data-dojo-type="lsmb/Form" method="get" action="[% SCRIPT %]">
+[% PROCESS input element_data = {
+    type = "hidden"
+    name = "sort"
+    value = "transdate"
+} %]
+
+<table width="100%">
+  <tr>
+    <th class="listtop">Balance y Mayor</th>
+  </tr>
+  <tr style="height:5px"></tr>
+  <tr>
+    <td>
+      <table>
+        <tr>
+          <th align="right">[% text('From') %]</th>
+          <td>[% PROCESS input element_data = {
+               type="date"
+               name="date_from"
+               size="11"
+               title=datestyle } %]</td>
+          <th align="right">[% text('To') %]</th>
+          <td>[% PROCESS input element_data = {
+                 type="date"
+                 name="date_to"
+                 size="11"
+                 title=datestyle } %]</td>
+        </tr>
+        <tr>
+        <td colspan="5">
+        [% PROCESS select element_data = {
+               name = "month"
+               options = accountingmonths
+               text_attr = "month"
+               value_attr = "id"
+        } %]
+        [% PROCESS select element_data = {
+               name="year"
+               options = all_years
+               text_attr = "year"
+               value_attr = "year"
+        } %]
+        [% PROCESS input element_data = {
+               name="interval"
+               class="radio"
+               type="radio"
+               value="0"
+               checked="checked" } %]&nbsp;[% text('Current') %]
+        [% PROCESS input element_data = {
+               name="interval"
+               class="radio"
+               type="radio"
+               value="1" } %]&nbsp;[% text('Month') %]
+        [% PROCESS input element_data = {
+               name="interval"
+               class="radio"
+               type="radio"
+               value="3" } %]&nbsp;[% text('Quarter') %]
+        <input name=interval class=radio type=radio value=12>&nbsp;Year
+        </td>
+        </tr>
+        <tr>
+          <th align="right">[% text('Include in Report') %]</th>
+          <td colspan="5">
+            <table>
+              <tr>
+                  <td nowrap>[% PROCESS input element_data = {
+                                    name="col_accno"
+                                    class="checkbox"
+                                    type="checkbox"
+                                    value="Y"
+                                    checked = 'checked'
+                             } %] [% text('Account Number') %]</td>
+                  <td nowrap>[% PROCESS input element_data = {
+                                    name="col_description"
+                                    class="checkbox"
+                                    type="checkbox"
+                                    value="Y"
+                                    checked="checked"
+                              } %] [% text('Account Name') %]</td>
+                  <td nowrap>[% PROCESS input element_data = {
+                                   name="col_starting_balance"
+                                   class="checkbox"
+                                   type="checkbox"
+                                   value="Y"
+                                   checked="checked"
+                            } %] [% text('Starting Balance') %]</td>
+                  <td nowrap>[% PROCESS input element_data = {
+                                   name="col_debits"
+                                   class="checkbox"
+                                   type="checkbox"
+                                   value="Y"
+                                   checked="checked"
+                             } %] [% text('debits') %]</td>
+                  <td nowrap>[% PROCESS input element_data = {
+                                  name="col_credits"
+                                  class="checkbox"
+                                  type="checkbox"
+                                  value="Y"
+                                  checked="checked"
+                            } %] [% text('Credit') %]</td>
+                  <td nowrap>[% PROCESS input element_data = {
+                                 name="col_balance"
+                                 class="checkbox"
+                                 type="checkbox"
+                                 value="Y"
+                                 checked = 'checked'
+                          } %] [% text('balance') %]</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td><hr size=3 noshade></td>
+  </tr>
+</table>
+
+[% PROCESS input element_data = {
+       type="hidden"
+       name="path"
+       value=path
+} %]
+[% PROCESS input element_data = {
+       type="hidden"
+       name="login"
+       value=login
+} %]
+
+<br>
+[% PROCESS button element_data = {
+       text = text('Continue')
+       class="submit"
+       type="submit"
+       name="__action"
+       value="run_bm"
+} %]
+</form>
+
+</body>

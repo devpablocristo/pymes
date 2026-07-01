@@ -1,0 +1,64 @@
+[% PROCESS 'elements.html' %]
+<body class="lsmb [% dojo_theme %]">
+<div id="assetclass-search">
+<div class="listtop">[% text('Search Asset Class') %]</div>
+<form data-dojo-type="lsmb/Form" action="[% request.script %]" method="GET">
+<div class="inputrow" id="labelrow">
+[% PROCESS input element_data = {
+        type = "text"
+        name = "label"
+        value = asset_class.label
+        class = "control_code"
+        size = 32
+        label = text('Label:')
+} %]
+</div>
+<div class="inputrow" id="methodrow">
+<span class="inputgroup" id="methodgroup">
+[%
+        PROCESS select element_data = {
+        label = text('Depreciation Method') #'
+        options = asset_class.dep_methods
+        value_attr = 'id'
+        text_attr = 'method'
+   default_blank = 1
+        name = 'method_id'
+} %]
+</span>
+</div>
+<div class="inputrow" id="accountsrow">
+<span class="inputgroup" id="assetaccgroup">
+[%
+        PROCESS select element_data = {
+        label = text('Asset Account') #'
+        options = asset_class.asset_accounts
+        name = "asset_account_id"
+   default_blank = 1
+        value_attr = 'id'
+        text_attr = 'text'
+} %]
+</span>
+<span class="inputgroup" id="depaccgroup">
+[%
+        PROCESS select element_data = {
+        label = text('Depreciation Account') #'
+        options = asset_class.dep_accounts
+        name = "dep_account_id"
+   default_blank = 1
+        value_attr = 'id'
+        text_attr = 'text'
+} %]
+</span>
+</div>
+<div class="inputrow" id="buttonrow">
+[% PROCESS button element_data = {
+        text = text("Search")
+        type = "submit"
+        class = "submit"
+        name = "__action"
+        value = "asset_category_results"
+} %]
+</div>
+</form>
+</div>
+</body>

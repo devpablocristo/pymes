@@ -30,16 +30,16 @@ func registerPymesSaaSRoutes(
 	billingRuntime *saasbilling.Runtime,
 	httpAuth pymesSaaSHTTPAuth,
 ) {
-	registerPublic(mux, "GET /tenants", func(w http.ResponseWriter, r *http.Request) {
+	registerPublic(mux, "GET /orgs", func(w http.ResponseWriter, r *http.Request) {
 		handleListMyTenants(w, r, store, httpAuth)
 	})
-	registerPublic(mux, "POST /tenants", func(w http.ResponseWriter, r *http.Request) {
+	registerPublic(mux, "POST /orgs", func(w http.ResponseWriter, r *http.Request) {
 		handleCreateTenant(w, r, store, httpAuth)
 	})
-	registerPublic(mux, "POST /tenant-invites/accept", func(w http.ResponseWriter, r *http.Request) {
+	registerPublic(mux, "POST /org-invitations/accept", func(w http.ResponseWriter, r *http.Request) {
 		handleAcceptTenantInvite(w, r, store, httpAuth)
 	})
-	registerPublic(mux, "GET /tenant-invites/preview", func(w http.ResponseWriter, r *http.Request) {
+	registerPublic(mux, "GET /org-invitations/preview", func(w http.ResponseWriter, r *http.Request) {
 		handlePreviewTenantInvite(w, r, store)
 	})
 	// El email de invitación apunta a este endpoint (a través del `redirect_url`
@@ -47,7 +47,7 @@ func registerPymesSaaSRoutes(
 	// server-side via FAPI — esto cubre el caso "user invitado ya tiene sesión
 	// Clerk activa", donde el SDK frontend no procesa el ticket — y luego
 	// redirigimos al dashboard del tenant.
-	registerPublic(mux, "GET /tenant-invites/exchange", func(w http.ResponseWriter, r *http.Request) {
+	registerPublic(mux, "GET /org-invitations/exchange", func(w http.ResponseWriter, r *http.Request) {
 		handleExchangeTenantInvite(w, r, store)
 	})
 	// Webhook receiver de Clerk. Verifica firma SVIX, persiste el evento en
@@ -69,6 +69,15 @@ func registerPymesSaaSRoutes(
 	registerProtected(mux, authMW, "PATCH /users/me/profile", func(w http.ResponseWriter, r *http.Request) {
 		handlePatchMeProfile(w, r, store, httpAuth)
 	})
+	registerProtected(mux, authMW, "GET /users", func(w http.ResponseWriter, r *http.Request) {
+		handleListOrgUsers(w, r, store)
+	})
+	registerProtected(mux, authMW, "POST /users", func(w http.ResponseWriter, r *http.Request) {
+		handleCreateOrgUser(w, r, store)
+	})
+	registerProtected(mux, authMW, "PATCH /users/{user_id}", func(w http.ResponseWriter, r *http.Request) {
+		handleUpdateOrgUser(w, r, store)
+	})
 	// Set inicial de password vía backend (Clerk SDK frontend rechaza el cambio
 	// sin elevated auth para users que llegaron por ticket). El handler usa el
 	// secret key de Clerk para PATCH /users/{id}, gateado a users que NO tienen
@@ -78,40 +87,46 @@ func registerPymesSaaSRoutes(
 	registerPublic(mux, "POST /users/me/set-initial-password", func(w http.ResponseWriter, r *http.Request) {
 		handleSetInitialPassword(w, r, store, httpAuth)
 	})
-	registerProtected(mux, authMW, "GET /tenants/{org_id}/members", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "GET /orgs/{org_id}/members", func(w http.ResponseWriter, r *http.Request) {
 		handleListMembers(w, r, store)
 	})
-	registerProtected(mux, authMW, "PATCH /tenants/{org_id}/members/{user_id}", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "PATCH /orgs/{org_id}/members/{user_id}", func(w http.ResponseWriter, r *http.Request) {
 		handleUpdateTenantMember(w, r, store)
 	})
-	registerProtected(mux, authMW, "DELETE /tenants/{org_id}/members/{user_id}", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "DELETE /orgs/{org_id}/members/{user_id}", func(w http.ResponseWriter, r *http.Request) {
 		handleRemoveTenantMember(w, r, store)
 	})
-	registerProtected(mux, authMW, "POST /tenants/{org_id}/ownership/transfer", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "POST /orgs/{org_id}/ownership/transfer", func(w http.ResponseWriter, r *http.Request) {
 		handleTransferTenantOwnership(w, r, store)
 	})
-	registerProtected(mux, authMW, "GET /tenants/{org_id}/invites", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "GET /orgs/{org_id}/invites", func(w http.ResponseWriter, r *http.Request) {
 		handleListTenantInvites(w, r, store)
 	})
-	registerProtected(mux, authMW, "POST /tenants/{org_id}/invites", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "POST /orgs/{org_id}/invites", func(w http.ResponseWriter, r *http.Request) {
 		handleCreateTenantInvite(w, r, store)
 	})
-	registerProtected(mux, authMW, "POST /tenant-invites/{invite_id}/revoke", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "GET /orgs/{org_id}/invitations", func(w http.ResponseWriter, r *http.Request) {
+		handleListTenantInvites(w, r, store)
+	})
+	registerProtected(mux, authMW, "POST /orgs/{org_id}/invitations", func(w http.ResponseWriter, r *http.Request) {
+		handleCreateTenantInvite(w, r, store)
+	})
+	registerProtected(mux, authMW, "POST /org-invitations/{invite_id}/revoke", func(w http.ResponseWriter, r *http.Request) {
 		handleRevokeTenantInvite(w, r, store)
 	})
-	registerProtected(mux, authMW, "POST /tenant-invites/{invite_id}/resend", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "POST /org-invitations/{invite_id}/resend", func(w http.ResponseWriter, r *http.Request) {
 		handleResendTenantInvite(w, r, store)
 	})
-	registerProtected(mux, authMW, "GET /tenants/{org_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "GET /orgs/{org_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
 		handleListAPIKeys(w, r, store)
 	})
-	registerProtected(mux, authMW, "POST /tenants/{org_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "POST /orgs/{org_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
 		handleCreateAPIKey(w, r, store)
 	})
-	registerProtected(mux, authMW, "DELETE /tenants/{org_id}/api-keys/{key_id}", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "DELETE /orgs/{org_id}/api-keys/{key_id}", func(w http.ResponseWriter, r *http.Request) {
 		handleDeleteAPIKey(w, r, store)
 	})
-	registerProtected(mux, authMW, "POST /tenants/{org_id}/api-keys/{key_id}/rotate", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "POST /orgs/{org_id}/api-keys/{key_id}/rotate", func(w http.ResponseWriter, r *http.Request) {
 		handleRotateAPIKey(w, r, store)
 	})
 	registerProtected(mux, authMW, "GET /billing/status", func(w http.ResponseWriter, r *http.Request) {
@@ -236,7 +251,7 @@ func handleCreateTenant(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 	}
 	writeCreateTenantResponse(w, http.StatusCreated, orgID, clerkOrgID, slug, rawKey, key.KeyPrefix, tenantAPIKeyDTO{
 		ID:        key.ID.String(),
-		OrgID:  orgID,
+		OrgID:     orgID,
 		Name:      key.Name,
 		Scopes:    scopes,
 		CreatedAt: key.CreatedAt,
@@ -245,7 +260,7 @@ func handleCreateTenant(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 
 func writeCreateTenantResponse(w http.ResponseWriter, status int, orgID, clerkOrgID, slug, rawKey, keyPrefix string, key tenantAPIKeyDTO) {
 	httperr.WriteJSON(w, status, map[string]any{
-		"org_id":    orgID,
+		"org_id":       orgID,
 		"clerk_org_id": strings.TrimSpace(clerkOrgID),
 		"slug":         strings.TrimSpace(slug),
 		"raw_key":      rawKey,
@@ -280,7 +295,7 @@ func handleSessionEnriched(w http.ResponseWriter, r *http.Request, store *pymesS
 		return
 	}
 	auth := map[string]any{
-		"org_id":    principal.OrgID,
+		"org_id":       principal.OrgID,
 		"role":         principal.Role,
 		"product_role": authz.ProductRole(principal.Role, principal.Scopes),
 		"scopes":       principal.Scopes,
@@ -383,8 +398,8 @@ func loadMeProfile(ctx context.Context, r *http.Request, principal tenantPrincip
 		"user": userPayload,
 		"membership": map[string]any{
 			"org_id": principal.OrgID,
-			"role":      principal.Role,
-			"scopes":    principal.Scopes,
+			"role":   principal.Role,
+			"scopes": principal.Scopes,
 		},
 	}, nil
 }
@@ -523,6 +538,54 @@ func handlePatchMeProfile(w http.ResponseWriter, r *http.Request, store *pymesSa
 		return
 	}
 	writeEnrichedMeProfile(w, r.Context(), store, profile)
+}
+
+func handleListOrgUsers(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
+	principal, ok := authorizedOrgUserAdmin(w, r, false)
+	if !ok {
+		return
+	}
+	items, err := store.ListOrgUsers(r.Context(), principal.OrgID)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	httperr.WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func handleCreateOrgUser(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
+	principal, ok := authorizedOrgUserAdmin(w, r, true)
+	if !ok {
+		return
+	}
+	var req orgUserCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httperr.BadRequest(w, "invalid request body")
+		return
+	}
+	item, err := store.CreateOrgUser(r.Context(), principal.OrgID, req)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	httperr.WriteJSON(w, http.StatusCreated, map[string]any{"user": item})
+}
+
+func handleUpdateOrgUser(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
+	if _, ok := authorizedOrgUserAdmin(w, r, true); !ok {
+		return
+	}
+	var req orgUserUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httperr.BadRequest(w, "invalid request body")
+		return
+	}
+	item, err := store.UpdateOrgUser(r.Context(), strings.TrimSpace(r.PathValue("user_id")), req)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	httperr.WriteJSON(w, http.StatusOK, map[string]any{"user": item})
 }
 
 func handleListMembers(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
@@ -948,7 +1011,7 @@ func handleBillingStatus(w http.ResponseWriter, r *http.Request, runtime *saasbi
 		return
 	}
 	httperr.WriteJSON(w, http.StatusOK, map[string]any{
-		"org_id":          principal.OrgID,
+		"org_id":             principal.OrgID,
 		"plan_code":          status.PlanCode,
 		"status":             status.BillingStatus,
 		"hard_limits":        status.HardLimits,
@@ -1062,6 +1125,23 @@ func authorizedTenantOwner(w http.ResponseWriter, r *http.Request, store *pymesS
 		return "", false
 	}
 	return orgID, true
+}
+
+func authorizedOrgUserAdmin(w http.ResponseWriter, r *http.Request, write bool) (tenantPrincipal, bool) {
+	principal, ok := tenantPrincipalFromContext(r.Context())
+	if !ok {
+		httperr.Unauthorized(w, "principal not found")
+		return tenantPrincipal{}, false
+	}
+	allowed := authz.CanReadConsoleSettings(principal.Role, principal.Scopes)
+	if write {
+		allowed = authz.CanWriteConsoleSettings(principal.Role, principal.Scopes)
+	}
+	if !allowed {
+		httperr.Write(w, http.StatusForbidden, "FORBIDDEN", "user management requires admin privileges")
+		return tenantPrincipal{}, false
+	}
+	return principal, true
 }
 
 func prefixFromSecret(secret string) string {

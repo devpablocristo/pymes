@@ -1,0 +1,100 @@
+[% PROCESS elements.html %]
+<body class="lsmb [% dojo_theme %]">
+  <form data-dojo-type="lsmb/Form"
+        id="system-settings"
+        method="post"
+        action="[% form.script %]">
+    <table width="100%"><col width="25%" align="right"><col><col>
+      <tr><th colspan="3" class="listtop">[% text('System Defaults') %]</th></tr>
+        [% FOREACH GROUP IN default_settings %]
+      <tr><th colspan="3" class="listheading">[% GROUP.title %]</th></tr>
+      [% FOREACH ITEM IN GROUP.items %]
+      <tr>
+        <th align="right">[% ITEM.label %]</th>
+        <td colspan="[% ITEM.info ? 1 : 2 %]" style='white-space:nowrap'>
+          [%
+             IF ITEM.type == 'YES_NO' OR ITEM.type == 'YES_NO_AUTO';
+               IF form.${ITEM.name} == 'auto';
+                 AUTO="CHECKED";
+                 YES=undef;
+                 NO=undef;
+               ELSIF form.${ITEM.name};
+                 AUTO=undef
+                 YES="CHECKED";
+                 NO=undef;
+               ELSE;
+                 AUTO=undef
+                 NO="CHECKED";
+                 YES=undef;
+               END;
+               PROCESS input element_data = {
+                       name = ITEM.name
+                       id = ITEM.name _ '-yes'
+                       type = 'radio'
+                       label = text('Yes')
+                       value = 1
+                       checked = YES
+                       };
+               PROCESS input element_data = {
+                       name = ITEM.name
+                       id = ITEM.name _ '-no'
+                       type = 'radio'
+                       label = text('No')
+                       value = 0
+                       checked = NO
+                       };
+               IF ITEM.type == 'YES_NO_AUTO';
+                 PROCESS input element_data = {
+                         name = ITEM.name
+                         id = ITEM.name _ '-auto'
+                         type = 'radio'
+                         label = text('Automatic')
+                         value = 'auto'
+                         checked = AUTO
+                         };
+               END;
+             ELSIF ITEM.type == 'SELECT_ONE';
+               PROCESS select element_data= selects.${ITEM.name};
+             ELSIF ITEM.type == 'TEXTAREA';
+               PROCESS textarea element_data = {
+                       rows = 3
+                       cols = 33
+                       text = form.${ITEM.name}
+                       name = ITEM.name
+                       };
+             ELSE;
+               PROCESS input element_data = {
+                       name = ITEM.name
+                       type = 'text'
+                       value = form.${ITEM.name}
+                       };
+             END;
+             IF ITEM.info;
+                "<td align='left'>";
+                FOREACH i IN ITEM.info;
+                    i = i.replace('\$1','<a href="http://currencies.apps.grandtrunk.net/" target="_blank" rel="noopener noreferrer">Historical currency converter web service</a>');
+                    "$i<br>";
+                END;
+                "</td>";
+             END;
+           %]
+        </td>
+      </tr>
+      [% END # FOREACH ITEM %]
+      [% END # FOREACH GROUP %]
+    </table>
+    <hr size="3" noshade="noshade" />
+
+    [% FOREACH hidden IN hiddens.keys;
+              PROCESS input element_data={
+                      type => 'hidden',
+                      name => hidden,
+                      value => hiddens.item(hidden)
+              };
+           END;
+           PROCESS button element_data={
+                   name => '__action'
+                   value => 'save_defaults'
+                   text => text('Save')} %]
+  </form>
+</body>

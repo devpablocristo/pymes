@@ -1,0 +1,145 @@
+[% PROCESS 'elements.html'  # Include form elements helper. %]
+<body id="payments-filter-body" class="lsmb [% dojo_theme %]">
+<div id="payments-filter">
+<div class="listtop">
+        <!-- CT:  Strings for locales:
+        [% text('Filtering Receipts') %]
+        [% text('Filtering Payments') %] -->
+        [% IF payment.account_class == 1 %][% text('Filtering Payments')
+        %][% ELSE %][% text('Filtering Receipts')
+        %][% END %]
+</div>
+<form data-dojo-type="lsmb/Form" name="search" method="post"
+      [% # action set explicitly,
+             # because this file renders from vouchers.pl %]
+      action="payment.pl">
+
+[% PROCESS input element_data={
+        value = payment.account_class
+        type = "hidden"
+        name = "account_class"
+} %]
+[% PROCESS input element_data={
+        value = payment.batch_id
+        type = "hidden"
+        name = "batch_id"
+} %]
+[% PROCESS input element_data={
+        value = payment.batch_date
+        type = "hidden"
+        name = "batch_date"
+} %]
+
+
+[% IF request.account_class == 1 %]
+[% vendor_customer_code = text("Vendor Number");
+   vendor_customer = text("Vendor") %]
+[% ELSIF request.account_class == 2 %]
+[% vendor_customer_code = text("Customer Number");
+   vendor_customer = text("Customer") %]
+[% END %]
+
+[% PROCESS input element_data = {
+        name = "meta_number"
+        type = "text"
+        value = payment.meta_number
+        label = vendor_customer_code
+        size = '15'
+} %]
+[% PROCESS input element_data = {
+        name = "contact_name"
+        type = "text"
+        label = vendor_customer
+        size = '60'
+} %]
+
+<div class="inputgroup" id="account_input">
+    [%
+     FOREACH a = payment.debt_accounts;
+       a.text = a.accno _ '--' _ a.description;
+     END;
+     PROCESS select element_data = {
+          label = text('Account')
+           name = "ar_ap_accno"
+        options = payment.debt_accounts
+     value_attr = 'accno'
+      text_attr = 'text'
+ default_values = [payment.account]
+    } %]
+</div>
+
+<div id = "payments-filter-currency-row" class="inputgroup">
+<label for="currency">[% text('Currency')%]</label>
+[%
+   currency_list = [];
+   FOREACH c IN payment.currencies;
+     currency_list.push( { text = c, value = c } );
+   END;
+   PROCESS select element_data = {
+        id = 'currency'
+       name = 'currency'
+       options = currency_list
+       default_values = [ payment.default_currency ]
+   }
+%]
+</div>
+
+<div class="listtop">[% text('Payment Processing') %]</div>
+
+      [%
+          IF payment.account_class == 1; pay_label = text('Pay From');#'
+          ELSIF payment.account_class == 2; pay_label = text('Pay To'); #'
+          END;
+          PROCESS select element_data = {
+                name = "cash_accno"
+                default_values = [payment.cash_accno]
+                options = payment.cash_accounts
+                value_attr = "accno"
+                text_attr = "text"
+                label = pay_label
+        } %]
+
+[% IF payment.payment_types && payment.payment_types.size > 0 %]
+
+<div id = "payments-filter-payment_types" class="inputpayment">
+
+ [% PROCESS select element_data = {
+                name = "payment_type_id"
+                default_values = []
+                options = payment.payment_types
+                value_attr = "id"
+                text_attr = "label"
+                label = text('Payment Type')
+        } %]
+
+
+</div>
+
+[% END %]
+
+
+
+
+[% IF payment.account_class == 1 %]
+<div class = "inputgroup">
+[% PROCESS input element_data = {
+        type = "text"
+        size = "20"
+        name = "source_start"
+        required = "true"
+        label = text('Start Source Numbering At')
+} # %]
+</div>
+[% END %]
+<div>
+[% PROCESS button element_data = {
+        type = "submit"
+        name = "__action"
+        text = text('Continue')
+        class = "submit"
+        value = "display_payments"
+} %]
+</div>
+</form>
+</div>
+</body>

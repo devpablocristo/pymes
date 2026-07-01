@@ -1,0 +1,167 @@
+<div id="person_div"
+     title="[% text('Person') %]"
+     data-dojo-type="dijit/layout/ContentPane"
+     [% IF request.target_div == 'person_div' %]data-dojo-props="selected:true"[% END %]
+     >
+  <div class="listtop"><strong>[%
+      IF entity_id.defined ;
+      text("Edit Person");
+      ELSE ;
+      text("Add Person");
+      END ;
+      %]</strong></div>
+  <form data-dojo-type="lsmb/Form" name="customer" method="post" action="[% request.script %]">
+[% PROCESS input element_data = { # Only for generate_control_code
+                  id = 'person-target-div'
+                type = "hidden"
+                name = "target_div"
+                value = 'person_div'
+        } %]
+        [% PROCESS input element_data = {
+                  id = 'person-entity-id'
+                type = "hidden"
+                name = "entity_class"
+                value = entity_class
+        } %]
+        [% PROCESS input element_data = {
+                  id = 'person-entity-id'
+                type = "hidden"
+                name = "entity_id"
+                value = entity_id
+        } %]
+        [% PROCESS input element_data = {
+                  id = 'person-id'
+                type = "hidden"
+                name = "id"
+                value = person.id
+        } %]
+[% PROCESS input element_data = {
+                  id = 'person-form-id'
+                type = "hidden"
+                name = "form_id"
+                value = form_id
+        } %]
+        [% PROCESS input element_data = {
+                  id = 'person-account-class'
+                type = "hidden"
+                name = "account_class"
+                value = account_class
+        } %]
+<div class="two-column-grid" style="width:fit-content">
+        [% PROCESS input element_data = {
+                  id = 'person-control-code'
+                label = text('Control Code')
+                type= "text"
+                name = "control_code"
+                value = person.control_code
+                size = "20"
+        } %]
+  [%
+        PROCESS select element_data = {
+                  label = text('Salutation')
+                   name = 'salutation_id'
+         default_values = [person.salutation_id]
+          default_blank = 1
+                options = salutations
+                  class = 'salutations'
+              text_attr = 'salutation'
+             value_attr = 'id'
+               required = 'true'
+    } %]
+        [% PROCESS input element_data = {
+                label = text('Given Name')
+                type= "text"
+                name = "first_name"
+                value = person.first_name
+                size = "20"
+            required = 'true'
+        } %]
+        [% PROCESS input element_data = {
+                label = text('Middle Name')
+                type= "text"
+                name = "middle_name"
+                value = person.middle_name
+                size = "20"
+        } %]
+        [% PROCESS input element_data = {
+                label = text('Surname')
+                type= "text"
+                name = "last_name"
+                value = person.last_name
+                size = "20"
+            required = 'true'
+        } %]
+       [%
+                person_country_id = person.country_id;
+                IF !person_country_id;
+                          person_country_id = default_country;
+                END;
+                INCLUDE select_country element_data = {
+                        id = 'person-country-id'
+                        text_attr = "name"
+                        value_attr = "id"
+                        default_values = [person_country_id]
+                        options = country_list
+                        name = "country_id"
+                        label = text('Country')
+                        required = 'true'
+        } %]
+    [% INCLUDE input element_data = {
+           name  = 'personal_id',
+           type  = 'text',
+           size  = '20',
+           value = person.personal_id,
+           label = text('Personal ID')
+           class = 'id',
+           required = 'true'
+    } %]
+    [% INCLUDE input element_data = {
+           name  = 'birthdate',
+           type  = 'date',
+           value = person.birthdate,
+           label = text('Birthdate'),
+           size  = '11',
+                          required = 'true'
+  } %]
+</div>
+        [% PROCESS button element_data = {
+                 id = 'person-generate-control-code'
+                text = text('Generate Control Code')
+                type = "submit"
+                name = "__action"
+                value = "generate_control_code"
+                class = "submit"
+        } %]
+        [% PROCESS button element_data = {
+                  id = 'person-retrieve'
+                text = text('Retrieve')
+                type = 'submit'
+                name = '__action'
+               value = 'get_by_cc'
+               class = 'submit'
+        } %]
+        [% INCLUDE button element_data = {
+                text = text('Save'),
+                class="submit"
+                 type="submit"
+                 name="__action"
+                value="save_person"
+                } %]
+        [%
+        IF may_delete AND entity_id.defined AND NOT company.is_used ;
+        INCLUDE button element_data = {
+               text = text('Delete')
+                 id = 'person-action-delete'
+               class="submit"
+                type="submit"
+                name="__action"
+               value="delete_entity"
+        };
+        END %]
+  </form>
+[% FOREACH n = notes %]
+<div class="note">
+  <div class="note_contents">[% n.note %]</div>
+</div>
+[% END %]
+</div>

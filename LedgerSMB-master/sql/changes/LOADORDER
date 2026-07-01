@@ -1,0 +1,196 @@
+# This is the base file used to build the LOAD.idx file
+# It specifies a list of db changes in order.
+# lines beginning with ! denote fixes where the fix is deemed applied even if it
+# errors (legacy fixes that may error).
+# comments begin with # (but you knew that....)
+
+# 1.4 fixes from the old Fixes.sql
+!1.4/location-fixes.sql
+!1.4/batch-fixes.sql
+1.4/eca-update.sql
+!1.4/person-fixes.sql
+!1.4/ar-constraint1.sql
+!1.4/ap-constraint1.sql
+!1.4/invoice-fixes.sql
+!1.4/ar-fixes2.sql
+!1.4/ar-fixes3.sql
+1.4/chart-view.sql
+!1.4/account-heading-fix.sql
+1.4/locale-update.sql
+!1.4/inventory-fix.sql
+!1.4/inventory-fix2.sql
+!1.4/bu-fix.sql
+!1.4/account-translations.sql
+1.4/drop-je-functions.sql
+!1.4/templatetrans.sql
+1.4/business_unit_class_id_seq-fix.sql
+# 1.5 changes
+!1.5/invoice-tbl-cogs-constraint.sql
+!1.5/trial_balance_cleanup.sql
+1.5/templates-last-modified.sql
+1.5/parts_fkeys.sql
+!1.5/open_forms_callers.sql
+1.5/robot_entity.sql
+1.5/cleanup_invoice_id.sql
+1.5/invoice_id_fkey.sql
+1.5/add_qty_to_pricematrix.sql
+1.5/issue-2380-modify-tax_extended_entry_id-constraint.sql
+# these lines were added after 1.5.0
+1.5/issue-2278-modify-acc_trans-index.sql
+1.5/fixed-assets-depreciation-sproc.sql
+1.5/fixed-assets-not-null-constraints.sql
+1.5/abstract_tables.sql
+#tag: migration-target-lsmb
+# Note: the schema as created up to here, is the one as required by
+#   the migration scripts in sql/upgrade/. Don't insert any change
+#   scripts before this point, because it breaks the migrations from
+#   both LedgerSMB 1.2 & 1.3 as well as from SQL 2.8 and 3.0
+# 1.6 changes
+1.6/drop_chart.sql
+!1.6/drop_arap_cols.sql
+1.6/drop_arap_cols.sql
+1.6/audittrail-pg-user.sql
+1.6/gl-trans-type.sql
+1.6/gl-trans-type2.sql
+1.6/no-inv-entity-cleanup.sql
+1.6/no-inv-entity-tables.sql
+1.6/no-inv-entity-end-entity.sql
+!1.6/no-inv-entity-remove-entity.sql
+1.6/drop-entity-duplicate_constraint.sql
+1.6/fix-entity-primary-key.sql
+1.6/add-eca-business-foreign-key.sql
+1.6/add_empty_salutation.sql
+1.6/missing-countries.sql
+1.6/constrain_default_password_duration.sql
+1.6/add-recon-index.sql
+1.6/track-deleted-transactions.sql
+1.6/more-indices.sql
+#
+# mc changes
+mc/create-migration-validation-data.sql
+mc/new-tables.sql
+mc/new-columns.sql
+mc/changed-objects.sql
+mc/drop-constraints.sql
+# do data migration here...
+mc/currency-migration.sql
+mc/aa-migration.sql
+mc/gl-add-curr-for-migration.sql
+mc/acc-trans-migration.sql
+mc/gl-del-curr-for-migration.sql
+mc/acc-checkpoint-migration.sql
+mc/journal-migration.sql
+mc/budget-migration.sql
+mc/migrate-new-constraints.sql
+mc/new-constraints.sql
+mc/dropped-objects.sql
+mc/views.sql
+mc/delete-migration-validation-data.sql
+#tag: migration-target-sl
+# 1.7 changes
+1.7/drop-custom-catalog.sql
+1.7/alter-menu-attributes.sql
+1.7/drop-duplicate-gifi-index.sql
+1.7/drop-max_ac_id.sql
+1.7/limit_summary_account_links.sql
+1.7/to-location-pkeys-optimization.sql
+1.7/create-trans_id-index.sql
+1.7/fix-oe-person_id-fkey.sql
+1.7/new_shipto-fkey.sql
+# 1.8 changes
+1.8/add-transdate-to-transactions.sql
+1.8/update-payment-tables-documentation.sql
+1.8/simplify-menu.sql
+1.8/remove-fixes-table.sql
+1.8/remove-custom-field-sprocs.sql
+1.8/remove-unused-sprocs.sql
+1.8/remove-unused-groups-admin.sql
+1.8/initialize-payments-from-vouchers.sql
+1.8/payments-reversing.sql
+1.8/drop-payment_map.sql
+1.8/explicit-reconciliation.sql
+1.8/constrain-default-exchange-rates.sql
+1.8/constrain-exchangerate-type.sql
+1.8/drop_queue_payments_setting.sql
+1.8/drop_poll_frequency_setting.sql
+1.8/constrain-transaction-tables.sql
+1.8/constrain-transactions-table-name.sql
+1.8/fix-reporting-units-pks.sql
+1.8/reconciliation-links-cascade.sql
+1.8/initialize-payments-from-invoices.sql
+1.8/add-payment-links-indices.sql
+1.8/notify-import-financial-report-templates.sql
+# 1.9 changes
+1.9/templates-last-modified-no-tz.sql
+1.9/drop-view-tx_report.sql
+1.9/company-strict-sic.sql
+1.9/workflow-schema.sql
+1.9/workflow-email-table.sql
+1.9/workflow-extend-tables.sql
+1.9/relaxed-transdate-nullity.sql
+1.9/transpose_user_prefs.sql
+1.9/file-reconciliation.sql
+1.9/add-vclimit.sql
+1.9/workflow-email-expansion.sql
+1.9/fix-template-images-typo.sql
+# 1.10 changes
+1.10/old-defaults-cleanup.sql
+1.10/workflow-context.sql
+1.10/aggregates-cleanup.sql
+1.10/change-data-capture.sql
+1.10/pricegroup-config.sql
+1.10/warehouse-config.sql
+1.10/language-config.sql
+1.10/sic-config.sql
+1.10/business-type-config.sql
+1.10/gifi-config.sql
+1.10/reconciliation-columns-cleanup.sql
+1.10/unique-transaction-reconciliation.sql
+1.10/missing-fkeys.sql
+1.10/file-tranaction-cascade-delete.sql
+1.10/fix-arap-approval-state.sql
+1.10/migration-batch-class.sql
+# 1.11 changes
+1.11/country-config.sql
+1.11/workflow-user.sql
+1.11/enable-barcode-on-invoices.sql
+1.11/reversed-transactions.sql
+1.11/negative-assets-liablilities-reclass.sql
+1.11/ar-ap-role-naming-consistency.sql
+1.11/aa-column-cleanup.sql
+1.11/gl-workflows.sql
+1.11/workflow-for-aa-transactions.sql
+1.11/fix-assembly-cogs.sql
+1.11/trigger-invoice-allocated-delete.sql
+1.11/cogs-allocation.sql
+# 1.12 changes
+1.12/migrate_to_identity.sql
+1.12/add-stored-order-quote-taxes.sql
+1.12/drop-entity-class-entity-trigger.sql
+1.12/reconciliation-workflow.sql
+1.12/rm-new_shipto.sql
+1.12/mv-location-temporality.sql
+1.12/shipto_attn.sql
+1.12/reconciliation-workflow-context.sql
+# 1.13 changes
+1.13/rm-status.sql
+1.13/fk-actions-for-is_used-functions.sql
+1.13/drop-inheritance-notes-translations.sql
+1.13/missing-fkeys.sql
+1.13/add-user-login.sql
+1.13/constrain-language-code.sql
+1.13/drop-function-menu_insert.sql
+1.13/partsgroup-config.sql
+1.13/old-migration-schemas-cleanup.sql
+1.13/custom-attributes.sql
+# 1.14 changes
+1.14/drop-function-arglist-changes-cleanup.sql
+1.14/rename-ar-ap-modules.sql
+1.14/non-gl-transactions.sql
+1.14/centralized-transdate.sql
+1.14/mv-gl_person_id.sql
+1.14/inventory_report-report_date.sql
+1.14/drop-lot_tracking_number.sql
+1.14/open-item-tracking.sql
+1.14/overpayments-as-open-items.sql
+1.14/payments-first-order.sql

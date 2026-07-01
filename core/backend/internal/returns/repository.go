@@ -142,7 +142,7 @@ func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uu
 }
 
 type CreateReturnInput struct {
-	OrgID     uuid.UUID
+	OrgID        uuid.UUID
 	SaleID       uuid.UUID
 	Reason       string
 	RefundMethod string
@@ -152,7 +152,7 @@ type CreateReturnInput struct {
 }
 
 type ApplyCreditInput struct {
-	OrgID     uuid.UUID
+	OrgID        uuid.UUID
 	SaleID       uuid.UUID
 	CreditNoteID uuid.UUID
 	Amount       float64
@@ -161,7 +161,7 @@ type ApplyCreditInput struct {
 
 // CreateManualCreditNoteInput registra una nota de crédito sin devolución (party + monto).
 type CreateManualCreditNoteInput struct {
-	OrgID  uuid.UUID
+	OrgID     uuid.UUID
 	PartyID   uuid.UUID
 	Amount    float64
 	Actor     string
@@ -330,12 +330,12 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 		}
 
 		var settings tenantReturnSettingsRow
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("tenant_settings").Select("return_prefix, next_return_number, credit_note_prefix, next_credit_note_number").Where("org_id = ?", in.OrgID).Take(&settings).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("org_settings").Select("return_prefix, next_return_number, credit_note_prefix, next_credit_note_number").Where("org_id = ?", in.OrgID).Take(&settings).Error; err != nil {
 			return err
 		}
 
 		returnNumber := fmt.Sprintf("%s-%05d", defaultString(settings.ReturnPrefix, "DEV"), maxInt(settings.NextReturn, 1))
-		if err := tx.Exec("UPDATE tenant_settings SET next_return_number = ? WHERE org_id = ?", maxInt(settings.NextReturn, 1)+1, in.OrgID).Error; err != nil {
+		if err := tx.Exec("UPDATE org_settings SET next_return_number = ? WHERE org_id = ?", maxInt(settings.NextReturn, 1)+1, in.OrgID).Error; err != nil {
 			return err
 		}
 
@@ -371,7 +371,7 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 
 		if in.RefundMethod == "credit_note" && sale.PartyID != nil && *sale.PartyID != uuid.Nil {
 			creditNumber := fmt.Sprintf("%s-%05d", defaultString(settings.CreditPrefix, "NC"), maxInt(settings.NextCredit, 1))
-			if err := tx.Exec("UPDATE tenant_settings SET next_credit_note_number = ? WHERE org_id = ?", maxInt(settings.NextCredit, 1)+1, in.OrgID).Error; err != nil {
+			if err := tx.Exec("UPDATE org_settings SET next_credit_note_number = ? WHERE org_id = ?", maxInt(settings.NextCredit, 1)+1, in.OrgID).Error; err != nil {
 				return err
 			}
 			rid := returnID
@@ -602,12 +602,12 @@ func (r *Repository) CreateManualCreditNote(ctx context.Context, in CreateManual
 			return domainerr.NotFoundf("party", in.PartyID.String())
 		}
 		var settings tenantReturnSettingsRow
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("tenant_settings").Select("credit_note_prefix, next_credit_note_number").Where("org_id = ?", in.OrgID).Take(&settings).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("org_settings").Select("credit_note_prefix, next_credit_note_number").Where("org_id = ?", in.OrgID).Take(&settings).Error; err != nil {
 			return err
 		}
 		noteID := uuid.New()
 		creditNumber := fmt.Sprintf("%s-%05d", defaultString(settings.CreditPrefix, "NC"), maxInt(settings.NextCredit, 1))
-		if err := tx.Exec("UPDATE tenant_settings SET next_credit_note_number = ? WHERE org_id = ?", maxInt(settings.NextCredit, 1)+1, in.OrgID).Error; err != nil {
+		if err := tx.Exec("UPDATE org_settings SET next_credit_note_number = ? WHERE org_id = ?", maxInt(settings.NextCredit, 1)+1, in.OrgID).Error; err != nil {
 			return err
 		}
 		row := returnmodels.CreditNoteModel{

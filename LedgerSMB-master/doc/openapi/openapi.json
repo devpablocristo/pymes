@@ -1,0 +1,4643 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "contact": {
+      "email": "devel@lists.ledgersmb.org",
+      "name": "LedgerSMB API Support",
+      "url": "https://github.com/ledgersmb/LedgerSMB/issues"
+    },
+    "description": "LedgerSMB comes with a web service API. The version number assigned follows\nthe [rules of semantic versioning](https://semver.org/). The current major\nversion is 0 (zero), meaning that it's not considered to have stabilized\nyet. The main reason is that not all functions have been ironed out yet:\nfiltering, sorting and pagination are to be specified and implemented.\n\nThe API is hosted on `erp/api/v0`, on the same root as `login.pl`. That is\nto say that if LedgerSMB's login screen is hosted at\n`https://example.org/login.pl` then the API can be found at\n`https://example.org/erp/api/v0`. All paths mentioned in this document will\nbe appended to that. E.g. the items in the menu for the authenticated user\ncan be accessed through `https://example.org/erp/api/v0/menu-nodes`.\n",
+    "license": {
+      "name": "GPL-2.0-or-later",
+      "url": "https://spdx.org/licenses/GPL-2.0-or-later.html"
+    },
+    "title": "LedgerSMB API",
+    "version": "0.0.1"
+  },
+  "servers": [
+    {
+      "url": "http://lsmb/erp/api/v0"
+    }
+  ],
+  "security": [
+    {
+      "cookieAuth": []
+    }
+  ],
+  "paths": {
+    "/contacts/business-types": {
+      "description": "Manage business types",
+      "get": {
+        "operationId": "getBusinessTypes",
+        "summary": "Get business types",
+        "responses": {
+          "200": {
+            "description": "Returns the list of business types",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validBusinessTypes": {
+                    "$ref": "#/components/examples/validBusinessTypes"
+                  }
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/BusinessType"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Business types"
+        ]
+      },
+      "post": {
+        "operationId": "postBusinessType",
+        "summary": "Create a business type",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewBusinessType"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Confirms creation of the new business type, redirecting to the new resource URI",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Business types"
+        ]
+      }
+    },
+    "/contacts/business-types/{id}": {
+      "delete": {
+        "operationId": "deleteBusinessTypesById",
+        "summary": "Delete a single business type",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Confirms deletion of the business type resource"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Business types"
+        ]
+      },
+      "description": "Manage business type",
+      "get": {
+        "operationId": "getBusinessTypesById",
+        "summary": "Get a single business type",
+        "responses": {
+          "200": {
+            "description": "Returns the requested business type data",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validBusinessType": {
+                    "$ref": "#/components/examples/validBusinessType"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessType"
+                }
+              }
+            }
+          },
+          "304": {
+            "$ref": "#/components/responses/304"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Business types"
+        ]
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/business-type-id"
+          },
+          "style": "simple"
+        }
+      ],
+      "patch": {
+        "operationId": "updateBusinessTypesById",
+        "summary": "Update a single business type",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirms updating the business type data, returning the new resource data",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessType"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Business types"
+        ]
+      },
+      "put": {
+        "operationId": "putBusinessTypesById",
+        "summary": "Update a single business type",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BusinessType"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Confirms replacement of the business type data",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessType"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Business types"
+        ]
+      }
+    },
+    "/contacts/sic": {
+      "description": "Collection of Standard Industry Codes (SICs)",
+      "get": {
+        "operationId": "getSICs",
+        "summary": "Get a list of SICs",
+        "responses": {
+          "200": {
+            "description": "Returns the list of SIC codes",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validSICs": {
+                    "$ref": "#/components/examples/validSICs"
+                  }
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SIC"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "SICs"
+        ]
+      },
+      "post": {
+        "operationId": "postSIC",
+        "summary": "Add SIC entry",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SIC"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Confirms creation of the new SIC, redirecting to the new resource URI",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "SICs"
+        ]
+      }
+    },
+    "/contacts/sic/{id}": {
+      "delete": {
+        "operationId": "deleteSICByCode",
+        "summary": "Delete a single SIC",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Confirms deletion of the SIC resource"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "SICs"
+        ]
+      },
+      "description": "Management of individual Standard Industry Code items",
+      "get": {
+        "operationId": "getSICById",
+        "summary": "Get a single SIC",
+        "responses": {
+          "200": {
+            "description": "Returns the data associated with the SIC code",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validSIC": {
+                    "$ref": "#/components/examples/validSIC"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/SIC"
+                }
+              }
+            }
+          },
+          "304": {
+            "$ref": "#/components/responses/304"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "SICs"
+        ]
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/sic-code"
+          },
+          "style": "simple"
+        }
+      ],
+      "patch": {
+        "operationId": "updateSICByCode",
+        "summary": "Update a single SIC",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirms updating the data associated with the SIC code, returning the new SIC data",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SIC"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "SICs"
+        ]
+      },
+      "put": {
+        "operationId": "putSICByCode",
+        "summary": "Update a single SIC",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SIC"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Confirms replacement of SIC resource, returning the new data",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SIC"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "SICs"
+        ]
+      }
+    },
+    "/countries": {
+      "description": "Management of country configuration",
+      "get": {
+        "operationId": "getCountries",
+        "summary": "Get available countries",
+        "responses": {
+          "200": {
+            "description": "Returns a list of configured countries",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validCountries": {
+                    "$ref": "#/components/examples/validCountries"
+                  }
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Country"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Countries"
+        ]
+      },
+      "post": {
+        "operationId": "postCountry",
+        "summary": "Create a country",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Country"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "...",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Countries"
+        ]
+      }
+    },
+    "/countries/{id}": {
+      "delete": {
+        "operationId": "deleteCountryById",
+        "summary": "Delete a single country",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Confirms deletion of the country resource"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Countries"
+        ]
+      },
+      "description": "Manage a single country",
+      "get": {
+        "operationId": "getCountryById",
+        "summary": "Get a single country",
+        "responses": {
+          "200": {
+            "description": "Returns the data associated with the country",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validCountry": {
+                    "$ref": "#/components/examples/validCountry"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/Country"
+                }
+              }
+            }
+          },
+          "304": {
+            "$ref": "#/components/responses/304"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Countries"
+        ]
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/country-code"
+          },
+          "style": "simple"
+        }
+      ],
+      "patch": {
+        "operationId": "updateCountryById",
+        "summary": "Update a single country",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirms updating the country resource, returning the new data"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Countries"
+        ]
+      },
+      "put": {
+        "operationId": "putCountryById",
+        "summary": "Update a single country",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Country"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Confirms replacement of country data, returning the new data",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Country"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Countries"
+        ]
+      }
+    },
+    "/gl/gifi": {
+      "description": "A list of GIFI",
+      "get": {
+        "operationId": "getGIFIs",
+        "summary": "Get a list of GIFI",
+        "responses": {
+          "200": {
+            "description": "Returns the full set of GIFI codes",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validGIFIs": {
+                    "$ref": "#/components/examples/validGIFIs"
+                  }
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GIFI"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "GIFI"
+        ]
+      },
+      "post": {
+        "operationId": "postGIFI",
+        "summary": "Create a single GIFI",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GIFI"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Returns the full collection of defined GIFI codes",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "GIFI"
+        ]
+      }
+    },
+    "/gl/gifi/{id}": {
+      "delete": {
+        "operationId": "deleteGIFIById",
+        "summary": "Delete a single GIFI",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The resource was succesfully deleted"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "GIFI"
+        ]
+      },
+      "description": "A single GIFI",
+      "get": {
+        "operationId": "getGIFIById",
+        "summary": "Get a single GIFI",
+        "responses": {
+          "200": {
+            "description": "...",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validGIFI": {
+                    "$ref": "#/components/examples/validGIFI"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/GIFI"
+                }
+              }
+            }
+          },
+          "304": {
+            "$ref": "#/components/responses/304"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "GIFI"
+        ]
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/accno-code"
+          },
+          "style": "simple"
+        }
+      ],
+      "patch": {
+        "operationId": "updateGIFIById",
+        "summary": "Update a single GIFI",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The resource was succesfully updated,\nreturning the new data for the resource.\n"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "GIFI"
+        ]
+      },
+      "put": {
+        "operationId": "putGIFIById",
+        "summary": "Put a single GIFI",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GIFI"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The resource was succesfully replaced,\nreturning the new data for the resource.\n",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GIFI"
+                }
+              }
+            }
+          },
+          "304": {
+            "$ref": "#/components/responses/304"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "GIFI"
+        ]
+      }
+    },
+    "/invoices": {
+      "description": "Management of Invoices",
+      "get": {
+        "operationId": "getInvoices",
+        "summary": "Lists invoices",
+        "responses": {
+          "200": {
+            "description": "...",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validInvoices": {
+                    "$ref": "#/components/examples/validInvoices"
+                  }
+                },
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Invoice"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "default": {
+            "description": "...",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Invoices",
+          "Experimental"
+        ]
+      },
+      "post": {
+        "operationId": "postInvoices",
+        "summary": "Add an invoice",
+        "requestBody": {
+          "description": "...",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/newInvoice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Invoices",
+          "Experimental"
+        ]
+      }
+    },
+    "/invoices/{id}": {
+      "get": {
+        "operationId": "getInvoicesById",
+        "summary": "Get a single invoice",
+        "responses": {
+          "200": {
+            "description": "...",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validInvoice": {
+                    "$ref": "#/components/examples/validInvoice"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Invoices",
+          "Experimental"
+        ]
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ],
+      "put": {
+        "operationId": "putInvoiceById",
+        "summary": "Update a single invoice",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/newInvoice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "...",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "..."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Invoices",
+          "Experimental"
+        ]
+      }
+    },
+    "/languages": {
+      "description": "Management of language configuration",
+      "get": {
+        "operationId": "getLanguages",
+        "summary": "Get available languages",
+        "responses": {
+          "200": {
+            "description": "Returns the full set of configured languages",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validLanguages": {
+                    "$ref": "#/components/examples/validLanguages"
+                  }
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Language"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Languages"
+        ]
+      },
+      "post": {
+        "operationId": "postLanguage",
+        "summary": "Create a language",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Language"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Confirms successfull creation of the new resource (language),\nreturning the data from the resource and in the Location header\nthe canonical location to access the resource.\n",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Languages"
+        ]
+      }
+    },
+    "/languages/{id}": {
+      "delete": {
+        "operationId": "deleteLanguageById",
+        "summary": "Delete a single language",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Confirms successful deletion of the resource"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Languages"
+        ]
+      },
+      "description": "Manage a single language",
+      "get": {
+        "operationId": "getLanguageById",
+        "summary": "Get a single language",
+        "responses": {
+          "200": {
+            "description": "Returns the requested single resource's data",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validLanguage": {
+                    "$ref": "#/components/examples/validLanguage"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/Language"
+                }
+              }
+            }
+          },
+          "304": {
+            "$ref": "#/components/responses/304"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Languages"
+        ]
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/language-code"
+          },
+          "style": "simple"
+        }
+      ],
+      "patch": {
+        "operationId": "updateLanguageById",
+        "summary": "Update a single language",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirms successful update,\nreturning the new data for the resource\n"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Languages"
+        ]
+      },
+      "put": {
+        "operationId": "putLanguageById",
+        "summary": "Update a single language",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Language"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Confirms successful replacement of the resource's data,\nreturning the new data of the resource.\n",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Language"
+                }
+              }
+            }
+          },
+          "304": {
+            "$ref": "#/components/responses/304"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Languages"
+        ]
+      }
+    },
+    "/menu-nodes": {
+      "description": "Menu items for the active user",
+      "get": {
+        "operationId": "getUserMenuNodes",
+        "summary": "Get the user's menu items",
+        "responses": {
+          "200": {
+            "description": "Returns the full set of menu nodes accessible\nby the requesting user.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "properties": {
+                      "id": {
+                        "type": "number"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "menu": {
+                        "type": "boolean"
+                      },
+                      "parent": {
+                        "type": "number"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "url",
+                      "parent",
+                      "label",
+                      "menu"
+                    ],
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "UserMenu"
+        ]
+      }
+    },
+    "/orders": {
+      "description": "Management of Orders",
+      "get": {
+        "operationId": "getOrders",
+        "summary": "Lists orders",
+        "responses": {
+          "200": {
+            "description": "...",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validOrders": {
+                    "$ref": "#/components/examples/validOrders"
+                  }
+                },
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Order"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "default": {
+            "description": "...",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Orders",
+          "Experimental"
+        ]
+      },
+      "post": {
+        "operationId": "postOrders",
+        "summary": "Add an order",
+        "requestBody": {
+          "description": "...",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/newOrder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Orders",
+          "Experimental"
+        ]
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "operationId": "getOrdersById",
+        "summary": "Get a single order",
+        "responses": {
+          "200": {
+            "description": "...",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validOrder": {
+                    "$ref": "#/components/examples/validOrder"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Orders",
+          "Experimental"
+        ]
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ],
+      "put": {
+        "operationId": "putOrderById",
+        "summary": "Update a single order",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/newOrder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "...",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "..."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Orders",
+          "Experimental"
+        ]
+      }
+    },
+    "/products/partsgroups": {
+      "description": "Managing products and related configuration",
+      "get": {
+        "operationId": "getProductsPartsgroups",
+        "summary": "Get products parts groups",
+        "responses": {
+          "200": {
+            "description": "Returns the full list of defined parts groups",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validPartsgroups": {
+                    "$ref": "#/components/examples/validPartsgroups"
+                  }
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Partsgroup"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Parts groups"
+        ]
+      },
+      "post": {
+        "operationId": "postProductsPartsgroup",
+        "summary": "Create products parts group",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewPartsgroup"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Confirms creation of the new resource, returning\nthe new data\n",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Parts groups"
+        ]
+      }
+    },
+    "/products/partsgroups/{id}": {
+      "delete": {
+        "operationId": "deleteProductsPartsgroupById",
+        "summary": "Delete a single products price group",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Confirms successful deletion of the resource"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Parts groups"
+        ]
+      },
+      "get": {
+        "operationId": "getProductsPartsgroupById",
+        "summary": "Get a single products parts group",
+        "responses": {
+          "200": {
+            "description": "Returns the data for a single resource\n",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validPartsgroup": {
+                    "$ref": "#/components/examples/validPartsgroup"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/Partsgroup"
+                }
+              }
+            }
+          },
+          "304": {
+            "$ref": "#/components/responses/304"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Parts groups"
+        ]
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/common-id"
+          },
+          "style": "simple"
+        }
+      ],
+      "patch": {
+        "operationId": "updateProductsPartsgroupById",
+        "summary": "Updaet a single products parts group",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirms successful update of the resource,\nreturning the new resource state\n"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          }
+        },
+        "tags": [
+          "Parts groups"
+        ]
+      },
+      "put": {
+        "operationId": "putProductsPartsgroupById",
+        "summary": "Create single products parts group",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Partsgroup"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Confirms successful replacement of the\nresource's data, returning the new state\n",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Partsgroup"
+                }
+              }
+            }
+          },
+          "304": {
+            "$ref": "#/components/responses/304"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Parts groups"
+        ]
+      }
+    },
+    "/products/pricegroups": {
+      "description": "Managing products and related configuration",
+      "get": {
+        "operationId": "getProductsPricegroups",
+        "summary": "Get products price groups",
+        "responses": {
+          "200": {
+            "description": "Returns the full list of defined price groups",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validPricegroups": {
+                    "$ref": "#/components/examples/validPricegroups"
+                  }
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Pricegroup"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Price groups"
+        ]
+      },
+      "post": {
+        "operationId": "postProductsPricegroup",
+        "summary": "Create products price group",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewPricegroup"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Confirms creation of the new resource, returning\nthe new data\n",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Price groups"
+        ]
+      }
+    },
+    "/products/pricegroups/{id}": {
+      "delete": {
+        "operationId": "deleteProductsPricegroupById",
+        "summary": "Delete a single products price group",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Confirms successful deletion of the resource"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Price groups"
+        ]
+      },
+      "get": {
+        "operationId": "getProductsPricegroupById",
+        "summary": "Get a single products price group",
+        "responses": {
+          "200": {
+            "description": "Returns the data for a single resource\n",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validPricegroup": {
+                    "$ref": "#/components/examples/validPricegroup"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/Pricegroup"
+                }
+              }
+            }
+          },
+          "304": {
+            "$ref": "#/components/responses/304"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Price groups"
+        ]
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/common-id"
+          },
+          "style": "simple"
+        }
+      ],
+      "patch": {
+        "operationId": "updateProductsPricegroupById",
+        "summary": "Update a single products price group",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirms successful update of the resource, returning\nthe new resource state\n"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          }
+        },
+        "tags": [
+          "Price groups"
+        ]
+      },
+      "put": {
+        "operationId": "putProductsPricegroupById",
+        "summary": "Create single products price group",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Pricegroup"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Confirms successful replacement of the\nresource's data, returning the new state\n",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pricegroup"
+                }
+              }
+            }
+          },
+          "304": {
+            "$ref": "#/components/responses/304"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Price groups"
+        ]
+      }
+    },
+    "/products/warehouses": {
+      "description": "Manage warehouses",
+      "get": {
+        "operationId": "getWarehouses",
+        "summary": "Get a list of warehouses",
+        "responses": {
+          "200": {
+            "description": "Returns the full set of configured warehouses",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validWarehouses": {
+                    "$ref": "#/components/examples/validWarehouses"
+                  }
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Warehouse"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Warehouses"
+        ]
+      },
+      "post": {
+        "operationId": "postWarehouse",
+        "summary": "Create a warehouse",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewWarehouse"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Confirms successful creation of the new resource,\nreturning the new data\n",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Warehouses"
+        ]
+      }
+    },
+    "/products/warehouses/{id}": {
+      "delete": {
+        "operationId": "deleteWarehousesById",
+        "summary": "Delete a single warehouse",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Confirms deletion of the resource"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Warehouses"
+        ]
+      },
+      "description": "Manage a warehouse",
+      "get": {
+        "operationId": "getWarehousesById",
+        "summary": "Get a single warehouse",
+        "responses": {
+          "200": {
+            "description": "Returns the data of a single resource",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validWarehouse": {
+                    "$ref": "#/components/examples/validWarehouse"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/Warehouse"
+                }
+              }
+            }
+          },
+          "304": {
+            "$ref": "#/components/responses/304"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "tags": [
+          "Warehouses"
+        ]
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/common-id"
+          },
+          "style": "simple"
+        }
+      ],
+      "patch": {
+        "operationId": "updateWarehousesById",
+        "summary": "Update a single warehouse",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirms successful update of the resource,\nreturning the new state\n"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          }
+        },
+        "tags": [
+          "Warehouses"
+        ]
+      },
+      "put": {
+        "operationId": "putWarehousesById",
+        "summary": "Update a single warehouse",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/if-match"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Warehouse"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Confirms successful replacement of the resources data,\nreturning the new state\n",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Warehouse"
+                }
+              }
+            }
+          },
+          "304": {
+            "$ref": "#/components/responses/304"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "tags": [
+          "Warehouses"
+        ]
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "if-match": {
+        "description": "Clients need to provide the If-Match parameter on update operations\n(PUT and PATCH) with the ETag obtained in the request from which\ndata are being updated. Requests missing this header will be\nrejected with HTTP response code 428. Requests trying to update\noutdated content will be rejected with HTTP response code 412.\n",
+        "in": "header",
+        "name": "If-Match",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "schemas": {
+      "BusinessType": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NewBusinessType"
+          },
+          {
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/business-type-id"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "Country": {
+        "type": "object",
+        "properties": {
+          "_meta": {
+            "type": "object"
+          },
+          "code": {
+            "$ref": "#/components/schemas/country-code"
+          },
+          "default": {
+            "type": "boolean"
+          },
+          "localizedName": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "GIFI": {
+        "type": "object",
+        "properties": {
+          "accno": {
+            "$ref": "#/components/schemas/accno-code"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "accno",
+          "description"
+        ]
+      },
+      "Invoice": {
+        "description": "...",
+        "allOf": [
+          {
+            "properties": {
+              "account": {
+                "type": "object",
+                "properties": {
+                  "accno": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 2
+                  }
+                }
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "eca": {
+                "type": "object",
+                "properties": {
+                  "credit_limit": {
+                    "type": "object",
+                    "properties": {
+                      "available": {
+                        "type": "number"
+                      },
+                      "total": {
+                        "type": "number"
+                      },
+                      "used": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "entity": {
+                    "type": "object",
+                    "properties": {
+                      "control_code": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "id": {
+                    "type": "number"
+                  },
+                  "number": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "pay_to_name": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "customer",
+                      "vendor"
+                    ]
+                  }
+                }
+              },
+              "lines": {
+                "type": "array",
+                "items": {
+                  "properties": {
+                    "delivery_date": {
+                      "type": "string",
+                      "format": "date",
+                      "nullable": true
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "discount": {
+                      "description": "A value of 10 means the customer gets a 10% discount,\nif discount_type has a value of '%'\n",
+                      "type": "number",
+                      "maximum": 100,
+                      "minimum": 0
+                    },
+                    "discount_type": {
+                      "type": "string",
+                      "enum": [
+                        "%"
+                      ]
+                    },
+                    "id": {
+                      "type": "number"
+                    },
+                    "item": {
+                      "type": "number"
+                    },
+                    "notes": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "part": {
+                      "type": "object",
+                      "properties": {
+                        "_self": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "number": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "onhand": {
+                          "type": "string"
+                        },
+                        "unit": {
+                          "type": "string"
+                        },
+                        "weight": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "number"
+                      ]
+                    },
+                    "price": {
+                      "type": "number"
+                    },
+                    "price_fixated": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "qty": {
+                      "type": "number",
+                      "default": 1
+                    },
+                    "serialnumber": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "total": {
+                      "type": "number"
+                    },
+                    "unit": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "payments": {
+                "type": "array",
+                "items": {
+                  "properties": {
+                    "account": {
+                      "type": "object",
+                      "properties": {
+                        "description": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "taxes": {
+                "type": "object",
+                "additionalProperties": {
+                  "properties": {
+                    "amount": {
+                      "type": "number"
+                    },
+                    "base-amount": {
+                      "type": "number"
+                    },
+                    "calculated-amount": {
+                      "type": "number"
+                    },
+                    "memo": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "tax": {
+                      "type": "object",
+                      "properties": {
+                        "category": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "rate": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "category"
+                      ]
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "workflow": {
+                "type": "object",
+                "properties": {
+                  "actions": {
+                    "type": "array"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "INITIAL",
+                      "SAVED",
+                      "POSTED",
+                      "ONHOLD",
+                      "VOIDED",
+                      "REVERSED",
+                      "DELETED"
+                    ]
+                  }
+                }
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "Language": {
+        "type": "object",
+        "properties": {
+          "_meta": {
+            "type": "object"
+          },
+          "code": {
+            "$ref": "#/components/schemas/language-code"
+          },
+          "default": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string",
+            "example": "French (Canada)"
+          }
+        },
+        "required": [
+          "code",
+          "description"
+        ]
+      },
+      "NewBusinessType": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "discount": {
+            "type": "number",
+            "format": "float"
+          }
+        },
+        "required": [
+          "description"
+        ]
+      },
+      "NewPartsgroup": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "parent": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "nullable": true
+          }
+        },
+        "required": [
+          "description"
+        ]
+      },
+      "NewPricegroup": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "description"
+        ]
+      },
+      "NewWarehouse": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "description"
+        ]
+      },
+      "Order": {
+        "description": "...",
+        "allOf": [
+          {
+            "properties": {
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "eca": {
+                "type": "object",
+                "properties": {
+                  "credit_limit": {
+                    "type": "object",
+                    "properties": {
+                      "available": {
+                        "type": "number"
+                      },
+                      "total": {
+                        "type": "number"
+                      },
+                      "used": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "entity": {
+                    "type": "object",
+                    "properties": {
+                      "control_code": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "id": {
+                    "type": "number"
+                  },
+                  "number": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "pay_to_name": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "customer",
+                      "vendor"
+                    ]
+                  }
+                }
+              },
+              "lines": {
+                "type": "array",
+                "items": {
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "discount": {
+                      "description": "A value of 10 means the customer gets a 10% discount,\nif discount_type has a value of '%'\n",
+                      "type": "number",
+                      "maximum": 100,
+                      "minimum": 0
+                    },
+                    "discount_type": {
+                      "type": "string",
+                      "enum": [
+                        "%"
+                      ]
+                    },
+                    "id": {
+                      "type": "number"
+                    },
+                    "item": {
+                      "type": "number"
+                    },
+                    "notes": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "part": {
+                      "type": "object",
+                      "properties": {
+                        "_self": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "number": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "onhand": {
+                          "type": "string"
+                        },
+                        "unit": {
+                          "type": "string"
+                        },
+                        "weight": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "number"
+                      ]
+                    },
+                    "price": {
+                      "type": "number"
+                    },
+                    "price_fixated": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "qty": {
+                      "type": "number",
+                      "default": 1
+                    },
+                    "required-by": {
+                      "type": "string",
+                      "format": "date",
+                      "nullable": true
+                    },
+                    "serialnumber": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "total": {
+                      "type": "number"
+                    },
+                    "unit": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "taxes": {
+                "type": "object",
+                "additionalProperties": {
+                  "properties": {
+                    "amount": {
+                      "type": "string"
+                    },
+                    "basis": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "tax": {
+                      "type": "object",
+                      "properties": {
+                        "category": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "rate": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "category"
+                      ]
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "workflow": {
+                "type": "object",
+                "properties": {
+                  "actions": {
+                    "type": "array"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "SAVED",
+                      "DELETED"
+                    ]
+                  }
+                }
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "Partsgroup": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NewPartsgroup"
+          },
+          {
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/common-id"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "Pricegroup": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NewPricegroup"
+          },
+          {
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/common-id"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "SIC": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/sic-code"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "description"
+        ]
+      },
+      "Warehouse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NewWarehouse"
+          },
+          {
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/common-id"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "accno-code": {
+        "type": "string",
+        "minLength": 1
+      },
+      "business-type-id": {
+        "type": "number",
+        "format": "int64"
+      },
+      "common-id": {
+        "type": "integer",
+        "format": "int64",
+        "minimum": 1
+      },
+      "country-code": {
+        "type": "string",
+        "pattern": "^[a-zA-Z]{2}$"
+      },
+      "error": {
+        "type": "object"
+      },
+      "language-code": {
+        "type": "string",
+        "example": "fr_CA",
+        "pattern": "^[a-z]{2}(_[A-Z]{2})?$"
+      },
+      "newInvoice": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {
+              "accno": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 3
+          },
+          "dates": {
+            "type": "object",
+            "properties": {
+              "book": {
+                "type": "string",
+                "format": "date"
+              },
+              "created": {
+                "type": "string",
+                "format": "date"
+              },
+              "due": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "required": [
+              "book"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "eca": {
+            "anyOf": [
+              {
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "format": "int64",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "number": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "customer",
+                      "vendor"
+                    ]
+                  }
+                },
+                "required": [
+                  "number",
+                  "type"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "internal-notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoice-number": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "properties": {
+                "delivery_date": {
+                  "type": "string",
+                  "format": "date",
+                  "nullable": true
+                },
+                "description": {
+                  "type": "string"
+                },
+                "discount": {
+                  "description": "A value of 10 means the customer gets a 10% discount,\nif discount_type has a value of '%'\n",
+                  "type": "number",
+                  "maximum": 100,
+                  "minimum": 0
+                },
+                "discount_type": {
+                  "type": "string",
+                  "enum": [
+                    "%"
+                  ]
+                },
+                "part": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "number"
+                  ]
+                },
+                "price": {
+                  "type": "number"
+                },
+                "price_fixated": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "qty": {
+                  "type": "number",
+                  "default": 1
+                },
+                "serialnumber": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "taxform": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "unit": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "part"
+              ],
+              "type": "object"
+            }
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "order-number": {
+            "type": "string"
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "properties": {
+                "account": {
+                  "type": "object",
+                  "properties": {
+                    "accno": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "accno"
+                  ]
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "memo": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "account",
+                "amount",
+                "date"
+              ],
+              "type": "object"
+            }
+          },
+          "po-number": {
+            "type": "string"
+          },
+          "ship-to": {
+            "type": "object"
+          },
+          "ship-via": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipping-point": {
+            "type": "string",
+            "nullable": true
+          },
+          "taxes": {
+            "type": "object",
+            "additionalProperties": {
+              "properties": {
+                "amount": {
+                  "type": "number"
+                },
+                "base-amount": {
+                  "type": "number"
+                },
+                "memo": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "tax": {
+                  "type": "object",
+                  "properties": {
+                    "category": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "category"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "eca",
+          "account",
+          "currency",
+          "dates",
+          "lines"
+        ]
+      },
+      "newOrder": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 3
+          },
+          "dates": {
+            "type": "object",
+            "properties": {
+              "order": {
+                "type": "string",
+                "format": "date"
+              },
+              "required-by": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "required": [
+              "order"
+            ]
+          },
+          "eca": {
+            "anyOf": [
+              {
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "format": "int64",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "number": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "customer",
+                      "vendor"
+                    ]
+                  }
+                },
+                "required": [
+                  "number",
+                  "type"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "internal-notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "discount": {
+                  "description": "A value of 10 means the customer gets a 10% discount,\nif discount_type has a value of '%'\n",
+                  "type": "number",
+                  "maximum": 100,
+                  "minimum": 0
+                },
+                "discount_type": {
+                  "type": "string",
+                  "enum": [
+                    "%"
+                  ]
+                },
+                "notes": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "part": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "number"
+                  ]
+                },
+                "price": {
+                  "type": "number"
+                },
+                "price_fixated": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "qty": {
+                  "type": "number",
+                  "default": 1
+                },
+                "required-by": {
+                  "type": "string",
+                  "format": "date",
+                  "nullable": true
+                },
+                "serialnumber": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "taxform": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "unit": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "part"
+              ],
+              "type": "object"
+            }
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "order-number": {
+            "type": "string"
+          },
+          "po-number": {
+            "type": "string"
+          },
+          "ship-to": {
+            "type": "object"
+          },
+          "ship-via": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipping-point": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "eca",
+          "currency",
+          "dates",
+          "lines"
+        ]
+      },
+      "partsgroup-id": {
+        "$ref": "#/components/schemas/common-id"
+      },
+      "pricegroup-id": {
+        "$ref": "#/components/schemas/common-id"
+      },
+      "sic-code": {
+        "type": "string",
+        "minLength": 1
+      },
+      "warehouse-id": {
+        "$ref": "#/components/schemas/common-id"
+      }
+    },
+    "examples": {
+      "validBusinessType": {
+        "description": "Business Type Entry",
+        "summary": "Valid Business Type",
+        "value": {
+          "description": "Big customer",
+          "discount": 0.05,
+          "id": 1
+        }
+      },
+      "validBusinessTypes": {
+        "description": "Business Types collection response",
+        "summary": "Valid Business Types (collection response)",
+        "value": {
+          "_links": [],
+          "items": [
+            {
+              "description": "Big customer",
+              "discount": 0.05,
+              "id": 1
+            }
+          ]
+        }
+      },
+      "validCountries": {
+        "description": "countries collection response example",
+        "summary": "Valid countries (collection response)",
+        "value": {
+          "_links": [],
+          "items": [
+            {
+              "code": "NL",
+              "default": false,
+              "name": "Netherlands"
+            },
+            {
+              "code": "DE",
+              "default": false,
+              "name": "Germany"
+            }
+          ]
+        }
+      },
+      "validCountry": {
+        "description": "Netherlands entry",
+        "summary": "Valid Country",
+        "value": {
+          "code": "NL",
+          "default": false,
+          "name": "Netherlands"
+        }
+      },
+      "validGIFI": {
+        "description": "French Canadian entry",
+        "summary": "Valid GIFI",
+        "value": {
+          "accno": "99999",
+          "description": "Test GIFI"
+        }
+      },
+      "validGIFIs": {
+        "description": "Collection response",
+        "summary": "Valid GIFIs (collection response)",
+        "value": {
+          "_links": [],
+          "items": [
+            {
+              "accno": "99999",
+              "description": "Test GIFI"
+            }
+          ]
+        }
+      },
+      "validInvoice": {
+        "description": "Invoice entry",
+        "summary": "Example Invoice",
+        "value": {
+          "account": {
+            "accno": "1200",
+            "description": "AR"
+          },
+          "currency": "USD",
+          "dates": {
+            "book": "2022-10-05",
+            "created": "2022-09-01",
+            "due": "2022-10-01"
+          },
+          "description": null,
+          "eca": {
+            "credit_limit": {
+              "available": 0,
+              "total": 0,
+              "used": 0
+            },
+            "description": null,
+            "entity": {
+              "control_code": "C-0",
+              "name": "Customer 1"
+            },
+            "id": 1,
+            "number": "Customer 1",
+            "pay_to_name": null,
+            "type": "customer"
+          },
+          "id": "1",
+          "internal-notes": "Internal notes",
+          "invoice-number": "2389434",
+          "lines": [
+            {
+              "delivery_date": "2022-10-27",
+              "description": "A description",
+              "discount": 12,
+              "discount_type": "%",
+              "id": 1,
+              "item": 1,
+              "notes": null,
+              "part": {
+                "description": "Part 1",
+                "number": "p1",
+                "onhand": "0",
+                "unit": "ea",
+                "weight": "0"
+              },
+              "price": 56.78,
+              "price_fixated": false,
+              "qty": 1,
+              "serialnumber": "1234567890",
+              "total": 49.97,
+              "unit": "lbs"
+            }
+          ],
+          "lines_total": 49.97,
+          "notes": "Notes",
+          "order-number": "order 345",
+          "po-number": "po 456",
+          "quote-number": "",
+          "ship-via": "ship via",
+          "shipping-point": "shipping from here",
+          "taxes": {
+            "2150": {
+              "amount": 6.78,
+              "base-amount": 50,
+              "calculated-amount": 2.5,
+              "memo": "tax memo",
+              "source": "Part 1",
+              "tax": {
+                "category": "2150",
+                "name": "Sales Tax",
+                "rate": "0.05"
+              }
+            }
+          },
+          "taxes_total": 6.78,
+          "total": 56.75,
+          "type": "customer",
+          "workflow": {
+            "actions": [
+              "approve",
+              "copy_to_new",
+              "del",
+              "edit_and_save",
+              "new_screen",
+              "sales_order",
+              "save_info",
+              "schedule",
+              "ship_to",
+              "update"
+            ],
+            "state": "SAVED"
+          }
+        }
+      },
+      "validInvoices": {
+        "description": "Invoices collection response",
+        "summary": "Valid invoices (collection response)",
+        "value": [
+          {
+            "account": {
+              "accno": "1200",
+              "description": "AR"
+            },
+            "currency": "USD",
+            "dates": {
+              "book": "2022-10-05",
+              "created": "2022-09-01",
+              "due": "2022-10-01"
+            },
+            "description": null,
+            "eca": {
+              "credit_limit": {
+                "available": 0,
+                "total": 0,
+                "used": 0
+              },
+              "description": null,
+              "entity": {
+                "control_code": "C-0",
+                "name": "Customer 1"
+              },
+              "id": 1,
+              "number": "Customer 1",
+              "pay_to_name": null,
+              "type": "customer"
+            },
+            "id": "1",
+            "internal-notes": "Internal notes",
+            "invoice-number": "2389434",
+            "lines": [
+              {
+                "delivery_date": "2022-10-27",
+                "description": "A description",
+                "discount": 12,
+                "discount_type": "%",
+                "id": 1,
+                "item": 1,
+                "notes": null,
+                "part": {
+                  "description": "Part 1",
+                  "number": "p1",
+                  "onhand": "0",
+                  "unit": "ea",
+                  "weight": "0"
+                },
+                "price": 56.78,
+                "price_fixated": false,
+                "qty": 1,
+                "serialnumber": "1234567890",
+                "total": 49.97,
+                "unit": "lbs"
+              }
+            ],
+            "lines_total": 49.97,
+            "notes": "Notes",
+            "order-number": "order 345",
+            "po-number": "po 456",
+            "quote-number": "",
+            "ship-via": "ship via",
+            "shipping-point": "shipping from here",
+            "taxes": {
+              "2150": {
+                "amount": 6.78,
+                "base-amount": 50,
+                "calculated-amount": 2.5,
+                "memo": "tax memo",
+                "source": "Part 1",
+                "tax": {
+                  "category": "2150",
+                  "name": "Sales Tax",
+                  "rate": "0.05"
+                }
+              }
+            },
+            "taxes_total": 6.78,
+            "total": 56.75,
+            "type": "customer",
+            "workflow": {
+              "actions": [
+                "approve",
+                "copy_to_new",
+                "del",
+                "edit_and_save",
+                "new_screen",
+                "sales_order",
+                "save_info",
+                "schedule",
+                "ship_to",
+                "update"
+              ],
+              "state": "SAVED"
+            }
+          }
+        ]
+      },
+      "validLanguage": {
+        "description": "French Canadian entry",
+        "summary": "Valid Language",
+        "value": {
+          "code": "fr_CA",
+          "default": false,
+          "description": "French (Canada)"
+        }
+      },
+      "validLanguages": {
+        "description": "languages collection response",
+        "summary": "Valid languages (collection response)",
+        "value": {
+          "_links": [],
+          "items": [
+            {
+              "code": "fr_CA",
+              "default": false,
+              "description": "French (Canada)"
+            },
+            {
+              "code": "nl_NL",
+              "default": false,
+              "description": "Dutch (Netherlands)"
+            }
+          ]
+        }
+      },
+      "validOrder": {
+        "description": "Order entry",
+        "summary": "Example Order",
+        "value": {
+          "currency": "USD",
+          "dates": {
+            "order": "2022-09-01",
+            "required-by": "2022-10-01"
+          },
+          "eca": {
+            "credit_limit": {
+              "available": 0,
+              "total": 0,
+              "used": 0
+            },
+            "description": null,
+            "entity": {
+              "control_code": "C-0",
+              "name": "Customer 1"
+            },
+            "id": 1,
+            "number": "Customer 1",
+            "pay_to_name": null,
+            "type": "customer"
+          },
+          "id": "1",
+          "internal-notes": "Internal notes",
+          "lines": [
+            {
+              "description": "A description",
+              "discount": 12,
+              "discount_type": "%",
+              "id": 1,
+              "item": 1,
+              "notes": null,
+              "part": {
+                "description": "Part 1",
+                "number": "p1",
+                "onhand": "0",
+                "unit": "ea",
+                "weight": "0"
+              },
+              "price": 56.78,
+              "price_fixated": false,
+              "qty": 1,
+              "required-by": "2022-10-27",
+              "serialnumber": "1234567890",
+              "total": 49.9664,
+              "unit": "lbs"
+            }
+          ],
+          "lines_total": 49.9664,
+          "notes": "Notes",
+          "order-number": "order 345",
+          "po-number": "po 456",
+          "quote-number": "",
+          "ship-via": "ship via",
+          "shipping-point": "shipping from here",
+          "taxes": {
+            "2150": {
+              "amount": "2.50",
+              "basis": "49.97",
+              "tax": {
+                "category": "2150",
+                "name": "Sales Tax",
+                "rate": "0.05"
+              }
+            }
+          },
+          "taxes_total": 2.5,
+          "total": 52.4664,
+          "type": "customer",
+          "workflow": {
+            "actions": [
+              "delete",
+              "e_mail",
+              "print",
+              "print_and_save",
+              "print_and_save_as_new",
+              "purchase_order",
+              "quotation",
+              "sales_invoice",
+              "save",
+              "save_as_new",
+              "ship_to",
+              "update"
+            ],
+            "state": "SAVED"
+          }
+        }
+      },
+      "validOrders": {
+        "description": "Orders collection response",
+        "summary": "Valid orders (collection response)",
+        "value": [
+          {
+            "currency": "USD",
+            "dates": {
+              "order": "2022-09-01",
+              "required-by": "2022-10-01"
+            },
+            "eca": {
+              "credit_limit": {
+                "available": 0,
+                "total": 0,
+                "used": 0
+              },
+              "description": null,
+              "entity": {
+                "control_code": "C-0",
+                "name": "Customer 1"
+              },
+              "id": 1,
+              "number": "Customer 1",
+              "pay_to_name": null,
+              "type": "customer"
+            },
+            "id": "1",
+            "internal-notes": "Internal notes",
+            "lines": [
+              {
+                "description": "A description",
+                "discount": 12,
+                "discount_type": "%",
+                "id": 1,
+                "item": 1,
+                "notes": null,
+                "part": {
+                  "description": "Part 1",
+                  "number": "p1",
+                  "onhand": "0",
+                  "unit": "ea",
+                  "weight": "0"
+                },
+                "price": 56.78,
+                "price_fixated": false,
+                "qty": 1,
+                "required-by": "2022-10-27",
+                "serialnumber": "1234567890",
+                "total": 49.9664,
+                "unit": "lbs"
+              }
+            ],
+            "lines_total": 49.9664,
+            "notes": "Notes",
+            "order-number": "order 345",
+            "po-number": "po 456",
+            "quote-number": "",
+            "ship-via": "ship via",
+            "shipping-point": "shipping from here",
+            "taxes": {
+              "2150": {
+                "amount": "2.50",
+                "basis": "49.97",
+                "tax": {
+                  "category": "2150",
+                  "name": "Sales Tax",
+                  "rate": "0.05"
+                }
+              }
+            },
+            "taxes_total": 2.5,
+            "total": 52.4664,
+            "type": "customer",
+            "workflow": {
+              "actions": [
+                "delete",
+                "e_mail",
+                "print",
+                "print_and_save",
+                "print_and_save_as_new",
+                "purchase_order",
+                "quotation",
+                "sales_invoice",
+                "save",
+                "save_as_new",
+                "ship_to",
+                "update"
+              ],
+              "state": "SAVED"
+            }
+          }
+        ]
+      },
+      "validPartsgroup": {
+        "description": "Partsgroup entry",
+        "summary": "Valid Partsgroup",
+        "value": {
+          "description": "Partsgroup1",
+          "id": 1,
+          "parent": null
+        }
+      },
+      "validPartsgroups": {
+        "description": "Parts groups collection response",
+        "summary": "Valid Partsgroups (collection response)",
+        "value": {
+          "_links": [],
+          "items": [
+            {
+              "description": "Partsgroup1",
+              "id": 1,
+              "parent": null
+            }
+          ]
+        }
+      },
+      "validPricegroup": {
+        "description": "Pricegroup entry",
+        "summary": "Valid Pricegroup",
+        "value": {
+          "description": "Pricegroup1",
+          "id": 1
+        }
+      },
+      "validPricegroups": {
+        "description": "Pricegroups collection response",
+        "summary": "Valid pricegroups (collection response)",
+        "value": {
+          "_links": [],
+          "items": [
+            {
+              "description": "Pricegroup1",
+              "id": 1
+            }
+          ]
+        }
+      },
+      "validSIC": {
+        "description": "Standard Industry Code",
+        "summary": "Valid SIC",
+        "value": {
+          "code": "541510",
+          "description": "Design of computer systems"
+        }
+      },
+      "validSICs": {
+        "description": "SIC collection response",
+        "summary": "Valid SICs (collection response)",
+        "value": {
+          "_links": [],
+          "items": [
+            {
+              "code": "541510",
+              "description": "Design of computer systems"
+            }
+          ]
+        }
+      },
+      "validWarehouse": {
+        "description": "Warehouse entry",
+        "summary": "Valid Warehouse",
+        "value": {
+          "description": "Warehouse1",
+          "id": 1
+        }
+      },
+      "validWarehouses": {
+        "description": "Warehouses collection response",
+        "summary": "Valid warehouses (collection response)",
+        "value": {
+          "_links": [],
+          "items": [
+            {
+              "description": "Warehouse1",
+              "id": 1
+            }
+          ]
+        }
+      }
+    },
+    "headers": {
+      "ETag": {
+        "description": "The API uses the ETag parameter to prevent different clients modifying\nthe same resource around the same time from overwriting each other's\ndata: the later updates will be rejected based on verification of this\nparameter.\nClients need to retain the ETag returned on a request when they might\nwant to update the values later.\n",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "304": {
+        "description": "Not modified"
+      },
+      "400": {
+        "description": "Bad request"
+      },
+      "401": {
+        "description": "Unauthorized"
+      },
+      "403": {
+        "description": "Forbidden"
+      },
+      "404": {
+        "description": "Not Found"
+      },
+      "409": {
+        "description": "Conflict"
+      },
+      "412": {
+        "description": "Precondition failed (If-Match header)"
+      },
+      "413": {
+        "description": "Payload too large"
+      },
+      "428": {
+        "description": "Precondition required"
+      }
+    },
+    "securitySchemes": {
+      "cookieAuth": {
+        "description": "The authenticating cookie can be obtained by sending a `POST` request\nto `login.pl?__action=authenticate&company=<url-encoded-company` with a\nJSON object in the body of the request, containing these three fields\n\n* company\n* username\n* password\n\nas if they had been entered on the login page in the browser. Please\nnote that the request `Content-Type` must be set to `application/json`\nand that an `X-Requested-With` header is expected with the value\n`XMLHttpRequest`.\n\n**Note**: the cookie value is updated on each response; the next\nrequest *must* be executed with the new cookie value.\n\n**Note 2**: the validity of the cookie is as long the user's timeout\nwhen logged into the application (default: 90 minutes).\n\n**Note 3**: Sites may customize the name of the cookie in order to run\nmultiple versions in parallel. The advice is to append the version name\nto the cookie, resulting in cookie name `LedgerSMB-1.1` for LedgerSMB\nversion 1.1.\n",
+        "in": "cookie",
+        "name": "LedgerSMB",
+        "type": "apiKey"
+      }
+    }
+  }
+}

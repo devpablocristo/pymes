@@ -1,0 +1,71 @@
+[% PROCESS 'elements.html' %]
+<body class="lsmb [% dojo_theme %]">
+<div id="assetclass-edit">
+<div class="listtop">[% request.title %]</div>
+<form data-dojo-type="lsmb/Form" action="[% request.script %]" method="post">
+[% PROCESS input element_data = {
+        type = "hidden"
+        name = "id"
+        value = asset_class.id
+} %]
+<div class="inputrow" id="labelrow">
+[% PROCESS input element_data = {
+        type = "text"
+        name = "label"
+        value = asset_class.label
+        class = "control_code"
+        size = 32
+        label = text('Label:')
+} %]
+</div>
+<div class="inputrow" id="methodrow">
+<span class="inputgroup" id="methodgroup">
+[% PROCESS select element_data = {
+        label = text('Depreciation Method') #'
+        options = asset_class.dep_methods
+        value_attr = 'id'
+        text_attr = 'method'
+        default_values = [asset_class.method]
+        name = 'method'
+        required = 1
+} %]
+</span>
+</div>
+<div class="inputrow" id="accountsrow">
+<span class="inputgroup" id="assetaccgroup">
+[% PROCESS select element_data = {
+        label = text('Asset Account') #'
+        options = asset_class.asset_accounts
+        name = "asset_account_id"
+        default_values = [asset_class.asset_account_id]
+        value_attr = 'id'
+        text_attr = 'text'
+        required = 1
+} %]
+</span>
+<span class="inputgroup" id="depaccgroup">
+[% PROCESS select element_data = {
+        label = text('Depreciation Account') #'
+        options = asset_class.dep_accounts
+        name = "dep_account_id"
+        default_values = [asset_class.dep_account_id]
+        value_attr = 'id'
+        text_attr = 'text'
+        required = 1
+} %]
+</span>
+</div>
+<div class="inputrow" id="buttonrow">
+[% PROCESS button element_data = {
+        text = text("Save")
+        type = "submit"
+        class = "submit"
+        name = "__action"
+        value = "asset_category_save"
+       'data-lsmb-doing' = text('Saving...')
+       'data-lsmb-done' = text('Saved')
+} %]
+</div>
+</form>
+</div>
+</body>

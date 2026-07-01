@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -18,6 +19,28 @@ const maxUserProfileNameLen = 200
 const maxUserProfileGivenNameLen = 100
 const maxUserProfileFamilyNameLen = 100
 const maxUserProfilePhoneLen = 40
+
+type orgUserCreateRequest struct {
+	ExternalID string  `json:"external_id"`
+	Email      string  `json:"email"`
+	Name       string  `json:"name"`
+	GivenName  string  `json:"given_name"`
+	FamilyName string  `json:"family_name"`
+	Phone      string  `json:"phone"`
+	AvatarURL  *string `json:"avatar_url"`
+	Role       string  `json:"role"`
+}
+
+type orgUserUpdateRequest struct {
+	ExternalID *string `json:"external_id"`
+	Email      *string `json:"email"`
+	Name       *string `json:"name"`
+	GivenName  *string `json:"given_name"`
+	FamilyName *string `json:"family_name"`
+	Phone      *string `json:"phone"`
+	AvatarURL  *string `json:"avatar_url"`
+	Status     *string `json:"status"`
+}
 
 func splitFullNameIntoParts(full string) (given, family string) {
 	full = strings.TrimSpace(full)
@@ -41,6 +64,25 @@ func joinDisplayName(given, family string) string {
 		return family
 	}
 	return given + " " + family
+}
+
+func manualExternalIDForEmail(email string) string {
+	email = normalizeEmail(email)
+	if email == "" {
+		return ""
+	}
+	return "manual:" + email
+}
+
+func normalizeOrgUserStatus(status string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "", "active":
+		return "active", nil
+	case "archived", "disabled":
+		return "archived", nil
+	default:
+		return "", domainerr.Validation("invalid user status")
+	}
 }
 
 // GetUserProfileExtrasByExternalID devuelve campos de perfil extendidos (Pymes) para enriquecer GET /users/me.
@@ -156,6 +198,191 @@ func (s *pymesSaaSStore) FindUserByExternalID(ctx context.Context, externalID st
 		return tenantUserDTO{}, false, err
 	}
 	return userDTOFromRow(row), true, nil
+}
+
+func (s *pymesSaaSStore) ListOrgUsers(ctx context.Context, orgID string) ([]tenantUserDTO, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
+	if err != nil {
+		return nil, domainerr.Validation("invalid org_id")
+	}
+	var rows []pymesUserRow
+	if err := s.db.WithContext(ctx).
+		Table("users AS u").
+		Select("u.*").
+		Joins("JOIN org_members om ON om.user_id = u.id AND om.status = 'active'").
+		Where("om.org_id = ?", tenantUUID).
+		Order("u.created_at DESC").
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	items := make([]tenantUserDTO, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, userDTOFromRow(row))
+	}
+	return items, nil
+}
+
+func (s *pymesSaaSStore) CreateOrgUser(ctx context.Context, orgID string, req orgUserCreateRequest) (tenantUserDTO, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
+	if err != nil {
+		return tenantUserDTO{}, domainerr.Validation("invalid org_id")
+	}
+	email := normalizeEmail(req.Email)
+	if email == "" {
+		return tenantUserDTO{}, domainerr.Validation("email is required")
+	}
+	externalID := strings.TrimSpace(req.ExternalID)
+	if externalID == "" {
+		externalID = manualExternalIDForEmail(email)
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		name = joinDisplayName(req.GivenName, req.FamilyName)
+	}
+	if name == "" {
+		name = email
+	}
+	if len([]rune(name)) > maxUserProfileNameLen {
+		return tenantUserDTO{}, domainerr.Validation("name too long")
+	}
+	row, err := s.upsertUserTx(ctx, s.db.WithContext(ctx), externalID, email, name, req.AvatarURL)
+	if err != nil {
+		return tenantUserDTO{}, err
+	}
+	updates := map[string]any{}
+	if phone := strings.TrimSpace(req.Phone); phone != "" {
+		if len([]rune(phone)) > maxUserProfilePhoneLen {
+			return tenantUserDTO{}, domainerr.Validation("phone too long")
+		}
+		updates["phone"] = phone
+	}
+	if strings.TrimSpace(req.GivenName) != "" || strings.TrimSpace(req.FamilyName) != "" {
+		given := strings.TrimSpace(req.GivenName)
+		family := strings.TrimSpace(req.FamilyName)
+		if len([]rune(given)) > maxUserProfileGivenNameLen {
+			return tenantUserDTO{}, domainerr.Validation("given name too long")
+		}
+		if len([]rune(family)) > maxUserProfileFamilyNameLen {
+			return tenantUserDTO{}, domainerr.Validation("family name too long")
+		}
+		combined := joinDisplayName(given, family)
+		if combined == "" {
+			combined = name
+		}
+		updates["given_name"] = given
+		updates["family_name"] = family
+		updates["name"] = combined
+	}
+	if len(updates) > 0 {
+		updates["updated_at"] = time.Now().UTC()
+		if err := s.db.WithContext(ctx).Model(&pymesUserRow{}).Where("id = ?", row.ID).Updates(updates).Error; err != nil {
+			return tenantUserDTO{}, err
+		}
+		if err := s.db.WithContext(ctx).Where("id = ?", row.ID).Take(&row).Error; err != nil {
+			return tenantUserDTO{}, err
+		}
+	}
+	if _, err := s.UpsertTenantMember(ctx, tenantUUID.String(), row.ID.String(), normalizeInviteRole(req.Role)); err != nil {
+		return tenantUserDTO{}, err
+	}
+	return userDTOFromRow(row), nil
+}
+
+func (s *pymesSaaSStore) UpdateOrgUser(ctx context.Context, userID string, req orgUserUpdateRequest) (tenantUserDTO, error) {
+	userUUID, err := uuid.Parse(strings.TrimSpace(userID))
+	if err != nil {
+		return tenantUserDTO{}, domainerr.Validation("invalid user_id")
+	}
+	var row pymesUserRow
+	if err := s.db.WithContext(ctx).Where("id = ?", userUUID).Take(&row).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return tenantUserDTO{}, domainerr.NotFound("user not found")
+		}
+		return tenantUserDTO{}, err
+	}
+	updates := map[string]any{}
+	if req.ExternalID != nil {
+		externalID := strings.TrimSpace(*req.ExternalID)
+		if externalID == "" {
+			return tenantUserDTO{}, domainerr.Validation("external_id cannot be empty")
+		}
+		updates["external_id"] = externalID
+	}
+	if req.Email != nil {
+		email := normalizeEmail(*req.Email)
+		if email == "" {
+			return tenantUserDTO{}, domainerr.Validation("email cannot be empty")
+		}
+		updates["email"] = email
+	}
+	if req.GivenName != nil || req.FamilyName != nil {
+		given := strings.TrimSpace(row.GivenName)
+		if req.GivenName != nil {
+			given = strings.TrimSpace(*req.GivenName)
+		}
+		family := strings.TrimSpace(row.FamilyName)
+		if req.FamilyName != nil {
+			family = strings.TrimSpace(*req.FamilyName)
+		}
+		if len([]rune(given)) > maxUserProfileGivenNameLen {
+			return tenantUserDTO{}, domainerr.Validation("given name too long")
+		}
+		if len([]rune(family)) > maxUserProfileFamilyNameLen {
+			return tenantUserDTO{}, domainerr.Validation("family name too long")
+		}
+		combined := joinDisplayName(given, family)
+		if combined == "" {
+			return tenantUserDTO{}, domainerr.Validation("name cannot be empty")
+		}
+		updates["given_name"] = given
+		updates["family_name"] = family
+		updates["name"] = combined
+	} else if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" {
+			return tenantUserDTO{}, domainerr.Validation("name cannot be empty")
+		}
+		if len([]rune(name)) > maxUserProfileNameLen {
+			return tenantUserDTO{}, domainerr.Validation("name too long")
+		}
+		given, family := splitFullNameIntoParts(name)
+		updates["given_name"] = given
+		updates["family_name"] = family
+		updates["name"] = joinDisplayName(given, family)
+	}
+	if req.Phone != nil {
+		phone := strings.TrimSpace(*req.Phone)
+		if len([]rune(phone)) > maxUserProfilePhoneLen {
+			return tenantUserDTO{}, domainerr.Validation("phone too long")
+		}
+		updates["phone"] = phone
+	}
+	if req.AvatarURL != nil {
+		updates["avatar_url"] = strings.TrimSpace(*req.AvatarURL)
+	}
+	if req.Status != nil {
+		status, err := normalizeOrgUserStatus(*req.Status)
+		if err != nil {
+			return tenantUserDTO{}, err
+		}
+		if status == "active" {
+			updates["deleted_at"] = nil
+		} else {
+			now := time.Now().UTC()
+			updates["deleted_at"] = &now
+		}
+	}
+	if len(updates) == 0 {
+		return userDTOFromRow(row), nil
+	}
+	updates["updated_at"] = time.Now().UTC()
+	if err := s.db.WithContext(ctx).Model(&pymesUserRow{}).Where("id = ?", row.ID).Updates(updates).Error; err != nil {
+		return tenantUserDTO{}, err
+	}
+	if err := s.db.WithContext(ctx).Where("id = ?", row.ID).Take(&row).Error; err != nil {
+		return tenantUserDTO{}, err
+	}
+	return userDTOFromRow(row), nil
 }
 
 func (s *pymesSaaSStore) UpsertUser(ctx context.Context, externalID, email, name string, avatarURL *string) (tenantUserDTO, error) {

@@ -17,7 +17,7 @@ type UpdatePaymentRequest struct {
 
 type PaymentItem struct {
 	ID            string   `json:"id"`
-	OrgID      string   `json:"org_id"`
+	OrgID         string   `json:"org_id"`
 	ReferenceType string   `json:"reference_type"`
 	ReferenceID   string   `json:"reference_id"`
 	Method        string   `json:"method"`

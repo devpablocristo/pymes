@@ -36,7 +36,7 @@ func (pymesUserRow) TableName() string { return "users" }
 
 type pymesTenantMembershipRow struct {
 	ID        uuid.UUID    `gorm:"column:id"`
-	OrgID  uuid.UUID    `gorm:"column:org_id"`
+	OrgID     uuid.UUID    `gorm:"column:org_id"`
 	UserID    uuid.UUID    `gorm:"column:user_id"`
 	Role      string       `gorm:"column:role"`
 	Status    string       `gorm:"column:status"`
@@ -51,7 +51,7 @@ func (pymesTenantMembershipRow) TableName() string { return "org_members" }
 
 type pymesTenantAPIKeyRow struct {
 	ID         uuid.UUID  `gorm:"column:id"`
-	OrgID   uuid.UUID  `gorm:"column:org_id"`
+	OrgID      uuid.UUID  `gorm:"column:org_id"`
 	Name       string     `gorm:"column:name"`
 	APIKeyHash string     `gorm:"column:api_key_hash"`
 	KeyPrefix  string     `gorm:"column:key_prefix"`
@@ -71,7 +71,7 @@ type pymesTenantAPIKeyScopeRow struct {
 func (pymesTenantAPIKeyScopeRow) TableName() string { return "org_api_key_scopes" }
 
 type pymesTenantSettingsRow struct {
-	OrgID              uuid.UUID  `gorm:"column:org_id"`
+	OrgID                 uuid.UUID  `gorm:"column:org_id"`
 	PlanCode              string     `gorm:"column:plan_code"`
 	HardLimits            []byte     `gorm:"column:hard_limits"`
 	HardLimitsJSON        []byte     `gorm:"column:hard_limits_json"`
@@ -88,7 +88,7 @@ type pymesTenantSettingsRow struct {
 	UpdatedAt             time.Time  `gorm:"column:updated_at"`
 }
 
-func (pymesTenantSettingsRow) TableName() string { return "tenant_settings" }
+func (pymesTenantSettingsRow) TableName() string { return "org_settings" }
 
 type pymesUsageCounterRow struct {
 	OrgID       uuid.UUID `gorm:"column:org_id"`
@@ -101,7 +101,7 @@ func (pymesUsageCounterRow) TableName() string { return "org_usage_counters" }
 
 type pymesTenantInvitationRow struct {
 	ID                uuid.UUID    `gorm:"column:id"`
-	OrgID          uuid.UUID    `gorm:"column:org_id"`
+	OrgID             uuid.UUID    `gorm:"column:org_id"`
 	EmailNormalized   string       `gorm:"column:email_normalized"`
 	Role              string       `gorm:"column:role"`
 	Status            string       `gorm:"column:status"`
@@ -118,4 +118,4 @@ type pymesTenantInvitationRow struct {
 	AcceptedByUser    pymesUserRow `gorm:"foreignKey:AcceptedByUserID;references:ID"`
 }
 
-func (pymesTenantInvitationRow) TableName() string { return "tenant_invitations" }
+func (pymesTenantInvitationRow) TableName() string { return "org_invitations" }

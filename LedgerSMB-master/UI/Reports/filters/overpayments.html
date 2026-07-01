@@ -1,0 +1,81 @@
+[% PROCESS 'elements.html';
+       PROCESS 'report_base.html'; %]
+<body class="lsmb [% dojo_theme %]">
+<div class="listtop">[% text('List Overpayments') %]</div>
+<form data-dojo-type="lsmb/Form" action="reports.pl" method="get">
+<table>
+ [% PROCESS date_row %]
+ <tr>
+    <th>[% text('Control Code') %]</th>
+    <td>[% PROCESS input element_data = {
+         name = 'control_code'
+         type = 'text'
+         size = '16'
+        value = control_code
+        class = 'control-code'
+    } %]</td>
+ </tr>
+ <tr>
+    <th>[% IF account_class == 1; text('Vendor Number'); END;
+              IF account_class == 2; text('Customer Number'); END;
+               %]</th>
+    <td>[% PROCESS input element_data = {
+         name = 'meta_number'
+         type = 'text'
+         size = '16'
+        value = meta_number
+        class = 'control-code'
+    } %]</td>
+ </tr>
+ <tr>
+    <th>[% text('Name') %]</th>
+    <td>[% PROCESS input element_data = {
+         name = 'name_part'
+         type = 'text'
+         size = '32'
+        value = name_part
+        class = 'name'
+    } %]</td>
+ </tr>
+ <tr class="listtop">
+  <th colspan="4">[% text('Reversal Information') %]</th>
+ </tr>
+ <tr><th>[% text('Currency'); %]</th>
+     <td>[% PROCESS select element_data = {
+          options = currencies
+             name = 'currency'
+   default_values = [currency]
+            class = 'currency'
+     }; %]</td>
+     <th>[% text('Exchange Rate'); %]</th>
+     <td>[% PROCESS input element_data = {
+     }; %]</td>
+ </tr>
+</table>
+[% PROCESS button element_data = {
+      name = '__action'
+     value = "search_overpayments"
+      type = 'submit'
+     class = 'submit'
+      text = text('Search')
+};
+ PROCESS input element_data = {
+      name = "post_date"
+     value = post_date
+      type = 'hidden'
+
+};
+ PROCESS input element_data = {
+      name = "account_class"
+     value = account_class
+      type = 'hidden'
+
+};
+ PROCESS input element_data = {
+      name = "batch_id"
+     value = batch_id
+      type = 'hidden'
+
+} %]
+</form>
+</body>

@@ -70,15 +70,15 @@ CREATE INDEX IF NOT EXISTS idx_restore_evidence_org_created
 CREATE INDEX IF NOT EXISTS idx_restore_evidence_org_system_env
     ON restore_evidence(org_id, system, environment, created_at DESC);
 
--- tenant_invitations: schema completo legacy (legacy 0075).
-CREATE TABLE IF NOT EXISTS tenant_invitations (
+-- org_invitations: schema completo legacy (legacy 0075).
+CREATE TABLE IF NOT EXISTS org_invitations (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
     email_normalized text NOT NULL,
     role text NOT NULL
-        CONSTRAINT tenant_invitations_role_check CHECK (role IN ('admin','member')),
+        CONSTRAINT org_invitations_role_check CHECK (role IN ('admin','member')),
     status text NOT NULL DEFAULT 'pending'
-        CONSTRAINT tenant_invitations_status_check CHECK (status IN ('pending','accepted','revoked','expired')),
+        CONSTRAINT org_invitations_status_check CHECK (status IN ('pending','accepted','revoked','expired')),
     token_hash text NOT NULL UNIQUE,
     clerk_invitation_id text,
     invited_by_user_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -89,13 +89,13 @@ CREATE TABLE IF NOT EXISTS tenant_invitations (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_invitations_pending_email
-    ON tenant_invitations(org_id, email_normalized) WHERE status = 'pending';
-CREATE INDEX IF NOT EXISTS idx_tenant_invitations_org_status
-    ON tenant_invitations(org_id, status, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_org_invitations_pending_email
+    ON org_invitations(org_id, email_normalized) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_org_invitations_org_status
+    ON org_invitations(org_id, status, created_at DESC);
 
-CREATE TRIGGER trg_tenant_invitations_updated_at
-    BEFORE UPDATE ON tenant_invitations FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_org_invitations_updated_at
+    BEFORE UPDATE ON org_invitations FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- webhook_events_clerk: schema completo con lifecycle (legacy 0078).
 CREATE TABLE IF NOT EXISTS webhook_events_clerk (

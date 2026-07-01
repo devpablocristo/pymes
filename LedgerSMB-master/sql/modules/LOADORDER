@@ -1,0 +1,61 @@
+# This is a simple list of files to be loaded from sql/modules
+# in the order they shall be loaded.
+#
+# Note: These files all adhere to the protocol where
+#  they change the value of the setting_key 'module_load_ok'
+#  from 'no' to 'yes' on success.
+aggregates.sql
+triggers.sql
+views.sql
+old.sql
+Settings.sql
+Preferences.sql
+Util.sql
+App_Module.sql
+Menu.sql
+Currency.sql
+Entity.sql
+Drafts.sql
+Account.sql
+Session.sql
+Robot.sql
+Business_type.sql
+Business_Unit.sql
+Location.sql
+Company.sql
+Customer.sql
+Date.sql
+Employee.sql
+Payment.sql
+Overpayment.sql
+Person.sql
+FinStatements.sql
+trial_balance.sql
+Report.sql
+Voucher.sql
+admin.sql
+Reconciliation.sql
+TaxForm.sql
+1099_reports.sql
+EndOfYear.sql
+Assets.sql
+Files.sql
+Parts.sql
+COGS.sql
+Budgetting.sql
+Inventory.sql
+Payroll.sql
+Transaction_Templates.sql
+OrderEntry.sql
+Goods.sql
+Roles.sql
+Templates.sql
+Timecards.sql
+PriceMatrix.sql
+arap.sql
+Configuration.sql
+# Why weren't those loaded before
+Backup.sql
+#Business_Dates.sql
+# This should remain the last check
+Duplicates_Functions.sql

@@ -1,0 +1,39 @@
+[% PROCESS 'elements.html';
+   PROCESS 'report_base.html';
+   PROCESS "dynatable.html" ;
+   IF !country_id; country_id = default_country; END ;
+   IF !country_id_t; country_id_t = default_country; END ;
+   IF entity_class == 3 ; DIV_ID = "edit_employee" ; ELSE ; DIV_ID = "edit_contact" ; END ;
+-%]
+<body class="lsmb [% dojo_theme %]">
+<div id="[% DIV_ID %]">
+
+    [% IF name %]
+<div class="pageheading">[% text('Company') %]: [% name %]</div>
+    [% END %]
+    [% IF meta_number %]
+<div class="pageheading">[% text('Account') %]: [% meta_number %]</div>
+    [% END %]
+[% notice = line_one %]
+    [% IF notice %]
+    <div class="notice">[% notice %]</div>
+    [% END %]
+    <div class="navigation" id="nav_div">[% target_div %]
+</div>
+    <div id="contact_tabs"
+         data-dojo-type="dijit/layout/TabContainer"
+         data-dojo-props="doLayout:false">
+  [% FOREACH ITEM IN DIVS;
+      INCLUDEDIV = "Contact/divs/" _ ITEM _ ".html";
+      INCLUDE $INCLUDEDIV;
+  END
+  %]
+  [% FOREACH ITEM IN PLUGINS;
+      INCLUDEDIV = "plugins/" _ ITEM;
+      INCLUDE $INCLUDEDIV;
+  END;
+  %]
+</div>
+
+</div>
+</body>

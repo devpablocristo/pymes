@@ -39,6 +39,7 @@ import (
 	"github.com/devpablocristo/pymes/core/backend/internal/internalapi"
 	"github.com/devpablocristo/pymes/core/backend/internal/inventory"
 	"github.com/devpablocristo/pymes/core/backend/internal/invoices"
+	"github.com/devpablocristo/pymes/core/backend/internal/ledger"
 	"github.com/devpablocristo/pymes/core/backend/internal/notifications"
 	"github.com/devpablocristo/pymes/core/backend/internal/outwebhooks"
 	"github.com/devpablocristo/pymes/core/backend/internal/party"
@@ -130,6 +131,7 @@ func InitializeApp() *app.App {
 	returnsRepo := returns.NewRepository(db)
 	rbacRepo := rbac.NewRepository(db)
 	accountsRepo := accounts.NewRepository(db)
+	ledgerRepo := ledger.NewRepository(db)
 	currencyRepo := currency.NewRepository(db)
 	dashboardRepo := dashboard.NewRepository(db)
 	dataioRepo := dataio.NewRepository(db)
@@ -167,16 +169,17 @@ func InitializeApp() *app.App {
 	customersUC := customers.NewUsecases(customersRepo, auditUC, customers.WithLifecycle(pymesLifecycle))
 	suppliersUC := suppliers.NewUsecases(suppliersRepo, auditUC, suppliers.WithLifecycle(pymesLifecycle))
 	accountsUC := accounts.NewUsecases(accountsRepo)
+	ledgerUC := ledger.NewUsecases(ledgerRepo)
 	currencyUC := currency.NewUsecases(currencyRepo)
 	dashboardUC := dashboard.NewUsecases(dashboardRepo)
 	priceListsUC := pricelists.NewUsecases(priceListsRepo, pricelists.WithLifecycle(pymesLifecycle))
-	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC, purchases.WithTimeline(timelineUC), purchases.WithWebhooks(outwebhooksUC), purchases.WithLifecycle(pymesLifecycle))
+	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC, purchases.WithTimeline(timelineUC), purchases.WithWebhooks(outwebhooksUC), purchases.WithLifecycle(pymesLifecycle), purchases.WithLedger(ledgerUC))
 	// procurement requiere Nexus governance: ya no hay motor local.
 	reportsUC := reports.NewUsecases(reportsRepo)
 	recurringUC := recurring.NewUsecases(recurringRepo, auditUC, recurring.WithLifecycle(pymesLifecycle))
 	rbacUC := rbac.NewUsecases(rbacRepo, auditUC)
 	rbacMiddleware := handlers.NewRBACMiddleware(rbacUC)
-	returnsUC := returns.NewUsecases(returnsRepo, auditUC, timelineUC, outwebhooksUC, returns.WithLifecycle(pymesLifecycle))
+	returnsUC := returns.NewUsecases(returnsRepo, auditUC, timelineUC, outwebhooksUC, returns.WithLifecycle(pymesLifecycle), returns.WithLedger(ledgerUC))
 	schedulingUC := schedulingmodule.NewUsecases(schedulingRepo, auditUC, schedulingmodule.WithNotifications(outwebhooksUC))
 	calendarExportUC := calendar_export.NewUsecases(calendarExportRepo, schedulingUC, calendar_export.Config{
 		ProductID: "-//Pymes SaaS//Calendar Export//ES",
@@ -242,7 +245,7 @@ func InitializeApp() *app.App {
 		logger.Error().Err(err).Msg("invalid notification backend, falling back to noop")
 		emailSender = notifications.NewNoopSender(logger)
 	}
-	schedulerUC := scheduler.NewUsecases(schedulerRepo, cfg.ExchangeRateProvider, outwebhooksUC, paymentGatewayUC, schedulingUC, emailSender, cfg.PublicBaseURL)
+	schedulerUC := scheduler.NewUsecases(schedulerRepo, cfg.ExchangeRateProvider, outwebhooksUC, paymentGatewayUC, schedulingUC, emailSender, cfg.PublicBaseURL, scheduler.WithLedger(ledgerUC))
 	notificationUC := notifications.NewUsecases(notificationRepo, emailSender, logger)
 
 	governanceURL := strings.TrimSpace(os.Getenv("GOVERNANCE_URL"))
@@ -273,8 +276,9 @@ func InitializeApp() *app.App {
 		sales.WithTimeline(timelineUC),
 		sales.WithWebhooks(outwebhooksUC),
 		sales.WithNotifications(businessInsightsUC),
+		sales.WithLedger(ledgerUC),
 	)
-	paymentsUC := payments.NewUsecases(paymentsRepo, auditUC, businessInsightsUC, payments.WithLifecycle(pymesLifecycle))
+	paymentsUC := payments.NewUsecases(paymentsRepo, auditUC, businessInsightsUC, payments.WithLifecycle(pymesLifecycle), payments.WithLedger(ledgerUC))
 	quotesUC := quotes.NewUsecases(quotesRepo, salesUC, auditUC, quotes.WithLifecycle(pymesLifecycle))
 	invoicesUC := invoices.NewUsecases(invoicesRepo, auditUC, invoices.WithLifecycle(pymesLifecycle))
 	employeesUC := employees.NewUsecases(employeesRepo, auditUC, employees.WithLifecycle(pymesLifecycle))
@@ -296,6 +300,7 @@ func InitializeApp() *app.App {
 	invoicesHandler := invoices.NewHandler(invoicesUC)
 	employeesHandler := employees.NewHandler(employeesUC)
 	accountsHandler := accounts.NewHandler(accountsUC)
+	ledgerHandler := ledger.NewHandler(ledgerUC)
 	currencyHandler := currency.NewHandler(currencyUC)
 	dashboardHandler := dashboard.NewHandler(dashboardUC)
 	dataioHandler := dataio.NewHandler(dataioUC)
@@ -385,6 +390,7 @@ func InitializeApp() *app.App {
 			customerMessagingHandler,
 			outwebhooksHandler,
 			accountsHandler,
+			ledgerHandler,
 			customersHandler,
 			currencyHandler,
 			dashboardHandler,

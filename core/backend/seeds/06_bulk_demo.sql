@@ -1270,7 +1270,7 @@ BEGIN
                 updated_at = now();
     END IF;
 
-    UPDATE tenant_settings
+    UPDATE org_settings
        SET next_quote_number = GREATEST(next_quote_number, 11),
            next_sale_number = GREATEST(next_sale_number, 11),
            updated_at = now()

@@ -1,0 +1,122 @@
+[% PROCESS 'elements.html' %]
+<body class="lsmb [% request.dojo_theme %]">
+<div class="listtop">[% text('Reporting Units') %]</div>
+<div id="business_units">
+<div class="table">
+<!-- headings -->
+<div class="tr listheading">
+    <div class="th">[% text('ID') %]</div>
+    <div class="th">[% text('Label') %]</div>
+    <div class="th">[% text('Active') %]</div>
+    <div class="th">[% text('Ordering') %]</div>
+  [% FOREACH m IN request.modules %]
+    <div class="th">[% text(m.label) %]</div>
+  [% END %]
+    <div class="th">&nbsp;</div>
+    <div class="th">&nbsp;</div>
+</div>
+[% request.classes.push({});
+       FOR c IN request.classes;
+           id = c.id;
+%]
+<form data-dojo-type="lsmb/Form"
+      action="[% request.script %]"
+      method="GET"
+      class="tr">
+<!-- div class="tr"-->
+
+<div class="td">
+[% PROCESS input element_data = {
+    type = "hidden"
+   value = id
+    name = "id"
+} %][% id %]</div>
+<div class="td">[% PROCESS input element_data = {
+    type = "text"
+   class = "control_code"
+    name = "label"
+   value = c.label
+      id = "label_$id"
+    size = 12
+} %]
+</div>
+<div class="td">[% PROCESS input element_data = {
+    type = "checkbox"
+   value = "1"
+   class = "is-active"
+    name = "active"
+      id = "active_$id"
+ checked = (c.active)? 'CHECKED' : ''
+} %]
+</div>
+<div class="td">[% PROCESS input element_data = {
+    type = "text"
+   class = "ordering"
+    name = "ordering"
+   value = c.ordering
+      id = "ordering_$id"
+    size = 4
+} %]
+</div>
+  [% FOREACH m IN request.modules %]
+    <div class="td">[%
+    checked = '';
+    FOREACH mm IN c.modules;
+       IF mm.id == m.id;
+          checked = 'checked';
+       END;
+    END;
+    PROCESS input element_data = {
+       type = 'checkbox'
+    checked = checked
+       name = "module_" _ m.id
+         id = "module_$id" _ "_" _ m.id
+      value = 1
+    } %] </div>
+  [% END %]
+    <!-- TODO:  Add modules perms here -->
+<div class="td">[% PROCESS button element_data = {
+    type = "submit"
+   class = "submit"
+    name = "__action"
+   value = "save_class"
+      id = "save_class_$id"
+    text = (c.id) ? text('Save') : text('Add Class')
+    'data-lsmb-doing' = text('Saving...')
+    'data-lsmb-done' = text('Saved')
+};
+PROCESS button element_data = {
+    type = "submit"
+   class = "submit"
+    name = "__action"
+   value = "delete_class"
+      id = "delete_class_$id"
+    text = text('Delete')
+} %]
+</div>
+<div class="td">[%
+IF c.id;
+PROCESS button element_data = {
+    type = "submit"
+   class = "submit"
+    name = "__action"
+      id = "action_$id"
+   value = "add"
+    text = text('Add Unit') #'
+};
+PROCESS button element_data = {
+    type = "submit"
+   class = "submit"
+    name = "__action"
+   value = "list"
+      id = "list_$id"
+    text = text('List Units')#'
+};
+END; %]</div>
+<!-- /div -->
+</form>
+[% END %]
+</div>
+</div>
+
+</body>

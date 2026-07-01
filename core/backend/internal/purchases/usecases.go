@@ -12,6 +12,7 @@ import (
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
 	lifecycle "github.com/devpablocristo/platform/lifecycle/go/lifecycle"
+	"github.com/devpablocristo/pymes/core/backend/internal/ledger"
 	purchasesdomain "github.com/devpablocristo/pymes/core/backend/internal/purchases/usecases/domain"
 	"github.com/devpablocristo/pymes/core/backend/internal/shared/status"
 )
@@ -43,11 +44,18 @@ type WebhookPort interface {
 	Enqueue(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) error
 }
 
+// LedgerPort dispara la reconciliación contable de la compra (posteo por outbox).
+// Nil-safe. Se llama tras cada cambio de estado; el worker reconcilia (alta/storno).
+type LedgerPort interface {
+	EnqueuePurchaseSync(ctx context.Context, evt ledger.PurchaseEvent) error
+}
+
 type Usecases struct {
 	repo      RepositoryPort
 	audit     AuditPort
 	timeline  TimelinePort
 	webhooks  WebhookPort
+	ledger    LedgerPort
 	lifecycle *lifecycle.Service // optional; when nil, legacy path
 }
 
@@ -55,6 +63,7 @@ type Option func(*Usecases)
 
 func WithTimeline(t TimelinePort) Option { return func(u *Usecases) { u.timeline = t } }
 func WithWebhooks(w WebhookPort) Option  { return func(u *Usecases) { u.webhooks = w } }
+func WithLedger(l LedgerPort) Option     { return func(u *Usecases) { u.ledger = l } }
 
 // WithLifecycle wires lifecycle.Service for Soft/Restore/HardDelete.
 func WithLifecycle(svc *lifecycle.Service) Option {
@@ -133,6 +142,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (purchasesdomain.
 	if u.webhooks != nil {
 		_ = u.webhooks.Enqueue(ctx, in.OrgID, "purchase.created", map[string]any{"purchase_id": out.ID.String(), "supplier_id": nullableUUID(out.SupplierID), "total": out.Total, "status": out.Status})
 	}
+	u.enqueueLedgerSync(ctx, in.OrgID, out.ID, in.CreatedBy)
 	return out, nil
 }
 
@@ -187,6 +197,7 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 	if u.webhooks != nil {
 		_ = u.webhooks.Enqueue(ctx, in.OrgID, "purchase.updated", map[string]any{"purchase_id": out.ID.String(), "supplier_id": nullableUUID(out.SupplierID), "status": out.Status})
 	}
+	u.enqueueLedgerSync(ctx, in.OrgID, out.ID, actor)
 	return out, nil
 }
 
@@ -234,6 +245,7 @@ func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor
 	if u.webhooks != nil {
 		_ = u.webhooks.Enqueue(ctx, in.OrgID, "purchase.status_updated", map[string]any{"purchase_id": out.ID.String(), "supplier_id": nullableUUID(out.SupplierID), "status": out.Status})
 	}
+	u.enqueueLedgerSync(ctx, in.OrgID, out.ID, actor)
 	return out, nil
 }
 
@@ -370,6 +382,14 @@ func markReceivedAt(status string) *time.Time {
 		return &now
 	}
 	return nil
+}
+
+// enqueueLedgerSync dispara la reconciliación contable de la compra tras
+// cualquier cambio de estado. Nil-safe y best-effort: nunca rompe la operación.
+func (u *Usecases) enqueueLedgerSync(ctx context.Context, orgID, purchaseID uuid.UUID, actor string) {
+	if u.ledger != nil {
+		_ = u.ledger.EnqueuePurchaseSync(ctx, ledger.PurchaseEvent{OrgID: orgID, PurchaseID: purchaseID, Actor: actor})
+	}
 }
 
 func nullableUUID(id *uuid.UUID) string {

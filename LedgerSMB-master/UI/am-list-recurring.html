@@ -1,0 +1,66 @@
+[% PROCESS elements.html %]
+<body class="lsmb [% dojo_theme %]">
+<form data-dojo-type="lsmb/Form" method="post" action="am.pl">
+  [% # This form is also rendered when form.script contains 'is.pl'
+         # or 'ir.pl'; however, submission really must be taken to 'am.pl'
+         # so we have no option but to hard-code it %]
+
+
+<table width="100%">
+  <tr>
+    <th class="listtop">[% text('Recurring Transactions') %]</th>
+  </tr>
+  <tr><td>&nbsp;</td></tr>
+  <tr>
+    <td>
+      <table width=100%>
+        <tr class="listtop">
+[% FOREACH column IN columns %]
+          <th class="listtop">
+  [% IF heading.$column.text.defined %]
+  <a class="listtop" href="[% heading.$column.href %]">[% heading.$column.text %]</a>
+  [% ELSE;
+    heading.$column;
+  END %]
+          </th>
+[% END %]
+        </tr>
+[% FOREACH transaction_type IN transactions %]
+        <tr>
+          <th class="listheading" colspan="[% columns.size %]">[% transaction_type.title %]</th>
+        </tr>
+  [% FOREACH transaction IN transaction_type.transactions %]
+      <tr class="listrow[% transaction.i %]">
+    [% FOREACH column IN columns %]
+        <td>
+      [% IF transaction.$column.delimiter.defined;
+        transaction.$column.text.replace(transaction.$column.delimiter, '<br />');
+      ELSIF transaction.$column.href.defined;
+        '<a href="'; transaction.$column.href; '">'; transaction.$column.text; '</a>';
+      ELSIF transaction.$column.type.defined;
+        PROCESS input element_data=transaction.$column;
+      ELSE;
+        transaction.$column;
+      END %]
+        </td>
+    [% END %]
+      </tr>
+  [% END %]
+[% END %]
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td><hr size="3" noshade="noshade" /></td>
+  </tr>
+</table>
+
+[% FOREACH hidden IN hiddens.keys;
+        PROCESS input element_data={
+                type => 'hidden',
+                name => hidden,
+                value => hiddens.item(hidden)
+                }; END;
+PROCESS button element_data={name => '__action', value => 'process_transactions' text => text('Process Transactions')} %]
+</form>
+</body>

@@ -167,9 +167,9 @@ assert_status_capture "GET /v1/admin/activity" GET "$BASE_URL/v1/admin/activity"
 # ── API Keys ──
 echo ""
 bold "▸ API Keys"
-assert_status_capture "GET /v1/tenants/:tenant_id/api-keys" GET "$BASE_URL/v1/tenants/$TENANT_ID/api-keys" 200
+assert_status_capture "GET /v1/orgs/:tenant_id/api-keys" GET "$BASE_URL/v1/orgs/$TENANT_ID/api-keys" 200
 
-assert_status_capture "POST /v1/tenants/:tenant_id/api-keys (create)" POST "$BASE_URL/v1/tenants/$TENANT_ID/api-keys" 201 \
+assert_status_capture "POST /v1/orgs/:tenant_id/api-keys (create)" POST "$BASE_URL/v1/orgs/$TENANT_ID/api-keys" 201 \
     -d '{"name":"e2e-test-key","scopes":["read"]}'
 NEW_KEY_ID=$(echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('key',{}).get('id',''))" 2>/dev/null || echo "")
 NEW_RAW_KEY=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('raw_key',''))" 2>/dev/null || echo "")
@@ -179,9 +179,9 @@ if [ -n "$NEW_KEY_ID" ] && [ "$NEW_KEY_ID" != "" ]; then
     PASS=$((PASS + 1))
     printf "  %-50s %s id=%s\n" "created key has id" "$(green "PASS")" "${NEW_KEY_ID:0:8}..."
 
-    assert_status_capture "POST rotate key" POST "$BASE_URL/v1/tenants/$TENANT_ID/api-keys/$NEW_KEY_ID/rotate" 200
+    assert_status_capture "POST rotate key" POST "$BASE_URL/v1/orgs/$TENANT_ID/api-keys/$NEW_KEY_ID/rotate" 200
 
-    assert_status "DELETE /v1/tenants/:tenant_id/api-keys/:id" DELETE "$BASE_URL/v1/tenants/$TENANT_ID/api-keys/$NEW_KEY_ID" 204 > /dev/null
+    assert_status "DELETE /v1/orgs/:tenant_id/api-keys/:id" DELETE "$BASE_URL/v1/orgs/$TENANT_ID/api-keys/$NEW_KEY_ID" 204 > /dev/null
 else
     TOTAL=$((TOTAL + 1))
     FAIL=$((FAIL + 1))
@@ -191,7 +191,7 @@ fi
 # ── Members ──
 echo ""
 bold "▸ Members"
-assert_status_capture "GET /v1/tenants/:tenant_id/members" GET "$BASE_URL/v1/tenants/$TENANT_ID/members" 200
+assert_status_capture "GET /v1/orgs/:tenant_id/members" GET "$BASE_URL/v1/orgs/$TENANT_ID/members" 200
 
 # ── Audit ──
 echo ""
@@ -271,7 +271,7 @@ assert_status "GET /v1/reports/profit-margin" GET "$BASE_URL/v1/reports/profit-m
 # ── Tenants (Clerk-auth only) ──
 echo ""
 bold "▸ Tenants"
-assert_status_noauth "POST /v1/tenants sin Clerk auth" POST "$BASE_URL/v1/tenants" 401 \
+assert_status_noauth "POST /v1/orgs sin Clerk auth" POST "$BASE_URL/v1/orgs" 401 \
     -d "{\"name\":\"E2E Tenant $(date +%s)\",\"slug\":\"e2e-$(date +%s)\"}"
 
 # ── CORS ──

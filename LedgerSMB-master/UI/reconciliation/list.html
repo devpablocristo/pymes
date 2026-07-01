@@ -1,0 +1,20 @@
+[% INCLUDE 'report_base.html'%]
+
+<div class="content">
+    <table>
+        <tr>
+            <td>ID</td>
+            <td>Account</td>
+            <td>Date Range</td>
+            <td>Total</td>
+        </tr>
+    [% FOR item IN reports%]
+        <tr>
+            <td><a href="recon.pl?__action=report&amp;report_id=[% item.report_id%]">[% item.report_id%]</a></td>
+            <td>[% item.account%]</td>
+            <td>[% item.range%]</td>
+            <td>[% item.total%]</td>
+        </tr>
+    [% END%]
+    </table>
+</div>

@@ -75,7 +75,7 @@ BEGIN
             removed_at = NULL,
             updated_at = now();
 
-    INSERT INTO tenant_settings (org_id, plan_code)
+    INSERT INTO org_settings (org_id, plan_code)
     VALUES (v_tenant, 'starter')
     ON CONFLICT (org_id) DO NOTHING;
 

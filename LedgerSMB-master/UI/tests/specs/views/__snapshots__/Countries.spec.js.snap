@@ -1,0 +1,145 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Countries - register as a component > should show dialog 1`] = `
+<div
+  data-v-app=""
+>
+  
+  <h1
+    class="listtop"
+  >
+    Configure countries
+  </h1>
+  
+  <div>
+    <table
+      class="dynatable"
+    >
+      <thead>
+        <tr>
+          <th>
+            Default
+          </th>
+          
+          <th>
+            Code
+          </th>
+          <th>
+            Name
+          </th>
+          
+          <th />
+        </tr>
+      </thead>
+      
+      <tbody
+        class="dynatableData"
+      >
+        
+        
+        <!-- eslint-disable prettier/prettier -->
+        <tr
+          class="data-row"
+        >
+          <td
+            style="vertical-align: middle; text-align: center;"
+          >
+            
+            
+          </td>
+          
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="code"
+              readonly=""
+              type="text"
+              value="ca"
+            />
+          </td>
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="name"
+              readonly=""
+              type="text"
+              value="Canada"
+            />
+          </td>
+          
+          <td>
+            <!--v-if-->
+            <!--v-if-->
+          </td>
+        </tr>
+        
+        
+        <!-- eslint-disable prettier/prettier -->
+        <tr
+          class="data-row"
+        >
+          <td
+            style="vertical-align: middle; text-align: center;"
+          >
+            
+            
+          </td>
+          
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="code"
+              readonly=""
+              type="text"
+              value="us"
+            />
+          </td>
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="name"
+              readonly=""
+              type="text"
+              value="United States"
+            />
+          </td>
+          
+          <td>
+            <!--v-if-->
+            <!--v-if-->
+          </td>
+        </tr>
+        
+        
+      </tbody>
+      <!--v-if-->
+      
+    </table>
+  </div>
+  <div>
+    <span>
+      Download: 
+    </span>
+    
+    <span>
+      <a
+        href="http://localhost/erp/api/v0/countries?format=HTML"
+        target="_blank"
+      >
+        [ HTML ]
+      </a>
+    </span>
+    
+  </div>
+  
+  
+</div>
+`;

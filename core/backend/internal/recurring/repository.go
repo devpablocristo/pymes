@@ -127,7 +127,7 @@ func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error 
 
 func (r *Repository) GetCurrency(ctx context.Context, orgID uuid.UUID) string {
 	var cur string
-	if err := r.db.WithContext(ctx).Table("tenant_settings").Select("currency").Where("org_id = ?", orgID).Take(&cur).Error; err != nil || cur == "" {
+	if err := r.db.WithContext(ctx).Table("org_settings").Select("currency").Where("org_id = ?", orgID).Take(&cur).Error; err != nil || cur == "" {
 		return "ARS"
 	}
 	return cur

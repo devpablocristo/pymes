@@ -1,0 +1,522 @@
+[% BLOCK format_money %][% number
+%][% END # block %]
+ [% PROCESS elements.html  # Include form elements helper. %]
+[% contact_type = (payment.account_class == 1) ? text('Vendor') : text('Customer')
+%]
+[% payment_type = (payment.account_class == 1) ? text('Payments') : text('Receipts')
+%]
+<body id="payment_2_body" onLoad="init()" class="lsmb [% dojo_theme %]">
+<!-- CT:  This template produces invalid XHTML due to the use of nested tables.
+    Because nested tables are widely used (perhaps improperly) for layout,
+    most browsers should have no issues with them.  Furthermore, I cannot find
+    any cleaner solution to embedding tabular data within tabular data than
+    this -->
+<div id="payments-detail">
+<div class="listtop">[% payment.payment_type %]</div>
+ <form data-dojo-type="lsmb/Form" name="pay_dues" method="post" action="[% request.script %]">
+ <!-- Moving all hidden variables to the top.  -CT -->
+ [% INCLUDE input element_data = {
+        type = "hidden"
+        name = "project_id"
+        value = payment.project_id
+ } %]
+ [% INCLUDE input element_data = {
+        type = "hidden"
+        name = "form_id"
+        value = request.form_id
+ } %]
+ [% INCLUDE input element_data = {
+        type = "hidden"
+        name = "account_class"
+        value = payment.account_class
+
+ } %]
+[% INCLUDE input element_data = {
+        type = "hidden"
+        name = "payment_type_id"
+        value = payment.payment_type_id
+
+ } %]
+ [% INCLUDE input element_data = {
+        type = "hidden"
+        name = "department_id"
+        value = payment.department_id
+ } %]
+ [% INCLUDE input element_data = {
+        type = "hidden"
+        name = "meta_number"
+        value = payment.meta_number
+ } %]
+ [% INCLUDE input element_data = {
+        type = "hidden"
+        name = "source_start"
+        value = payment.source_start
+        } %]
+ [% INCLUDE input element_data = {
+        type = "hidden"
+        name = "approved"
+        value = payment.approved
+ } %]
+ [% INCLUDE input element_data = {
+        type = "hidden"
+        name = "currency"
+        value = payment.currency
+ } %]
+ [% INCLUDE input element_data = {
+        type = "hidden"
+        name = "ar_ap_accno"
+        value = payment.ar_ap_accno
+ } %]
+ [% INCLUDE input element_data = {
+        type = "hidden"
+        name = "date_from"
+        value = payment.date_from
+ } %]
+ [% INCLUDE input element_data = {
+        type = "hidden"
+        name = "date_to"
+        value = payment.date_to
+ } %]
+ [% INCLUDE input element_data = {
+        type = "hidden"
+        name = "business_id"
+        value = payment.business_id
+ } %]
+ [% INCLUDE input element_data = {
+        type = "hidden"
+        name = "batch_id"
+        value = payment.batch_id
+ } %]
+
+
+  <div class="container">
+
+    <!-- Start of heading_section -->
+    <div class="heading_section report_header">
+
+        <div id="date_row">
+            <label for="date_paid">[% text('Posting Date') %]</label>
+            [% IF payment.batch_id %]
+                        [% IF ! payment.datepaid %][% payment.datepaid = payment.batch_date %][% END %]
+                        <span id="date_paid">[% payment.datepaid %]</span>
+            [% END %]
+            [% INCLUDE input element_data= {
+                        value = payment.datepaid
+                        name  = "datepaid"
+                        size  = 20
+                        class = (payment.batch_id) ? "hidden" : "date"
+                        type  = (payment.batch_id) ? "hidden" : "text"
+                }
+            %]
+        </div>
+
+        [% IF payment.date_from %]
+        <div id="date_filter_from_row">
+            <label for="filter_from">[% text('Filtering From') %]</label>
+            <span id="filter_from">[% payment.date_from %]</span>
+        </div>
+        [% END %]
+
+        [% IF payment.date_to %]
+        <div id="date_filter_to_row">
+            <label for="filter_to">[% text('To') %]</label>
+            <span id="filter_to">[% payment.date_to %]</span>
+        </div>
+        [% END %]
+
+        [% IF payment.department.value %]
+        <div class="info">
+            <label for="department_info">[% text('Department') %]</label>
+            <span id="department_info">[% payment.department %]</span>
+        </div>
+        [% END %]
+
+        <div id="account_row">
+            <label for="account_info">[% text('Account') %]</label>
+            <span id="account_info">
+                        [% FOREACH a = payment.debt_accounts %]
+                                [% IF a.accno == payment.ar_ap_accno %]
+                                        [% a.accno %] -- [% a.description %]
+                                [% END # If a.accno... %]
+                        [%  END # FOREACH a %]
+            </span>
+        </div>
+
+        [%  IF payment.default_currency != payment.currency %]
+        <div id="exrate_row">
+                        [% IF payment.fx_from_db %]
+                                <label>[% text('Exchange Rate') %]</label> [% payment.exchangerate %]
+                                [% PROCESS input element_data = {
+                                        name  = 'exchangerate'
+                                        value = payment.exchangerate
+                                        type  = 'hidden'
+                                };
+                        ELSE;
+
+                                PROCESS input element_data= {
+                                        label = text('Exchange Rate') #'
+                                        type  = 'text'
+                                        class = "numeric"
+                                        name  = 'exchangerate'
+               id = 'exchangerate'
+                                        value = payment.exchangerate
+                                        size  = 20
+                                };
+                        END %]
+        </div>
+        [% END %]
+
+        [% IF payment.business %]
+        <div id="business_row">
+            <label for="business_info">[% text('Business') %]</label>
+            <span id="business_info">
+                                [% FOREACH b = payment.businesses %]
+                                        [% IF b.id == payment.business %]
+                                                [% b.id %] -- [% b.description %]
+                                        [% END # if b.id... %]
+                                [% END # foreach b %]
+            </span>
+        </div>
+        [% END # if business %]
+
+        [% IF payment.payment_type %]
+        <div class="payment_type" id="payment_type_label_div">
+            <label for="filter_type_label">[% text('Payment Type') %]</label>
+            <span id="filter_type_label">[% payment_type_return_label %] </span>
+        </div>
+        [% END %]
+
+        <div id="cash_account_div">
+                [% INCLUDE input element_data = {
+                        type  = "hidden"
+                        name  = "cash_accno"
+                        value = payment.cash_accno
+                } %]
+                <label>[% text('Pay From') %]</label>
+                <span id="cash_accno">
+                    [% FOR c = payment.cash_accounts -%]
+                        [% IF c.accno == payment.cash_accno -%]
+                                [% c.accno %] -- [% c.description %]
+                        [% END # if c.accno -%]
+                    [% END # for c -%]
+                </span>
+        </div>
+
+    </div>
+    <!-- end of heading_section -->
+
+        <table id="payments-table">
+            <thead>
+                <tr class="listheading">
+                        <th class="account">
+                                        [% INCLUDE input element_data = {
+                                                id    = 'checkbox-selectall'
+                                                name  = 'selectall'
+                                                class = 'selectall'
+                                                value = 0
+                                                type  = 'checkbox'
+                                                topic = 'ui/pay/bulk/all-accounts'
+                                        } %]
+                                [% text('Account') %]
+                        </th>
+                        <th class="entity_name">[% text('Name') %]</th>
+                        <th class="invoice">[% text('Invoice Total') %]</th>
+                        <th class="payment">[% text('Payment') %]</th>
+                        <th class="payment">[% text('Details') %]</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% rc = 1 %][% count = 0 %]
+                [% FOREACH r = payment.contact_invoices %]
+                        [% rc = (rc + 1) % 2; count = count + 1 %]
+                        <tr class="listrow[% rc %]">
+                                <td class="account_number" rowspan="2" >
+                                        [% INCLUDE input element_data = {
+                                                type  = "hidden"
+                                                name  = "contact_$count"
+                                                value = r.contact_id
+                                        } %]
+                                        [% INCLUDE input element_data = {
+                                                type = "hidden"
+                                                name = "contact_label_" _ r.contact_id
+                                                value = r.econtrol_code _ "--" _ r.account_number _ "--" _ r.contact_name
+                                        } %]
+                                        [% # IF payment.action == "update_payments" -%]
+                                                [% IF payment.${"id_$r.contact_id"} -%]
+                                                        [% r.selected = 1 -%]
+                                                [% END # IF payment.${"id_$r.contact_id"} -%]
+                                        [% # END # IF action ... -%]
+                                        [% INCLUDE input element_data = {
+                                                type    = "checkbox"
+                                                id      = "id_" _ r.contact_id
+                                                name    = "id_" _ r.contact_id
+                                                value   = r.contact_id
+                                                checked = (r.selected) ? "checked" : undef
+                                                class   = 'contactcb'
+                                                "update-from" = 'ui/pay/bulk/all-accounts'
+                                        } %]
+                                        [% r.econtrol_code %] --
+                                        [% r.account_number %] -- [% r.eca_description %]
+                                </td>
+                                <td class="entity_name">
+                                        <span class="[%
+                                                IF r.has_vouchers; 'name_has_vouchers' ;
+                                                ELSE ; 'name_has_no_vouchers' ;
+                                                END
+                                                %]">
+                                                [% r.contact_name %]
+                                        </span>
+                                </td>
+                                <td class="invoice">[% r.to_pay %]
+                                        [% payment.currency %]
+                                </td>
+                                <td>
+                                        <div class="details_select">
+                                                <div class="input">
+                                                        [% INCLUDE input element_data = {
+                                                                name    = "paid_" _ r.contact_id
+                                                                value   = "some"
+                                                                class   = "paid_some"
+                                                                id      = "paid-some-" _ r.contact_id
+                                                                label   = text('Some')
+                                                                type    = "radio"
+                                                                checked = (payment.${"paid_$r.contact_id"} == 'some') ? "checked" : ""
+                                                                topic   = 'ui/pay/bulk/invoice-data-table-' _ r.contact_id
+                                                         }      %]
+                                                </div>
+                                                <div class="input">
+                                                        [% INCLUDE input element_data = {
+                                                                name    = "paid_" _ r.contact_id
+                                                                value   = "all"
+                                                                class   = "paid_all"
+                                                                id      = "paid-all-" _ r.contact_id
+                                                                label   = text('All')
+                                                                type    = "radio"
+                                                                checked = (payment.${"paid_$r.contact_id"} != 'some') ? "checked" : ""
+                                                                topic   = 'ui/pay/bulk/invoice-data-table-' _ r.contact_id
+
+                                                 }      %]
+                                                </div>
+                                        </div>
+                                </td>
+                                <td rowspan = 2>
+                                        [% INCLUDE input element_data = {
+                                                name  = "source_$r.contact_id"
+                                                id    = "source_$r.contact_id"
+                                                value = r.source
+                                                type  = "text"
+                                                size  = "20"
+                                                label = text('Source')
+                                        } %]
+                                </td>
+                        </tr>
+
+                        <tr class="listrow[% rc %]">
+                                <td class="invoice_detail_list" colspan="3">
+
+                                        <table id = "invoice-data-table-[% r.contact_id %]"
+                      width="100%"
+                      data-dojo-type="lsmb/SubscribeShowHide"
+                      data-dojo-props="topic:'ui/pay/bulk/invoice-data-table-[% r.contact_id %]',showValues:['some']"
+                      [% IF 'some' != payment.${"paid_$r.contact_id"} ; -%]
+                      style="display:none"
+                      [% END; %]
+                      >
+                                            <thead>
+                                                <tr class="listheading">
+                                                        <th class="invoice_date_list">[% text('Date') %]
+                                                        </th>
+                                                        <th class="invoice_list">
+                                                                [% text('Invoice Number') %]
+                                                        </th>
+                                                        <th class="total_due_list">[% text('Total') %]</th>
+                                                        <th class="paid_list">[% text('Paid') %]</th>
+                                                        <th class="discount_list">[% text('Discount') %]</th>
+                                                        <th class="net_due_list">[% text('Net Due') %] </th>
+                                                        <th class="to_pay_list">[% text('To Pay') %]</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                [% FOREACH i = r.invoices %]
+                                                        [% # NEXT IF nothing to pay %]
+                                                        [% IF i.to_pay %]
+                                                                <tr>
+                                                                        <td class="invoice_date_list">
+                                                                                [% i.transdate %]
+                                                                                [% PROCESS input element_data = {
+                                                                                        type = "hidden"
+                                                                                        name = "open_item_id_" _ r.contact_id _ "_" _ i.id
+                                                                                        value = i.open_item_id } %]
+                                                                                [% PROCESS input element_data = {
+                                                                                        type = "hidden"
+                                                                                        name = "invoice_date_" _ r.contact_id _ "_" _ i.id
+                                                                                        value = i.transdate } %]
+                                                                        </td>
+                                                                        <td class="invoice_list">
+                                                                                [% i.invnumber %]
+                                                                                [% PROCESS input element_data = {
+                                                                                        type = "hidden"
+                                                                                        name = "invnumber_" _ r.contact_id _ "_" _ i.id
+                                                                                        value = i.invnumber } %]
+                                                                        </td>
+                                                                        <td class="total_due_list">
+                                                                                [% i.amount %]
+                                                                                [% PROCESS input element_data = {
+                                                                                        type = "hidden"
+                                                                                        name = "due_" _ r.contact_id _  "_" _ i.id
+                                                                                        value = i.due } %]
+                                                                        </td>
+                                                                        <td class="paid_list">
+                                                                                [% i.paid %]
+                                                                        </td>
+                                                                        <td class="discount_list">
+                                                                                [% i.net %]
+                                                                        </td>
+                                                                        <td class="net_due_list">
+                                                                                [% i.due %]
+                                                                                [% currency %]
+                                                                        </td>
+                                                                        <td class="to_pay_list">
+                                                                          [%
+fld = "payment_" _ r.contact_id _ "_" _ i.id ;
+                                                                            PROCESS input element_data = {
+                                                                                        name = fld
+                                 id   = "payment_$i.id"
+                                                                                        value = payment.${fld}
+                                                                                        size = 20
+                                                                                        type = "text"
+                                                                                        class = "monetary" } %]
+                                                                                [% PROCESS input element_data = {
+                                                                                        type = "hidden"
+                                                                                        name = "invoice_" _ r.contact_id _  "_" _ i.id
+                                                                                        value = i.id } %]
+                                                                                [% PROCESS input element_data = {
+                                                                                        type = "hidden"
+                                                                                        name = "net_" _ r.contact_id _ "_" _ i.id
+                                                                                        value = i.to_pay } %]
+                                                                        </td>
+                                                                </tr>
+                                                        [% ELSE #not $i.to_pay %]
+                                                                <tr>
+                                                                        <td class="invoice_date_list">
+                                                                                [% i.transdate %]
+                                                                        </td>
+                                                                        <td class="invoice_list">
+                                                                                [% i.invnumber %]
+                                                                        </td>
+                                                                        <td class="total_due_list">
+                                                                                [% i.amount %]
+                                                                        </td>
+                                                                        <td class="paid_list">
+                                                                                [% i.paid %]
+                                                                        </td>
+                                                                        <td class="net_due_list">
+                                                                                [% i.due %]
+                                                                                [% currency %]
+                                                                        </td>
+                                                                        <td class="to_pay_list">
+                                                                                [% text("Locked by [_1]", i.8) %]
+                                                                        </td>
+                                                                </tr>
+                                                        [% END # if i.8 %]
+                                                [% END # foreach i %]
+
+                                                [% INCLUDE input element_data = {
+                                                                 type = "hidden"
+                                                                 name = "invoice_count_" _ r.contact_id
+                                                                 value = i.size()
+                                                                 } %]
+                                            </tbody>
+                                            <tfoot>
+                                                <tr class="subtotal">
+                                                        <td colspan="6" class="total_label">
+                                                                [% text('Contact Total (if paying "some")') %]
+                                                        </td>
+                                                        <td>
+                                                                <span id='[% ${"contact_total_$r.id"} %]'>
+                                                                        [% r.contact_total %]
+                                                                </span>
+                                                                <span class="currency">
+                                                                        [% payment.currency %]
+                                                                </span>
+                                                        </td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                </td>
+                        </tr>
+                [% END # foreach r %]
+            </tbody>
+            <tfoot>
+                <tr class="subtotal">
+                        <td>
+                                &nbsp;
+                        </td>
+                        <td class="total_label">
+                                [% text('Grand Total') %]
+                        </td>
+                        <td>
+                                <span id="grand_total">
+                                        [% payment.grand_total %]
+                                </span>
+                                <span id="grand_total_currency" class="currency">
+                                        [% payment.currency %]
+                                </span>
+                        </td>
+                </tr>
+            </tfoot>
+        </table>
+
+        [% INCLUDE input element_data = {
+                type  = "hidden"
+                name  = "contact_count"
+                value = payment.contact_invoices.size
+        } %]
+        [% PROCESS input element_data = {
+                name  = "multiple"
+                type  = "hidden"
+                value = '1'
+        } %]
+        [% INCLUDE button element_data = {
+                text  = text('Update'),
+                value = 'update_payments'
+                class = "submit"
+                name  = '__action'
+        } %]
+        [% INCLUDE button element_data = {
+                text  = text((batch_id) ? 'Save' : 'Post'),
+                # value = 'pre_bulk_post_report'
+                value = 'pre_bulk_post_report'
+                class = "submit"
+                name  = '__action'
+                'data-lsmb-doing' = text('Saving...')
+                'data-lsmb-done'  = text('Saved')
+        } %]
+        [% IF payment.can_print %]
+                [% INCLUDE select element_data = {
+                        name    = "media"
+                        class   = "select"
+                        options = payment.media_options
+                        value   = payment.media
+                } %]
+                [% INCLUDE select element_data = {
+                        name    = "format"
+                        class   = "select"
+                        options = payment.format_options
+                        value   = payment.format
+                } %]
+                [% INCLUDE button element_data = {
+                        text  = text('Print')
+                        value = 'print'
+                        class = 'submit'
+                       name  = '__action'
+                       'data-dojo-type' = 'lsmb/PrintButton'
+                       'data-dojo-props' = "minimalGET: false"
+                } %]
+        [% END # IF can_print %]
+
+  </div>
+
+ </form>
+</div>
+</body>

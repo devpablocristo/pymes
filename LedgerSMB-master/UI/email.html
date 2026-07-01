@@ -1,0 +1,171 @@
+[%
+  PROCESS elements.html;
+%]
+<body class="lsmb [% dojo_theme %]">
+<div id="email">
+<a href="[% callback %]">&lt;&lt; [% text('Return') %]</a>
+<div class="listtop">[% text('Compose e-mail') %]</div>
+<form data-dojo-type="lsmb/Form"
+      name="email"
+      method="post"
+      enctype="multipart/form-data"
+      action="email.pl">
+<div>
+  [%
+  PROCESS input element_data = {
+           name  = "from"
+           label = text("From")
+           readonly = "readonly"
+           type  = "text"
+           value = from };
+  %]
+</div>
+<div>
+  [%
+  PROCESS input element_data = {
+           name  = "to"
+           label = text("To")
+           type  = "text"
+           value = to };
+  %]
+</div>
+<div>
+  [%
+  PROCESS input element_data = {
+           name  = "cc"
+           label = text("Cc")
+           type  = "text"
+           value = cc };
+  %]
+</div>
+<div>
+  [%
+  PROCESS input element_data = {
+           name  = "bcc"
+           label = text("Bcc")
+           type  = "text"
+           value = bcc };
+  %]
+</div>
+<div>
+  [%
+  PROCESS input element_data = {
+           name  = "subject"
+           label = text("Subject")
+           type  = "text"
+           value = subject };
+  %]
+</div>
+<div>
+  [%
+  PROCESS textarea element_data = {
+           label = text("Body")
+           name  = "body"
+           type  = "text"
+           value = body };
+  %]
+</div>
+<div>
+  [%
+  PROCESS input element_data = {
+           name  = "notify"
+           label = text("Read receipt")
+           type  = "checkbox"
+           value = notify };
+  %]
+</div>
+<div style="margin-top:1em">
+[%
+
+FOR action IN actions ;
+NEXT IF action.value == 'attach';
+PROCESS button element_data = {
+name = 'wf_action'
+text = maketext(action.text)
+value = action.value
+id = 'wf-action-' _ action.value
+};
+END
+
+%]
+</div>
+
+[%
+
+IF attachments.size > 0 ;
+'<table style="margin-top:2em">
+<caption>Attachments</caption>
+<tr><th>Filename</th><th>Description</th></tr>';
+FOR att IN attachments ;
+%]
+   <tr><td><a
+        href="file.pl?__action=get&amp;file_class=8&amp;id=[% att.id %]"
+        target="_blank"
+        download="[% att.file_name %]">[% att.file_name %]</a></td><td>[% att.description %]</td></tr>
+[%
+END ; # FOR
+'</table>';
+END ; # IF
+
+
+have_attach = 0;
+FOR action IN actions ;
+  have_attach = have_attach OR action.value == 'attach';
+END ;
+
+IF have_attach ;
+%]
+
+<div style="margin-top:1em">
+  <input type="file"
+         name="attachment_content"
+         id="attachment-content">
+  <button
+    id="wf-action-attach"
+    name="wf-action"
+    value="attach"
+    data-dojo-type="dijit/form/Button">
+    [% text('Attach') %]
+  </button>
+</div>
+
+[%
+END ; # IF
+
+IF expansions.keys.size > 0 ;
+
+%]
+
+<p>[% text('The e-mail body may contain variables to be expanded - e.g. <%invnumber%> - the table below specifies the available variables and their expansions for this e-mail') %]</p>
+<table style="min-width:40em">
+  <tr>
+    <th>[% text('Variable') %]</th>
+    <th>[% text('Expansion') %]</th>
+  </tr>
+
+[%
+FOR expansion_key IN expansions.keys ;
+%]
+
+  <tr>
+    <td>[% expansion_key %]</td>
+    <td>[% expansions.$expansion_key %]</td>
+  </tr>
+
+[%
+
+END ; # FOR
+
+%]</table>[%
+
+END ; # IF
+
+%]
+
+
+  <input type="hidden" name="callback" value="[% callback %]">
+  <input type="hidden" name="id" value="[% id %]">
+  <input type="hidden" name="__action" value="render">
+</form>
+</div>
+</body>

@@ -12,6 +12,7 @@ import (
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	archive "github.com/devpablocristo/platform/lifecycle/go/archive"
 	lifecycle "github.com/devpablocristo/platform/lifecycle/go/lifecycle"
+	"github.com/devpablocristo/pymes/core/backend/internal/ledger"
 	returndomain "github.com/devpablocristo/pymes/core/backend/internal/returns/usecases/domain"
 )
 
@@ -43,11 +44,18 @@ type WebhookPort interface {
 	Enqueue(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) error
 }
 
+// LedgerPort postea la devolución (storno parcial) y su reversa. Nil-safe.
+type LedgerPort interface {
+	EnqueueReturn(ctx context.Context, evt ledger.ReturnEvent) error
+	EnqueueReversal(ctx context.Context, orgID uuid.UUID, refType string, refID uuid.UUID, targetEvent, actor string) error
+}
+
 type Usecases struct {
 	repo      RepositoryPort
 	audit     AuditPort
 	timeline  TimelinePort
 	webhooks  WebhookPort
+	ledger    LedgerPort
 	lifecycle *lifecycle.Service // optional; when nil, legacy path
 }
 
@@ -62,6 +70,9 @@ func WithLifecycle(svc *lifecycle.Service) Option {
 		}
 	}
 }
+
+// WithLedger cablea el posteo contable de devoluciones.
+func WithLedger(l LedgerPort) Option { return func(u *Usecases) { u.ledger = l } }
 
 func NewUsecases(repo RepositoryPort, audit AuditPort, timeline TimelinePort, webhooks WebhookPort, opts ...Option) *Usecases {
 	u := &Usecases{repo: repo, audit: audit, timeline: timeline, webhooks: webhooks}
@@ -187,6 +198,26 @@ func (u *Usecases) Create(ctx context.Context, in CreateReturnInput) (returndoma
 	if u.webhooks != nil {
 		_ = u.webhooks.Enqueue(ctx, in.OrgID, "return.created", map[string]any{"return_id": out.ID.String(), "sale_id": out.SaleID.String(), "refund_method": out.RefundMethod, "total": out.Total})
 	}
+	if u.ledger != nil {
+		evtLines := make([]ledger.SaleEventLine, 0, len(out.Items))
+		for _, it := range out.Items {
+			evtLines = append(evtLines, ledger.SaleEventLine{TaxRate: it.TaxRate, Subtotal: it.Subtotal})
+		}
+		_ = u.ledger.EnqueueReturn(ctx, ledger.ReturnEvent{
+			OrgID:        in.OrgID,
+			ReturnID:     out.ID,
+			SaleID:       out.SaleID,
+			Number:       out.Number,
+			OccurredAt:   out.CreatedAt,
+			RefundMethod: out.RefundMethod,
+			PartyID:      out.PartyID,
+			Subtotal:     out.Subtotal,
+			TaxTotal:     out.TaxTotal,
+			Total:        out.Total,
+			Lines:        evtLines,
+			Actor:        in.CreatedBy,
+		})
+	}
 	return out, credit, nil
 }
 
@@ -203,6 +234,9 @@ func (u *Usecases) Void(ctx context.Context, orgID, id uuid.UUID, actor string) 
 	}
 	if u.webhooks != nil {
 		_ = u.webhooks.Enqueue(ctx, orgID, "return.voided", map[string]any{"return_id": out.ID.String(), "sale_id": out.SaleID.String()})
+	}
+	if u.ledger != nil {
+		_ = u.ledger.EnqueueReversal(ctx, orgID, "return", id, "return.created", actor)
 	}
 	return out, nil
 }

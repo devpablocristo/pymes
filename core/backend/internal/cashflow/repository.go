@@ -22,7 +22,7 @@ type Repository struct {
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 type ListParams struct {
-	OrgID uuid.UUID
+	OrgID    uuid.UUID
 	BranchID *uuid.UUID
 	Limit    int
 	After    *uuid.UUID
@@ -115,7 +115,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]cashdomain.CashM
 func (r *Repository) Create(ctx context.Context, in cashdomain.CashMovement) (cashdomain.CashMovement, error) {
 	row := models.CashMovementModel{
 		ID:            uuid.New(),
-		OrgID:      in.OrgID,
+		OrgID:         in.OrgID,
 		BranchID:      normalizeBranchID(in.BranchID),
 		Type:          in.Type,
 		Amount:        in.Amount,
@@ -222,7 +222,7 @@ func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error 
 
 func (r *Repository) GetCurrency(ctx context.Context, orgID uuid.UUID) string {
 	var v string
-	if err := r.db.WithContext(ctx).Table("tenant_settings").Select("currency").Where("org_id = ?", orgID).Take(&v).Error; err != nil || strings.TrimSpace(v) == "" {
+	if err := r.db.WithContext(ctx).Table("org_settings").Select("currency").Where("org_id = ?", orgID).Take(&v).Error; err != nil || strings.TrimSpace(v) == "" {
 		return "ARS"
 	}
 	return strings.TrimSpace(v)
@@ -281,7 +281,7 @@ func (r *Repository) DailySummary(ctx context.Context, orgID uuid.UUID, branchID
 		key := day.Format("2006-01-02")
 		dr := byDay[key]
 		result = append(result, cashdomain.CashSummary{
-			OrgID:     orgID,
+			OrgID:        orgID,
 			PeriodStart:  day,
 			PeriodEnd:    day.Add(24*time.Hour - time.Nanosecond),
 			TotalIncome:  dr.Income,
@@ -296,7 +296,7 @@ func (r *Repository) DailySummary(ctx context.Context, orgID uuid.UUID, branchID
 func toDomain(row models.CashMovementModel) cashdomain.CashMovement {
 	return cashdomain.CashMovement{
 		ID:            row.ID,
-		OrgID:      row.OrgID,
+		OrgID:         row.OrgID,
 		BranchID:      row.BranchID,
 		Type:          row.Type,
 		Amount:        row.Amount,

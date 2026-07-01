@@ -1,0 +1,91 @@
+{
+    "extends": [
+        "config:recommended"
+    ],
+    "lockFileMaintenance": {
+        "enabled": true
+    },
+    "baseBranchPatterns": [
+        "master",
+        "1.13",
+        "1.12"
+    ],
+    "cpanfile": {
+        "enabled": false
+    },
+    "minimumReleaseAge": "3 days",
+    "packageRules": [
+        {
+            "matchPackageNames": [ "selenium/*" ],
+            "baseBranchPatterns": [
+                "1.12"
+            ],
+            "allowedVersions": "<4"
+        },
+        {
+            "matchManagers": [
+                "github-actions"
+            ]
+        },
+        {
+            "matchUpdateTypes": ["lockFileMaintenance"],
+            "automerge": true
+        },
+        {
+            "baseBranchPatterns": [
+                "1.12",
+                "1.13"
+            ],
+            "matchPackageNames": [ "babel*", "@babel/*" ],
+            "allowedVersions": "<8"
+        },
+        {
+           "baseBranchPatterns": [
+                "1.12",
+                "1.13"
+            ],
+           "matchPackageNames": [ "eslint", "@eslint/*" ],
+           "allowedVersions": "<10"
+        },
+        {
+            "matchUpdateTypes": [
+                "minor",
+                "patch"
+            ],
+            "groupName": "all non-major dependencies",
+            "groupSlug": "all-minor-patch",
+            "automerge": true,
+            "matchPackageNames": [
+                "*"
+            ]
+        },
+        {
+            "matchUpdateTypes": [
+                "major"
+            ],
+            "automerge": false,
+            "groupName": "all stylelint related dependencies",
+            "groupSlug": "stylelint-major",
+            "matchPackageNames": [
+                "/stylelint/"
+            ]
+        },
+        {
+            "matchUpdateTypes": [
+                "major"
+            ],
+            "automerge": false,
+            "matchPackageNames": [
+                "*"
+            ]
+        }
+    ],
+    "timezone": "Etc/Greenwich",
+    "schedule": [
+        "after 11pm on friday",
+        "before 7am on saturday"
+    ],
+    "vulnerabilityAlerts": {
+        "schedule": null
+    }
+}

@@ -43,6 +43,7 @@ export const queryKeys = {
     watchers: ['governance', 'watchers'] as const,
   },
   rbac: {
+    users: ['rbac', 'users'] as const,
     members: (tenantId: string) => ['rbac', 'members', tenantId] as const,
     invites: (tenantId: string) => ['rbac', 'invites', tenantId] as const,
     roles: ['rbac', 'roles'] as const,

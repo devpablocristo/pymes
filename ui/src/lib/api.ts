@@ -223,7 +223,7 @@ export async function getBillingStatus(): Promise<BillingStatus> {
   return request('/v1/billing/status');
 }
 
-export type TenantSummary = {
+export type OrgSummary = {
   id: string;
   slug?: string;
   name: string;
@@ -231,15 +231,28 @@ export type TenantSummary = {
   role: 'owner' | 'admin' | 'member' | string;
 };
 
+export type TenantSummary = OrgSummary;
+
+export async function listOrgs(): Promise<{ items: OrgSummary[] }> {
+  return request('/v1/orgs');
+}
+
 export async function listTenants(): Promise<{ items: TenantSummary[] }> {
-  return request('/v1/tenants');
+  return listOrgs();
+}
+
+export async function createOrg(payload: {
+  name: string;
+  slug?: string;
+}): Promise<{ org_id: string; clerk_org_id: string; slug?: string; raw_key?: string; key?: APIKeyItem }> {
+  return request('/v1/orgs', { method: 'POST', body: payload });
 }
 
 export async function createTenant(payload: {
   name: string;
   slug?: string;
 }): Promise<{ org_id: string; clerk_org_id: string; slug?: string; raw_key?: string; key?: APIKeyItem }> {
-  return request('/v1/tenants', { method: 'POST', body: payload });
+  return createOrg(payload);
 }
 
 export async function createPortal(payload: { return_url: string }): Promise<{ portal_url: string }> {
@@ -247,22 +260,22 @@ export async function createPortal(payload: { return_url: string }): Promise<{ p
 }
 
 export async function getAPIKeys(tenantID: string): Promise<{ items: APIKeyItem[] }> {
-  return request(`/v1/tenants/${tenantID}/api-keys`);
+  return request(`/v1/orgs/${tenantID}/api-keys`);
 }
 
 export async function createAPIKey(
   tenantID: string,
   payload: { name: string; scopes: string[] },
 ): Promise<{ key: APIKeyItem; raw_key: string }> {
-  return request(`/v1/tenants/${tenantID}/api-keys`, { method: 'POST', body: payload });
+  return request(`/v1/orgs/${tenantID}/api-keys`, { method: 'POST', body: payload });
 }
 
 export async function rotateAPIKey(tenantID: string, keyID: string): Promise<{ key: APIKeyItem; raw_key: string }> {
-  return request(`/v1/tenants/${tenantID}/api-keys/${keyID}/rotate`, { method: 'POST', body: {} });
+  return request(`/v1/orgs/${tenantID}/api-keys/${keyID}/rotate`, { method: 'POST', body: {} });
 }
 
 export async function deleteAPIKey(tenantID: string, keyID: string): Promise<void> {
-  await request(`/v1/tenants/${tenantID}/api-keys/${keyID}`, { method: 'DELETE' });
+  await request(`/v1/orgs/${tenantID}/api-keys/${keyID}`, { method: 'DELETE' });
 }
 
 export type InAppNotificationItem = {
@@ -312,7 +325,47 @@ export async function downloadAuditExportCsv(): Promise<string> {
   return downloadAPIFile('/v1/audit/export?format=csv');
 }
 
-export type TenantMemberRow = {
+export type OrgUser = {
+  id: string;
+  external_id: string;
+  email: string;
+  name: string;
+  given_name?: string;
+  family_name?: string;
+  avatar_url?: string | null;
+  status: 'active' | 'archived' | string;
+  deleted_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function listOrgUsers(): Promise<{ items: OrgUser[] }> {
+  return request('/v1/users');
+}
+
+export async function createOrgUser(payload: {
+  external_id?: string;
+  email: string;
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+  phone?: string;
+  avatar_url?: string | null;
+}): Promise<{ user: OrgUser }> {
+  return request('/v1/users', { method: 'POST', body: payload });
+}
+
+export async function updateOrgUser(
+  userId: string,
+  payload: Partial<Pick<OrgUser, 'external_id' | 'email' | 'name' | 'given_name' | 'family_name' | 'status'>> & {
+    phone?: string;
+    avatar_url?: string | null;
+  },
+): Promise<{ user: OrgUser }> {
+  return request(`/v1/users/${userId}`, { method: 'PATCH', body: payload });
+}
+
+export type OrgMemberRow = {
   id: string;
   org_id?: string;
   user_id: string;
@@ -322,15 +375,21 @@ export type TenantMemberRow = {
   user?: { id?: string; email?: string; name?: string; given_name?: string; family_name?: string };
 };
 
+export type TenantMemberRow = OrgMemberRow;
+
+export async function listOrgMembers(orgId: string): Promise<{ items: OrgMemberRow[] }> {
+  return request(`/v1/orgs/${orgId}/members`);
+}
+
 export async function listTenantMembers(tenantId: string): Promise<{ items: TenantMemberRow[] }> {
-  return request(`/v1/tenants/${tenantId}/members`);
+  return listOrgMembers(tenantId);
 }
 
 export async function removeTenantMember(tenantId: string, userId: string): Promise<void> {
-  await request(`/v1/tenants/${tenantId}/members/${userId}`, { method: 'DELETE' });
+  await request(`/v1/orgs/${tenantId}/members/${userId}`, { method: 'DELETE' });
 }
 
-export type TenantInvitation = {
+export type OrgInvitation = {
   id: string;
   org_id: string;
   email: string;
@@ -346,6 +405,8 @@ export type TenantInvitation = {
   updated_at: string;
 };
 
+export type TenantInvitation = OrgInvitation;
+
 export type TenantInvitationPreview = {
   org_id: string;
   tenant_slug: string;
@@ -356,31 +417,42 @@ export type TenantInvitationPreview = {
   expires_at: string;
 };
 
+export async function listOrgInvitations(orgId: string): Promise<{ items: OrgInvitation[] }> {
+  return request(`/v1/orgs/${orgId}/invitations`);
+}
+
 export async function listTenantInvites(tenantId: string): Promise<{ items: TenantInvitation[] }> {
-  return request(`/v1/tenants/${tenantId}/invites`);
+  return listOrgInvitations(tenantId);
+}
+
+export async function createOrgInvitation(
+  orgId: string,
+  payload: { email: string; role: string },
+): Promise<{ invite: OrgInvitation }> {
+  return request(`/v1/orgs/${orgId}/invitations`, { method: 'POST', body: payload });
 }
 
 export async function createTenantInvite(
   tenantId: string,
   payload: { email: string; role: string },
 ): Promise<{ invite: TenantInvitation }> {
-  return request(`/v1/tenants/${tenantId}/invites`, { method: 'POST', body: payload });
+  return createOrgInvitation(tenantId, payload);
 }
 
 export async function revokeTenantInvite(inviteId: string): Promise<{ invite: TenantInvitation }> {
-  return request(`/v1/tenant-invites/${inviteId}/revoke`, { method: 'POST', body: {} });
+  return request(`/v1/org-invitations/${inviteId}/revoke`, { method: 'POST', body: {} });
 }
 
 export async function resendTenantInvite(inviteId: string): Promise<{ invite: TenantInvitation }> {
-  return request(`/v1/tenant-invites/${inviteId}/resend`, { method: 'POST', body: {} });
+  return request(`/v1/org-invitations/${inviteId}/resend`, { method: 'POST', body: {} });
 }
 
 export async function acceptTenantInvite(token: string): Promise<{ invite: TenantInvitation; clerk_org_id: string; tenant_slug?: string }> {
-  return request('/v1/tenant-invites/accept', { method: 'POST', body: { token }, skipTenantSlug: true });
+  return request('/v1/org-invitations/accept', { method: 'POST', body: { token }, skipTenantSlug: true });
 }
 
 export async function previewTenantInvite(token: string): Promise<{ invite: TenantInvitationPreview }> {
-  return request(`/v1/tenant-invites/preview?token=${encodeURIComponent(token)}`, { skipTenantSlug: true });
+  return request(`/v1/org-invitations/preview?token=${encodeURIComponent(token)}`, { skipTenantSlug: true });
 }
 
 export async function setInitialPassword(password: string): Promise<void> {

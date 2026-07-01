@@ -1,0 +1,212 @@
+[%
+IF stand_alone ;
+PROCESS 'elements.html' ;
+END;
+IF employee.first_name or stand_alone %]
+<div id="user_div"
+     title="[% text('User') %]"
+     data-dojo-type="dijit/layout/ContentPane"
+     [% IF request.target_div == 'user_div' %]data-dojo-props="selected:true"[% END %]
+     >
+        <div class="listtop">
+            [%
+               IF request.pls_import;
+                       text('Duplicate User Found: Importing User');
+                       action = 'save_user';
+                ELSIF user.username;
+                      text('Editing User');
+                      action = 'edit_user';
+                ELSE;
+                      text('New User');
+                      action = 'save_user';
+                END %]
+        </div>
+
+    <form data-dojo-type="lsmb/Form" method="POST" action="[% request.script %]">
+        <input type="hidden" name="entity_class" value="[% entity_class %]"/>
+        <input type="hidden" name="entity_id" value="[% entity_id %]"/>
+        <input type="hidden" name="id" value="[% user.id %]" />
+        <table>
+
+          [% IF user.username and not request.pls_import %]
+            <tr>
+                <td>[% text('Username') %]</td>
+                <td>
+                    [% user.username;
+                    INCLUDE input element_data = {
+                            name  = 'username'
+                            type  = 'hidden'
+                            value = user.username
+                    };
+                    PROCESS button element_data  = {
+                         text = text('Delete User') #'
+                         name = '__action'
+                         type = 'submit'
+                        class = 'submit'
+                        value = 'delete_user'
+                }; %]
+                </td>
+            </tr>
+
+            [% ELSE %]
+            <tr>
+                <td>[% text('Username') %]</td>
+                <td>
+                    <input type="text" name="username" value="[% user.username %]" required/>
+                </td>
+            </tr>
+            [% END %]
+            <tr>
+                <td>[% text('Password') %]</td>
+                <td>
+                    [% INCLUDE input element_data = {
+                           type="password"
+                           name="reset_password"
+                           value="",
+                           attributes = { autocomplete = 'off' }
+                           } %]
+                </td>
+            </tr>
+
+            [% IF (request.pls_import == 1) OR !user.username %]
+            <tr>
+                <td>[% text('User creation') %]</td>
+                [%
+                  IF request.pls_import;
+                      importc1 = 'CHECKED';
+                      importc0 = '';
+                  ELSE;
+                      importc1 = '';
+                      importc0 = 'CHECKED';
+                  END; %]
+                <td><div class="input_line"><div overflow="auto" class="input_group">
+                            [%
+                               PROCESS input element_data = {
+                               label   = text("Create new user")
+                               value   = '0'
+                               checked = 'CHECKED'
+                               name    = 'pls_import'
+                               type    = 'radio'
+                               }
+                               label_pos = 1 ;
+                               %]
+                    </div><div overflow="auto"
+                               class="input_group">
+                      [%
+                         PROCESS input element_data = {
+                         label   = text("Import existing user")
+                         value   = '1'
+                         checked = ''
+                         name    = 'pls_import'
+                         type    = 'radio'
+                         }
+                         label_pos = 1 ; %]
+                  </div></div>
+                  <div data-dojo-type="dijit/Tooltip"
+       data-dojo-props="connectId:'pls-import-1',position:['below']">
+    <div style="width:30em">
+      <b>Import an existing user (from another database)</b><br /><br />
+      This username exists because it is being used with another database;
+      using it with the current database requires it to be <em>imported</em>.
+      <br /><br />
+      Note that technically any existing PostgreSQL &quot;role&quot; that is to
+      be used as a username needs to be imported this way, regardless of whether
+      it is a username in a different database.
+    </div>
+  </div>
+  <div data-dojo-type="dijit/Tooltip"
+       data-dojo-props="connectId:'pls-import-0'">
+    <div style="width:30em">
+      <b>Creates a new user</b><br />
+      This username <em>must not</em> be used by any of the other databases. If
+      you want to use a username that is already used with another database,
+      you can do so by selecting the <b>Import</b> option.
+    </div>
+  </div>
+</td>
+            </tr>
+            [% END # unless employee.entity_id %]
+        </table>
+           [% IF user.username and not request.pls_import;
+                PROCESS button element_data  = {
+                         text = text('Reset Password') #'
+                         name = '__action'
+                         type = 'submit'
+                        class = 'submit'
+                        value = 'reset_password'
+                };
+           ELSE;
+                PROCESS button element_data  = {
+                         text = text('Add User') #'
+                         name = '__action'
+                         type = 'submit'
+                        class = 'submit'
+                        value = 'create_user'
+                };
+           END;
+                PROCESS input element_data = {
+                         type = 'hidden'
+                         name = 'form_id'
+                        value = form_id
+                };
+    %]
+    </form>
+    [% IF user.entity_id and not request.pls_import%]
+        <hr />
+        <form data-dojo-type="lsmb/Form" name="groups" method="POST" action="[% request.script %]">
+            <input type="hidden" name="entity_class" value="[% entity_class %]" />
+            <input type="hidden" name="entity_id" value="[% entity_id %]" />
+            <input type="hidden" name="id" value="[% user.id %]" />
+            [% PROCESS input element_data = {
+               type="hidden"
+               name="user_id"
+               value=user.id
+              };
+                PROCESS input element_data = {
+                         type = 'hidden'
+                         name = 'form_id'
+                        value = form_id
+                };
+           %]
+
+            <table>
+                <!-- Groups section -->
+                <tr>
+                [% FOREACH role IN roles %]
+                    <td>
+                        [% rolcheck = undef;
+                           IF user.role_list.grep(role.rolname).size;
+                              rolcheck = "checked";
+                           END %]
+                        [% PROCESS input element_data = {
+                               type = "checkbox"
+                               title = role.description
+                               label = role.description
+                               value = 1
+                               name = "role__" _ role.rolname
+                               id = role.rolname
+                               checked = rolcheck
+                         }, label_pos = 1 %]
+                    </td>
+                [% IF loop.even() %]
+                </tr>
+                <tr>
+                [% END %]
+                [% END %]
+                </tr>
+            </table>
+
+            <table>
+                <tr>
+                    <td>[% PROCESS button element_data = {
+                          text = text('Save Groups') #'
+                          class = "submit"
+                          name = "__action"
+                          value = "save_roles"
+                    } %]</td>
+                </tr>
+            </table>
+        </form>
+[% END %]
+</div>
+[% END %]

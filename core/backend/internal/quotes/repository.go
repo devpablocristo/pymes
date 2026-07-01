@@ -80,7 +80,7 @@ func (r *Repository) GetServiceSnapshot(ctx context.Context, orgID, serviceID uu
 func (r *Repository) GetTenantSettings(ctx context.Context, orgID uuid.UUID) (currency string, taxRate float64, quotePrefix string, err error) {
 	var row tenantBusinessSettings
 	err = r.db.WithContext(ctx).
-		Table("tenant_settings").
+		Table("org_settings").
 		Select("currency, tax_rate, quote_prefix, next_quote_number").
 		Where("org_id = ?", orgID).
 		Take(&row).Error
@@ -106,7 +106,7 @@ type CreateItemInput struct {
 }
 
 type CreateInput struct {
-	OrgID     uuid.UUID
+	OrgID        uuid.UUID
 	BranchID     *uuid.UUID
 	CustomerID   *uuid.UUID
 	CustomerName string
@@ -134,7 +134,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (quotedomain.Qu
 		number := fmt.Sprintf("%s-%05d", tenant.QuotePrefix, tenant.NextQuoteNumber)
 		quoteRow := models.QuoteModel{
 			ID:           uuid.New(),
-			OrgID:     in.OrgID,
+			OrgID:        in.OrgID,
 			BranchID:     in.BranchID,
 			Number:       number,
 			CustomerID:   in.CustomerID,
@@ -178,7 +178,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (quotedomain.Qu
 			}
 		}
 
-		if err := tx.Table("tenant_settings").Where("org_id = ?", in.OrgID).
+		if err := tx.Table("org_settings").Where("org_id = ?", in.OrgID).
 			Updates(map[string]any{
 				"next_quote_number": tenant.NextQuoteNumber + 1,
 				"updated_at":        gorm.Expr("now()"),
@@ -196,7 +196,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (quotedomain.Qu
 }
 
 type ListParams struct {
-	OrgID   uuid.UUID
+	OrgID      uuid.UUID
 	BranchID   *uuid.UUID
 	Limit      int
 	After      *uuid.UUID
@@ -295,7 +295,7 @@ func (r *Repository) GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quo
 }
 
 type UpdateInput struct {
-	OrgID     uuid.UUID
+	OrgID        uuid.UUID
 	ID           uuid.UUID
 	CustomerID   *uuid.UUID
 	CustomerName string
@@ -461,7 +461,7 @@ func (r *Repository) SetStatus(ctx context.Context, orgID, quoteID uuid.UUID, st
 
 func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx *gorm.DB, orgID uuid.UUID) (tenantBusinessSettings, error) {
 	var tenant tenantBusinessSettings
-	err := tx.WithContext(ctx).Table("tenant_settings").
+	err := tx.WithContext(ctx).Table("org_settings").
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Select("currency, tax_rate, quote_prefix, next_quote_number").
 		Where("org_id = ?", orgID).Take(&tenant).Error
@@ -474,7 +474,7 @@ func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx 
 	}
 
 	if err := tx.WithContext(ctx).Exec(`
-		INSERT INTO tenant_settings (
+		INSERT INTO org_settings (
 			org_id, plan_code, hard_limits, currency, tax_rate, quote_prefix, sale_prefix,
 			next_quote_number, next_sale_number, allow_negative_stock, created_at, updated_at
 		)
@@ -483,7 +483,7 @@ func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx 
 	`, orgID).Error; err != nil {
 		return tenantBusinessSettings{}, err
 	}
-	if err := tx.WithContext(ctx).Table("tenant_settings").
+	if err := tx.WithContext(ctx).Table("org_settings").
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Select("currency, tax_rate, quote_prefix, next_quote_number").
 		Where("org_id = ?", orgID).Take(&tenant).Error; err != nil {
@@ -505,7 +505,7 @@ func (r *Repository) syncNextQuoteNumber(ctx context.Context, tx *gorm.DB, orgID
 	}
 	if tenant.NextQuoteNumber <= maxExisting {
 		tenant.NextQuoteNumber = maxExisting + 1
-		if err := tx.WithContext(ctx).Table("tenant_settings").
+		if err := tx.WithContext(ctx).Table("org_settings").
 			Where("org_id = ?", orgID).
 			Updates(map[string]any{
 				"next_quote_number": tenant.NextQuoteNumber,
@@ -567,7 +567,7 @@ func quoteToDomain(quoteRow models.QuoteModel, itemRows []models.QuoteItemModel)
 	}
 	return quotedomain.Quote{
 		ID:           quoteRow.ID,
-		OrgID:     quoteRow.OrgID,
+		OrgID:        quoteRow.OrgID,
 		BranchID:     quoteRow.BranchID,
 		Number:       quoteRow.Number,
 		CustomerID:   quoteRow.CustomerID,

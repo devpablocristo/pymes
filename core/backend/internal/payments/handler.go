@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/platform/http/go/pagination"
 	crudpaths "github.com/devpablocristo/platform/features/crud/paths/go/paths"
+	"github.com/devpablocristo/platform/http/go/pagination"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -19,8 +19,10 @@ import (
 
 type usecasesPort interface {
 	ListSalePayments(ctx context.Context, orgID, saleID uuid.UUID) ([]paymentsdomain.Payment, error)
+	ListPurchasePayments(ctx context.Context, orgID, purchaseID uuid.UUID) ([]paymentsdomain.Payment, error)
 	ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]paymentsdomain.Payment, error)
 	CreateSalePayment(ctx context.Context, orgID, saleID uuid.UUID, in paymentsdomain.Payment) (paymentsdomain.Payment, error)
+	CreatePurchasePayment(ctx context.Context, orgID, purchaseID uuid.UUID, in paymentsdomain.Payment) (paymentsdomain.Payment, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (paymentsdomain.Payment, error)
 	Update(ctx context.Context, in paymentsdomain.Payment, actor string) (paymentsdomain.Payment, error)
 	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
@@ -35,6 +37,8 @@ func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
 	auth.GET("/sales/:id/payments", rbac.RequirePermission("payments", "read"), h.ListSalePayments)
 	auth.POST("/sales/:id/payments", rbac.RequirePermission("payments", "create"), h.CreateSalePayment)
+	auth.GET("/purchases/:id/payments", rbac.RequirePermission("payments", "read"), h.ListPurchasePayments)
+	auth.POST("/purchases/:id/payments", rbac.RequirePermission("payments", "create"), h.CreatePurchasePayment)
 
 	// CRUD canónico sobre recursos payments standalone (para la vista "Pagos" del frontend).
 	const base = "/payments"
@@ -88,6 +92,52 @@ func (h *Handler) CreateSalePayment(c *gin.Context) {
 		isFavorite = *req.IsFavorite
 	}
 	out, err := h.uc.CreateSalePayment(c.Request.Context(), orgID, saleID, paymentsdomain.Payment{Method: req.Method, Amount: req.Amount, Notes: strings.TrimSpace(req.Notes), ReceivedAt: receivedAt, IsFavorite: isFavorite, Tags: req.Tags, CreatedBy: authCtx.Actor})
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, toPaymentItem(out))
+}
+
+func (h *Handler) ListPurchasePayments(c *gin.Context) {
+	authCtx := handlers.GetAuthContext(c)
+	orgID, purchaseID, ok := parseOrgSale(c, authCtx.OrgID)
+	if !ok {
+		return
+	}
+	items, err := h.uc.ListPurchasePayments(c.Request.Context(), orgID, purchaseID)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	handlers.WriteListResponse(c, items, int64(len(items)), false, "")
+}
+
+func (h *Handler) CreatePurchasePayment(c *gin.Context) {
+	authCtx := handlers.GetAuthContext(c)
+	orgID, purchaseID, ok := parseOrgSale(c, authCtx.OrgID)
+	if !ok {
+		return
+	}
+	var req dto.CreatePaymentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handlers.WriteValidation(c, "invalid request body")
+		return
+	}
+	receivedAt := time.Now().UTC()
+	if strings.TrimSpace(req.ReceivedAt) != "" {
+		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(req.ReceivedAt))
+		if err != nil {
+			handlers.WriteValidation(c, "invalid received_at")
+			return
+		}
+		receivedAt = parsed.UTC()
+	}
+	isFavorite := false
+	if req.IsFavorite != nil {
+		isFavorite = *req.IsFavorite
+	}
+	out, err := h.uc.CreatePurchasePayment(c.Request.Context(), orgID, purchaseID, paymentsdomain.Payment{Method: req.Method, Amount: req.Amount, Notes: strings.TrimSpace(req.Notes), ReceivedAt: receivedAt, IsFavorite: isFavorite, Tags: req.Tags, CreatedBy: authCtx.Actor})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -255,7 +305,7 @@ func parsePaymentOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 func toPaymentItem(in paymentsdomain.Payment) dto.PaymentItem {
 	out := dto.PaymentItem{
 		ID:            in.ID.String(),
-		OrgID:      in.OrgID.String(),
+		OrgID:         in.OrgID.String(),
 		ReferenceType: in.ReferenceType,
 		ReferenceID:   in.ReferenceID.String(),
 		Method:        in.Method,

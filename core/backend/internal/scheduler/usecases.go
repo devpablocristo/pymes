@@ -13,8 +13,8 @@ import (
 
 	"github.com/devpablocristo/platform/concurrency/go/resilience"
 	"github.com/devpablocristo/platform/errors/go/domainerr"
-	"github.com/devpablocristo/platform/http/go/httpclient"
 	schedulingdomain "github.com/devpablocristo/platform/features/scheduling/go/domain"
+	"github.com/devpablocristo/platform/http/go/httpclient"
 	schedulerdomain "github.com/devpablocristo/pymes/core/backend/internal/scheduler/usecases/domain"
 )
 
@@ -47,6 +47,11 @@ type EmailSenderPort interface {
 	Send(ctx context.Context, to, subject, htmlBody, textBody string) error
 }
 
+// LedgerTaskPort drena el outbox contable (posteo de asientos diferido).
+type LedgerTaskPort interface {
+	ProcessDueOutbox(ctx context.Context, orgFilter *uuid.UUID, limit int) (posted, failed, skipped int, err error)
+}
+
 type Usecases struct {
 	repo            RepositoryPort
 	provider        string
@@ -56,11 +61,18 @@ type Usecases struct {
 	scheduling      SchedulingTaskPort
 	emailSender     EmailSenderPort
 	publicBaseURL   string
+	ledger          LedgerTaskPort
 }
+
+// Option configura dependencias opcionales del scheduler sin romper la firma.
+type Option func(*Usecases)
+
+// WithLedger cablea el drenado del outbox contable (task ledger_post).
+func WithLedger(l LedgerTaskPort) Option { return func(u *Usecases) { u.ledger = l } }
 
 type RecurringDue struct {
 	ID            uuid.UUID
-	OrgID      uuid.UUID
+	OrgID         uuid.UUID
 	Description   string
 	Amount        float64
 	Currency      string
@@ -72,7 +84,7 @@ type RecurringDue struct {
 }
 
 type SchedulingReminderDue struct {
-	OrgID      uuid.UUID
+	OrgID         uuid.UUID
 	TenantSlug    string
 	BookingID     uuid.UUID
 	CustomerName  string
@@ -83,8 +95,8 @@ type SchedulingReminderDue struct {
 	StartAt       time.Time
 }
 
-func NewUsecases(repo RepositoryPort, provider string, webhooks WebhookTaskPort, paymentGateways PaymentGatewayTaskPort, scheduling SchedulingTaskPort, emailSender EmailSenderPort, publicBaseURL string) *Usecases {
-	return &Usecases{
+func NewUsecases(repo RepositoryPort, provider string, webhooks WebhookTaskPort, paymentGateways PaymentGatewayTaskPort, scheduling SchedulingTaskPort, emailSender EmailSenderPort, publicBaseURL string, opts ...Option) *Usecases {
+	uc := &Usecases{
 		repo:     repo,
 		provider: strings.ToLower(strings.TrimSpace(provider)),
 		caller: &httpclient.Caller{
@@ -96,6 +108,10 @@ func NewUsecases(repo RepositoryPort, provider string, webhooks WebhookTaskPort,
 		emailSender:     emailSender,
 		publicBaseURL:   strings.TrimRight(strings.TrimSpace(publicBaseURL), "/"),
 	}
+	for _, opt := range opts {
+		opt(uc)
+	}
+	return uc
 }
 
 func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunResult, error) {
@@ -103,7 +119,7 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 	if task == "" {
 		task = "all"
 	}
-	if task != "all" && task != "exchange_rates" && task != "recurring_expenses" && task != "retry_webhooks" && task != "cleanup_webhook_deliveries" && task != "payment_gateway_webhooks" && task != "scheduling_holds" && task != "scheduling_reminders" && task != "scheduling_waitlist" {
+	if task != "all" && task != "exchange_rates" && task != "recurring_expenses" && task != "retry_webhooks" && task != "cleanup_webhook_deliveries" && task != "payment_gateway_webhooks" && task != "scheduling_holds" && task != "scheduling_reminders" && task != "scheduling_waitlist" && task != "ledger_post" {
 		return schedulerdomain.RunResult{}, domainerr.Validation("invalid task")
 	}
 	result := schedulerdomain.RunResult{Task: task, Metadata: map[string]any{}}
@@ -169,6 +185,21 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 		}
 		result.Metadata["payment_gateway_events_processed"] = processed
 		if recErr := u.repo.RecordRun(ctx, "payment_gateway_webhooks", "ok", "", time.Now().UTC().Add(5*time.Minute)); recErr != nil {
+			slog.Error("failed to record scheduler run", "error", recErr)
+		}
+	}
+	if u.ledger != nil && (task == "all" || task == "ledger_post") {
+		posted, failed, skipped, err := u.ledger.ProcessDueOutbox(ctx, nil, 500)
+		if err != nil {
+			if recErr := u.repo.RecordRun(ctx, "ledger_post", "error", err.Error(), time.Now().UTC().Add(5*time.Minute)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
+			return schedulerdomain.RunResult{}, err
+		}
+		result.Metadata["ledger_posted"] = posted
+		result.Metadata["ledger_failed"] = failed
+		result.Metadata["ledger_skipped"] = skipped
+		if recErr := u.repo.RecordRun(ctx, "ledger_post", "ok", "", time.Now().UTC().Add(5*time.Minute)); recErr != nil {
 			slog.Error("failed to record scheduler run", "error", recErr)
 		}
 	}

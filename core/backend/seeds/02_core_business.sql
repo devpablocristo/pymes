@@ -238,7 +238,7 @@ BEGIN
         (uuid_generate_v5(v_tenant, 'pymes-seed/v1/cash-move/3'), v_tenant, 'income', 8833, 'ARS', 'sale', 'Seed sale income', 'card', 'sale', sale3, 'seed')
     ON CONFLICT (id) DO NOTHING;
 
-    UPDATE tenant_settings
+    UPDATE org_settings
        SET currency = 'ARS',
            tax_rate = 21.00,
            quote_prefix = 'PRE',

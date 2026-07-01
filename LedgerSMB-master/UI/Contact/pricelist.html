@@ -1,0 +1,135 @@
+[% PROCESS 'elements.html' %]
+[% PROCESS 'dynatable.html' %]
+<!--
+
+The overall structure here is imagined to be a list of individual price
+listings followed by the listings for the pricegroup.  The reason for including
+both is simply that it makes it easier for someone to see what's going on when
+checking a price deal for a customer.
+
+-CT
+
+-->
+[% account_class = entity_class %]
+<body class="lsmb [% dojo_theme %]">
+<div class="listtop">[% text('Pricelist') %] [% pricematrix.length %]</div>
+[%
+    columns = [
+              { col_id = 'parts_id',
+                  type = 'hidden' },
+              { col_id = 'int_partnumber'
+                  name = text('Partnumber')
+                  type = 'text'
+                },
+                { col_id = 'description'
+                  name = text('Description')
+                  type = 'text'
+                } ];
+     IF account_class == 1;
+         columns.push(
+                  {col_id = 'lastcost'
+                     name = text('Last Cost') #'
+                     type = 'text_input'},
+                  {col_id = 'partnumber',
+                     name = text('Vendor Partnumber') #'
+                     type = 'text_input'},
+                  {col_id = 'leadtime',
+                     name = text('Lead Time') #'
+                     type = 'input_text'}
+         );
+     ELSE;
+         columns.push(
+                  {col_id = 'sellprice'
+                     name = text('Sell Price') #'
+                     type = 'input_text'},
+                  {col_id = 'validfrom',
+                     name = text('Valid From') #'
+                     type = 'input_text'},
+                  {col_id = 'validto',
+                     name = text('Valid To') #'
+                     type = 'input_text'},
+                  {col_id = 'qty',
+                     name = text('Min Qty') #'
+                     type = 'input_text'},
+         );
+     END;
+     columns.push({col_id = 'currency',
+                     name = text('Currency'),
+                     type = 'text'},
+                  {col_id = 'delete',
+                     name = '&nbsp;',
+                     type = 'href',
+                href_base = script _ '?action=delete_pricelist&amp;credit_id='
+                            _ id _ '&amp;entry_id=' }
+     );
+     FOREACH pm IN pricematrix;
+         pm.delete = '[' _ text('Delete') _ ']';
+         pm.row_id = pm.entry_id;
+     END %]
+<form data-dojo-type="lsmb/Form" name="pricematrix" action="[% script %]" method="post">
+ [% PROCESS input element_data = {
+        type="hidden"
+        name="entity_class"
+        value=account_class } %]
+ [% PROCESS input element_data = {
+        type="hidden"
+        name="credit_id"
+        value=credit_id } %]
+ [% PROCESS input element_data = {
+        type="hidden"
+        name="entity_id"
+        value=entity_id } %][%
+      PROCESS dynatable
+    attributes = { id = 'pricematrix' }
+         tbody = { rows = pricematrix }
+         tfoot = { coltypes = { int_partnumber = 'input_text',
+                                   description = 'text',
+                              },
+                   dojo_type = { int_partnumber = "lsmb/parts/PartSelector" },
+                   dojo_props = { int_partnumber = "required: false" },
+                   rows = [{}]} %]
+[% PROCESS button element_data = {
+    type = "submit"
+   class = "submit"
+    name = "__action"
+   value = "save_pricelist"
+    text = text('Save')
+ 'data-lsmb-doing' = text('Saving...')
+  'data-lsmb-done' = text('Saved')
+} ;
+
+FORMATS = LIST_FORMATS();
+
+IF FORMATS.grep('PDF').size() %] <a href="[% request.script %]?__action=get_pricelist&amp;format=PDF&amp;credit_id=[%
+             credit_id %]&amp;entity_id=[% entity_id
+     %]">[[% text('PDF') %]]</a>
+[% END;
+
+IF FORMATS.grep('XLS').size()
+%] <a href="[% request.script %]?__action=get_pricelist&amp;format=XLS&amp;credit_id=[%
+             credit_id %]&amp;entity_id=[% entity_id
+     %]">[[% text('XLS') %]]</a>
+[% END;
+
+IF FORMATS.grep('XLSX').size()
+%] <a href="[% request.script %]?__action=get_pricelist&amp;format=XLSX&amp;credit_id=[%
+             credit_id %]&amp;entity_id=[% entity_id
+     %]">[[% text('XLSX') %]]</a>
+[% END;
+
+IF FORMATS.grep('ODS').size()
+%] <a href="[% request.script %]?__action=get_pricelist&amp;format=ODS&amp;credit_id=[%
+             credit_id %]&amp;entity_id=[% entity_id
+     %]">[[% text('ODS') %]]</a>
+[% END %]
+ <a href="[% request.script %]?__action=get_pricelist&amp;format=CSV&amp;credit_id=[%
+             credit_id %]&amp;entity_id=[% entity_id
+     %]">[[% text('CSV') %]]</a>
+[% IF pricematrix_pricegroup;
+     PROCESS dynatable
+       attributes = { id = 'pricematrixgroup'
+                      input_prefix = 'grp_' }
+         tbody = { rows = pricematrix_pricegroup };
+       END %]
+</form>
+</body>

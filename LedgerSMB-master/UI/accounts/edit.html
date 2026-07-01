@@ -1,0 +1,672 @@
+[%
+    PROCESS elements.html;
+
+    # Build text for dropdown options
+    FOREACH h IN form.all_headings;
+        h.text = h.accno _ '--' _ h.description;
+    END;
+
+    null_heading = [{
+        id = -1,
+        text = '-- ' _ text('NONE') _ ' --'
+    }];
+%]
+<body class="lsmb [% dojo_theme %]">
+<div id="account-tabs"
+     data-dojo-type="dijit/layout/TabContainer"
+     data-dojo-props="doLayout:false">
+[% IF form.charttype == 'H'; %]
+<div data-dojo-type="dijit/layout/ContentPane"
+     data-dojo-props="selected:true"
+     title="[% text('Heading') %]" id="H">
+  [% # if we put the FORM tag as the toplevel tab element,
+         # we get trouble: content gets cut off; wrap in a div
+         # although maybe the point is not to have the toplevel
+         # be a *widget*...?  %]
+  <div>
+<form data-dojo-type="lsmb/Form" method="post" action="account.pl">
+[% PROCESS input element_data = {
+        value = 'H'
+        name = 'charttype'
+        type = 'hidden'
+} %]
+[% PROCESS input element_data = {
+        value = form.id
+        name = 'id'
+        type = 'hidden'
+} %]
+<div class="inputline" id="accno-line">
+  <label class="line" for="accno-h">[% text('Account Number') %]</label>
+  <div class="inputgroup">
+    [%
+    INCLUDE input element_data = {
+      name = 'accno'
+       id  = 'accno-h'
+      size = '20'
+     value = form.accno
+      type = 'text'
+     class = 'control-code'
+    } %]
+  </div>
+</div>
+<div class="inputline" id="desc-line">
+   <label class="line" for="desc-h">[% text('Description') %]</label>
+   <div class="inputgroup">
+      [%
+    INCLUDE input element_data = {
+        id = 'desc-h'
+      name = 'description'
+      size = '40'
+     value = form.description
+      type = 'text'
+     class = 'description'
+    } %]
+   </div>
+</div>
+<div class="inputline" id="heading-line">
+   <label class="line">[% text('Heading') %]</label>
+   <div class="inputgroup">
+      [%
+    INCLUDE select element_data = {
+                  name = 'parent'
+               options = null_heading.merge(form.all_headings)
+        default_values = [form.parent_id]
+             text_attr = 'text'
+            value_attr = 'id'
+                 class = 'account'
+                    id = 'parent'
+    }; %]
+   </div>
+</div>
+<hr size="3" noshade="noshade" />
+
+[%
+    INCLUDE button element_data={
+       name = '__action',
+       value = 'save'
+       text = text('Save')
+       'data-lsmb-doing' = text('Saving...')
+       'data-lsmb-done' = text('Saved')
+    };
+
+    IF form.id;
+        INCLUDE button element_data={
+           name = '__action',
+           value = 'save_as_new'
+           text = text('Save as new')
+        };
+    END;
+
+    IF form.orphaned;
+        INCLUDE button element_data={
+           name = '__action',
+           value = 'delete'
+           text = text('Delete')
+           'data-lsmb-doing' = text('Deleting...')
+           'data-lsmb-done' = text('Deleted')
+        };
+    END;
+%]
+
+<hr />
+</form>
+</div>
+</div>
+[% END %]
+[% IF form.charttype == 'A' %]
+<div data-dojo-type="dijit/layout/ContentPane"
+     data-dojo-props="selected:true"
+     title="[% text('Account') %]" id="A">
+  <div>
+<form data-dojo-type="lsmb/Form" method="post" action="account.pl">
+[% PROCESS input element_data = {
+        value = 'A'
+        name = 'charttype'
+        type = 'hidden'
+} %]
+<div class="inputline" id="accno-line2">
+  <label class="line" for="accno-a">[% text('Account Number') %]</label>
+  <div class="inputgroup">
+    [%
+    INCLUDE input element_data = {
+      name = 'accno'
+      size = '20'
+     value = form.accno
+      type = 'text'
+     class = 'control-code'
+        id = "accno-a"
+    } %]
+  </div>
+</div>
+<div class="inputline" id="desc-line2">
+   <label class="line" for="desc-a">[% text('Description') %]</label>
+   <div class="inputgroup">
+      [%
+    INCLUDE input element_data = {
+      name = 'description'
+      size = '40'
+     value = form.description
+      type = 'text'
+     class = 'description'
+        id = 'desc-a'
+    } %]
+   </div>
+</div>
+<div class="inputline" id="acctype-line">
+   <label class="line" for="category-a">[% text('Account Type') %]</label>
+   <div class="inputgroup">
+      [%
+        a_types = [
+              { value = 'A', text = text('Asset') }
+              { value = 'L', text = text('Liability') }
+              { value = 'Q', text = text('Equity') }
+              { value = 'Qt', text = text('Equity (Temporary)') } #'
+              { value = 'I', text = text('Income') }
+              { value = 'E', text = text('Expense') }
+        ];
+    INCLUDE select element_data = {
+                  name = 'category'
+               options = a_types
+        default_values = [form.category]
+                    id = 'category-a'
+    }; %]
+  </div>
+</div>
+<div class="inputline" id="heading-line2">
+   <label class="line" for="heading-a">[% text('Heading') %]</label>
+   <div class="inputgroup">
+      [%
+    INCLUDE select element_data = {
+                  name = 'heading'
+               options = form.all_headings
+        default_values = [form.heading]
+             text_attr = 'text'
+            value_attr = 'id'
+                 class = 'account'
+                    id = 'heading-a'
+    }; %]
+   </div>
+</div>
+<div class="inputline" id="heading-line2">
+   <label class="line" for="heading-a" title="[% text('Heading for negative assets reclassified as (positive) liabilities or the other way around') %]">[% text('Negative balance heading') %]</label>
+   <div class="inputgroup">
+      [%
+    INCLUDE select element_data = {
+                  name = 'heading_negative_balance'
+               options = form.all_headings
+         default_blank = 1
+        default_values = [form.heading_negative_balance]
+             text_attr = 'text'
+            value_attr = 'id'
+                 class = 'account'
+    }; %]
+   </div>
+</div>
+<fieldset id="accdetails" style="border:1px solid lightgrey;border-radius:4px;margin-top:2em;padding:1em;width:max-content">
+  <legend style="padding-left:1em;padding-right:1em;font-size:120%;font-weight:bold">Configuration</legend>
+<div class="inputline" id="summary-line">
+    <label class="line" for="summary-a">[% text('Summary account for') %]</label>
+    <div class="inputgroup">
+    [%
+        summary = [];
+
+        # Localize summary account_link descriptions
+        FOREACH account_link IN form.summary_link_descriptions;
+            IF account_link.description == 'IC';
+                # Retain historic override for Inventory
+                account_link.text = text('Inventory');
+            ELSE;
+                account_link.text = maketext(account_link.description);
+            END;
+
+            IF form.${account_link.description};
+                summary = account_link.description;
+            END;
+        END;
+
+        INCLUDE select element_data = {
+                   name = "summary"
+                options = form.summary_link_descriptions
+         default_values = summary
+          default_blank = 'true'
+              text_attr = 'text',
+             value_attr = 'description'
+                     id = 'summary-a'
+        };
+    %]
+    </div>
+</div>
+[% IF gifis.size > 0 -%]
+<div class="inputline" id="gifi-line">
+   <label class="line" for="gifi-a">[% text('GIFI') %]</label>
+   <div class="inputgroup">
+       [%
+          FOREACH g IN gifis;
+             g.text = g.accno _ '--' _ g.description;
+          END;
+
+          INCLUDE select element_data={
+              name = 'gifi_accno'
+              default_values = [form.gifi_accno]
+              default_blank = 1
+              options = gifis
+              text_attr = 'text'
+              value_attr = 'accno'
+              id = 'gifi-a'
+          };
+       %]
+   </div>
+</div>
+[% END -%]
+<div class="inputline" id="acc-options-line">
+   <label class="line">[% text('Options') %]</label>
+   <div class="inputgroup">
+       [%
+       IF form.contra;
+          contra = 'CHECKED';
+       END;
+       INCLUDE input element_data = {
+               type = 'checkbox'
+               name = 'contra'
+              label = text('Contra')
+              value = '1'
+            checked = contra
+       } %]
+   </div>
+   <div class="inputgroup">
+     [%
+        INCLUDE input element_data={
+               name = 'recon'
+               type = 'checkbox',
+              label = text('Recon')
+            checked = form.account__is_recon ? 'checked' : ''
+              value = '1'
+        } %]
+   </div>
+   <div class="inputgroup">
+      [%
+        IF form.tax; tax = 'CHECKED'; END;
+        INCLUDE input element_data={
+               name = 'tax',
+               type = 'checkbox',
+              label = text('Tax'),
+            checked = tax,
+              value = '1'} %]
+   </div>
+   <div class="inputgroup">
+      [%
+        IF form.AR OR form.AP;
+            form.open_items = 1;
+            disabled = 'DISABLED';
+        ELSE;
+            disabled = '';
+        END;
+        IF form.open_items; open_items = 'CHECKED'; END;
+        INCLUDE input element_data={
+               name = 'open_items',
+               type = 'checkbox',
+              label = text('Open items'),
+            checked = open_items,
+           disabled = disabled,
+              value = '1'} %]
+   </div>
+[% IF form.id %]
+   <div  class="inputgroup">
+     [%
+        INCLUDE input element_data={
+               name = 'obsolete'
+               type = 'checkbox'
+              label = text('Obsolete')
+            checked = form.obsolete ? 'checked' : ''
+              value = '1'
+        } %]
+   </div>
+[% END #  IF ID %]
+</div>
+[% IF form.custom_link_descriptions.size %]
+<div class="inputline" id="acc-custom-flags-line">
+    <label class="line">[% text('Custom Flags') %]</label>
+    [% FOREACH link IN form.custom_link_descriptions %]
+    <div class="inputgroup">
+        [% INCLUDE input element_data={
+              name = link.description,
+              type = 'checkbox',
+             label = link.description,
+           checked = form.${link.description} ? 'CHECKED' : '',
+             value = link.description
+        } %]
+    </div>
+    [% END %]
+</div>
+[% END %]
+</fieldset> <!-- account details div -->
+<fieldset id="dropdowns" style="border:1px solid lightgrey;border-radius:4px;margin-top:2em;padding:1em;width:max-content">
+<legend class="subsectionhead" style="padding-left:1em;padding-right:1em;font-size:120%;font-weight:bold">
+   [% text('Include in drop-down menus') %]
+</legend>
+<div class="inputline" id="ar-line">
+   <label class="line">[% text('Receivables') %]</label>
+   <div class="inputgroup">
+      [% IF form.AR_amount; AR_amount = 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'AR_amount',
+              type = 'checkbox',
+             label = text('Income'),
+           checked = AR_amount,
+             value = 'AR_amount'
+         } %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.AR_paid; AR_paid = 'CHECKED'; END;
+          INCLUDE input element_data={
+              name = 'AR_paid',
+              type = 'checkbox',
+             label = text('Payment'),
+           checked = AR_paid,
+             value = 'AR_paid'
+     } %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.AR_tax; AR_tax = 'CHECKED'; END;
+          INCLUDE input element_data={
+              name = 'AR_tax',
+              type = 'checkbox',
+             label = text('Tax'),
+           checked = AR_tax,
+             value = 'AR_tax'
+     } %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.AR_overpayment; AR_overpayment = 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'AR_overpayment',
+              type = 'checkbox',
+             label = text('Overpayment'),
+           checked = AR_overpayment,
+             value = 'AR_overpayment'
+       } %]
+   </div>
+   <div class="inputgroup">
+       [% IF form.AR_discount; AR_discount = 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'AR_discount',
+              type = 'checkbox',
+             label = text('Discount'),
+           checked = AR_discount,
+             value = 'AR_discount'
+        } %]
+   </div>
+</div>
+<div class="inputline" id="ap-line">
+   <label class="line">[% text('Payables') %]</label>
+   <div class="inputgroup">
+      [% IF form.AP_amount; AP_amount= 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'AP_amount',
+              type = 'checkbox',
+             label = text('Expense/Asset'),
+           checked = AP_amount,
+             value = 'AP_amount'} %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.AP_paid; AP_paid= 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'AP_paid',
+              type = 'checkbox',
+             label = text('Payment'),
+           checked = AP_paid,
+             value = 'AP_paid'} %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.AP_tax; AP_tax = 'CHECKED'; END;
+          INCLUDE input element_data={
+              name = 'AP_tax',
+              type = 'checkbox',
+             label = text('Tax'),
+           checked = AP_tax,
+             value = 'AP_tax'
+     } %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.AP_overpayment; AP_overpayment= 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'AP_overpayment',
+              type = 'checkbox',
+             label = text('Overpayment'),
+           checked = AP_overpayment,
+             value = 'AP_overpayment'} %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.AP_discount; AP_discount= 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'AP_discount',
+              type = 'checkbox',
+             label = text('Discount'),
+           checked = AP_discount,
+             value = 'AP_discount'} %]
+   </div>
+</div>
+<div class="inputline" id="goods-line">
+   <label class="line">[% text('Tracking Items') %]</label>
+   <div class="inputgroup">
+      [% IF form.IC_sale; IC_sale= 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'IC_sale',
+              type = 'checkbox',
+             label = text('Income'),
+           checked = IC_sale,
+             value = 'IC_sale'} %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.IC_cogs; IC_cogs= 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'IC_cogs',
+              type = 'checkbox',
+             label = text('COGS'),
+           checked = IC_cogs,
+             value = 'IC_cogs'} %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.IC_taxpart; IC_taxpart= 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'IC_taxpart',
+              type = 'checkbox',
+             label = text('Tax'),
+           checked = IC_taxpart,
+             value = 'IC_taxpart'} %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.IC_returns;IC_returns= 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'IC_returns',
+              type = 'checkbox',
+             label = text('Returns'),
+           checked = IC_returns,
+             value = 'IC_returns'} %]
+   </div>
+</div>
+<div class="inputline" id="services-line">
+   <label class="line">[% text('Non-tracking Items') %]</label>
+   <div class="inputgroup">
+      [% IF form.IC_income;IC_income= 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'IC_income',
+              type = 'checkbox',
+             label = text('Income'),
+           checked = IC_income,
+             value = 'IC_income'} %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.IC_expense;IC_expense= 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'IC_expense',
+              type = 'checkbox',
+             label = text('Expense'),
+           checked = IC_expense,
+             value = 'IC_expense'} %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.IC_taxservice; IC_taxservice= 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'IC_taxservice',
+              type = 'checkbox',
+             label = text('Tax'),
+           checked = IC_taxservice,
+             value = 'IC_taxservice'} %]
+   </div>
+</div>
+<div class="inputline" id="assets-line">
+   <label class="line">[% text('Fixed Assets') %]</label>
+   <div class="inputgroup">
+      [% IF form.Fixed_Asset;fixed_asset= 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'Fixed_Asset',
+              type = 'checkbox',
+             label = text('Fixed Asset'), #'
+           checked = fixed_asset,
+             value = 'Fixed_Asset'} %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.Asset_Dep;asset_dep = 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'Asset_Dep',
+              type = 'checkbox',
+             label = text('Depreciation'),
+           checked = asset_dep,
+             value = 'Asset_Dep'} %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.asset_expense;asset_expense = 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'asset_expense',
+              type = 'checkbox',
+             label = text('Expense'),
+           checked = asset_expense,
+             value = 'asset_expense'} %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.asset_gain;asset_gain = 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'asset_gain',
+              type = 'checkbox',
+             label = text('Gain'),
+           checked = asset_gain,
+             value = 'asset_gain'} %]
+   </div>
+   <div class="inputgroup">
+      [% IF form.asset_loss;asset_loss = 'CHECKED'; END;
+         INCLUDE input element_data={
+              name = 'asset_loss',
+              type = 'checkbox',
+             label = text('Loss'),
+           checked = asset_loss,
+             value = 'asset_loss'} %]
+   </div>
+</div>
+</fieldset> <!-- dropdown div -->
+
+<hr size="3" noshade="noshade" />
+
+[%
+    PROCESS input element_data = {
+        value = form.id
+        name = 'id'
+        type = 'hidden'
+    };
+
+    INCLUDE button element_data={
+       name = '__action',
+       value = 'save'
+       text = text('Save')
+       'data-lsmb-doing' = text('Saving...')
+       'data-lsmb-done' = text('Saved')
+    };
+
+    IF form.id;
+        INCLUDE button element_data={
+           name = '__action',
+           value = 'save_as_new'
+           text = text('Save as new')
+        };
+    END;
+
+    IF form.orphaned;
+        INCLUDE button element_data={
+           name = '__action',
+           value = 'delete'
+           text = text('Delete')
+           'data-lsmb-doing' = text('Deleting...')
+           'data-lsmb-done' = text('Deleted')
+        };
+    END;
+%]
+
+<hr />
+</form>
+</div>
+</div>
+[% END %]
+[% IF form.id %]
+<div data-dojo-type="dijit/layout/ContentPane"
+     title="[% text('Translations') %]" id="TranslationPane">
+  <div>
+<form data-dojo-type="lsmb/Form" method="post" action="account.pl">
+<table>
+<caption>Translations</caption>
+<tbody>
+[%
+   PROCESS input element_data = {
+       type="hidden"
+       name="languagecount"
+       value=languages.size
+   };
+   lang_index = 0;
+   FOREACH language IN languages;
+     lang_index = lang_index + 1; %]
+  <tr>
+    <td>
+      <label for="heading-languagetranslation-[% lang_index %]">
+        [% language.description %]
+      </label>
+      [% PROCESS input element_data = {
+             type="hidden"
+             name = 'languagecode_' _ lang_index
+             value = language.code } %]
+    </td>
+    <td>[% PROCESS input element_data = {
+               name = 'languagetranslation_' _ lang_index
+               id = 'heading-languagetranslation-' _ lang_index
+               class = 'translation'
+               value = form.translations.${language.code}.description
+               title = maketext(language.description)
+       } %]
+      </td>
+    </tr>
+  [% END %]
+</tbody>
+</table>
+[% PROCESS input element_data = {
+    name = 'charttype'
+    type = 'hidden'
+   value = form.charttype
+}; %]
+[% PROCESS input element_data = {
+    name = 'id'
+    type = 'hidden'
+   value = form.id
+}; %]
+[% PROCESS button element_data = {
+    name = '__action',
+    value = 'update_translations',
+    type = 'submit',
+    class = 'submit',
+    text = text('Save Translations'),
+    'data-lsmb-doing' = text('Saving Translations...')
+    'data-lsmb-done' = text('Saved Translations')
+} %]
+</form>
+</div>
+</div>
+[% END %]
+</div>
+</body>

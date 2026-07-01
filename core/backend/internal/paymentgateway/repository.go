@@ -95,7 +95,7 @@ func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, e
 
 func (r *Repository) GetPlanCode(ctx context.Context, orgID uuid.UUID) string {
 	var plan string
-	if err := r.db.WithContext(ctx).Table("tenant_settings").Select("plan_code").Where("org_id = ?", orgID).Take(&plan).Error; err != nil {
+	if err := r.db.WithContext(ctx).Table("org_settings").Select("plan_code").Where("org_id = ?", orgID).Take(&plan).Error; err != nil {
 		return "starter"
 	}
 	plan = strings.TrimSpace(strings.ToLower(plan))
@@ -108,7 +108,7 @@ func (r *Repository) GetPlanCode(ctx context.Context, orgID uuid.UUID) string {
 func (r *Repository) GetBankInfo(ctx context.Context, orgID uuid.UUID) (gatewaydomain.BankInfo, bool, error) {
 	var row bankInfoRow
 	if err := r.db.WithContext(ctx).
-		Table("tenant_settings").
+		Table("org_settings").
 		Select("bank_holder, bank_cbu, bank_alias, bank_name").
 		Where("org_id = ?", orgID).
 		Take(&row).Error; err != nil {
@@ -130,7 +130,7 @@ func (r *Repository) GetBankInfo(ctx context.Context, orgID uuid.UUID) (gatewayd
 func (r *Repository) GetWhatsAppTransferTemplate(ctx context.Context, orgID uuid.UUID) string {
 	var tpl string
 	err := r.db.WithContext(ctx).
-		Table("tenant_settings").
+		Table("org_settings").
 		Select("wa_payment_template").
 		Where("org_id = ?", orgID).
 		Take(&tpl).Error
@@ -143,7 +143,7 @@ func (r *Repository) GetWhatsAppTransferTemplate(ctx context.Context, orgID uuid
 func (r *Repository) GetWhatsAppLinkTemplate(ctx context.Context, orgID uuid.UUID) string {
 	var tpl string
 	err := r.db.WithContext(ctx).
-		Table("tenant_settings").
+		Table("org_settings").
 		Select("wa_payment_link_template").
 		Where("org_id = ?", orgID).
 		Take(&tpl).Error
@@ -212,7 +212,7 @@ func (r *Repository) ListActiveConnections(ctx context.Context) ([]gatewaydomain
 func (r *Repository) SaveConnection(ctx context.Context, in gatewaydomain.PaymentGatewayConnection) error {
 	now := time.Now().UTC()
 	row := models.PaymentGatewayConnectionModel{
-		OrgID:              in.OrgID,
+		OrgID:                 in.OrgID,
 		Provider:              coalesce(in.Provider, "mercadopago"),
 		ExternalUserID:        strings.TrimSpace(in.ExternalUserID),
 		AccessTokenEncrypted:  strings.TrimSpace(in.AccessToken),
@@ -257,7 +257,7 @@ func (r *Repository) CountMonthlyPreferences(ctx context.Context, orgID uuid.UUI
 func (r *Repository) SavePreference(ctx context.Context, in gatewaydomain.PaymentPreference) (gatewaydomain.PaymentPreference, error) {
 	row := models.PaymentPreferenceModel{
 		ID:              uuid.New(),
-		OrgID:        in.OrgID,
+		OrgID:           in.OrgID,
 		Provider:        coalesce(in.Provider, "mercadopago"),
 		ExternalID:      strings.TrimSpace(in.ExternalID),
 		ReferenceType:   strings.TrimSpace(in.ReferenceType),
@@ -349,7 +349,7 @@ func (r *Repository) GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.U
 }
 
 type ProcessSalePaymentInput struct {
-	OrgID      uuid.UUID
+	OrgID         uuid.UUID
 	SaleID        uuid.UUID
 	Amount        float64
 	ExternalPayID string
@@ -569,7 +569,7 @@ func (r *Repository) MarkWebhookEventError(ctx context.Context, id uuid.UUID, er
 
 func toConnectionDomain(in models.PaymentGatewayConnectionModel) gatewaydomain.PaymentGatewayConnection {
 	return gatewaydomain.PaymentGatewayConnection{
-		OrgID:       in.OrgID,
+		OrgID:          in.OrgID,
 		Provider:       in.Provider,
 		ExternalUserID: in.ExternalUserID,
 		AccessToken:    in.AccessTokenEncrypted,
@@ -584,7 +584,7 @@ func toConnectionDomain(in models.PaymentGatewayConnectionModel) gatewaydomain.P
 func toPreferenceDomain(in models.PaymentPreferenceModel) gatewaydomain.PaymentPreference {
 	return gatewaydomain.PaymentPreference{
 		ID:              in.ID,
-		OrgID:        in.OrgID,
+		OrgID:           in.OrgID,
 		Provider:        in.Provider,
 		ExternalID:      in.ExternalID,
 		ReferenceType:   in.ReferenceType,

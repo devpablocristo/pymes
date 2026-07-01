@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/pymes/core/backend/internal/inventory"
+	"github.com/devpablocristo/pymes/core/backend/internal/ledger"
 	saledomain "github.com/devpablocristo/pymes/core/backend/internal/sales/usecases/domain"
 	"github.com/devpablocristo/pymes/core/backend/internal/shared/status"
 	httperrors "github.com/devpablocristo/pymes/core/shared/backend/httperrors"
@@ -64,6 +65,13 @@ type NotificationPort interface {
 	NotifySaleCreated(ctx context.Context, sale saledomain.Sale) error
 }
 
+// LedgerPort encola el evento contable de la venta (posteo desacoplado por
+// outbox). Nil-safe: si no está cableado, la venta opera igual.
+type LedgerPort interface {
+	EnqueueSale(ctx context.Context, evt ledger.SaleEvent) error
+	EnqueueReversal(ctx context.Context, orgID uuid.UUID, refType string, refID uuid.UUID, targetEvent, actor string) error
+}
+
 type Usecases struct {
 	repo      RepositoryPort
 	inventory InventoryPort
@@ -72,6 +80,7 @@ type Usecases struct {
 	timeline  TimelinePort
 	webhooks  WebhookPort
 	notifier  NotificationPort
+	ledger    LedgerPort
 }
 
 type Option func(*Usecases)
@@ -81,6 +90,7 @@ func WithWebhooks(w WebhookPort) Option  { return func(u *Usecases) { u.webhooks
 func WithNotifications(n NotificationPort) Option {
 	return func(u *Usecases) { u.notifier = n }
 }
+func WithLedger(l LedgerPort) Option { return func(u *Usecases) { u.ledger = l } }
 
 func NewUsecases(repo RepositoryPort, inventory InventoryPort, cashflow CashflowPort, audit AuditPort, opts ...Option) *Usecases {
 	uc := &Usecases{repo: repo, inventory: inventory, cashflow: cashflow, audit: audit}
@@ -101,7 +111,7 @@ type CreateSaleItemInput struct {
 }
 
 type CreateSaleInput struct {
-	OrgID      uuid.UUID
+	OrgID         uuid.UUID
 	BranchID      *uuid.UUID
 	CustomerID    *uuid.UUID
 	CustomerName  string
@@ -116,7 +126,7 @@ type CreateSaleInput struct {
 }
 
 type UpdateSaleInput struct {
-	OrgID   uuid.UUID
+	OrgID      uuid.UUID
 	ID         uuid.UUID
 	IsFavorite *bool
 	Tags       *[]string
@@ -244,7 +254,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 
 	total := subtotal + taxTotal
 	out, err := u.repo.Create(ctx, CreateInput{
-		OrgID:      in.OrgID,
+		OrgID:         in.OrgID,
 		BranchID:      in.BranchID,
 		CustomerID:    in.CustomerID,
 		CustomerName:  strings.TrimSpace(in.CustomerName),
@@ -290,12 +300,35 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 	if u.notifier != nil {
 		_ = u.notifier.NotifySaleCreated(ctx, out)
 	}
+	if u.ledger != nil {
+		evtLines := make([]ledger.SaleEventLine, 0, len(createItems))
+		for _, it := range createItems {
+			evtLines = append(evtLines, ledger.SaleEventLine{TaxRate: it.TaxRate, Subtotal: it.Subtotal})
+		}
+		// Venta de mostrador: nace cobrada (contado). El crédito quedará para
+		// cuando el dominio exponga payment_status.
+		_ = u.ledger.EnqueueSale(ctx, ledger.SaleEvent{
+			OrgID:         in.OrgID,
+			SaleID:        out.ID,
+			Number:        out.Number,
+			OccurredAt:    out.CreatedAt,
+			Currency:      out.Currency,
+			PaymentStatus: "paid",
+			PaymentMethod: out.PaymentMethod,
+			PartyID:       out.CustomerID,
+			Subtotal:      out.Subtotal,
+			TaxTotal:      out.TaxTotal,
+			Total:         out.Total,
+			Lines:         evtLines,
+			Actor:         in.CreatedBy,
+		})
+	}
 	return out, nil
 }
 
 func (u *Usecases) Update(ctx context.Context, in UpdateSaleInput) (saledomain.Sale, error) {
 	out, err := u.repo.Update(ctx, UpdateInput{
-		OrgID:   in.OrgID,
+		OrgID:      in.OrgID,
 		ID:         in.ID,
 		IsFavorite: in.IsFavorite,
 		Tags:       in.Tags,
@@ -458,6 +491,9 @@ func (u *Usecases) Void(ctx context.Context, orgID, saleID uuid.UUID, actor stri
 	}
 	if u.webhooks != nil {
 		_ = u.webhooks.Enqueue(ctx, orgID, "sale.voided", map[string]any{"sale_id": saleID.String(), "customer_id": nullableUUID(current.CustomerID), "total": current.Total})
+	}
+	if u.ledger != nil {
+		_ = u.ledger.EnqueueReversal(ctx, orgID, "sale", saleID, "sale.completed", actor)
 	}
 	return out, nil
 }

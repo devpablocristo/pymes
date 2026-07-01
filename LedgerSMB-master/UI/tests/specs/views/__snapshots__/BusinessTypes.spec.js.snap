@@ -1,0 +1,315 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`BusinessTypes - register as a component > should show dialog 1`] = `
+<div
+  data-v-app=""
+>
+  
+  <h1
+    class="listtop"
+  >
+    Configure Type of Businesses
+  </h1>
+  
+  <div>
+    <table
+      class="dynatable"
+    >
+      <thead>
+        <tr>
+          <!--v-if-->
+          
+          <th>
+            Description
+          </th>
+          <th>
+            Discount (%)
+          </th>
+          
+          <th />
+        </tr>
+      </thead>
+      
+      <tbody
+        class="dynatableData"
+      >
+        
+        
+        <!-- eslint-disable prettier/prettier -->
+        <tr
+          class="data-row"
+        >
+          <!--v-if-->
+          
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="description"
+              readonly=""
+              type="text"
+              value="Big customer"
+            />
+          </td>
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="discount"
+              readonly=""
+              type="text"
+              value="0.05"
+            />
+          </td>
+          
+          <td>
+            <!--v-if-->
+            <!--v-if-->
+          </td>
+        </tr>
+        
+        
+        <!-- eslint-disable prettier/prettier -->
+        <tr
+          class="data-row"
+        >
+          <!--v-if-->
+          
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="description"
+              readonly=""
+              type="text"
+              value="Bigger customer"
+            />
+          </td>
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="discount"
+              readonly=""
+              type="text"
+              value="0.15"
+            />
+          </td>
+          
+          <td>
+            <!--v-if-->
+            <!--v-if-->
+          </td>
+        </tr>
+        
+        
+      </tbody>
+      <!--v-if-->
+      
+    </table>
+  </div>
+  <div>
+    <span>
+      Download: 
+    </span>
+    
+    <span>
+      <a
+        href="http://localhost/erp/api/v0/contacts/business-types?format=HTML"
+        target="_blank"
+      >
+        [ HTML ]
+      </a>
+    </span>
+    
+  </div>
+  
+  
+</div>
+`;
+
+exports[`BusinessTypes - register as a component > should show dialog with editable data 1`] = `
+<div
+  data-v-app=""
+>
+  
+  <h1
+    class="listtop"
+  >
+    Configure Type of Businesses
+  </h1>
+  
+  <div>
+    <table
+      class="dynatable"
+    >
+      <thead>
+        <tr>
+          <!--v-if-->
+          
+          <th>
+            Description
+          </th>
+          <th>
+            Discount (%)
+          </th>
+          
+          <th />
+        </tr>
+      </thead>
+      
+      <tbody
+        class="dynatableData"
+      >
+        
+        
+        <!-- eslint-disable prettier/prettier -->
+        <tr
+          class="data-row"
+        >
+          <!--v-if-->
+          
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="description"
+              readonly=""
+              type="text"
+              value="Big customer"
+            />
+          </td>
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="discount"
+              readonly=""
+              type="text"
+              value="0.05"
+            />
+          </td>
+          
+          <td>
+            
+            <button
+              name="modify"
+            >
+              
+              Modify
+              
+            </button>
+            <button
+              disabled=""
+              name="save"
+            >
+              
+              Save
+              
+            </button>
+            <button
+              disabled=""
+              name="cancel"
+            >
+              
+              Cancel
+              
+            </button>
+            <!--v-if-->
+            
+            <!--v-if-->
+          </td>
+        </tr>
+        
+        
+        <!-- eslint-disable prettier/prettier -->
+        <tr
+          class="data-row"
+        >
+          <!--v-if-->
+          
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="description"
+              readonly=""
+              type="text"
+              value="Bigger customer"
+            />
+          </td>
+          <td
+            class="data-entry"
+          >
+            <input
+              class="neutral input-box"
+              name="discount"
+              readonly=""
+              type="text"
+              value="0.15"
+            />
+          </td>
+          
+          <td>
+            
+            <button
+              name="modify"
+            >
+              
+              Modify
+              
+            </button>
+            <button
+              disabled=""
+              name="save"
+            >
+              
+              Save
+              
+            </button>
+            <button
+              disabled=""
+              name="cancel"
+            >
+              
+              Cancel
+              
+            </button>
+            <!--v-if-->
+            
+            <!--v-if-->
+          </td>
+        </tr>
+        
+        
+      </tbody>
+      <!--v-if-->
+      
+    </table>
+  </div>
+  <div>
+    <span>
+      Download: 
+    </span>
+    
+    <span>
+      <a
+        href="http://localhost/erp/api/v0/contacts/business-types?format=HTML"
+        target="_blank"
+      >
+        [ HTML ]
+      </a>
+    </span>
+    
+  </div>
+  
+  
+</div>
+`;

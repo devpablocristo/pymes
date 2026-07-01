@@ -368,7 +368,7 @@ func TestAcceptTenantInvitationCreatesMembershipForCorrectTenant(t *testing.T) {
 	now := time.Now().UTC()
 	row := pymesTenantInvitationRow{
 		ID:                inviteID,
-		OrgID:          uuid.MustParse(orgID),
+		OrgID:             uuid.MustParse(orgID),
 		EmailNormalized:   "new@bicimax.test",
 		Role:              "member",
 		Status:            "pending",
@@ -434,7 +434,7 @@ func TestAcceptTenantInvitationRelinksExistingEmailAndReactivatesMembership(t *t
 	now := time.Now().UTC()
 	row := pymesTenantInvitationRow{
 		ID:                uuid.New(),
-		OrgID:          uuid.MustParse(orgID),
+		OrgID:             uuid.MustParse(orgID),
 		EmailNormalized:   "tucbox@gmail.com",
 		Role:              "admin",
 		Status:            "pending",
@@ -536,7 +536,7 @@ func TestPreviewTenantInvitationReturnsTenantDestinationWithoutAccepting(t *test
 		t.Fatalf("CreateTenantInvitation() error = %v", err)
 	}
 	// El redirect_url ahora apunta al backend exchange endpoint (Phase 6.1):
-	// `${publicBaseURL}/v1/tenant-invites/exchange?token=<token>`. El backend
+	// `${publicBaseURL}/v1/org-invitations/exchange?token=<token>`. El backend
 	// procesa el ticket server-side cuando el SDK frontend no puede.
 	rawRedirect := store.clerk.(*fakeClerkTenantClient).lastInviteInput.RedirectURL
 	parsed, err := url.Parse(rawRedirect)
@@ -614,7 +614,7 @@ func TestAcceptTenantInvitationRejectsLocalOnlyPendingInvite(t *testing.T) {
 	now := time.Now().UTC()
 	if err := db.Create(&pymesTenantInvitationRow{
 		ID:              uuid.New(),
-		OrgID:        uuid.MustParse(orgID),
+		OrgID:           uuid.MustParse(orgID),
 		EmailNormalized: "new@medlab.test",
 		Role:            "member",
 		Status:          "pending",
@@ -664,7 +664,7 @@ func TestAcceptTenantInvitationCreatesMissingClerkMembership(t *testing.T) {
 	now := time.Now().UTC()
 	if err := db.Create(&pymesTenantInvitationRow{
 		ID:                uuid.New(),
-		OrgID:          uuid.MustParse(orgID),
+		OrgID:             uuid.MustParse(orgID),
 		EmailNormalized:   "new@medlab.test",
 		Role:              "member",
 		Status:            "pending",
@@ -715,7 +715,7 @@ func TestAcceptTenantInvitationRejectsEmailMismatch(t *testing.T) {
 	now := time.Now().UTC()
 	if err := db.Create(&pymesTenantInvitationRow{
 		ID:                uuid.New(),
-		OrgID:          uuid.MustParse(orgID),
+		OrgID:             uuid.MustParse(orgID),
 		EmailNormalized:   "expected@bicimax.test",
 		Role:              "admin",
 		Status:            "pending",

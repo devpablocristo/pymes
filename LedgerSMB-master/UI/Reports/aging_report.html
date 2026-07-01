@@ -1,0 +1,115 @@
+[%
+
+PROCESS "elements.html";
+
+PROCESS "dynatable.html";
+
+%]
+<body>
+<div class="report_header"><label>[% text('Report Name') %]:</label>
+<span class="report_header">[% name %]</span>
+</div>
+<div class="report_header"><label>[% text('Company') %]:</label>
+<span class="report_header">[% SETTINGS.company_name %]</span>
+</div>
+[% FOREACH LINE IN hlines %]
+<div class="report_header"><label>[% LINE.text %]:</label>
+<span class="report_header">[% LINE.value %]</span>
+</div>
+[% END %]
+
+<form data-dojo-type="lsmb/Form" method="get" action="report_aging.pl">
+[%
+
+PROCESS input element_data = {
+         name = 'form_id'
+         value = FORM_ID
+         type = 'hidden'
+};
+FOREACH KEY IN [ 'entity_class', 'to_date', 'report_type',
+                 'overdue', 'c0', 'c30', 'c60', 'c90'];
+    PROCESS input element_data = {
+          name = KEY
+          type = 'hidden'
+          value = report.$KEY
+    };
+END;
+
+PROCESS input element_data = {
+    name = 'rowcount'
+   value = rows.size
+    type = 'hidden'
+};
+
+PROCESS dynatable tbody = {rows = rows }
+               attributes = {id = 'aging', class = 'report' };
+
+
+PROCESS select element_data = {
+    name = 'print_template'
+ options = [{text = 'Statement', value = 'statement'}]
+   class = 'print_template'
+};
+
+PRINTERS.push({text = text('Email'), value = 'email' });
+
+PFORMATS = [ ];
+FOREACH F IN LIST_FORMATS();
+  PFORMATS.push({text = F, value = F});
+END;
+
+PROCESS select element_data = {
+   name = 'print_format'
+options = PFORMATS
+default_values = [ 'PDF' ]
+  class = 'print_format'
+};
+
+PROCESS select element_data = {
+   name = 'media'
+options = PRINTERS
+  class = 'printers'
+};
+
+PROCESS input element_data = {
+   name = 'copies'
+  value = '1'
+   type = 'text'
+   size = '2'
+  class = 'smallint'
+};
+
+PROCESS button element_data = {
+    text = text('Generate')
+    name = '__action'
+   value = 'generate_statement'
+   class = 'submit'
+   'data-dojo-type' = 'lsmb/PrintButton'
+   'data-dojo-props' = 'minimalGET:false'
+};
+ %]
+</form><br />
+<a href="[% REPORT_LINK %]">[[% text('permalink') %]]</a>&nbsp;
+[% IF FORMATS.grep('PDF').size()
+%]
+<a target="_blank" rel="noopener noreferrer"
+   href="[% REPORT_LINK _ '&amp;format=PDF' %]">[[% text('PDF') %]]</a>&nbsp;
+[% END;
+IF FORMATS.grep('TXT').size();
+%]
+<a target="_blank" rel="noopener noreferrer"
+   href="[% REPORT_LINK _ '&amp;format=CSV' %]">[[% text('CSV') %]]</a>&nbsp;
+[% END;
+IF FORMATS.grep('XLS').size() %]
+<a target="_blank" rel="noopener noreferrer"
+   href="[% REPORT_LINK _ '&amp;format=XLS' %]">[[% text('XLS') %]]</a>&nbsp;
+[% END;
+IF FORMATS.grep('XLSX').size() %]
+<a target="_blank" rel="noopener noreferrer"
+   href="[% REPORT_LINK _ '&amp;format=XLSX' %]">[[% text('XLSX') %]]</a>&nbsp;
+[% END;
+IF FORMATS.grep('ODS').size() %]
+<a target="_blank" rel="noopener noreferrer"
+   href="[% REPORT_LINK _ '&amp;format=ODS' %]">[[% text('ODS') %]]</a>&nbsp;
+[% END; %]
+</body>

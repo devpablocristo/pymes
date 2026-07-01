@@ -25,7 +25,7 @@ const tenantInviteTTL = 7 * 24 * time.Hour
 
 type tenantInvitationDTO struct {
 	ID                string     `json:"id"`
-	OrgID          string     `json:"org_id"`
+	OrgID             string     `json:"org_id"`
 	Email             string     `json:"email"`
 	Role              string     `json:"role"`
 	Status            string     `json:"status"`
@@ -40,7 +40,7 @@ type tenantInvitationDTO struct {
 }
 
 type tenantInvitationPreviewDTO struct {
-	OrgID   string    `json:"org_id"`
+	OrgID      string    `json:"org_id"`
 	TenantSlug string    `json:"tenant_slug"`
 	TenantName string    `json:"tenant_name"`
 	Email      string    `json:"email"`
@@ -101,7 +101,7 @@ func (s *pymesSaaSStore) PreviewTenantInvitation(ctx context.Context, token stri
 		return tenantInvitationPreviewDTO{}, err
 	}
 	return tenantInvitationPreviewDTO{
-		OrgID:   invite.OrgID.String(),
+		OrgID:      invite.OrgID.String(),
 		TenantSlug: tenantRowSlug(tenant),
 		TenantName: strings.TrimSpace(tenant.Name),
 		Email:      invite.EmailNormalized,
@@ -145,7 +145,7 @@ func (s *pymesSaaSStore) CreateTenantInvitation(ctx context.Context, orgID, acto
 	expiresAt := now.Add(tenantInviteTTL)
 	row := pymesTenantInvitationRow{
 		ID:              uuid.New(),
-		OrgID:        tenantUUID,
+		OrgID:           tenantUUID,
 		EmailNormalized: email,
 		Role:            role,
 		Status:          "pending",
@@ -424,7 +424,7 @@ func (s *pymesSaaSStore) persistInviteAccept(ctx context.Context, snap inviteAcc
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			existing = pymesTenantMembershipRow{
 				ID:        uuid.New(),
-				OrgID:  invite.OrgID,
+				OrgID:     invite.OrgID,
 				UserID:    localUser.ID,
 				Role:      normalizeInviteRole(invite.Role),
 				Status:    "active",
@@ -615,7 +615,7 @@ func tenantInviteCreateError(err error) error {
 	}
 	// Detectar UNIQUE violation por SQLSTATE en vez de string-matching del mensaje:
 	// el driver pgx envuelve constraint violations en *pgconn.PgError con Code 23505.
-	// Funciona tanto para el unique index parcial `idx_tenant_invitations_pending_email`
+	// Funciona tanto para el unique index parcial `idx_org_invitations_pending_email`
 	// como para cualquier otro UNIQUE de la tabla.
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolationCode {
@@ -673,9 +673,9 @@ func (s *pymesSaaSStore) inviteRedirectURL(token string) string {
 	if base == "" {
 		base = "http://localhost:8080"
 	}
-	u, err := url.Parse(base + "/v1/tenant-invites/exchange")
+	u, err := url.Parse(base + "/v1/org-invitations/exchange")
 	if err != nil {
-		return base + "/v1/tenant-invites/exchange?token=" + url.QueryEscape(token)
+		return base + "/v1/org-invitations/exchange?token=" + url.QueryEscape(token)
 	}
 	q := u.Query()
 	q.Set("token", token)
@@ -691,7 +691,7 @@ func tenantInvitationDTOFromRow(row pymesTenantInvitationRow) tenantInvitationDT
 	}
 	return tenantInvitationDTO{
 		ID:                row.ID.String(),
-		OrgID:          row.OrgID.String(),
+		OrgID:             row.OrgID.String(),
 		Email:             row.EmailNormalized,
 		Role:              row.Role,
 		Status:            row.Status,

@@ -1,0 +1,159 @@
+#!/usr/bin/perl
+
+=pod
+
+This script contains a relatively simple state machine to scan various
+Perl files for translatable strings.
+
+The scanner consists of 2 main state processes (block comment (POD) and
+text() call parsing).
+
+Single line comments are intentionally *not* stripped, because single line
+comments sometimes intentionally contain translatable strings.
+
+This script exists because xgettext and xgettext.pl don't allow us to
+extract a sub-set of strings from our SQL files.
+
+=cut
+
+
+use strict;
+use warnings;
+
+
+use constant {
+    NUL => 1,
+    POD => 10,
+    TXT => 20,
+    FIN => 21,
+};
+
+
+my %dict;
+
+sub add_entry {
+    my ($string, $file, $line) = @_;
+
+    return if $string =~ m/^[\s\t\n]*$/g; # return on empty/space-only strings
+    $string =~ s/(?<!\\)(\$)/\\$1/g;
+
+    $dict{$string} = []
+        if ! exists $dict{$string};
+
+    push @{$dict{$string}}, "#: $file:$line\n";
+}
+
+sub slurp{
+    local (*ARGV, $/);
+    @ARGV = shift;
+    open my $fh, "<:encoding(UTF-8)", $_
+        or die "Can't open '$_'; error: $!";
+    readline($fh);
+}
+
+while (<>) {
+    chomp;
+
+    my $file = $_;
+    say STDERR "Parsing: $file";
+    my $source = slurp($file);
+    $source .= "\n";    # Make sure the last line has a newline.
+
+    my $state = NUL;
+    my $line_no = 1;
+    my $text;
+
+    while ($source ne '') {
+
+      PARSER: {
+         #Note: All patterns below MUST be global for pos to be set
+         if ( defined pos($source)) {
+              my $p = pos($source);
+              $line_no += ( substr($source,0,$p) =~ tr /\n//) ;
+              $source = substr($source,$p);
+          }
+#          warn "S:$state:$line_no:".substr($source,0,index($source,"\n")+1);
+
+          $source =~ m/^[\s\t\n]+/gs
+              && do { next; };  # Strip leading white space
+
+          $state==NUL &&
+              $source =~ m/^=\w+\b.*?\n=cut\n/gs
+              && do { $state = NUL; redo; };
+
+          $state==NUL &&
+              # the reports use a workaround with a function called Text()
+              # or MarkText()
+              $source =~ m/^[^\n]*\b(([Mm]ark)?[tT]ext)[\s\t\n]*\(/gs
+              && do { $state = TXT; $text = $1; redo; };
+
+         $state==TXT # All patterns must give $1 for the whole
+                      # $2 for the separator and $4 for the inner string
+            && (    $source =~ m/^( (')  ((([^'\\]++|\\.)*+))     ('))/gsx
+                 || $source =~ m/^( (\bq\()((([^)\\]|\(.*\)|\\.)*))(\)) )/gsx
+                 || $source =~ m/^( <<(['`])(\w+)\2;(?:[ \t]*\#[^\n]*)?\n(.+)\n(\3)\n)/gsx
+            ) && do {
+                      $state = FIN;
+                      my $string = $4;
+                      if ($2 eq "'" ) {
+                          $string =~ s/\\'/'/g;
+                          $string =~ s/(?<!\\)"/\\"/g;
+                      }
+                      $string =~ s/\n/\\n/g;
+                      add_entry($string, $file, $line_no);
+                      redo;
+              };
+
+          $state==TXT
+            && (    $source =~ m/^( (")  ((([^"\\]++|\\.)*+))     ("))/gsx
+                 || $source =~ m/^( (\bqq\()((([^\)\\]|\(.*\)|\\.)*))(\)))/gsx
+                 || $source =~ m/^( <<(")?(\w+)"?;(?:[ \t]*\#[^\n]*)?\n(.+)\n(\3)\n)/gsx
+            ) && do {
+                      my $string = $4;
+                      $string =~ s/\n/\\n/g;
+                      if ($string =~ m/(?<!\\)([\$\%\@][\w\[\]\{\}\-\<\>\.]+)/gs) {
+                          warn "$file:$line_no: Direct variable interpolation not supported; use bracketed ([_1]) syntax for '$1'!\n";
+                          $state = NUL;
+                      }
+                      else {
+                          add_entry($string, $file, $line_no);
+                          $state = FIN;
+                      }
+                      redo;
+              };
+
+          $state==TXT &&
+              ! $source =~ m/^[\s\t\n]*$/s
+              && do { my $s = $source =~ /^.*$/s; chop($s);
+                      warn "$file:$line_no: $text() called with non string first argument; resetting scan (consider using maketext('$s') directly!\n";
+                      pos($source) += length $s;
+                      $state = NUL;
+              };
+
+          $state==FIN &&
+              $source =~ m/^[,\)]/gs
+              && do { $text = undef; $state = NUL; redo; };
+
+          $state==FIN &&
+              ! $source =~ m/^$/gs
+              && do { my $junk = substr($source,0,index($source,"\n"));
+                      warn "$file:$line_no: junk '$junk' after first text() argument; resetting scan!\n";
+                      pos($source) += length $junk;
+                      $state = NUL; next;
+              };
+
+          $source =~ m/^[^\n]*?\n/gs
+              && do { redo; }; # Skip to next line
+        };
+    };
+    die "Remaining data in $source"
+        if $source;
+};
+
+foreach my $string (sort keys %dict) {
+    foreach my $location (sort @{$dict{$string}}) {
+        print $location;
+    }
+    print "msgid \"" . join("\"\n\"",split("\n",$string)) . "\"\n";
+    print "msgstr \"\"\n\n";
+}

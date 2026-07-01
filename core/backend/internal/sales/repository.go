@@ -79,7 +79,7 @@ func (r *Repository) GetServiceSnapshot(ctx context.Context, orgID, serviceID uu
 func (r *Repository) GetTenantSettings(ctx context.Context, orgID uuid.UUID) (currency string, taxRate float64, salePrefix string, err error) {
 	var row tenantBusinessSettings
 	err = r.db.WithContext(ctx).
-		Table("tenant_settings").
+		Table("org_settings").
 		Select("currency, tax_rate, sale_prefix, next_sale_number").
 		Where("org_id = ?", orgID).
 		Take(&row).Error
@@ -105,7 +105,7 @@ type CreateItemInput struct {
 }
 
 type CreateInput struct {
-	OrgID      uuid.UUID
+	OrgID         uuid.UUID
 	BranchID      *uuid.UUID
 	CustomerID    *uuid.UUID
 	CustomerName  string
@@ -124,7 +124,7 @@ type CreateInput struct {
 }
 
 type UpdateInput struct {
-	OrgID   uuid.UUID
+	OrgID      uuid.UUID
 	ID         uuid.UUID
 	IsFavorite *bool
 	Tags       *[]string
@@ -143,7 +143,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sal
 
 		saleRow := models.SaleModel{
 			ID:            uuid.New(),
-			OrgID:      in.OrgID,
+			OrgID:         in.OrgID,
 			BranchID:      in.BranchID,
 			Number:        number,
 			CustomerID:    in.CustomerID,
@@ -188,7 +188,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sal
 			}
 		}
 
-		if err := tx.Table("tenant_settings").
+		if err := tx.Table("org_settings").
 			Where("org_id = ?", in.OrgID).
 			Updates(map[string]any{
 				"next_sale_number": tenant.NextSaleNumber + 1,
@@ -207,7 +207,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sal
 }
 
 type ListParams struct {
-	OrgID      uuid.UUID
+	OrgID         uuid.UUID
 	BranchID      *uuid.UUID
 	Limit         int
 	After         *uuid.UUID
@@ -385,7 +385,7 @@ func (r *Repository) PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in 
 func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx *gorm.DB, orgID uuid.UUID) (tenantBusinessSettings, error) {
 	var tenant tenantBusinessSettings
 	err := tx.WithContext(ctx).
-		Table("tenant_settings").
+		Table("org_settings").
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Select("currency, tax_rate, sale_prefix, next_sale_number").
 		Where("org_id = ?", orgID).
@@ -400,7 +400,7 @@ func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx 
 
 	// Bootstrap tenant settings if missing for restored or seeded tenants.
 	if err := tx.WithContext(ctx).Exec(`
-		INSERT INTO tenant_settings (
+		INSERT INTO org_settings (
 			org_id, plan_code, hard_limits, currency, tax_rate, quote_prefix, sale_prefix,
 			next_quote_number, next_sale_number, allow_negative_stock, created_at, updated_at
 		)
@@ -411,7 +411,7 @@ func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx 
 	}
 
 	if err := tx.WithContext(ctx).
-		Table("tenant_settings").
+		Table("org_settings").
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Select("currency, tax_rate, sale_prefix, next_sale_number").
 		Where("org_id = ?", orgID).
@@ -434,7 +434,7 @@ func (r *Repository) syncNextSaleNumber(ctx context.Context, tx *gorm.DB, orgID 
 	}
 	if tenant.NextSaleNumber <= maxExisting {
 		tenant.NextSaleNumber = maxExisting + 1
-		if err := tx.WithContext(ctx).Table("tenant_settings").
+		if err := tx.WithContext(ctx).Table("org_settings").
 			Where("org_id = ?", orgID).
 			Updates(map[string]any{
 				"next_sale_number": tenant.NextSaleNumber,
@@ -482,7 +482,7 @@ func saleToDomain(saleRow models.SaleModel, itemRows []models.SaleItemModel) sal
 	}
 	return saledomain.Sale{
 		ID:            saleRow.ID,
-		OrgID:      saleRow.OrgID,
+		OrgID:         saleRow.OrgID,
 		BranchID:      saleRow.BranchID,
 		Number:        saleRow.Number,
 		CustomerID:    saleRow.CustomerID,

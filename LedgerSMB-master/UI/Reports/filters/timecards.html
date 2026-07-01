@@ -1,0 +1,58 @@
+[% PROCESS 'elements.html';
+       PROCESS 'report_base.html'; %]
+<body class="lsmb [% dojo_theme %]">
+<form data-dojo-type="lsmb/Form" action="timecard.pl" method="get">
+<div class="listtop">[% text('Time and Material Cards') %]</div>
+<table>
+[% PROCESS business_classes %]
+<tr>
+   <th>[% text('Partnumber') %]</th>
+   <td>[% PROCESS input element_data = {
+           name = 'partnumber'
+          value = partnumber
+          class = 'control-code'
+           type = 'text'
+           size = '32'
+       } %]</td>
+</tr>
+[% PROCESS employee_row %]
+[% PROCESS date_row %]
+<tr>
+   <th>&nbsp;</th>
+   <td><div class="input">
+       [% PROCESS input element_data = {
+                      name = 'oc_state'
+                      type = 'radio'
+                      checked = 'CHECKED'
+                      value = 'open'
+                      label = text('Open')
+                      } %]</div>
+     <div class="input">
+       [% PROCESS input element_data = {
+                      name = 'oc_state'
+                      type = 'radio'
+                      value = 'closed'
+                      label = text('Closed')
+                      } %]</div>
+     <div class="input">
+       [% PROCESS input element_data = {
+                      name = 'oc_state'
+                      type = 'radio'
+                      value = 'all'
+                      label = text('All')
+                      } %]</div>
+   </td>
+</tr>
+<tr id="buttonrow">
+ <td>[% PROCESS button element_data = {
+                 text = text('Search')
+                value = 'timecard_report'
+                 type = 'submit'
+                 name = '__action'
+                class = 'submit'
+            } %]
+ </td>
+</tr>
+</table>
+</form>
+</body>

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-expected_tree="5182664257d6b8311b743a17c13b9105df7f0ee6"
+expected_tree="32981e1296c2f65019aead71b638fa81ab3a42ec"
 current_tree="$(git rev-parse HEAD:v1)"
 
 if [[ "$current_tree" != "$expected_tree" ]]; then

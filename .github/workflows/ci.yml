@@ -18,11 +18,7 @@ jobs:
           fetch-depth: 0
       - name: Verify immutable v1 snapshot
         run: .github/scripts/verify-v1-archive.sh v1-final
+      - name: Verify frozen v1 tree
+        run: .github/scripts/check-v1-frozen.sh
       - name: Verify v2 placeholder
         run: test -f v2/README.md
-
-  required-check-transition:
-    name: review-notifications-e2e
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "Transitional required check; replaced by v2-ci after archive cutover."

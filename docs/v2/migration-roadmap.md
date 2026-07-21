@@ -13,3 +13,11 @@
 
 Cada capacidad se divide en dominio/migración, persistencia/API y web. Un PR no
 mezcla extracción de plataforma con adopción en Pymes.
+
+## Estado
+
+- Archivo v1: completado y protegido por tree y conteo de blobs.
+- PLAT-01 releases: completado.
+- V2-RUNTIME-01: backend, migrador, PostgreSQL local y shell web creados. No
+  incluye una API de negocio, identidad ni CD.
+- OpenAPI, generación de clientes e identidad: siguientes entregas separadas.

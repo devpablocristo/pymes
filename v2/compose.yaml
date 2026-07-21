@@ -1,0 +1,23 @@
+name: pymes-v2
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pymes
+      POSTGRES_PASSWORD: pymes
+      POSTGRES_DB: pymes_v2
+    ports:
+      - "127.0.0.1:55433:5432"
+    volumes:
+      - pymes_v2_postgres_data:/var/lib/postgresql/data
+      - ./db/dev/init-test-database.sql:/docker-entrypoint-initdb.d/10-test-database.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pymes -d pymes_v2"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+
+volumes:
+  pymes_v2_postgres_data:

@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  v2-ci:
-    name: v2-ci
+  archive:
+    name: archive
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,5 +20,147 @@ jobs:
         run: .github/scripts/verify-v1-archive.sh v1-final
       - name: Verify frozen v1 tree
         run: .github/scripts/check-v1-frozen.sh
-      - name: Verify v2 placeholder
-        run: test -f v2/README.md
+
+  dependency-boundary:
+    name: dependency-boundary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject local and unpublished dependencies
+        run: .github/scripts/check-v2-dependencies.sh
+
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pymes
+          POSTGRES_PASSWORD: pymes
+          POSTGRES_DB: pymes_v2_smoke
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pymes -d pymes_v2_smoke"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    defaults:
+      run:
+        working-directory: v2/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: v2/backend/go.mod
+          cache-dependency-path: v2/backend/go.sum
+      - name: Test backend
+        env:
+          GOWORK: "off"
+        run: go test ./...
+      - name: Smoke health and readiness endpoints
+        env:
+          GOWORK: "off"
+          PYMES_HTTP_ADDR: 127.0.0.1:18080
+          PYMES_DATABASE_URL: postgres://pymes:pymes@127.0.0.1:5432/pymes_v2_smoke?sslmode=disable
+        run: |
+          go build -o "${RUNNER_TEMP}/pymes-v2-api" ./cmd/api
+          "${RUNNER_TEMP}/pymes-v2-api" >"${RUNNER_TEMP}/pymes-v2-api.log" 2>&1 &
+          api_pid=$!
+          trap 'kill "${api_pid}" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:18080/healthz >/dev/null; then
+              break
+            fi
+            if [[ "${attempt}" -eq 30 ]]; then
+              cat "${RUNNER_TEMP}/pymes-v2-api.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          curl --fail --silent --show-error http://127.0.0.1:18080/readyz >/dev/null
+          kill "${api_pid}"
+          wait "${api_pid}"
+          trap - EXIT
+          grep -q '"event":"api_stopped_gracefully"' "${RUNNER_TEMP}/pymes-v2-api.log"
+
+  db:
+    name: db
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pymes
+          POSTGRES_PASSWORD: pymes
+          POSTGRES_DB: pymes_v2_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pymes -d pymes_v2_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    defaults:
+      run:
+        working-directory: v2/db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: v2/db/go.mod
+          cache-dependency-path: v2/db/go.sum
+      - name: Test migrations from an empty database
+        env:
+          GOWORK: "off"
+          PYMES_DATABASE_TEST_URL: postgres://pymes:pymes@127.0.0.1:5432/pymes_v2_test?sslmode=disable
+        run: go test -count=1 ./...
+      - name: Migrate twice, restart PostgreSQL, and remigrate
+        env:
+          GOWORK: "off"
+          PYMES_DATABASE_URL: postgres://pymes:pymes@127.0.0.1:5432/pymes_v2_test?sslmode=disable
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          go run ./cmd/migrate
+          go run ./cmd/migrate
+          docker restart "${POSTGRES_CONTAINER}"
+          for attempt in {1..30}; do
+            if docker exec "${POSTGRES_CONTAINER}" pg_isready -U pymes -d pymes_v2_test; then
+              break
+            fi
+            if [[ "${attempt}" -eq 30 ]]; then
+              exit 1
+            fi
+            sleep 1
+          done
+          go run ./cmd/migrate
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+          cache-dependency-path: v2/web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  v2-ci:
+    name: v2-ci
+    if: always()
+    needs: [archive, dependency-boundary, backend, db, web]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every v2 check
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: test "${RESULTS}" = "success success success success success"

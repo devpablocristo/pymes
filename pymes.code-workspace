@@ -3,10 +3,6 @@
       {
           "name": "pymes (monorepo)",
           "path": "."
-      },
-      {
-          "name": "mobile (Expo)",
-          "path": "mobile"
       }
   ],
   "settings": {

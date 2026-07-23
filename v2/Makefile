@@ -8,7 +8,7 @@ export COMPOSE_PROFILES
 
 .DEFAULT_GOAL := help
 
-.PHONY: help up down ps logs smoke provision-org api-generate api-check backend-run backend-test db-up db-bootstrap db-down db-migrate db-test db-integration web-dev web-ci ci
+.PHONY: help up down ps logs smoke clerk-check provision-org api-generate api-check backend-run backend-test db-up db-bootstrap db-down db-migrate db-test db-integration web-dev web-ci ci
 
 help:
 	@echo "Pymes v2"
@@ -16,6 +16,7 @@ help:
 	@echo "  make up              Construye y levanta postgres, migrate, backend y web"
 	@echo "                       (también iam-worker cuando Clerk está configurado)"
 	@echo "  make smoke           Verifica base, API y web"
+	@echo "  make clerk-check     Verifica la configuración remota de Clerk sin modificarla"
 	@echo "  make provision-org ORG_NAME='Acme' ORG_SLUG=acme OWNER_EMAIL=owner@example.com"
 	@echo "  make api-generate     Regenera contratos Go y TypeScript desde OpenAPI"
 	@echo "  make api-check        Verifica que el código generado no tenga drift"
@@ -54,6 +55,9 @@ smoke:
 		'test "$$(psql -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''idempotency/core'\''")" = 1'
 	docker compose exec -T postgres sh -ec \
 		'test "$$(psql -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 7'
+
+clerk-check:
+	./scripts/check-clerk-config.sh
 
 provision-org:
 	@test -n "$(strip $(ORG_NAME))" || (echo "ORG_NAME es obligatorio" >&2; exit 2)

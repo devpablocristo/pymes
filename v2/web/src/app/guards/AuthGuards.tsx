@@ -13,7 +13,7 @@ export function SignedInGuard() {
     return <AuthNotConfigured />;
   }
   if (auth.status === "error") {
-    return <AuthLoadError />;
+    return <AuthLoadError code={auth.errorCode} />;
   }
   if (auth.status === "signed-out") {
     return <Navigate replace to="/sign-in" state={{ from: location.pathname }} />;
@@ -29,11 +29,23 @@ export function ActiveOrganizationGuard() {
   return <Outlet />;
 }
 
-export function AuthLoadError() {
+export function AuthLoadError({
+  code,
+}: {
+  code?: import("../../auth/AuthContext").AuthErrorCode;
+}) {
+  const body =
+    code === "AUTH_SESSION_TOKEN_UNAVAILABLE"
+      ? "Clerk no pudo emitir una sesión válida. Volvé a iniciar sesión."
+      : code === "AUTH_SESSION_REJECTED"
+        ? "La sesión fue rechazada por la API. Volvé a iniciar sesión."
+        : code === "AUTH_DIRECTORY_UNAVAILABLE"
+          ? "No pudimos cargar tus organizaciones. Intentá nuevamente."
+          : "Revisá que la API esté disponible e intentá nuevamente.";
   return (
     <FatalErrorState
       title="Pymes no pudo cargar la autenticación"
-      body="Revisá que la API esté disponible e intentá nuevamente."
+      body={body}
       reloadLabel="Intentar de nuevo"
     />
   );

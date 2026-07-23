@@ -37,6 +37,22 @@ Cuando existe `PYMES_CLERK_SECRET_KEY`, `make up` habilita automáticamente el
 perfil Compose `iam`; sin esa clave el worker no arranca y ningún efecto
 externo se simula.
 
+Pymes selecciona organizaciones exclusivamente desde su directorio local. La
+instancia Clerk debe emitir el session token estándar con
+`aud=pymes-v2-api`, permitir que Pymes active la organización admitida y tener
+slugs habilitados. No se usan JWT templates porque no conservan el vínculo de
+sesión requerido por la API. Con la CLI autenticada y el repositorio vinculado,
+la configuración remota puede verificarse sin modificarla:
+
+```bash
+make clerk-check
+```
+
+El check exige `force_organization_selection=false`, `slug_disabled=false`,
+el claim de audiencia y ausencia de JWT templates. También admite un destino
+explícito con
+`./scripts/check-clerk-config.sh --app app_... --instance dev`.
+
 Los puertos publicados pueden cambiarse, por ejemplo con
 `PYMES_API_PORT=28080 PYMES_WEB_PORT=25173 make up`. Dentro de Docker el
 backend y el servidor web conservan el puerto `8080`.

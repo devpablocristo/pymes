@@ -7,6 +7,12 @@ export type AuthStatus =
   | "signed-in"
   | "error";
 
+export type AuthErrorCode =
+  | "AUTH_RUNTIME_CONFIG_UNAVAILABLE"
+  | "AUTH_SESSION_TOKEN_UNAVAILABLE"
+  | "AUTH_SESSION_REJECTED"
+  | "AUTH_DIRECTORY_UNAVAILABLE";
+
 export type AuthOrganization = {
   id: string;
   switchKey: string;
@@ -25,6 +31,7 @@ export type AuthUser = {
 export type AuthContextValue = {
   status: AuthStatus;
   error?: string;
+  errorCode?: AuthErrorCode;
   sessionId?: string;
   activeOrganizationId?: string;
   organizations: AuthOrganization[];

@@ -90,6 +90,7 @@ function AuthProbe() {
       </output>
       <output data-testid="organizations">{JSON.stringify(auth.organizations)}</output>
       <output data-testid="auth-error">{auth.error ?? ""}</output>
+      <output data-testid="auth-error-code">{auth.errorCode ?? ""}</output>
     </>
   );
 }
@@ -148,6 +149,7 @@ describe("RuntimeAuthProvider local organization authority", () => {
     const headers = new Headers(init?.headers);
     expect(headers.get("Accept")).toBe("application/json");
     expect(headers.get("Authorization")).toBe("Bearer jwt-from-clerk");
+    expect(clerkMocks.getToken).toHaveBeenNthCalledWith(1);
     expect(clerkMocks.useOrganizationList).not.toHaveBeenCalled();
 
     expect(observedAuth.organizations).toEqual([
@@ -291,39 +293,143 @@ describe("RuntimeAuthProvider local organization authority", () => {
 
   test.each([
     {
-      name: "a 401 response",
-      response: () =>
-        Promise.resolve(
-          jsonResponse(
-            {
-              error: {
-                code: "AUTH_INVALID_TOKEN",
-                message: "token rejected",
-              },
-            },
-            401,
-          ),
-        ),
-      expectedError: "token rejected",
+      name: "Clerk returns no token",
+      configure: () => clerkMocks.getToken.mockResolvedValueOnce(null),
     },
     {
-      name: "a directory transport failure",
-      response: () => Promise.reject(new Error("directory offline")),
-      expectedError: "directory offline",
+      name: "Clerk rejects token acquisition",
+      configure: () =>
+        clerkMocks.getToken.mockRejectedValueOnce(new Error("provider detail")),
     },
-  ])("fails closed when the organization directory returns $name", async ({
-    response,
-    expectedError,
-  }) => {
+  ])("fails safely before fetching when $name", async ({ configure }) => {
     const fetchImpl = vi.fn<typeof fetch>();
-    fetchImpl.mockImplementation(response);
+    configure();
 
     renderProvider(fetchImpl);
 
     await waitFor(() => {
       expect(screen.getByTestId("auth-status")).toHaveTextContent("error");
     });
+    expect(fetchImpl).not.toHaveBeenCalled();
     expect(observedAuth.organizations).toEqual([]);
-    expect(screen.getByTestId("auth-error")).toHaveTextContent(expectedError);
+    expect(screen.getByTestId("auth-error")).toHaveTextContent(
+      "No se pudo obtener una sesión válida de Clerk.",
+    );
+    expect(screen.getByTestId("auth-error-code")).toHaveTextContent(
+      "AUTH_SESSION_TOKEN_UNAVAILABLE",
+    );
+    expect(screen.getByTestId("auth-error")).not.toHaveTextContent(
+      "provider detail",
+    );
+  });
+
+  test("refreshes once and retries the directory after AUTH_INVALID_TOKEN", async () => {
+    clerkMocks.getToken
+      .mockResolvedValueOnce("cached-token")
+      .mockResolvedValueOnce("fresh-token");
+    const fetchImpl = vi.fn<typeof fetch>();
+    fetchImpl
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error: {
+              code: "AUTH_INVALID_TOKEN",
+              message: "provider detail",
+            },
+          },
+          401,
+        ),
+      )
+      .mockResolvedValueOnce(jsonResponse(organizationDirectory));
+
+    renderProvider(fetchImpl);
+
+    await waitFor(() => expect(observedAuth.status).toBe("signed-in"));
+    expect(clerkMocks.getToken).toHaveBeenNthCalledWith(1);
+    expect(clerkMocks.getToken).toHaveBeenNthCalledWith(2, {
+      skipCache: true,
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(
+      new Headers(fetchImpl.mock.calls[0][1]?.headers).get("Authorization"),
+    ).toBe("Bearer cached-token");
+    expect(
+      new Headers(fetchImpl.mock.calls[1][1]?.headers).get("Authorization"),
+    ).toBe("Bearer fresh-token");
+  });
+
+  test("stops after one refresh when the API rejects the token again", async () => {
+    clerkMocks.getToken
+      .mockResolvedValueOnce("cached-token")
+      .mockResolvedValueOnce("fresh-token");
+    const invalidTokenResponse = () =>
+      jsonResponse(
+        {
+          error: {
+            code: "AUTH_INVALID_TOKEN",
+            message: "provider detail",
+          },
+        },
+        401,
+      );
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(invalidTokenResponse())
+      .mockResolvedValueOnce(invalidTokenResponse());
+
+    renderProvider(fetchImpl);
+
+    await waitFor(() => expect(observedAuth.status).toBe("error"));
+    expect(clerkMocks.getToken).toHaveBeenCalledTimes(2);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("auth-error-code")).toHaveTextContent(
+      "AUTH_SESSION_REJECTED",
+    );
+    expect(screen.getByTestId("auth-error")).toHaveTextContent(
+      "La API rechazó la sesión de Clerk.",
+    );
+    expect(screen.getByTestId("auth-error")).not.toHaveTextContent(
+      "provider detail",
+    );
+  });
+
+  test.each([
+    {
+      name: "a non-canonical 401 response",
+      response: () =>
+        Promise.resolve(
+          jsonResponse(
+            {
+              error: {
+                code: "OTHER_AUTH_ERROR",
+                message: "provider detail",
+              },
+            },
+            401,
+          ),
+        ),
+    },
+    {
+      name: "a directory transport failure",
+      response: () => Promise.reject(new Error("provider detail")),
+    },
+  ])("does not leak details for $name", async ({ response }) => {
+    const fetchImpl = vi.fn<typeof fetch>();
+    fetchImpl.mockImplementation(response);
+
+    renderProvider(fetchImpl);
+
+    await waitFor(() => expect(observedAuth.status).toBe("error"));
+    expect(clerkMocks.getToken).toHaveBeenCalledOnce();
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("auth-error-code")).toHaveTextContent(
+      "AUTH_DIRECTORY_UNAVAILABLE",
+    );
+    expect(screen.getByTestId("auth-error")).toHaveTextContent(
+      "No se pudo cargar el directorio de organizaciones.",
+    );
+    expect(screen.getByTestId("auth-error")).not.toHaveTextContent(
+      "provider detail",
+    );
   });
 });

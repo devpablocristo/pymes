@@ -182,13 +182,13 @@ jobs:
       - name: Verify readiness failure and recovery
         run: |
           docker compose stop postgres
-          if curl --fail --silent http://127.0.0.1:8080/readyz >/dev/null; then
+          if curl --fail --silent http://127.0.0.1:18080/readyz >/dev/null; then
             echo "readiness remained successful while PostgreSQL was stopped" >&2
             exit 1
           fi
           docker compose start postgres
           for attempt in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:8080/readyz >/dev/null; then
+            if curl --fail --silent http://127.0.0.1:18080/readyz >/dev/null; then
               exit 0
             fi
             sleep 1

@@ -38,7 +38,7 @@ services:
       PYMES_SHUTDOWN_TIMEOUT: 10s
       PYMES_READINESS_TIMEOUT: 2s
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:${PYMES_API_PORT:-18080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,7 +58,7 @@ services:
     build:
       context: ./web
     ports:
-      - "127.0.0.1:5173:8080"
+      - "127.0.0.1:${PYMES_WEB_PORT:-15173}:8080"
     depends_on:
       backend:
         condition: service_healthy

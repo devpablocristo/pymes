@@ -23,9 +23,13 @@ make up
 make smoke
 ```
 
-La web queda disponible en `http://localhost:5173`, la API en
-`http://localhost:8080` y PostgreSQL en `127.0.0.1:55433`. El job `migrate`
+La web queda disponible en `http://localhost:15173`, la API en
+`http://localhost:18080` y PostgreSQL en `127.0.0.1:55433`. El job `migrate`
 termina antes de que se inicie el backend.
+
+Los puertos publicados pueden cambiarse, por ejemplo con
+`PYMES_API_PORT=28080 PYMES_WEB_PORT=25173 make up`. Dentro de Docker el
+backend y el servidor web conservan el puerto `8080`.
 
 `make down` detiene los servicios sin borrar el volumen. `make ps` muestra el
 estado y `make logs` sigue los logs del stack.
@@ -43,7 +47,8 @@ make backend-run
 make web-dev
 ```
 
-La API escucha en `http://localhost:8080` y expone:
+En ejecución nativa, la API escucha en la dirección definida por
+`PYMES_HTTP_ADDR`. El ejemplo usa `:8080` y expone:
 
 - `GET /healthz`: liveness del proceso;
 - `GET /readyz`: disponibilidad de PostgreSQL.

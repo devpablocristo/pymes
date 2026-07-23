@@ -1,63 +1,92 @@
-import { createContext, type PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
+import { createI18nProvider } from "@devpablocristo/platform-browser/i18n";
 
-type Locale = "es" | "en";
-
-const copy = {
+const messages = {
   es: {
-    navigation: "Navegación principal",
-    runtime: "Runtime",
-    principles: "Principios",
-    language: "Idioma",
-    darkTheme: "Usar tema oscuro",
-    lightTheme: "Usar tema claro",
-    title: "Una base limpia para construir.",
-    description: "API, datos y web avanzan como componentes independientes sobre contratos publicados.",
-    statusLabel: "Componentes del runtime",
-    principlesTitle: "Horizontal desde el primer día",
-    principlesDescription: "Este shell contiene solamente infraestructura. Identidad y capacidades de negocio llegarán en entregas separadas.",
-    foundation: "Runtime técnico",
-    noLegacy: "Sin dependencias de v1",
+    "app.name": "Pymes",
+    "app.subtitle": "Gestión simple",
+    "nav.section": "Principal",
+    "nav.home": "Inicio",
+    "nav.search": "Buscar en Pymes…",
+    "shell.clearSearch": "Limpiar búsqueda",
+    "shell.noResults": "No hay coincidencias",
+    "shell.collapse": "Contraer navegación",
+    "shell.expand": "Expandir navegación",
+    "shell.open": "Abrir navegación",
+    "shell.close": "Cerrar navegación",
+    "shell.navigation": "Navegación principal",
+    "shell.skip": "Ir al contenido",
+    "preferences.language": "Cambiar idioma",
+    "preferences.themeDark": "Usar tema oscuro",
+    "preferences.themeLight": "Usar tema claro",
+    "dashboard.eyebrow": "Inicio",
+    "dashboard.title": "Tu negocio, en un solo lugar.",
+    "dashboard.description":
+      "Este espacio va a reunir la actividad diaria y lo que necesita tu atención.",
+    "dashboard.emptyTitle": "Todo empieza acá",
+    "dashboard.emptyBody":
+      "Cuando estén disponibles tus primeros datos, vas a ver un resumen claro de la operación.",
+    "dashboard.emptyTag": "Espacio preparado",
+    "state.loading": "Cargando contenido",
+    "state.emptyTitle": "Todavía no hay información",
+    "state.emptyBody": "Los datos aparecerán acá cuando estén disponibles.",
+    "state.errorTitle": "No pudimos cargar esta sección",
+    "state.errorBody": "Revisá la conexión e intentá nuevamente.",
+    "state.retry": "Intentar de nuevo",
+    "state.fatalTitle": "Pymes no pudo iniciar",
+    "state.fatalBody": "Recargá la página. Si el problema continúa, contactá a soporte.",
+    "state.reload": "Recargar",
+    "notFound.code": "404",
+    "notFound.title": "Esta página no existe",
+    "notFound.body": "La dirección puede haber cambiado o estar incompleta.",
+    "notFound.action": "Volver al inicio",
   },
   en: {
-    navigation: "Primary navigation",
-    runtime: "Runtime",
-    principles: "Principles",
-    language: "Language",
-    darkTheme: "Use dark theme",
-    lightTheme: "Use light theme",
-    title: "A clean foundation to build on.",
-    description: "API, data, and web evolve as independent components over published contracts.",
-    statusLabel: "Runtime components",
-    principlesTitle: "Horizontal from day one",
-    principlesDescription: "This shell contains infrastructure only. Identity and business capabilities will arrive in separate deliveries.",
-    foundation: "Technical runtime",
-    noLegacy: "No v1 dependencies",
+    "app.name": "Pymes",
+    "app.subtitle": "Simple management",
+    "nav.section": "Main",
+    "nav.home": "Home",
+    "nav.search": "Search Pymes…",
+    "shell.clearSearch": "Clear search",
+    "shell.noResults": "No matches",
+    "shell.collapse": "Collapse navigation",
+    "shell.expand": "Expand navigation",
+    "shell.open": "Open navigation",
+    "shell.close": "Close navigation",
+    "shell.navigation": "Primary navigation",
+    "shell.skip": "Skip to content",
+    "preferences.language": "Change language",
+    "preferences.themeDark": "Use dark theme",
+    "preferences.themeLight": "Use light theme",
+    "dashboard.eyebrow": "Home",
+    "dashboard.title": "Your business, all in one place.",
+    "dashboard.description":
+      "This space will bring together daily activity and everything that needs your attention.",
+    "dashboard.emptyTitle": "Everything starts here",
+    "dashboard.emptyBody":
+      "Once your first data is available, you will see a clear overview of the operation.",
+    "dashboard.emptyTag": "Workspace ready",
+    "state.loading": "Loading content",
+    "state.emptyTitle": "No information yet",
+    "state.emptyBody": "Data will appear here when it becomes available.",
+    "state.errorTitle": "We could not load this section",
+    "state.errorBody": "Check your connection and try again.",
+    "state.retry": "Try again",
+    "state.fatalTitle": "Pymes could not start",
+    "state.fatalBody": "Reload the page. If the problem continues, contact support.",
+    "state.reload": "Reload",
+    "notFound.code": "404",
+    "notFound.title": "This page does not exist",
+    "notFound.body": "The address may have changed or be incomplete.",
+    "notFound.action": "Back to home",
   },
 } as const;
 
-type I18nContextValue = {
-  locale: Locale;
-  setLocale: (locale: Locale) => void;
-  text: (typeof copy)[Locale];
-};
+const i18n = createI18nProvider({
+  namespace: "pymes-v2",
+  storageKey: "language",
+  defaultLanguage: "es",
+  messages,
+});
 
-const I18nContext = createContext<I18nContextValue | null>(null);
-
-export function I18nProvider({ children }: PropsWithChildren) {
-  const [locale, setLocale] = useState<Locale>("es");
-
-  useEffect(() => {
-    document.documentElement.lang = locale;
-  }, [locale]);
-
-  const value = useMemo(() => ({ locale, setLocale, text: copy[locale] }), [locale]);
-  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
-}
-
-export function useI18n(): I18nContextValue {
-  const value = useContext(I18nContext);
-  if (!value) {
-    throw new Error("useI18n must be used inside I18nProvider");
-  }
-  return value;
-}
+export const I18nProvider = i18n.Provider;
+export const useI18n = i18n.useI18n;

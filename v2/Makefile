@@ -3,7 +3,41 @@ include .env
 export
 endif
 
-.PHONY: backend-run backend-test db-up db-down db-migrate db-test db-integration web-dev web-ci ci
+.DEFAULT_GOAL := help
+
+.PHONY: help up down ps logs smoke backend-run backend-test db-up db-down db-migrate db-test db-integration web-dev web-ci ci
+
+help:
+	@echo "Pymes v2"
+	@echo ""
+	@echo "  make up              Construye y levanta postgres, migrate, backend y web"
+	@echo "  make smoke           Verifica base, API y web"
+	@echo "  make ps              Muestra el estado del stack"
+	@echo "  make logs            Sigue los logs"
+	@echo "  make down            Detiene el stack sin borrar el volumen"
+	@echo "  make ci              Ejecuta los checks nativos de v2"
+	@echo "  make db-integration  Prueba migraciones y reinicio de PostgreSQL"
+
+up:
+	docker compose stop backend web >/dev/null 2>&1 || true
+	docker compose rm -f migrate >/dev/null 2>&1 || true
+	docker compose up --build --detach --wait --wait-timeout 180
+
+down:
+	docker compose down
+
+ps:
+	docker compose ps
+
+logs:
+	docker compose logs --follow --tail=200
+
+smoke:
+	docker compose exec -T backend wget -q -O - http://127.0.0.1:8080/healthz >/dev/null
+	docker compose exec -T backend wget -q -O - http://127.0.0.1:8080/readyz >/dev/null
+	docker compose exec -T web wget -q -O - http://127.0.0.1:8080/healthz >/dev/null
+	docker compose exec -T postgres sh -ec \
+		'test "$$(psql -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_namespace WHERE nspname = '\''app'\''")" = 1'
 
 backend-run:
 	cd backend && GOWORK=off go run ./cmd/api
@@ -15,7 +49,7 @@ db-up:
 	docker compose up -d --wait postgres
 
 db-down:
-	docker compose down
+	$(MAKE) down
 
 db-migrate:
 	cd db && GOWORK=off go run ./cmd/migrate

@@ -8,6 +8,8 @@ import (
 	"time"
 
 	observability "github.com/devpablocristo/platform/observability/go"
+	"github.com/devpablocristo/pymes/v2/backend/internal/api"
+	"github.com/devpablocristo/pymes/v2/backend/internal/config"
 )
 
 type Readiness interface {
@@ -19,6 +21,31 @@ type healthResponse struct {
 }
 
 func NewHandler(logger *slog.Logger, readiness Readiness, readinessTimeout time.Duration) http.Handler {
+	return NewHandlerWithIAM(logger, readiness, readinessTimeout, NewIAMAPI(config.ClerkConfig{}))
+}
+
+func NewHandlerWithIAM(
+	logger *slog.Logger,
+	readiness Readiness,
+	readinessTimeout time.Duration,
+	iamAPI api.ServerInterface,
+) http.Handler {
+	return NewHandlerWithIAMAndIdempotency(
+		logger,
+		readiness,
+		readinessTimeout,
+		iamAPI,
+		nil,
+	)
+}
+
+func NewHandlerWithIAMAndIdempotency(
+	logger *slog.Logger,
+	readiness Readiness,
+	readinessTimeout time.Duration,
+	iamAPI api.ServerInterface,
+	idempotency *IAMIdempotency,
+) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, healthResponse{Status: "ok"})
@@ -43,10 +70,21 @@ func NewHandler(logger *slog.Logger, readiness Readiness, readinessTimeout time.
 		writeJSON(w, http.StatusOK, healthResponse{Status: "ready"})
 	})
 
-	return observability.Middleware(logger, mux)
+	api.HandlerWithOptions(iamAPI, api.StdHTTPServerOptions{
+		BaseRouter: mux,
+		ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
+			writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", err.Error())
+		},
+	})
+
+	var handler http.Handler = mux
+	if idempotency != nil {
+		handler = idempotency.Wrap(handler)
+	}
+	return observability.Middleware(logger, handler)
 }
 
-func writeJSON(w http.ResponseWriter, status int, body healthResponse) {
+func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)

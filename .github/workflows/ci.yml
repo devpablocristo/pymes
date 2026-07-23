@@ -154,13 +154,58 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  compose:
+    name: compose
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start the complete stack
+        run: make up
+      - name: Smoke the complete stack
+        run: make smoke
+      - name: Verify non-root application containers
+        run: |
+          docker compose exec -T backend sh -ec 'test "$(id -u)" != "0"'
+          docker compose exec -T web sh -ec 'test "$(id -u)" != "0"'
+          test -n "$(docker image inspect --format '{{.Config.User}}' "$(docker compose images -q migrate)")"
+          test "$(docker image inspect --format '{{.Config.User}}' "$(docker compose images -q migrate)")" != "0"
+      - name: Re-run migrations through the normal startup contract
+        run: |
+          docker compose exec -T postgres sh -ec \
+            'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 1'
+          make up
+          docker compose exec -T postgres sh -ec \
+            'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 1'
+      - name: Verify readiness failure and recovery
+        run: |
+          docker compose stop postgres
+          if curl --fail --silent http://127.0.0.1:8080/readyz >/dev/null; then
+            echo "readiness remained successful while PostgreSQL was stopped" >&2
+            exit 1
+          fi
+          docker compose start postgres
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8080/readyz >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker compose logs backend postgres
+          exit 1
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes
+
   v2-ci:
     name: v2-ci
     if: always()
-    needs: [archive, dependency-boundary, backend, db, web]
+    needs: [archive, dependency-boundary, backend, db, web, compose]
     runs-on: ubuntu-latest
     steps:
       - name: Require every v2 check
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
-        run: test "${RESULTS}" = "success success success success success"
+        run: test "${RESULTS}" = "success success success success success success"

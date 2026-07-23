@@ -14,9 +14,26 @@ lee, ejecuta ni importa código de `v1/`.
 Cada componente mantiene dependencias y checks propios. Los módulos de
 `platform` se consumen exclusivamente mediante versiones publicadas.
 
-## Desarrollo local
+## Desarrollo local con Docker
 
-Requiere Go 1.26.5, Node 20.19 o posterior, npm 10 y Docker con Compose.
+Requiere Docker con Compose. No requiere Go ni Node instalados en el host:
+
+```bash
+make up
+make smoke
+```
+
+La web queda disponible en `http://localhost:5173`, la API en
+`http://localhost:8080` y PostgreSQL en `127.0.0.1:55433`. El job `migrate`
+termina antes de que se inicie el backend.
+
+`make down` detiene los servicios sin borrar el volumen. `make ps` muestra el
+estado y `make logs` sigue los logs del stack.
+
+## Desarrollo nativo
+
+Para ejecutar backend y web fuera de contenedores se requieren Go 1.26.5,
+Node 20.19 o posterior y npm 10:
 
 ```bash
 cp .env.example .env
@@ -38,7 +55,7 @@ make ci
 make db-integration
 ```
 
-`make db-down` detiene PostgreSQL sin borrar su volumen.
+`make db-down` detiene el stack sin borrar su volumen.
 
 Principios iniciales:
 

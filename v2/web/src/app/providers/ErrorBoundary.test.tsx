@@ -14,6 +14,6 @@ test("renders a stable fallback when a child crashes", () => {
     </ErrorBoundary>,
   );
 
-  expect(screen.getByRole("alert")).toHaveTextContent("No pudimos cargar la aplicación.");
+  expect(screen.getByRole("alert")).toHaveTextContent("Pymes no pudo iniciar");
   consoleError.mockRestore();
 });

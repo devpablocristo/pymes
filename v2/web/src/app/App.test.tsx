@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, test } from "vitest";
+import { beforeEach, expect, test } from "vitest";
 import { App } from "./App";
 import { AppProviders } from "./providers/AppProviders";
 
@@ -12,22 +12,69 @@ function renderApp() {
   );
 }
 
-test("renders the technical shell", () => {
-  renderApp();
-
-  expect(screen.getByRole("heading", { name: "Una base limpia para construir." })).toBeInTheDocument();
-  expect(screen.getByRole("navigation", { name: "Navegación principal" })).toBeInTheDocument();
-  expect(screen.getByText("PostgreSQL")).toBeInTheDocument();
+beforeEach(() => {
+  window.localStorage.clear();
+  window.history.replaceState({}, "", "/");
 });
 
-test("switches theme and locale through providers", async () => {
-  const user = userEvent.setup();
+test("redirects home into the product console with one main landmark", async () => {
   renderApp();
 
-  await user.click(screen.getByRole("button", { name: "Usar tema oscuro" }));
-  expect(document.documentElement).toHaveAttribute("data-theme", "dark");
+  expect(await screen.findByRole("heading", { name: "Tu negocio, en un solo lugar." })).toBeInTheDocument();
+  expect(window.location.pathname).toBe("/dashboard");
+  expect(document.querySelectorAll("main")).toHaveLength(1);
+  expect(screen.getByRole("link", { name: "Inicio" })).toHaveAttribute("aria-current", "page");
+  expect(screen.queryByText("Clientes")).not.toBeInTheDocument();
+});
 
-  await user.selectOptions(screen.getByRole("combobox", { name: "Idioma" }), "en");
-  expect(screen.getByRole("heading", { name: "A clean foundation to build on." })).toBeInTheDocument();
-  expect(document.documentElement).toHaveAttribute("lang", "en");
+test("supports keyboard search and accessible desktop and mobile navigation", async () => {
+  const user = userEvent.setup();
+  renderApp();
+  await screen.findByRole("heading", { name: "Tu negocio, en un solo lugar." });
+
+  fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+  expect(screen.getByRole("searchbox", { name: "Buscar en Pymes…" })).toHaveFocus();
+
+  await user.click(screen.getByRole("button", { name: "Contraer navegación" }));
+  expect(screen.getByRole("button", { name: "Expandir navegación" })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+
+  await user.click(screen.getByRole("button", { name: "Abrir navegación" }));
+  expect(screen.getByRole("button", { name: "Cerrar navegación" })).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(screen.getByRole("button", { name: "Abrir navegación" })).toHaveFocus();
+});
+
+test("persists language and theme through platform-browser", async () => {
+  const user = userEvent.setup();
+  const firstRender = renderApp();
+  await screen.findByRole("heading", { name: "Tu negocio, en un solo lugar." });
+
+  await user.click(screen.getByRole("button", { name: "Usar tema oscuro" }));
+  await user.click(screen.getByRole("button", { name: "Cambiar idioma" }));
+
+  expect(document.documentElement).toHaveAttribute("data-theme", "dark");
+  expect(document.documentElement).toHaveAttribute("lang", "en-US");
+  expect(window.localStorage.getItem("pymes-v2:theme")).toBe("dark");
+  expect(window.localStorage.getItem("pymes-v2:language")).toBe("en");
+
+  firstRender.unmount();
+  renderApp();
+
+  expect(await screen.findByRole("heading", { name: "Your business, all in one place." })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Use light theme" })).toBeInTheDocument();
+});
+
+test("renders a useful 404 inside the console", async () => {
+  window.history.replaceState({}, "", "/missing");
+  renderApp();
+
+  expect(await screen.findByRole("heading", { name: "Esta página no existe" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Volver al inicio" })).toHaveAttribute("href", "/dashboard");
+  await waitFor(() => expect(document.querySelectorAll("main")).toHaveLength(1));
 });

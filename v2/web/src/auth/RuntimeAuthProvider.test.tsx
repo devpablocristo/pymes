@@ -132,7 +132,7 @@ beforeEach(() => {
 });
 
 describe("RuntimeAuthProvider local organization authority", () => {
-  test("loads the admitted directory with platform-http and maps local IDs and switch keys", async () => {
+  test("loads the admitted directory with the v1 Clerk token-provider pattern and maps local IDs and switch keys", async () => {
     const fetchImpl = vi.fn<typeof fetch>();
     fetchImpl.mockResolvedValue(jsonResponse(organizationDirectory));
 
@@ -146,6 +146,8 @@ describe("RuntimeAuthProvider local organization authority", () => {
     const [url, init] = fetchImpl.mock.calls[0];
     expect(url).toBe("/api/v1/organizations?limit=100");
     expect(init?.method).toBe("GET");
+    expect(init?.cache).toBe("no-store");
+    expect(init?.credentials).toBe("same-origin");
     const headers = new Headers(init?.headers);
     expect(headers.get("Accept")).toBe("application/json");
     expect(headers.get("Authorization")).toBe("Bearer jwt-from-clerk");
@@ -193,6 +195,7 @@ describe("RuntimeAuthProvider local organization authority", () => {
 
     await waitFor(() => expect(observedAuth.status).toBe("signed-in"));
     expect(observedAuth.organizations).toHaveLength(2);
+    expect(clerkMocks.getToken).toHaveBeenCalledTimes(2);
     expect(fetchImpl).toHaveBeenNthCalledWith(
       1,
       "/api/v1/organizations?limit=100",

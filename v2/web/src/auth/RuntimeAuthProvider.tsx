@@ -5,11 +5,6 @@ import {
   useUser,
 } from "@clerk/react";
 import {
-  createHttpClient,
-  HttpError,
-  type HttpClient,
-} from "@devpablocristo/platform-http";
-import {
   useEffect,
   useMemo,
   useRef,
@@ -27,9 +22,12 @@ import { clearTenantCaches } from "./tenantCache";
 
 type RuntimeConfig = components["schemas"]["RuntimeConfig"];
 type OrganizationList = components["schemas"]["OrganizationList"];
-type SessionTokenGetter = (
-  options?: { skipCache?: boolean },
-) => Promise<string | null>;
+
+function createClerkTokenProvider(
+  getToken: () => Promise<string | null | undefined>,
+): () => Promise<string | null> {
+  return async () => (await getToken()) ?? null;
+}
 
 class AuthBridgeError extends Error {
   constructor(
@@ -38,6 +36,16 @@ class AuthBridgeError extends Error {
   ) {
     super(message);
     this.name = "AuthBridgeError";
+  }
+}
+
+class OrganizationDirectoryError extends Error {
+  constructor(
+    readonly status: number,
+    readonly body: string,
+  ) {
+    super(`organization directory returned ${status}`);
+    this.name = "OrganizationDirectoryError";
   }
 }
 
@@ -120,6 +128,7 @@ export function RuntimeAuthProvider({
       signInUrl="/sign-in"
       signUpUrl="/accept-invitation"
       afterSignOutUrl="/sign-in"
+      taskUrls={{ "choose-organization": "/select-organization" }}
       appearance={{
         variables: {
           colorPrimary: "#0085db",
@@ -182,8 +191,15 @@ function ClerkAuthBridge({
     const controller = new AbortController();
     setDirectoryStatus("loading");
     setDirectoryError(undefined);
+    const sessionTokenProvider = createClerkTokenProvider(
+      () => auth.getToken(),
+    );
+    const refreshedSessionTokenProvider = createClerkTokenProvider(
+      () => auth.getToken({ skipCache: true }),
+    );
     loadAuthorizedOrganizationDirectory(
-      auth.getToken,
+      sessionTokenProvider,
+      refreshedSessionTokenProvider,
       fetchImpl,
       controller.signal,
     )
@@ -272,7 +288,8 @@ function ClerkAuthBridge({
 }
 
 async function loadOrganizationDirectory(
-  client: HttpClient,
+  getToken: () => Promise<string | null>,
+  fetchImpl: typeof fetch,
   signal: AbortSignal,
 ): Promise<OrganizationList["items"]> {
   const organizations: OrganizationList["items"] = [];
@@ -282,12 +299,12 @@ async function loadOrganizationDirectory(
   for (;;) {
     const query = new URLSearchParams({ limit: "100" });
     if (cursor) query.set("cursor", cursor);
-    const response = await client.request<OrganizationList>(
+    const token = await requireSessionToken(getToken);
+    const response = await fetchOrganizationDirectoryPage(
+      fetchImpl,
       `/api/v1/organizations?${query.toString()}`,
-      {
-        signal,
-        skipJSONContentType: true,
-      },
+      token,
+      signal,
     );
     organizations.push(...response.items);
 
@@ -302,28 +319,21 @@ async function loadOrganizationDirectory(
 }
 
 async function loadAuthorizedOrganizationDirectory(
-  getToken: SessionTokenGetter,
+  getToken: () => Promise<string | null>,
+  refreshToken: () => Promise<string | null>,
   fetchImpl: typeof fetch,
   signal: AbortSignal,
 ): Promise<OrganizationList["items"]> {
-  const initialToken = await requireSessionToken(getToken, false);
   try {
-    return await loadOrganizationDirectory(
-      createOrganizationDirectoryClient(fetchImpl, initialToken),
-      signal,
-    );
+    return await loadOrganizationDirectory(getToken, fetchImpl, signal);
   } catch (cause: unknown) {
     if (!isInvalidSessionToken(cause)) {
       throw cause;
     }
   }
 
-  const refreshedToken = await requireSessionToken(getToken, true);
   try {
-    return await loadOrganizationDirectory(
-      createOrganizationDirectoryClient(fetchImpl, refreshedToken),
-      signal,
-    );
+    return await loadOrganizationDirectory(refreshToken, fetchImpl, signal);
   } catch (cause: unknown) {
     if (isInvalidSessionToken(cause)) {
       throw new AuthBridgeError(
@@ -335,29 +345,46 @@ async function loadAuthorizedOrganizationDirectory(
   }
 }
 
-function createOrganizationDirectoryClient(
+async function fetchOrganizationDirectoryPage(
   fetchImpl: typeof fetch,
+  path: string,
   token: string,
-): HttpClient {
-  return createHttpClient({
-    baseURL: "",
-    fetch: fetchImpl,
-    resolveHeaders: () => ({
+  signal: AbortSignal,
+): Promise<OrganizationList> {
+  const response = await fetchImpl(path, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "same-origin",
+    signal,
+    headers: {
       Accept: "application/json",
       Authorization: `Bearer ${token}`,
-    }),
+    },
   });
+  const body = await response.text();
+  if (!response.ok) {
+    throw new OrganizationDirectoryError(response.status, body);
+  }
+  try {
+    const payload = JSON.parse(body) as OrganizationList;
+    if (!Array.isArray(payload.items) || !payload.page) {
+      throw new Error("invalid organization directory payload");
+    }
+    return payload;
+  } catch {
+    throw new AuthBridgeError(
+      "AUTH_DIRECTORY_UNAVAILABLE",
+      "No se pudo cargar el directorio de organizaciones.",
+    );
+  }
 }
 
 async function requireSessionToken(
-  getToken: SessionTokenGetter,
-  forceRefresh: boolean,
+  getToken: () => Promise<string | null>,
 ): Promise<string> {
   let token: string | null;
   try {
-    token = forceRefresh
-      ? await getToken({ skipCache: true })
-      : await getToken();
+    token = await getToken();
   } catch {
     throw new AuthBridgeError(
       "AUTH_SESSION_TOKEN_UNAVAILABLE",
@@ -374,7 +401,11 @@ async function requireSessionToken(
 }
 
 function isInvalidSessionToken(cause: unknown): boolean {
-  if (!(cause instanceof HttpError) || cause.status !== 401 || !cause.body) {
+  if (
+    !(cause instanceof OrganizationDirectoryError) ||
+    cause.status !== 401 ||
+    !cause.body
+  ) {
     return false;
   }
   try {

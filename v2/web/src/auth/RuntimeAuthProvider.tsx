@@ -168,7 +168,7 @@ function ClerkAuthBridge({
       baseURL: "",
       fetch: fetchImpl,
       resolveHeaders: async () => {
-        const token = await auth.getToken();
+        const token = await auth.getToken({ skipCache: true });
         if (!token) {
           throw new Error("session token unavailable");
         }

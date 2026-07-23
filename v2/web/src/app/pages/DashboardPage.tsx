@@ -6,11 +6,10 @@ export function DashboardPage() {
 
   return (
     <div className="dashboard-page">
-      <header className="page-intro">
+      <header className="page-topbar">
         <div>
-          <p className="page-intro__eyebrow">{t("dashboard.eyebrow")}</p>
-          <h1>{t("dashboard.title")}</h1>
-          <p>{t("dashboard.description")}</p>
+          <h1>{t("dashboard.eyebrow")}</h1>
+          <small>Dashboard</small>
         </div>
         <span className="readiness-tag">
           <span aria-hidden="true" />
@@ -19,10 +18,11 @@ export function DashboardPage() {
       </header>
 
       <div className="dashboard-canvas">
-        <div className="dashboard-canvas__rule" aria-hidden="true">
-          <span />
-          <span />
-          <span />
+        <div className="dashboard-canvas__header">
+          <div>
+            <h2>{t("dashboard.title")}</h2>
+            <p>{t("dashboard.description")}</p>
+          </div>
         </div>
         <EmptyState title={t("dashboard.emptyTitle")} body={t("dashboard.emptyBody")} />
       </div>

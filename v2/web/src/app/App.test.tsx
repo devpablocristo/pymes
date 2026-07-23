@@ -20,7 +20,7 @@ beforeEach(() => {
 test("redirects home into the product console with one main landmark", async () => {
   renderApp();
 
-  expect(await screen.findByRole("heading", { name: "Tu negocio, en un solo lugar." })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Inicio" })).toBeInTheDocument();
   expect(window.location.pathname).toBe("/dashboard");
   expect(document.querySelectorAll("main")).toHaveLength(1);
   expect(screen.getByRole("link", { name: "Inicio" })).toHaveAttribute("aria-current", "page");
@@ -30,7 +30,7 @@ test("redirects home into the product console with one main landmark", async () 
 test("supports keyboard search and accessible desktop and mobile navigation", async () => {
   const user = userEvent.setup();
   renderApp();
-  await screen.findByRole("heading", { name: "Tu negocio, en un solo lugar." });
+  await screen.findByRole("heading", { name: "Inicio" });
 
   fireEvent.keyDown(document, { key: "k", ctrlKey: true });
   expect(screen.getByRole("searchbox", { name: "Buscar en Pymes…" })).toHaveFocus();
@@ -53,7 +53,7 @@ test("supports keyboard search and accessible desktop and mobile navigation", as
 test("persists language and theme through platform-browser", async () => {
   const user = userEvent.setup();
   const firstRender = renderApp();
-  await screen.findByRole("heading", { name: "Tu negocio, en un solo lugar." });
+  await screen.findByRole("heading", { name: "Inicio" });
 
   await user.click(screen.getByRole("button", { name: "Usar tema oscuro" }));
   await user.click(screen.getByRole("button", { name: "Cambiar idioma" }));
@@ -66,7 +66,7 @@ test("persists language and theme through platform-browser", async () => {
   firstRender.unmount();
   renderApp();
 
-  expect(await screen.findByRole("heading", { name: "Your business, all in one place." })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Home" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Use light theme" })).toBeInTheDocument();
 });
 

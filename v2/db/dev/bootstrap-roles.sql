@@ -42,6 +42,7 @@ BEGIN
     END IF;
     IF to_regnamespace('app') IS NOT NULL THEN
         GRANT USAGE, CREATE ON SCHEMA app TO pymes_migrator;
+        GRANT USAGE ON SCHEMA app TO pymes_backend, pymes_iam_worker;
     END IF;
 END
 $legacy$;

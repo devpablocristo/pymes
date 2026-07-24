@@ -15,6 +15,7 @@ import (
 	clerkadapter "github.com/devpablocristo/platform/sdks/clerk/go"
 	"github.com/devpablocristo/pymes/v2/backend/internal/administration"
 	"github.com/devpablocristo/pymes/v2/backend/internal/config"
+	fiscalstorage "github.com/devpablocristo/pymes/v2/backend/internal/fiscal/storage"
 	"github.com/devpablocristo/pymes/v2/backend/internal/httpserver"
 	productiam "github.com/devpablocristo/pymes/v2/backend/internal/iam"
 	"github.com/jackc/pgx/v5"
@@ -103,6 +104,11 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 		database.Close()
 		return nil, fmt.Errorf("configure administration service: %w", err)
 	}
+	fiscalStore, err := fiscalstorage.Open(ctx, cfg.Fiscal)
+	if err != nil {
+		database.Close()
+		return nil, fmt.Errorf("configure fiscal storage: %w", err)
+	}
 
 	var iamIdempotency *httpserver.IAMIdempotency
 	if verifier != nil {
@@ -144,6 +150,9 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 					WebhookInbox:          iamStore,
 					OutboxAppender:        outboxStore,
 					Administration:        administrationService,
+					FiscalKMS:             fiscalStore.KMS,
+					FiscalObjects:         fiscalStore.Objects,
+					FiscalKMSKeyReference: fiscalStore.KeyReference,
 				}),
 				iamIdempotency,
 			),

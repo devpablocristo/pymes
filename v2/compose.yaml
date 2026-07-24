@@ -91,6 +91,89 @@ services:
     stop_grace_period: 15s
     restart: unless-stopped
 
+  fiscal-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    command: ["-c", ".air.fiscal-worker.toml"]
+    environment:
+      PYMES_DATABASE_URL: postgres://pymes_fiscal_worker:pymes_fiscal_worker@postgres:5432/pymes_v2?sslmode=disable
+      PYMES_ENVIRONMENT: ${PYMES_ENVIRONMENT:-development}
+      PYMES_FISCAL_STORAGE_BACKEND: ${PYMES_FISCAL_STORAGE_BACKEND:-local}
+      PYMES_FISCAL_STORAGE_DIR: /var/lib/pymes/fiscal
+      PYMES_FISCAL_MASTER_KEY: ${PYMES_FISCAL_MASTER_KEY:-cHltZXMtdjItZGV2ZWxvcG1lbnQta2V5LTMyYnl0ZSE=}
+      PYMES_FISCAL_AWS_REGION: ${PYMES_FISCAL_AWS_REGION:-}
+      PYMES_FISCAL_KMS_KEY_ID: ${PYMES_FISCAL_KMS_KEY_ID:-}
+      PYMES_FISCAL_KMS_ENDPOINT: ${PYMES_FISCAL_KMS_ENDPOINT:-}
+      PYMES_FISCAL_S3_BUCKET: ${PYMES_FISCAL_S3_BUCKET:-}
+      PYMES_FISCAL_S3_PREFIX: ${PYMES_FISCAL_S3_PREFIX:-pymes-v2}
+      PYMES_FISCAL_S3_ENDPOINT: ${PYMES_FISCAL_S3_ENDPOINT:-}
+      PYMES_FISCAL_S3_FORCE_PATH_STYLE: ${PYMES_FISCAL_S3_FORCE_PATH_STYLE:-false}
+      PYMES_FISCAL_WORKER_POLL_INTERVAL: ${PYMES_FISCAL_WORKER_POLL_INTERVAL:-2s}
+      PYMES_FISCAL_WORKER_LEASE_DURATION: ${PYMES_FISCAL_WORKER_LEASE_DURATION:-2m}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - ./backend:/src
+      - pymes_v2_fiscal_data:/var/lib/pymes/fiscal
+    tmpfs:
+      - /src/tmp:exec,mode=1777
+    init: true
+    stop_grace_period: 20s
+    restart: unless-stopped
+
+  fiscal-accounting-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    command: ["-c", ".air.fiscal-accounting-worker.toml"]
+    environment:
+      PYMES_DATABASE_URL: ${PYMES_FISCAL_ACCOUNTING_DATABASE_URL:-postgres://pymes_fiscal_accounting_worker:pymes_fiscal_accounting_worker@postgres:5432/pymes_v2?sslmode=disable}
+      PYMES_FISCAL_ACCOUNTING_WORKER_ID: ${PYMES_FISCAL_ACCOUNTING_WORKER_ID:-}
+      PYMES_FISCAL_ACCOUNTING_ACTOR: ${PYMES_FISCAL_ACCOUNTING_ACTOR:-system:fiscal-accounting}
+      PYMES_FISCAL_ACCOUNTING_POLL_INTERVAL: ${PYMES_FISCAL_ACCOUNTING_POLL_INTERVAL:-1s}
+      PYMES_FISCAL_ACCOUNTING_RETRY_DELAY: ${PYMES_FISCAL_ACCOUNTING_RETRY_DELAY:-30s}
+      PYMES_FISCAL_ACCOUNTING_MAX_ATTEMPTS: ${PYMES_FISCAL_ACCOUNTING_MAX_ATTEMPTS:-10}
+      PYMES_FISCAL_ACCOUNTING_ORG_BATCH_SIZE: ${PYMES_FISCAL_ACCOUNTING_ORG_BATCH_SIZE:-100}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - ./backend:/src
+    tmpfs:
+      - /src/tmp:exec,mode=1777
+    init: true
+    stop_grace_period: 15s
+    restart: unless-stopped
+
+  fiscal-homologation:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.fiscal-homologation
+    environment:
+      PYMES_DATABASE_URL: postgres://pymes_backend:pymes_backend@postgres:5432/pymes_v2?sslmode=disable
+      PYMES_ENVIRONMENT: ${PYMES_ENVIRONMENT:-development}
+      PYMES_FISCAL_STORAGE_BACKEND: ${PYMES_FISCAL_STORAGE_BACKEND:-local}
+      PYMES_FISCAL_STORAGE_DIR: /var/lib/pymes/fiscal
+      PYMES_FISCAL_MASTER_KEY: ${PYMES_FISCAL_MASTER_KEY:-cHltZXMtdjItZGV2ZWxvcG1lbnQta2V5LTMyYnl0ZSE=}
+      PYMES_FISCAL_AWS_REGION: ${PYMES_FISCAL_AWS_REGION:-}
+      PYMES_FISCAL_KMS_KEY_ID: ${PYMES_FISCAL_KMS_KEY_ID:-}
+      PYMES_FISCAL_KMS_ENDPOINT: ${PYMES_FISCAL_KMS_ENDPOINT:-}
+      PYMES_FISCAL_S3_BUCKET: ${PYMES_FISCAL_S3_BUCKET:-}
+      PYMES_FISCAL_S3_PREFIX: ${PYMES_FISCAL_S3_PREFIX:-pymes-v2}
+      PYMES_FISCAL_S3_ENDPOINT: ${PYMES_FISCAL_S3_ENDPOINT:-}
+      PYMES_FISCAL_S3_FORCE_PATH_STYLE: ${PYMES_FISCAL_S3_FORCE_PATH_STYLE:-false}
+      PYMES_FISCAL_HOMOLOGATION_ENABLED: ${PYMES_FISCAL_HOMOLOGATION_ENABLED:-false}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - pymes_v2_fiscal_data:/var/lib/pymes/fiscal
+    profiles: ["ops"]
+    init: true
+    restart: "no"
+
   backend:
     build:
       context: ./backend
@@ -109,6 +192,16 @@ services:
       PYMES_CLERK_JWT_KEY: ${PYMES_CLERK_JWT_KEY:-}
       PYMES_SHUTDOWN_TIMEOUT: 10s
       PYMES_READINESS_TIMEOUT: 2s
+      PYMES_FISCAL_STORAGE_BACKEND: ${PYMES_FISCAL_STORAGE_BACKEND:-local}
+      PYMES_FISCAL_STORAGE_DIR: /var/lib/pymes/fiscal
+      PYMES_FISCAL_MASTER_KEY: ${PYMES_FISCAL_MASTER_KEY:-cHltZXMtdjItZGV2ZWxvcG1lbnQta2V5LTMyYnl0ZSE=}
+      PYMES_FISCAL_AWS_REGION: ${PYMES_FISCAL_AWS_REGION:-}
+      PYMES_FISCAL_KMS_KEY_ID: ${PYMES_FISCAL_KMS_KEY_ID:-}
+      PYMES_FISCAL_KMS_ENDPOINT: ${PYMES_FISCAL_KMS_ENDPOINT:-}
+      PYMES_FISCAL_S3_BUCKET: ${PYMES_FISCAL_S3_BUCKET:-}
+      PYMES_FISCAL_S3_PREFIX: ${PYMES_FISCAL_S3_PREFIX:-pymes-v2}
+      PYMES_FISCAL_S3_ENDPOINT: ${PYMES_FISCAL_S3_ENDPOINT:-}
+      PYMES_FISCAL_S3_FORCE_PATH_STYLE: ${PYMES_FISCAL_S3_FORCE_PATH_STYLE:-false}
     ports:
       - "127.0.0.1:${PYMES_API_PORT:-18080}:8080"
     depends_on:
@@ -118,6 +211,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - ./backend:/src
+      - pymes_v2_fiscal_data:/var/lib/pymes/fiscal
     tmpfs:
       - /src/tmp:exec,mode=1777
     healthcheck:
@@ -157,3 +251,4 @@ services:
 volumes:
   pymes_v2_postgres_data:
   pymes_v2_web_node_modules:
+  pymes_v2_fiscal_data:

@@ -71,3 +71,23 @@ export function OrganizationIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function LedgerIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
+      <path d="M5 3h13a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />
+      <path d="M7 3v18M10 8h6M10 12h6M10 16h4" />
+    </svg>
+  );
+}
+
+export function FiscalIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
+      <path d="M6 3h9l3 3v15H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />
+      <path d="M14 3v4h4M8 11h6M8 15h8M8 19h5" />
+      <circle cx="17.5" cy="10.5" r="2.5" fill="var(--color-surface)" />
+      <path d="m16.4 10.5.7.7 1.4-1.5" />
+    </svg>
+  );
+}

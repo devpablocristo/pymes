@@ -363,6 +363,24 @@ export interface paths {
         patch: operations["updateTeamMember"];
         trace?: never;
     };
+    "/api/v1/team/members/{member_id}/business-permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Devuelve únicamente las delegaciones explícitas de gestión contable y fiscal del miembro. Los permisos propios de owner/admin se derivan del rol y no se duplican aquí. */
+        get: operations["getTeamMemberBusinessPermissions"];
+        /** @description Reemplaza el conjunto acotado de delegaciones del miembro dentro de la organización activa. No cambia su rol general. */
+        put: operations["updateTeamMemberBusinessPermissions"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/team/ownership-transfer": {
         parameters: {
             query?: never;
@@ -431,6 +449,745 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounting/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAccountingAccounts"];
+        put?: never;
+        post: operations["createAccountingAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/accounts/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAccountingAccount"];
+        put: operations["updateAccountingAccount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/accounts/{account_id}/{lifecycle_action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["transitionAccountingAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/account-mappings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAccountingMappings"];
+        put: operations["updateAccountingMappings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listJournalDrafts"];
+        put?: never;
+        post: operations["createJournalDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/drafts/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateJournalDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/drafts/{draft_id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["postJournalDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/journal-entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listJournalEntries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/journal-entries/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getJournalEntry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/journal-entries/{entry_id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reverseJournalEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/open-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAccountingOpenItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createAccountingReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/supplier-payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createAccountingSupplierPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAccountingPeriods"];
+        put?: never;
+        post: operations["createAccountingPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/periods/{period_id}/transition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["transitionAccountingPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/periods/{period_id}/annual-close-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createAnnualClosingDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/financial-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listFinancialAccounts"];
+        put?: never;
+        post: operations["createFinancialAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/financial-accounts/{financial_account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateFinancialAccount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/statement-imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["importAccountingStatement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/statement-imports/{statement_import_id}/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["suggestAccountingMatches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/reconciliations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAccountingReconciliations"];
+        put?: never;
+        post: operations["createAccountingReconciliation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/reconciliations/{reconciliation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAccountingReconciliation"];
+        put: operations["updateAccountingReconciliation"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/reconciliations/{reconciliation_id}/{reconciliation_action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["transitionAccountingReconciliation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/reports/{report}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAccountingReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/reports/{report}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["exportAccountingReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/inflation-indices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["importInflationIndices"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/inflation-adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewInflationAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/currency-revaluations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createCurrencyRevaluation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getFiscalSettings"];
+        put: operations["updateFiscalSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/homologation/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Última evidencia técnica inmutable de interoperabilidad contra el ambiente de homologación. No representa una aprobación otorgada por ARCA y nunca expone tickets ni secretos. */
+        get: operations["getLatestFiscalHomologation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/production/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Habilita emisión productiva sólo si perfil, certificado, punto de venta y una homologación técnica vigente son consistentes. */
+        post: operations["enableFiscalProduction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/certificates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["rotateFiscalCertificate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/points-of-sale": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listFiscalPointsOfSale"];
+        put?: never;
+        post: operations["createFiscalPointOfSale"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/purchase-vouchers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listFiscalPurchaseVouchers"];
+        put?: never;
+        post: operations["createFiscalPurchaseVoucher"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/vouchers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listFiscalVouchers"];
+        put?: never;
+        post: operations["createFiscalVoucher"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/vouchers/{voucher_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getFiscalVoucher"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/vouchers/{voucher_id}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getFiscalVoucherPDF"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/credit-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createFiscalCreditNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/debit-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createFiscalDebitNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/iva-simple/{period}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getIVASimple"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/iva-simple/{period}/workflow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getIVASimpleWorkflow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/iva-simple/{period}/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Crea el borrador del período o vuelve a tomar un snapshot de sus comprobantes mientras continúe abierto. */
+        post: operations["prepareIVASimpleWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/iva-simple/{period}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["closeIVASimpleWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/iva-simple/{period}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["exportIVASimpleWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/iva-simple/{period}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reopenIVASimpleWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fiscal/iva-simple/{period}/exports/{export_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["downloadIVASimpleExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/webhooks/clerk": {
         parameters: {
             query?: never;
@@ -473,7 +1230,7 @@ export interface components {
          * @description Permiso IAM efectivo derivado del rol efectivo.
          * @enum {string}
          */
-        Permission: "organization:view" | "organization:update" | "team:view" | "team:member:update" | "team:member:remove" | "team:invitation:create" | "team:invitation:manage" | "sessions:manage:self";
+        Permission: "organization:view" | "organization:update" | "team:view" | "team:member:update" | "team:member:remove" | "team:invitation:create" | "team:invitation:manage" | "sessions:manage:self" | "accounting:view" | "accounting:manage" | "fiscal:view" | "fiscal:manage";
         /**
          * @description Roles administrables dentro de un tenant. `owner` es un rol global del producto y no forma parte de una membresía.
          * @enum {string}
@@ -614,6 +1371,16 @@ export interface components {
             status: components["schemas"]["MembershipStatus"];
             sync_status: components["schemas"]["SyncStatus"];
         };
+        /** @enum {string} */
+        DelegatedBusinessPermission: "accounting:manage" | "fiscal:manage";
+        MemberBusinessPermissionsInput: {
+            permissions: components["schemas"]["DelegatedBusinessPermission"][];
+        };
+        MemberBusinessPermissions: {
+            /** Format: uuid */
+            member_id: string;
+            permissions: components["schemas"]["DelegatedBusinessPermission"][];
+        };
         Invitation: {
             /** Format: uuid */
             id: string;
@@ -682,6 +1449,841 @@ export interface components {
             /** Format: int64 */
             version: number;
         };
+        /**
+         * @description Decimal exacto serializado como string; nunca IEEE-754.
+         * @example 1250.50
+         */
+        DecimalAmount: string;
+        /** @example ARS */
+        CurrencyCode: string;
+        /** @enum {string} */
+        AccountingAccountType: "asset" | "liability" | "equity" | "income" | "cost" | "expense";
+        /** @enum {string} */
+        AccountingNormalBalance: "debit" | "credit";
+        /** @enum {string} */
+        MonetaryClassification: "monetary" | "non_monetary" | "not_applicable";
+        AccountingAccount: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            account_type: components["schemas"]["AccountingAccountType"];
+            normal_balance: components["schemas"]["AccountingNormalBalance"];
+            monetary_classification: components["schemas"]["MonetaryClassification"];
+            /** Format: uuid */
+            parent_id?: string | null;
+            postable: boolean;
+            lifecycle_state: components["schemas"]["LifecycleState"];
+            /** Format: int64 */
+            version: number;
+        };
+        AccountingAccountInput: {
+            code: string;
+            name: string;
+            account_type: components["schemas"]["AccountingAccountType"];
+            normal_balance: components["schemas"]["AccountingNormalBalance"];
+            monetary_classification: components["schemas"]["MonetaryClassification"];
+            /** Format: uuid */
+            parent_id?: string | null;
+            postable: boolean;
+        };
+        UpdateAccountingAccountInput: components["schemas"]["AccountingAccountInput"] & {
+            /** Format: int64 */
+            version: number;
+        };
+        AccountingAccountList: {
+            items: components["schemas"]["AccountingAccount"][];
+            page: components["schemas"]["PageInfo"];
+        };
+        AccountingMapping: {
+            role: string;
+            /** Format: uuid */
+            account_id: string;
+            account_code: string;
+            account_name: string;
+            /** Format: int64 */
+            version: number;
+        };
+        AccountingMappingInput: {
+            role: string;
+            /** Format: uuid */
+            account_id: string;
+            /** Format: int64 */
+            version?: number;
+        };
+        JournalLineInput: {
+            /** Format: uuid */
+            account_id: string;
+            debit: components["schemas"]["DecimalAmount"];
+            credit: components["schemas"]["DecimalAmount"];
+            transaction_currency?: components["schemas"]["CurrencyCode"];
+            transaction_amount?: components["schemas"]["DecimalAmount"];
+            exchange_rate?: components["schemas"]["DecimalAmount"];
+            /** Format: uuid */
+            party_id?: string | null;
+            memo?: string;
+        };
+        JournalLine: components["schemas"]["JournalLineInput"] & {
+            /** Format: uuid */
+            id: string;
+            line_number: number;
+        };
+        JournalDraftInput: {
+            /** Format: date */
+            accounting_date: string;
+            description: string;
+            currency: components["schemas"]["CurrencyCode"];
+            lines: components["schemas"]["JournalLineInput"][];
+        };
+        UpdateJournalDraftInput: components["schemas"]["JournalDraftInput"] & {
+            /** Format: int64 */
+            version: number;
+        };
+        JournalDraft: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            accounting_date: string;
+            description: string;
+            currency: components["schemas"]["CurrencyCode"];
+            lines: components["schemas"]["JournalLine"][];
+            total_debit: components["schemas"]["DecimalAmount"];
+            total_credit: components["schemas"]["DecimalAmount"];
+            /** Format: int64 */
+            version: number;
+        };
+        JournalDraftList: {
+            items: components["schemas"]["JournalDraft"][];
+            page: components["schemas"]["PageInfo"];
+        };
+        JournalEntry: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            entry_number: number;
+            /** Format: date */
+            accounting_date: string;
+            description: string;
+            currency: components["schemas"]["CurrencyCode"];
+            source_type?: string;
+            /** Format: uuid */
+            source_id?: string | null;
+            /** Format: uuid */
+            reverses_entry_id?: string | null;
+            reversal_reason?: string | null;
+            lines: components["schemas"]["JournalLine"][];
+            total_debit: components["schemas"]["DecimalAmount"];
+            total_credit: components["schemas"]["DecimalAmount"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        JournalEntryList: {
+            items: components["schemas"]["JournalEntry"][];
+            page: components["schemas"]["PageInfo"];
+        };
+        /** @enum {string} */
+        AccountingOpenItemType: "receivable" | "payable";
+        /** @enum {string} */
+        AccountingPaymentMethod: "cash" | "bank_transfer" | "card" | "wallet" | "check";
+        AccountingOpenItem: {
+            /** Format: uuid */
+            id: string;
+            item_type: components["schemas"]["AccountingOpenItemType"];
+            /** Format: uuid */
+            party_id: string;
+            /** Format: uuid */
+            account_id: string;
+            /** Format: uuid */
+            origin_entry_id: string;
+            source_type: string;
+            /** Format: uuid */
+            source_id: string;
+            /** Format: date */
+            issued_at: string;
+            /** Format: date */
+            due_date?: string | null;
+            currency: components["schemas"]["CurrencyCode"];
+            original_amount: components["schemas"]["DecimalAmount"];
+            original_functional_amount: components["schemas"]["DecimalAmount"];
+            open_amount: components["schemas"]["DecimalAmount"];
+            open_functional_amount: components["schemas"]["DecimalAmount"];
+        };
+        AccountingOpenItemList: {
+            items: components["schemas"]["AccountingOpenItem"][];
+            page: components["schemas"]["PageInfo"];
+        };
+        AccountingSettlementInput: {
+            /** Format: uuid */
+            open_item_id: string;
+            /** Format: date */
+            accounting_date: string;
+            payment_method: components["schemas"]["AccountingPaymentMethod"];
+            amount: components["schemas"]["DecimalAmount"];
+            exchange_rate: components["schemas"]["DecimalAmount"];
+            /** Format: date */
+            exchange_rate_date: string;
+            exchange_rate_source: string;
+        };
+        VersionedCommandInput: {
+            /** Format: int64 */
+            version: number;
+            reason?: string;
+        };
+        ReverseJournalEntryInput: {
+            /** Format: date */
+            accounting_date: string;
+            reason: string;
+        };
+        /** @enum {string} */
+        AccountingPeriodState: "open" | "soft_closed" | "locked";
+        AccountingPeriodInput: {
+            /** Format: date */
+            start_date: string;
+            /** Format: date */
+            end_date: string;
+        };
+        AccountingPeriod: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            start_date: string;
+            /** Format: date */
+            end_date: string;
+            state: components["schemas"]["AccountingPeriodState"];
+            /** Format: int64 */
+            version: number;
+            checklist?: {
+                code: string;
+                clear: boolean;
+                count?: number;
+            }[];
+        };
+        AnnualClosingDraftInput: {
+            /** Format: int64 */
+            version: number;
+        };
+        PeriodTransitionInput: {
+            desired_state: components["schemas"]["AccountingPeriodState"];
+            /** Format: int64 */
+            version: number;
+            reason: string;
+        };
+        /** @enum {string} */
+        FinancialAccountType: "cash" | "bank" | "card" | "wallet";
+        FinancialAccountInput: {
+            /** Format: uuid */
+            ledger_account_id: string;
+            account_type: components["schemas"]["FinancialAccountType"];
+            name: string;
+            currency: components["schemas"]["CurrencyCode"];
+            institution_name?: string;
+            external_reference?: string;
+        };
+        UpdateFinancialAccountInput: components["schemas"]["FinancialAccountInput"] & {
+            /** Format: int64 */
+            version: number;
+            archived: boolean;
+        };
+        FinancialAccount: components["schemas"]["FinancialAccountInput"] & {
+            /** Format: uuid */
+            id: string;
+            ledger_account_code: string;
+            ledger_account_name: string;
+            archived: boolean;
+            /** Format: int64 */
+            version: number;
+        };
+        /** @enum {string} */
+        StatementImportFormat: "csv" | "xlsx" | "ofx";
+        StatementImportInput: {
+            /** Format: uuid */
+            financial_account_id: string;
+            file_name: string;
+            format: components["schemas"]["StatementImportFormat"];
+            currency: components["schemas"]["CurrencyCode"];
+            /** Format: byte */
+            content_base64: string;
+        };
+        StatementMovement: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            booked_at: string;
+            /** Format: date */
+            value_at: string;
+            description: string;
+            reference: string;
+            amount: components["schemas"]["DecimalAmount"];
+            currency: components["schemas"]["CurrencyCode"];
+            fingerprint: string;
+        };
+        StatementImport: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            financial_account_id: string;
+            file_name: string;
+            format: components["schemas"]["StatementImportFormat"];
+            sha256: string;
+            currency: components["schemas"]["CurrencyCode"];
+            /** Format: date-time */
+            imported_at: string;
+            movements: components["schemas"]["StatementMovement"][];
+        };
+        /** @enum {string} */
+        ReconciliationState: "draft" | "completed" | "reopened";
+        ReconciliationMatchInput: {
+            /** Format: uuid */
+            statement_movement_id: string;
+            /** Format: uuid */
+            journal_line_id: string;
+            statement_amount: components["schemas"]["DecimalAmount"];
+            ledger_amount: components["schemas"]["DecimalAmount"];
+        };
+        ReconciliationMatch: components["schemas"]["ReconciliationMatchInput"] & {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        ReconciliationSuggestion: {
+            /** Format: uuid */
+            statement_movement_id: string;
+            /** Format: uuid */
+            journal_line_id: string;
+            amount: components["schemas"]["DecimalAmount"];
+            score: number;
+            reasons: string[];
+        };
+        ReconciliationInput: {
+            /** Format: uuid */
+            account_id: string;
+            /** Format: date */
+            period_start: string;
+            /** Format: date */
+            statement_date: string;
+            opening_balance: components["schemas"]["DecimalAmount"];
+            statement_balance: components["schemas"]["DecimalAmount"];
+            currency: components["schemas"]["CurrencyCode"];
+            matches: components["schemas"]["ReconciliationMatchInput"][];
+        };
+        UpdateReconciliationInput: {
+            /** Format: int64 */
+            version: number;
+            opening_balance: components["schemas"]["DecimalAmount"];
+            statement_balance: components["schemas"]["DecimalAmount"];
+            matches: components["schemas"]["ReconciliationMatchInput"][];
+        };
+        Reconciliation: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            account_id: string;
+            /** Format: date */
+            period_start: string;
+            /** Format: date */
+            statement_date: string;
+            opening_balance: components["schemas"]["DecimalAmount"];
+            statement_balance: components["schemas"]["DecimalAmount"];
+            ledger_balance: components["schemas"]["DecimalAmount"];
+            difference: components["schemas"]["DecimalAmount"];
+            currency: components["schemas"]["CurrencyCode"];
+            state: components["schemas"]["ReconciliationState"];
+            /** Format: int64 */
+            version: number;
+            matches: components["schemas"]["ReconciliationMatch"][];
+        };
+        ReconciliationList: {
+            items: components["schemas"]["Reconciliation"][];
+            page: components["schemas"]["PageInfo"];
+        };
+        AccountingReportRow: {
+            key: string;
+            label: string;
+            debit: components["schemas"]["DecimalAmount"];
+            credit: components["schemas"]["DecimalAmount"];
+            balance: components["schemas"]["DecimalAmount"];
+        };
+        AccountingReport: {
+            report: string;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            currency: components["schemas"]["CurrencyCode"];
+            rows: components["schemas"]["AccountingReportRow"][];
+            total_debit: components["schemas"]["DecimalAmount"];
+            total_credit: components["schemas"]["DecimalAmount"];
+        };
+        InflationAdjustmentInput: {
+            /** Format: uuid */
+            period_id: string;
+        };
+        InflationIndexInput: {
+            period: string;
+            value: components["schemas"]["DecimalAmount"];
+            source: string;
+            /** @description Referencia o contenido normalizado usado para calcular el checksum. */
+            source_document: string;
+        };
+        InflationAdjustmentLine: {
+            /** Format: uuid */
+            account_id: string;
+            account_code: string;
+            account_name: string;
+            /** Format: date */
+            origin_date: string;
+            origin_index: components["schemas"]["DecimalAmount"];
+            closing_index: components["schemas"]["DecimalAmount"];
+            coefficient: components["schemas"]["DecimalAmount"];
+            historical: components["schemas"]["DecimalAmount"];
+            restated: components["schemas"]["DecimalAmount"];
+            adjustment: components["schemas"]["DecimalAmount"];
+        };
+        InflationAdjustment: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            period_id: string;
+            /** Format: date */
+            closing_date: string;
+            source: string;
+            source_checksum: string;
+            recpam: components["schemas"]["DecimalAmount"];
+            lines: components["schemas"]["InflationAdjustmentLine"][];
+            draft: components["schemas"]["JournalDraft"];
+        };
+        ClosingExchangeRateInput: {
+            currency: components["schemas"]["CurrencyCode"];
+            rate: components["schemas"]["DecimalAmount"];
+            /** Format: date */
+            date: string;
+            source: string;
+            source_reference?: string;
+            source_checksum: string;
+        };
+        CurrencyRevaluationInput: {
+            /** Format: date */
+            closing_date: string;
+            rates: components["schemas"]["ClosingExchangeRateInput"][];
+        };
+        CurrencyRevaluationLine: {
+            /** Format: uuid */
+            account_id: string;
+            account_code: string;
+            account_name: string;
+            currency: components["schemas"]["CurrencyCode"];
+            currency_amount: components["schemas"]["DecimalAmount"];
+            carrying_amount: components["schemas"]["DecimalAmount"];
+            closing_rate: components["schemas"]["DecimalAmount"];
+            revalued_amount: components["schemas"]["DecimalAmount"];
+            exchange_difference: components["schemas"]["DecimalAmount"];
+        };
+        CurrencyRevaluation: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            closing_date: string;
+            functional_currency: components["schemas"]["CurrencyCode"];
+            source_checksum: string;
+            rates: components["schemas"]["ClosingExchangeRateInput"][];
+            lines: components["schemas"]["CurrencyRevaluationLine"][];
+            total_gain: components["schemas"]["DecimalAmount"];
+            total_loss: components["schemas"]["DecimalAmount"];
+            net_result: components["schemas"]["DecimalAmount"];
+            draft: components["schemas"]["JournalDraft"];
+        };
+        /** @enum {string} */
+        FiscalEnvironment: "homologation" | "production";
+        /** @enum {string} */
+        ArgentinaTaxCondition: "registered" | "monotributo" | "exempt" | "not_responsible";
+        /** @enum {string} */
+        FiscalAuthorizationState: "queued" | "processing" | "authorized" | "rejected" | "uncertain";
+        /** @enum {string} */
+        FiscalConcept: "products" | "services" | "mixed";
+        /** @enum {string} */
+        FiscalVoucherKind: "invoice_a" | "invoice_b" | "invoice_c" | "credit_note_a" | "credit_note_b" | "credit_note_c" | "debit_note_a" | "debit_note_b" | "debit_note_c";
+        ArgentinaFiscalSettingsInput: {
+            cuit: string;
+            legal_name: string;
+            tax_address: string;
+            tax_condition: components["schemas"]["ArgentinaTaxCondition"];
+            /** Format: date */
+            activity_start_date: string;
+            environment: components["schemas"]["FiscalEnvironment"];
+            functional_currency: components["schemas"]["CurrencyCode"];
+            /** Format: int64 */
+            version: number;
+        };
+        ArgentinaFiscalSettings: components["schemas"]["ArgentinaFiscalSettingsInput"] & {
+            /** @enum {string} */
+            country_code: "AR";
+            production_ready: boolean;
+            /** Format: date-time */
+            certificate_expires_at?: string | null;
+        };
+        /** @enum {string} */
+        FiscalHomologationStatus: "succeeded" | "failed";
+        FiscalHomologationCheck: {
+            ordinal: number;
+            /** @enum {string} */
+            kind: "configuration" | "certificate" | "wsaa" | "wsfe_last_authorized" | "local_matrix";
+            name: string;
+            status: components["schemas"]["FiscalHomologationStatus"];
+            point_of_sale?: number | null;
+            voucher_type?: number | null;
+            /** @description Detalle operativo sin credenciales ni datos secretos. */
+            detail: string;
+            evidence: {
+                [key: string]: unknown;
+            };
+            evidence_sha256: string;
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            completed_at: string;
+        };
+        FiscalHomologationRun: {
+            /** Format: uuid */
+            id: string;
+            status: components["schemas"]["FiscalHomologationStatus"];
+            certificate_fingerprint?: string | null;
+            point_of_sale_count: number;
+            check_count: number;
+            success_count: number;
+            failure_count: number;
+            evidence_sha256: string;
+            evidence_note: string;
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            completed_at: string;
+            checks: components["schemas"]["FiscalHomologationCheck"][];
+        };
+        FiscalCertificateInput: {
+            environment: components["schemas"]["FiscalEnvironment"];
+            certificate_pem: string;
+            private_key_pem: string;
+        };
+        FiscalCertificate: {
+            /** Format: uuid */
+            id: string;
+            environment: components["schemas"]["FiscalEnvironment"];
+            fingerprint: string;
+            /** Format: date-time */
+            valid_from: string;
+            /** Format: date-time */
+            expires_at: string;
+            active: boolean;
+        };
+        FiscalPointOfSaleInput: {
+            number: number;
+            environment: components["schemas"]["FiscalEnvironment"];
+            name?: string;
+        };
+        FiscalPointOfSale: components["schemas"]["FiscalPointOfSaleInput"] & {
+            /** Format: uuid */
+            id: string;
+            active: boolean;
+        };
+        FiscalTaxComponent: {
+            /** @enum {string} */
+            kind: "vat" | "exempt" | "non_taxed" | "other_tax" | "withholding" | "perception";
+            rate: components["schemas"]["DecimalAmount"];
+            taxable_base: components["schemas"]["DecimalAmount"];
+            amount: components["schemas"]["DecimalAmount"];
+            /** @description Código de tributo informado a ARCA; obligatorio para tributos no IVA. */
+            authority_code?: number;
+            description?: string;
+            jurisdiction?: string;
+        };
+        FiscalVoucherLineInput: {
+            description: string;
+            quantity: components["schemas"]["DecimalAmount"];
+            unit_price: components["schemas"]["DecimalAmount"];
+            subtotal: components["schemas"]["DecimalAmount"];
+            /** @description Costo total confirmado de la línea en moneda funcional; no se envía a ARCA ni se imprime. */
+            cost_amount?: components["schemas"]["DecimalAmount"];
+            /** @default false */
+            cost_confirmed: boolean;
+            taxes: components["schemas"]["FiscalTaxComponent"][];
+        };
+        FiscalVoucherInput: {
+            environment: components["schemas"]["FiscalEnvironment"];
+            /**
+             * @description Documento comercial de venta que origina la autorización de ARCA. Las compras se registran por el recurso dedicado y las NC/ND por sus comandos específicos.
+             * @enum {string}
+             */
+            source_type: "sale";
+            /** Format: uuid */
+            source_id: string;
+            /** Format: uuid */
+            point_of_sale_id: string;
+            concept: components["schemas"]["FiscalConcept"];
+            receiver_name?: string;
+            /** @enum {string} */
+            receiver_document_type: "CUIT" | "CUIL" | "DNI" | "CONSUMER_FINAL";
+            receiver_document_number: string;
+            receiver_tax_condition: string;
+            /**
+             * @description Define si el asiento cancela contra un medio de cobro o genera una partida por cobrar.
+             * @enum {string}
+             */
+            sale_condition: "cash" | "credit";
+            /**
+             * Format: uuid
+             * @description Cliente contable; obligatorio para venta a crédito y omitido para consumidor sin cuenta corriente.
+             */
+            party_id?: string | null;
+            /**
+             * @description Cuenta funcional o clearing usada por el posteo; en crédito queda como medio original para NC/reintegros.
+             * @enum {string}
+             */
+            payment_method: "cash" | "bank_transfer" | "card" | "wallet" | "check";
+            /** Format: date */
+            service_from?: string;
+            /** Format: date */
+            service_to?: string;
+            /** Format: date */
+            payment_due_date?: string;
+            /**
+             * Format: date
+             * @description Vencimiento de la cuenta corriente; obligatorio para venta a crédito.
+             */
+            accounting_due_date?: string;
+            currency: components["schemas"]["CurrencyCode"];
+            exchange_rate: components["schemas"]["DecimalAmount"];
+            exchange_rate_source?: string;
+            lines: components["schemas"]["FiscalVoucherLineInput"][];
+        };
+        FiscalVoucher: {
+            /** Format: uuid */
+            id: string;
+            environment: components["schemas"]["FiscalEnvironment"];
+            state: components["schemas"]["FiscalAuthorizationState"];
+            kind?: components["schemas"]["FiscalVoucherKind"];
+            source_type: string;
+            /** Format: uuid */
+            source_id: string;
+            concept: components["schemas"]["FiscalConcept"];
+            point_of_sale?: number;
+            /** Format: int64 */
+            voucher_number?: number;
+            currency: components["schemas"]["CurrencyCode"];
+            total: components["schemas"]["DecimalAmount"];
+            cae?: string | null;
+            /** Format: date */
+            cae_expires_at?: string | null;
+            /** Format: uuid */
+            associated_voucher_id?: string | null;
+            observations?: string[];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        FiscalVoucherSnapshotLine: {
+            position: number;
+            description: string;
+            quantity: components["schemas"]["DecimalAmount"];
+            unit_price: components["schemas"]["DecimalAmount"];
+            /** @enum {string} */
+            tax_treatment: "taxable" | "exempt" | "non_taxed";
+            subtotal: components["schemas"]["DecimalAmount"];
+            vat_rate: components["schemas"]["DecimalAmount"];
+            vat_amount: components["schemas"]["DecimalAmount"];
+            total: components["schemas"]["DecimalAmount"];
+        };
+        FiscalVoucherDetail: components["schemas"]["FiscalVoucher"] & {
+            /** Format: date */
+            issue_date: string;
+            /** Format: date */
+            service_from?: string;
+            /** Format: date */
+            service_to?: string;
+            /** Format: date */
+            payment_due_date?: string;
+            receiver_name: string;
+            /** @enum {string} */
+            receiver_document_type: "CUIT" | "CUIL" | "DNI" | "CONSUMER_FINAL";
+            receiver_document_number: string;
+            receiver_tax_condition: string;
+            exchange_rate: components["schemas"]["DecimalAmount"];
+            exchange_rate_source?: string;
+            lines: components["schemas"]["FiscalVoucherSnapshotLine"][];
+        };
+        FiscalVoucherList: {
+            items: components["schemas"]["FiscalVoucher"][];
+            page: components["schemas"]["PageInfo"];
+        };
+        FiscalAdjustmentInput: {
+            /** Format: uuid */
+            associated_voucher_id: string;
+            reason: string;
+            lines: components["schemas"]["FiscalVoucherLineInput"][];
+        };
+        FiscalPurchaseLineInput: {
+            description: string;
+            quantity: components["schemas"]["DecimalAmount"];
+            unit_of_measure: string;
+            unit_price: components["schemas"]["DecimalAmount"];
+            discount_amount?: components["schemas"]["DecimalAmount"];
+            /** @enum {string} */
+            tax_treatment: "taxable" | "exempt" | "non_taxed";
+            vat_rate: components["schemas"]["DecimalAmount"];
+            net_amount: components["schemas"]["DecimalAmount"];
+            vat_amount: components["schemas"]["DecimalAmount"];
+            total_amount: components["schemas"]["DecimalAmount"];
+            /** @default false */
+            inventory: boolean;
+        };
+        FiscalPurchaseTaxInput: {
+            /** @enum {string} */
+            kind: "vat" | "other_tax" | "withholding" | "perception";
+            authority_code: string;
+            jurisdiction?: string;
+            description: string;
+            taxable_base: components["schemas"]["DecimalAmount"];
+            rate: components["schemas"]["DecimalAmount"];
+            amount: components["schemas"]["DecimalAmount"];
+            /** @default false */
+            creditable: boolean;
+        };
+        FiscalPurchaseVoucherInput: {
+            environment: components["schemas"]["FiscalEnvironment"];
+            /** Format: uuid */
+            source_id: string;
+            /** Format: uuid */
+            supplier_id: string;
+            supplier_tax_id: string;
+            supplier_name: string;
+            /** @enum {integer} */
+            voucher_type: 1 | 2 | 3 | 6 | 7 | 8 | 11 | 12 | 13;
+            point_of_sale: number;
+            /** Format: int64 */
+            voucher_number: number;
+            /** Format: date */
+            issue_date: string;
+            /** Format: date */
+            due_date?: string | null;
+            currency: components["schemas"]["CurrencyCode"];
+            exchange_rate: components["schemas"]["DecimalAmount"];
+            /** Format: date */
+            exchange_rate_date: string;
+            exchange_rate_source: string;
+            source_reference?: string;
+            /**
+             * Format: uuid
+             * @description Factura de compra original. Es obligatoria para notas de crédito y débito y debe pertenecer al mismo proveedor, ambiente y letra.
+             */
+            associated_purchase_voucher_id?: string | null;
+            lines: components["schemas"]["FiscalPurchaseLineInput"][];
+            taxes: components["schemas"]["FiscalPurchaseTaxInput"][];
+        };
+        FiscalPurchaseVoucher: {
+            /** Format: uuid */
+            id: string;
+            environment: components["schemas"]["FiscalEnvironment"];
+            /** Format: uuid */
+            supplier_id: string;
+            supplier_tax_id: string;
+            supplier_name: string;
+            voucher_type: number;
+            point_of_sale: number;
+            /** Format: int64 */
+            voucher_number: number;
+            /** Format: date */
+            issue_date: string;
+            /** Format: date */
+            due_date?: string | null;
+            currency: components["schemas"]["CurrencyCode"];
+            exchange_rate: components["schemas"]["DecimalAmount"];
+            net_amount: components["schemas"]["DecimalAmount"];
+            exempt_amount: components["schemas"]["DecimalAmount"];
+            non_taxed_amount: components["schemas"]["DecimalAmount"];
+            vat_amount: components["schemas"]["DecimalAmount"];
+            other_taxes_amount: components["schemas"]["DecimalAmount"];
+            withholding_amount: components["schemas"]["DecimalAmount"];
+            perception_amount: components["schemas"]["DecimalAmount"];
+            total_amount: components["schemas"]["DecimalAmount"];
+            /** Format: int64 */
+            version: number;
+            /** Format: uuid */
+            journal_entry_id?: string | null;
+            /** Format: uuid */
+            associated_purchase_voucher_id?: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        FiscalPurchaseVoucherList: {
+            items: components["schemas"]["FiscalPurchaseVoucher"][];
+            page: components["schemas"]["PageInfo"];
+        };
+        IVASimpleReport: {
+            period: string;
+            sales_net: components["schemas"]["DecimalAmount"];
+            output_vat: components["schemas"]["DecimalAmount"];
+            purchases_net: components["schemas"]["DecimalAmount"];
+            input_vat: components["schemas"]["DecimalAmount"];
+            withholdings: components["schemas"]["DecimalAmount"];
+            perceptions: components["schemas"]["DecimalAmount"];
+            balance: components["schemas"]["DecimalAmount"];
+            /** @description Archivo de trabajo codificado en base64. */
+            sales_file?: string;
+            /** @description Archivo de trabajo codificado en base64. */
+            purchases_file?: string;
+            validation_errors: string[];
+        };
+        /** @enum {string} */
+        IVASimpleWorkflowStatus: "draft" | "closed" | "exported";
+        IVASimplePrepareInput: {
+            /**
+             * Format: int64
+             * @description Obligatoria al volver a preparar un borrador existente; debe omitirse al crear el período por primera vez.
+             */
+            version?: number | null;
+            opening_balance?: components["schemas"]["DecimalAmount"];
+        };
+        IVASimpleTransitionInput: {
+            /** Format: int64 */
+            version: number;
+            reason: string;
+        };
+        IVASimpleExportSummary: {
+            /** Format: uuid */
+            id: string;
+            export_version: number;
+            filename: string;
+            media_type: string;
+            sha256: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        IVASimpleExportArtifact: components["schemas"]["IVASimpleExportSummary"] & {
+            /** Format: byte */
+            content_base64: string;
+        };
+        IVASimpleWorkflowPeriod: {
+            /** Format: uuid */
+            id: string;
+            period: string;
+            environment: components["schemas"]["FiscalEnvironment"];
+            status: components["schemas"]["IVASimpleWorkflowStatus"];
+            opening_balance: components["schemas"]["DecimalAmount"];
+            closing_balance?: components["schemas"]["DecimalAmount"];
+            report: components["schemas"]["IVASimpleReport"];
+            /** Format: int64 */
+            version: number;
+            exports: components["schemas"]["IVASimpleExportSummary"][];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: date-time */
+            closed_at?: string | null;
+            /** Format: date-time */
+            exported_at?: string | null;
+        };
         LifecycleCommandInput: {
             reason?: string;
         };
@@ -746,8 +2348,17 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description Conflicto con el estado actual (`IAM_ROLE_CONFLICT`, `IAM_INVITATION_PENDING`, `IDEMPOTENCY_KEY_CONFLICT` o `IDEMPOTENCY_IN_PROGRESS`). */
+        /** @description Conflicto con el estado actual (`VERSION_CONFLICT`, `RESOURCE_DUPLICATE`, `INVALID_TRANSITION`, `ACCOUNTING_PERIOD_CLOSED`, `RESOURCE_IMMUTABLE`, `FISCAL_AUTHORIZATION_UNCERTAIN`, `FISCAL_PRODUCTION_NOT_READY`, `IAM_ROLE_CONFLICT`, `IAM_INVITATION_PENDING`, `IDEMPOTENCY_KEY_CONFLICT` o `IDEMPOTENCY_IN_PROGRESS`). */
         Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description La operación es sintácticamente válida pero no satisface una garantía contable (`ACCOUNTING_UNBALANCED`). */
+        Unprocessable: {
             headers: {
                 [name: string]: unknown;
             };
@@ -811,6 +2422,14 @@ export interface components {
         InvitationID: string;
         TenantID: string;
         UserID: string;
+        AccountID: string;
+        DraftID: string;
+        EntryID: string;
+        PeriodID: string;
+        FinancialAccountID: string;
+        StatementImportID: string;
+        ReconciliationID: string;
+        VoucherID: string;
     };
     requestBodies: {
         LifecycleCommand: {
@@ -1580,6 +3199,66 @@ export interface operations {
             503: components["responses"]["Unavailable"];
         };
     };
+    getTeamMemberBusinessPermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                member_id: components["parameters"]["MemberID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Delegaciones explícitas vigentes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberBusinessPermissions"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    updateTeamMemberBusinessPermissions: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                member_id: components["parameters"]["MemberID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberBusinessPermissionsInput"];
+            };
+        };
+        responses: {
+            /** @description Delegaciones actualizadas. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberBusinessPermissions"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
     transferOwnership: {
         parameters: {
             query?: never;
@@ -1716,6 +3395,1793 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listAccountingAccounts: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+                lifecycle_state?: components["schemas"]["LifecycleState"];
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Plan de cuentas de la organización activa. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingAccountList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createAccountingAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingAccountInput"];
+            };
+        };
+        responses: {
+            /** @description Cuenta creada. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingAccount"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getAccountingAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: components["parameters"]["AccountID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cuenta contable. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingAccount"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    updateAccountingAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                account_id: components["parameters"]["AccountID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAccountingAccountInput"];
+            };
+        };
+        responses: {
+            /** @description Cuenta actualizada. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingAccount"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    transitionAccountingAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                account_id: components["parameters"]["AccountID"];
+                lifecycle_action: "archive" | "unarchive" | "trash" | "restore";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionedCommandInput"];
+            };
+        };
+        responses: {
+            /** @description Cuenta transicionada. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingAccount"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listAccountingMappings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mapeos funcionales del plan de cuentas. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingMapping"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    updateAccountingMappings: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingMappingInput"][];
+            };
+        };
+        responses: {
+            /** @description Mapeos vigentes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingMapping"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listJournalDrafts: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Borradores manuales. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalDraftList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createJournalDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JournalDraftInput"];
+            };
+        };
+        responses: {
+            /** @description Borrador creado. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalDraft"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    updateJournalDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                draft_id: components["parameters"]["DraftID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateJournalDraftInput"];
+            };
+        };
+        responses: {
+            /** @description Borrador actualizado. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalDraft"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    postJournalDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                draft_id: components["parameters"]["DraftID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionedCommandInput"];
+            };
+        };
+        responses: {
+            /** @description Asiento contabilizado. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntry"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listJournalEntries: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+                from?: string;
+                to?: string;
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Libro Diario paginado. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntryList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getJournalEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: components["parameters"]["EntryID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Asiento contabilizado. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntry"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    reverseJournalEntry: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                entry_id: components["parameters"]["EntryID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReverseJournalEntryInput"];
+            };
+        };
+        responses: {
+            /** @description Asiento de reversa creado sin modificar el original. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntry"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listAccountingOpenItems: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+                item_type?: components["schemas"]["AccountingOpenItemType"];
+                party_id?: string;
+                currency?: components["schemas"]["CurrencyCode"];
+                /** @description Fecha contable de corte. Si se omite, devuelve el saldo actual. */
+                as_of?: string;
+                open_only?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Partidas abiertas de clientes y proveedores. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingOpenItemList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createAccountingReceipt: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingSettlementInput"];
+            };
+        };
+        responses: {
+            /** @description Cobro contabilizado y aplicado a la cuenta por cobrar. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntry"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createAccountingSupplierPayment: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingSettlementInput"];
+            };
+        };
+        responses: {
+            /** @description Pago contabilizado y aplicado a la cuenta por pagar. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntry"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listAccountingPeriods: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Períodos contables. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingPeriod"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createAccountingPeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingPeriodInput"];
+            };
+        };
+        responses: {
+            /** @description Período contable abierto. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingPeriod"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    transitionAccountingPeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                period_id: components["parameters"]["PeriodID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeriodTransitionInput"];
+            };
+        };
+        responses: {
+            /** @description Período transicionado. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingPeriod"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createAnnualClosingDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                period_id: components["parameters"]["PeriodID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnualClosingDraftInput"];
+            };
+        };
+        responses: {
+            /** @description Borrador de cierre anual para revisión del contador. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalDraft"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listFinancialAccounts: {
+        parameters: {
+            query?: {
+                lifecycle_state?: "active" | "archived";
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cajas, bancos, tarjetas y billeteras conciliables. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinancialAccount"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createFinancialAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinancialAccountInput"];
+            };
+        };
+        responses: {
+            /** @description Cuenta financiera creada. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinancialAccount"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    updateFinancialAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                financial_account_id: components["parameters"]["FinancialAccountID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateFinancialAccountInput"];
+            };
+        };
+        responses: {
+            /** @description Cuenta financiera actualizada. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinancialAccount"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    importAccountingStatement: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatementImportInput"];
+            };
+        };
+        responses: {
+            /** @description Extracto importado y deduplicado por contenido. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementImport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    suggestAccountingMatches: {
+        parameters: {
+            query: {
+                financial_account_id: string;
+                from: string;
+                to: string;
+                max_days?: number;
+            };
+            header?: never;
+            path: {
+                statement_import_id: components["parameters"]["StatementImportID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sugerencias explicables por fecha, importe y referencia. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationSuggestion"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listAccountingReconciliations: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Conciliaciones bancarias. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createAccountingReconciliation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconciliationInput"];
+            };
+        };
+        responses: {
+            /** @description Conciliación creada. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Reconciliation"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getAccountingReconciliation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reconciliation_id: components["parameters"]["ReconciliationID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Conciliación con asignaciones parciales y combinadas. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Reconciliation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    updateAccountingReconciliation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                reconciliation_id: components["parameters"]["ReconciliationID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateReconciliationInput"];
+            };
+        };
+        responses: {
+            /** @description Conciliación y asignaciones actualizadas. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Reconciliation"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    transitionAccountingReconciliation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                reconciliation_id: components["parameters"]["ReconciliationID"];
+                reconciliation_action: "close" | "reopen";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionedCommandInput"];
+            };
+        };
+        responses: {
+            /** @description Conciliación cerrada o reabierta con auditoría. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Reconciliation"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getAccountingReport: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                account_id?: string;
+                financial_account_id?: string;
+            };
+            header?: never;
+            path: {
+                report: "journal" | "general-ledger" | "trial-balance" | "balance-sheet" | "income-statement" | "aging" | "vat-position" | "financial-activity";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reporte contable exacto con filas y totales. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    exportAccountingReport: {
+        parameters: {
+            query: {
+                format: "csv" | "xlsx" | "pdf";
+                from: string;
+                to: string;
+                account_id?: string;
+                financial_account_id?: string;
+            };
+            header?: never;
+            path: {
+                report: "journal" | "general-ledger" | "trial-balance" | "balance-sheet" | "income-statement" | "aging" | "vat-position" | "financial-activity";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exportación reproducible del reporte solicitado. */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/pdf": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    importInflationIndices: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InflationIndexInput"][];
+            };
+        };
+        responses: {
+            /** @description Índices almacenados con fuente y checksum. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    previewInflationAdjustment: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InflationAdjustmentInput"];
+            };
+        };
+        responses: {
+            /** @description Papel de trabajo y borrador de ajuste; nunca contabiliza automáticamente. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InflationAdjustment"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createCurrencyRevaluation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CurrencyRevaluationInput"];
+            };
+        };
+        responses: {
+            /** @description Papel de trabajo y borrador de revaluación; no se contabiliza automáticamente. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrencyRevaluation"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getFiscalSettings: {
+        parameters: {
+            query?: {
+                /** @description Ambiente a consultar; homologación por defecto. */
+                environment?: components["schemas"]["FiscalEnvironment"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Perfil fiscal argentino de la organización activa. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArgentinaFiscalSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    updateFiscalSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArgentinaFiscalSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Perfil fiscal actualizado. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArgentinaFiscalSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getLatestFiscalHomologation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Última ejecución finalizada y sus verificaciones. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalHomologationRun"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    enableFiscalProduction: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionedCommandInput"];
+            };
+        };
+        responses: {
+            /** @description Ambiente productivo habilitado. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArgentinaFiscalSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    rotateFiscalCertificate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FiscalCertificateInput"];
+            };
+        };
+        responses: {
+            /** @description Certificado validado y almacenado mediante KMS. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalCertificate"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listFiscalPointsOfSale: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Puntos de venta configurados. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalPointOfSale"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createFiscalPointOfSale: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FiscalPointOfSaleInput"];
+            };
+        };
+        responses: {
+            /** @description Punto de venta creado. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalPointOfSale"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listFiscalPurchaseVouchers: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+                period?: string;
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Comprobantes de proveedores registrados e inmutables. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalPurchaseVoucherList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createFiscalPurchaseVoucher: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FiscalPurchaseVoucherInput"];
+            };
+        };
+        responses: {
+            /** @description Comprobante de proveedor y efecto contable confirmados atómicamente. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalPurchaseVoucher"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listFiscalVouchers: {
+        parameters: {
+            query: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+                /** @description Ambiente fiscal aislado que se desea consultar. */
+                environment: components["schemas"]["FiscalEnvironment"];
+                status?: components["schemas"]["FiscalAuthorizationState"];
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Comprobantes e intentos de autorización. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalVoucherList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createFiscalVoucher: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FiscalVoucherInput"];
+            };
+        };
+        responses: {
+            /** @description Solicitud fiscal durable encolada. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalVoucher"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getFiscalVoucher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                voucher_id: components["parameters"]["VoucherID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Comprobante y snapshot fiscal inmutable para consulta y ajustes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalVoucherDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getFiscalVoucherPDF: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                voucher_id: components["parameters"]["VoucherID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description PDF fiscal inmutable generado desde el snapshot autorizado. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createFiscalCreditNote: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FiscalAdjustmentInput"];
+            };
+        };
+        responses: {
+            /** @description Nota de crédito encolada. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalVoucher"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createFiscalDebitNote: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FiscalAdjustmentInput"];
+            };
+        };
+        responses: {
+            /** @description Nota de débito encolada. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalVoucher"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getIVASimple: {
+        parameters: {
+            query?: {
+                /** @description Ambiente fiscal aislado; producción es el predeterminado para libros impositivos. */
+                environment?: "homologation" | "production";
+            };
+            header?: never;
+            path: {
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Posición IVA y archivos de trabajo compatibles con IVA Simple. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IVASimpleReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getIVASimpleWorkflow: {
+        parameters: {
+            query: {
+                environment: components["schemas"]["FiscalEnvironment"];
+            };
+            header?: never;
+            path: {
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Período IVA Simple persistido y sus artefactos inmutables. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IVASimpleWorkflowPeriod"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    prepareIVASimpleWorkflow: {
+        parameters: {
+            query: {
+                environment: components["schemas"]["FiscalEnvironment"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IVASimplePrepareInput"];
+            };
+        };
+        responses: {
+            /** @description Borrador actualizado. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IVASimpleWorkflowPeriod"];
+                };
+            };
+            /** @description Borrador creado. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IVASimpleWorkflowPeriod"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    closeIVASimpleWorkflow: {
+        parameters: {
+            query: {
+                environment: components["schemas"]["FiscalEnvironment"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IVASimpleTransitionInput"];
+            };
+        };
+        responses: {
+            /** @description Período cerrado luego de conciliar documentos y asientos. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IVASimpleWorkflowPeriod"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    exportIVASimpleWorkflow: {
+        parameters: {
+            query: {
+                environment: components["schemas"]["FiscalEnvironment"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IVASimpleTransitionInput"];
+            };
+        };
+        responses: {
+            /** @description ZIP inmutable generado y persistido. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IVASimpleExportArtifact"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    reopenIVASimpleWorkflow: {
+        parameters: {
+            query: {
+                environment: components["schemas"]["FiscalEnvironment"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IVASimpleTransitionInput"];
+            };
+        };
+        responses: {
+            /** @description Período reabierto; eventos y exportaciones anteriores se conservan. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IVASimpleWorkflowPeriod"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    downloadIVASimpleExport: {
+        parameters: {
+            query: {
+                environment: components["schemas"]["FiscalEnvironment"];
+            };
+            header?: never;
+            path: {
+                period: string;
+                export_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Artefacto ZIP inmutable. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IVASimpleExportArtifact"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             503: components["responses"]["Unavailable"];
         };
     };

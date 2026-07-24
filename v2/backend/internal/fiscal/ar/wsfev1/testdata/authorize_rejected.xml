@@ -1,0 +1,16 @@
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <FECAESolicitarResponse xmlns="http://ar.gov.afip.dif.FEV1/">
+      <FECAESolicitarResult>
+        <FeCabResp><Resultado>R</Resultado></FeCabResp>
+        <FeDetResp>
+          <FECAEDetResponse>
+            <CbteDesde>42</CbteDesde>
+            <Resultado>R</Resultado>
+          </FECAEDetResponse>
+        </FeDetResp>
+        <Errors><Err><Code>10016</Code><Msg>Fecha inválida</Msg></Err></Errors>
+      </FECAESolicitarResult>
+    </FECAESolicitarResponse>
+  </soap:Body>
+</soap:Envelope>

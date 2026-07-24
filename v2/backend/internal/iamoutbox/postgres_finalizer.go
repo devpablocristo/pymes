@@ -118,6 +118,14 @@ func (finalizer *PostgresFinalizer) Finalize(ctx context.Context, result Finaliz
 			return fmt.Errorf("iam outbox: attach Clerk organization: %w", err)
 		}
 
+		if err := installDefaultAccountingChart(
+			txContext,
+			tx,
+			request.OrganizationID,
+		); err != nil {
+			return err
+		}
+
 		if err := persistOwnerInvitation(
 			txContext,
 			store,
@@ -143,6 +151,76 @@ func (finalizer *PostgresFinalizer) Finalize(ctx context.Context, result Finaliz
 		}
 		return nil
 	})
+}
+
+func installDefaultAccountingChart(
+	ctx context.Context,
+	tx pgx.Tx,
+	organizationID string,
+) error {
+	var installed int
+	if err := tx.QueryRow(ctx, `
+		SELECT accounting.install_chart_template($1::uuid, 'ar-pyme', 1)
+	`, organizationID).Scan(&installed); err != nil {
+		return fmt.Errorf("iam outbox: install default accounting chart: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		SELECT pg_advisory_xact_lock(
+			hashtextextended($1::uuid::text, 910010)
+		)
+	`, organizationID); err != nil {
+		return fmt.Errorf("iam outbox: lock initial accounting period: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		WITH configured AS (
+			SELECT
+				fiscal_year_start_month,
+				(now() AT TIME ZONE timezone)::date AS local_today
+			  FROM accounting.organization_settings
+			 WHERE org_id = $1::uuid
+		),
+		bounds AS (
+			SELECT make_date(
+				extract(year FROM local_today)::integer
+					- CASE
+						WHEN extract(month FROM local_today)::integer
+							< fiscal_year_start_month
+						THEN 1
+						ELSE 0
+					  END,
+				fiscal_year_start_month,
+				1
+			) AS start_date
+			  FROM configured
+		)
+		INSERT INTO accounting.periods (
+			org_id,
+			code,
+			start_date,
+			end_date
+		)
+		SELECT
+			$1::uuid,
+			extract(year FROM start_date)::integer::text,
+			start_date,
+			(start_date + interval '1 year - 1 day')::date
+		  FROM bounds
+		 WHERE NOT EXISTS (
+			SELECT 1
+			  FROM accounting.periods AS period
+			 WHERE period.org_id = $1::uuid
+			   AND daterange(period.start_date, period.end_date, '[]')
+			       && daterange(
+					bounds.start_date,
+					(bounds.start_date + interval '1 year - 1 day')::date,
+					'[]'
+			       )
+		 )
+		ON CONFLICT DO NOTHING
+	`, organizationID); err != nil {
+		return fmt.Errorf("iam outbox: create initial accounting period: %w", err)
+	}
+	return nil
 }
 
 type durableProvisioningRequest struct {

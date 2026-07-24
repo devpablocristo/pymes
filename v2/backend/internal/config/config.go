@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	fiscalstorage "github.com/devpablocristo/pymes/v2/backend/internal/fiscal/storage"
 )
 
 const ServiceName = "pymes-v2-api"
@@ -31,11 +33,14 @@ func (c ClerkConfig) Configured() bool {
 	return c.PublishableKey != "" && c.SecretKey != "" && c.Issuer != ""
 }
 
+type FiscalConfig = fiscalstorage.Config
+
 type Config struct {
 	HTTPAddr         string
 	DatabaseURL      string
 	Environment      string
 	Clerk            ClerkConfig
+	Fiscal           FiscalConfig
 	ShutdownTimeout  time.Duration
 	ReadinessTimeout time.Duration
 }
@@ -51,10 +56,11 @@ func LoadFrom(getenv Getenv) (Config, error) {
 		return Config{}, fmt.Errorf("configuration environment reader is nil")
 	}
 
+	environment := strings.ToLower(valueOrDefault(getenv("PYMES_ENVIRONMENT"), defaultEnvironment))
 	cfg := Config{
 		HTTPAddr:    valueOrDefault(getenv("PYMES_HTTP_ADDR"), defaultHTTPAddr),
 		DatabaseURL: strings.TrimSpace(getenv("PYMES_DATABASE_URL")),
-		Environment: strings.ToLower(valueOrDefault(getenv("PYMES_ENVIRONMENT"), defaultEnvironment)),
+		Environment: environment,
 		Clerk: ClerkConfig{
 			PublishableKey:    strings.TrimSpace(getenv("PYMES_CLERK_PUBLISHABLE_KEY")),
 			SecretKey:         strings.TrimSpace(getenv("PYMES_CLERK_SECRET_KEY")),
@@ -79,8 +85,15 @@ func LoadFrom(getenv Getenv) (Config, error) {
 	if cfg.Clerk.Configured() && len(cfg.Clerk.AuthorizedParties) == 0 {
 		return Config{}, fmt.Errorf("PYMES_CLERK_AUTHORIZED_PARTIES is required when Clerk is configured")
 	}
+	fiscalConfig, err := fiscalstorage.LoadConfig(
+		fiscalstorage.Getenv(getenv),
+		cfg.Environment,
+	)
+	if err != nil {
+		return Config{}, fmt.Errorf("fiscal storage: %w", err)
+	}
+	cfg.Fiscal = fiscalConfig
 
-	var err error
 	cfg.ShutdownTimeout, err = durationOrDefault(getenv("PYMES_SHUTDOWN_TIMEOUT"), defaultShutdownTimeout)
 	if err != nil {
 		return Config{}, fmt.Errorf("PYMES_SHUTDOWN_TIMEOUT: %w", err)

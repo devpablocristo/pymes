@@ -8,7 +8,7 @@ export COMPOSE_PROFILES
 
 .DEFAULT_GOAL := help
 
-.PHONY: help up down ps logs smoke clerk-check provision-org api-generate api-check backend-run backend-test db-up db-bootstrap db-down db-migrate db-test db-integration web-dev web-ci ci
+.PHONY: help up down ps logs smoke clerk-check provision-org fiscal-homologation api-generate api-check backend-run backend-test db-up db-bootstrap db-down db-migrate db-test db-integration web-dev web-ci ci
 
 help:
 	@echo "Pymes v2"
@@ -18,6 +18,7 @@ help:
 	@echo "  make smoke           Verifica base, API y web"
 	@echo "  make clerk-check     Verifica la configuración remota de Clerk sin modificarla"
 	@echo "  make provision-org ORG_NAME='Acme' ORG_SLUG=acme OWNER_EMAIL=owner@example.com"
+	@echo "  make fiscal-homologation ORG_ID='<uuid>'  Ejecuta pruebas ARCA no emisivas (opt-in)"
 	@echo "  make api-generate     Regenera contratos Go y TypeScript desde OpenAPI"
 	@echo "  make api-check        Verifica que el código generado no tenga drift"
 	@echo "  make ps              Muestra el estado del stack"
@@ -54,7 +55,7 @@ smoke:
 	docker compose exec -T postgres sh -ec \
 		'test "$$(psql -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''idempotency/core'\''")" = 1'
 	docker compose exec -T postgres sh -ec \
-		'test "$$(psql -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 9'
+		'test "$$(psql -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 18'
 
 clerk-check:
 	./scripts/check-clerk-config.sh
@@ -71,6 +72,12 @@ provision-org:
 		--name "$(ORG_NAME)" \
 		--slug "$(ORG_SLUG)" \
 		--owner-email "$(OWNER_EMAIL)"
+
+fiscal-homologation:
+	@test -n "$(strip $(ORG_ID))" || (echo "ORG_ID es obligatorio" >&2; exit 2)
+	PYMES_FISCAL_HOMOLOGATION_ENABLED=true docker compose --profile ops run --rm fiscal-homologation \
+		--organization-id "$(ORG_ID)" \
+		--actor "make:fiscal-homologation"
 
 api-generate:
 	cd backend && GOWORK=off go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --config oapi-codegen.yaml ../api/openapi.yaml
@@ -103,14 +110,15 @@ db-test:
 	cd db && GOWORK=off go test ./...
 
 db-integration: db-up
-	cd db && PYMES_DATABASE_URL='postgres://pymes:pymes@127.0.0.1:55433/pymes_v2_test?sslmode=disable' GOWORK=off go run ./cmd/migrate
-	cd db && PYMES_DATABASE_URL='postgres://pymes:pymes@127.0.0.1:55433/pymes_v2_test?sslmode=disable' GOWORK=off go run ./cmd/migrate
+	docker compose exec -T postgres psql -U pymes -d postgres -v ON_ERROR_STOP=1 < db/dev/reset-integration-database.sql
+	cd db && PYMES_DATABASE_URL='postgres://pymes:pymes@127.0.0.1:55433/pymes_v2_integration?sslmode=disable' GOWORK=off go run ./cmd/migrate
+	cd db && PYMES_DATABASE_URL='postgres://pymes:pymes@127.0.0.1:55433/pymes_v2_integration?sslmode=disable' GOWORK=off go run ./cmd/migrate
 	docker compose restart postgres
 	docker compose up -d --wait postgres
-	cd db && PYMES_DATABASE_URL='postgres://pymes:pymes@127.0.0.1:55433/pymes_v2_test?sslmode=disable' GOWORK=off go run ./cmd/migrate
-	cd db && PYMES_DATABASE_TEST_URL='postgres://pymes:pymes@127.0.0.1:55433/pymes_v2_test?sslmode=disable' GOWORK=off go test -count=1 ./...
-	cd db && PYMES_DATABASE_URL='postgres://pymes_migrator:pymes_migrator@127.0.0.1:55433/pymes_v2_test?sslmode=disable' GOWORK=off go run ./cmd/migrate
-	cd backend && PYMES_DATABASE_TEST_URL='postgres://pymes_migrator:pymes_migrator@127.0.0.1:55433/pymes_v2_test?sslmode=disable' GOWORK=off go test -count=1 ./internal/provisioning ./internal/iamoutbox
+	cd db && PYMES_DATABASE_URL='postgres://pymes:pymes@127.0.0.1:55433/pymes_v2_integration?sslmode=disable' GOWORK=off go run ./cmd/migrate
+	cd db && PYMES_DATABASE_TEST_URL='postgres://pymes:pymes@127.0.0.1:55433/pymes_v2_integration?sslmode=disable' GOWORK=off go test -count=1 ./...
+	cd db && PYMES_DATABASE_URL='postgres://pymes_migrator:pymes_migrator@127.0.0.1:55433/pymes_v2_integration?sslmode=disable' GOWORK=off go run ./cmd/migrate
+	cd backend && PYMES_DATABASE_TEST_URL='postgres://pymes_migrator:pymes_migrator@127.0.0.1:55433/pymes_v2_integration?sslmode=disable' GOWORK=off go test -count=1 ./internal/provisioning ./internal/iamoutbox ./internal/fiscalaccounting
 
 web-dev:
 	cd web && npm run dev

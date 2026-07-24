@@ -1,8 +1,10 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ActiveOrganizationGuard, GlobalOwnerGuard, SignedInGuard } from "./guards/AuthGuards";
 import { AccessManagementPage } from "./pages/AccessManagementPage";
+import { AccountingPage } from "./pages/AccountingPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { EmployeesPage } from "./pages/EmployeesPage";
+import { FiscalPage } from "./pages/FiscalPage";
 import { NoAccessPage } from "./pages/NoAccessPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { OrganizationSettingsPage } from "./pages/OrganizationSettingsPage";
@@ -31,6 +33,8 @@ export function App() {
             <Route index element={<Navigate replace to="/dashboard" />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/employees" element={<EmployeesPage />} />
+            <Route path="/accounting/:section?" element={<AccountingPage />} />
+            <Route path="/fiscal/:section?" element={<FiscalPage />} />
             <Route path="/settings/organization" element={<OrganizationSettingsPage />} />
             <Route path="/settings/team" element={<TeamPage />} />
           </Route>

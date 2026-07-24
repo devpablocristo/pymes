@@ -2,7 +2,7 @@ import type { AppShellNavSection } from "@devpablocristo/platform-ui-page-shell"
 import { PageShellFrame } from "@devpablocristo/platform-ui-page-shell";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useProductAuth } from "../../auth/AuthContext";
-import { HomeIcon, TeamIcon } from "../icons";
+import { FiscalIcon, HomeIcon, LedgerIcon, TeamIcon } from "../icons";
 import { useI18n } from "../providers/I18nProvider";
 
 export function ProductShell() {
@@ -32,6 +32,21 @@ export function ProductShell() {
                 to: "/employees",
                 label: t("nav.employees"),
                 icon: <TeamIcon aria-hidden="true" />,
+              },
+            ],
+          },
+          {
+            label: t("nav.managementSection"),
+            items: [
+              {
+                to: "/accounting",
+                label: t("nav.accounting"),
+                icon: <LedgerIcon aria-hidden="true" />,
+              },
+              {
+                to: "/fiscal",
+                label: t("nav.fiscal"),
+                icon: <FiscalIcon aria-hidden="true" />,
               },
             ],
           },

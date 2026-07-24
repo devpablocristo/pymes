@@ -11,6 +11,8 @@ tags:
   - name: Administration
   - name: Organization
   - name: Team
+  - name: Accounting
+  - name: Fiscal
   - name: Webhooks
 paths:
   /api/v1/runtime-config:
@@ -674,6 +676,65 @@ paths:
           $ref: "#/components/responses/Conflict"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /api/v1/team/members/{member_id}/business-permissions:
+    get:
+      operationId: getTeamMemberBusinessPermissions
+      tags: [Team]
+      description: >-
+        Devuelve únicamente las delegaciones explícitas de gestión contable y
+        fiscal del miembro. Los permisos propios de owner/admin se derivan del
+        rol y no se duplican aquí.
+      parameters:
+        - $ref: "#/components/parameters/MemberID"
+      responses:
+        "200":
+          description: Delegaciones explícitas vigentes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberBusinessPermissions"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    put:
+      operationId: updateTeamMemberBusinessPermissions
+      tags: [Team]
+      description: >-
+        Reemplaza el conjunto acotado de delegaciones del miembro dentro de la
+        organización activa. No cambia su rol general.
+      parameters:
+        - $ref: "#/components/parameters/MemberID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberBusinessPermissionsInput"
+      responses:
+        "200":
+          description: Delegaciones actualizadas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberBusinessPermissions"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /api/v1/team/ownership-transfer:
     post:
       operationId: transferOwnership
@@ -804,6 +865,1843 @@ paths:
           $ref: "#/components/responses/Conflict"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/accounts:
+    get:
+      operationId: listAccountingAccounts
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: lifecycle_state
+          in: query
+          schema:
+            $ref: "#/components/schemas/LifecycleState"
+        - name: query
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+      responses:
+        "200":
+          description: Plan de cuentas de la organización activa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingAccountList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      operationId: createAccountingAccount
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountingAccountInput"
+      responses:
+        "201":
+          description: Cuenta creada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingAccount"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/accounts/{account_id}:
+    get:
+      operationId: getAccountingAccount
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/AccountID"
+      responses:
+        "200":
+          description: Cuenta contable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingAccount"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    put:
+      operationId: updateAccountingAccount
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/AccountID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAccountingAccountInput"
+      responses:
+        "200":
+          description: Cuenta actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingAccount"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/accounts/{account_id}/{lifecycle_action}:
+    post:
+      operationId: transitionAccountingAccount
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/AccountID"
+        - name: lifecycle_action
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [archive, unarchive, trash, restore]
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionedCommandInput"
+      responses:
+        "200":
+          description: Cuenta transicionada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingAccount"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/account-mappings:
+    get:
+      operationId: listAccountingMappings
+      tags: [Accounting]
+      responses:
+        "200":
+          description: Mapeos funcionales del plan de cuentas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AccountingMapping"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    put:
+      operationId: updateAccountingMappings
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              minItems: 1
+              items:
+                $ref: "#/components/schemas/AccountingMappingInput"
+      responses:
+        "200":
+          description: Mapeos vigentes.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AccountingMapping"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/drafts:
+    get:
+      operationId: listJournalDrafts
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Borradores manuales.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalDraftList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      operationId: createJournalDraft
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JournalDraftInput"
+      responses:
+        "201":
+          description: Borrador creado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalDraft"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/drafts/{draft_id}:
+    put:
+      operationId: updateJournalDraft
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/DraftID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateJournalDraftInput"
+      responses:
+        "200":
+          description: Borrador actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalDraft"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/drafts/{draft_id}/post:
+    post:
+      operationId: postJournalDraft
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/DraftID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionedCommandInput"
+      responses:
+        "201":
+          description: Asiento contabilizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/journal-entries:
+    get:
+      operationId: listJournalEntries
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: query
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+      responses:
+        "200":
+          description: Libro Diario paginado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntryList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/journal-entries/{entry_id}:
+    get:
+      operationId: getJournalEntry
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/EntryID"
+      responses:
+        "200":
+          description: Asiento contabilizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/journal-entries/{entry_id}/reverse:
+    post:
+      operationId: reverseJournalEntry
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/EntryID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReverseJournalEntryInput"
+      responses:
+        "201":
+          description: Asiento de reversa creado sin modificar el original.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/open-items:
+    get:
+      operationId: listAccountingOpenItems
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: item_type
+          in: query
+          schema:
+            $ref: "#/components/schemas/AccountingOpenItemType"
+        - name: party_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: currency
+          in: query
+          schema:
+            $ref: "#/components/schemas/CurrencyCode"
+        - name: as_of
+          in: query
+          description: Fecha contable de corte. Si se omite, devuelve el saldo actual.
+          schema:
+            type: string
+            format: date
+        - name: open_only
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: Partidas abiertas de clientes y proveedores.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingOpenItemList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/receipts:
+    post:
+      operationId: createAccountingReceipt
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountingSettlementInput"
+      responses:
+        "201":
+          description: Cobro contabilizado y aplicado a la cuenta por cobrar.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/supplier-payments:
+    post:
+      operationId: createAccountingSupplierPayment
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountingSettlementInput"
+      responses:
+        "201":
+          description: Pago contabilizado y aplicado a la cuenta por pagar.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/periods:
+    get:
+      operationId: listAccountingPeriods
+      tags: [Accounting]
+      responses:
+        "200":
+          description: Períodos contables.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AccountingPeriod"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      operationId: createAccountingPeriod
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountingPeriodInput"
+      responses:
+        "201":
+          description: Período contable abierto.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingPeriod"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/periods/{period_id}/transition:
+    post:
+      operationId: transitionAccountingPeriod
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/PeriodID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PeriodTransitionInput"
+      responses:
+        "200":
+          description: Período transicionado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingPeriod"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/periods/{period_id}/annual-close-draft:
+    post:
+      operationId: createAnnualClosingDraft
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/PeriodID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnnualClosingDraftInput"
+      responses:
+        "201":
+          description: Borrador de cierre anual para revisión del contador.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalDraft"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/financial-accounts:
+    get:
+      operationId: listFinancialAccounts
+      tags: [Accounting]
+      parameters:
+        - name: lifecycle_state
+          in: query
+          schema:
+            type: string
+            enum: [active, archived]
+            default: active
+        - name: query
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+      responses:
+        "200":
+          description: Cajas, bancos, tarjetas y billeteras conciliables.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FinancialAccount"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      operationId: createFinancialAccount
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinancialAccountInput"
+      responses:
+        "201":
+          description: Cuenta financiera creada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinancialAccount"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/financial-accounts/{financial_account_id}:
+    put:
+      operationId: updateFinancialAccount
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/FinancialAccountID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFinancialAccountInput"
+      responses:
+        "200":
+          description: Cuenta financiera actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinancialAccount"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/statement-imports:
+    post:
+      operationId: importAccountingStatement
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatementImportInput"
+      responses:
+        "201":
+          description: Extracto importado y deduplicado por contenido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatementImport"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/statement-imports/{statement_import_id}/suggestions:
+    get:
+      operationId: suggestAccountingMatches
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/StatementImportID"
+        - name: financial_account_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: max_days
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 30
+            default: 3
+      responses:
+        "200":
+          description: Sugerencias explicables por fecha, importe y referencia.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReconciliationSuggestion"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/reconciliations:
+    get:
+      operationId: listAccountingReconciliations
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Conciliaciones bancarias.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReconciliationList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      operationId: createAccountingReconciliation
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReconciliationInput"
+      responses:
+        "201":
+          description: Conciliación creada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reconciliation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/reconciliations/{reconciliation_id}:
+    get:
+      operationId: getAccountingReconciliation
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/ReconciliationID"
+      responses:
+        "200":
+          description: Conciliación con asignaciones parciales y combinadas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reconciliation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    put:
+      operationId: updateAccountingReconciliation
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/ReconciliationID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReconciliationInput"
+      responses:
+        "200":
+          description: Conciliación y asignaciones actualizadas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reconciliation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/reconciliations/{reconciliation_id}/{reconciliation_action}:
+    post:
+      operationId: transitionAccountingReconciliation
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/ReconciliationID"
+        - name: reconciliation_action
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [close, reopen]
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionedCommandInput"
+      responses:
+        "200":
+          description: Conciliación cerrada o reabierta con auditoría.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reconciliation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/reports/{report}:
+    get:
+      operationId: getAccountingReport
+      tags: [Accounting]
+      parameters:
+        - name: report
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [journal, general-ledger, trial-balance, balance-sheet, income-statement, aging, vat-position, financial-activity]
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: account_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: financial_account_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Reporte contable exacto con filas y totales.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingReport"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/reports/{report}/export:
+    get:
+      operationId: exportAccountingReport
+      tags: [Accounting]
+      parameters:
+        - name: report
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [journal, general-ledger, trial-balance, balance-sheet, income-statement, aging, vat-position, financial-activity]
+        - name: format
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [csv, xlsx, pdf]
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: account_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: financial_account_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Exportación reproducible del reporte solicitado.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/inflation-indices:
+    post:
+      operationId: importInflationIndices
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              minItems: 1
+              maxItems: 600
+              items:
+                $ref: "#/components/schemas/InflationIndexInput"
+      responses:
+        "204":
+          description: Índices almacenados con fuente y checksum.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/inflation-adjustments:
+    post:
+      operationId: previewInflationAdjustment
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InflationAdjustmentInput"
+      responses:
+        "200":
+          description: Papel de trabajo y borrador de ajuste; nunca contabiliza automáticamente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InflationAdjustment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/currency-revaluations:
+    post:
+      operationId: createCurrencyRevaluation
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurrencyRevaluationInput"
+      responses:
+        "201":
+          description: Papel de trabajo y borrador de revaluación; no se contabiliza automáticamente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrencyRevaluation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/settings:
+    get:
+      operationId: getFiscalSettings
+      tags: [Fiscal]
+      parameters:
+        - name: environment
+          in: query
+          schema:
+            $ref: "#/components/schemas/FiscalEnvironment"
+          description: Ambiente a consultar; homologación por defecto.
+      responses:
+        "200":
+          description: Perfil fiscal argentino de la organización activa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArgentinaFiscalSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    put:
+      operationId: updateFiscalSettings
+      tags: [Fiscal]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArgentinaFiscalSettingsInput"
+      responses:
+        "200":
+          description: Perfil fiscal actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArgentinaFiscalSettings"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/homologation/latest:
+    get:
+      operationId: getLatestFiscalHomologation
+      tags: [Fiscal]
+      description: >-
+        Última evidencia técnica inmutable de interoperabilidad contra el
+        ambiente de homologación. No representa una aprobación otorgada por
+        ARCA y nunca expone tickets ni secretos.
+      responses:
+        "200":
+          description: Última ejecución finalizada y sus verificaciones.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiscalHomologationRun"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/production/enable:
+    post:
+      operationId: enableFiscalProduction
+      tags: [Fiscal]
+      description: >-
+        Habilita emisión productiva sólo si perfil, certificado, punto de
+        venta y una homologación técnica vigente son consistentes.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionedCommandInput"
+      responses:
+        "200":
+          description: Ambiente productivo habilitado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArgentinaFiscalSettings"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/certificates:
+    post:
+      operationId: rotateFiscalCertificate
+      tags: [Fiscal]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FiscalCertificateInput"
+      responses:
+        "201":
+          description: Certificado validado y almacenado mediante KMS.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiscalCertificate"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/points-of-sale:
+    get:
+      operationId: listFiscalPointsOfSale
+      tags: [Fiscal]
+      responses:
+        "200":
+          description: Puntos de venta configurados.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FiscalPointOfSale"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      operationId: createFiscalPointOfSale
+      tags: [Fiscal]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FiscalPointOfSaleInput"
+      responses:
+        "201":
+          description: Punto de venta creado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiscalPointOfSale"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/purchase-vouchers:
+    get:
+      operationId: listFiscalPurchaseVouchers
+      tags: [Fiscal]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: period
+          in: query
+          schema:
+            type: string
+            pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+        - name: query
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+      responses:
+        "200":
+          description: Comprobantes de proveedores registrados e inmutables.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiscalPurchaseVoucherList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      operationId: createFiscalPurchaseVoucher
+      tags: [Fiscal]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FiscalPurchaseVoucherInput"
+      responses:
+        "201":
+          description: Comprobante de proveedor y efecto contable confirmados atómicamente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiscalPurchaseVoucher"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/vouchers:
+    get:
+      operationId: listFiscalVouchers
+      tags: [Fiscal]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: environment
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/FiscalEnvironment"
+          description: Ambiente fiscal aislado que se desea consultar.
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/FiscalAuthorizationState"
+        - name: query
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+      responses:
+        "200":
+          description: Comprobantes e intentos de autorización.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiscalVoucherList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      operationId: createFiscalVoucher
+      tags: [Fiscal]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FiscalVoucherInput"
+      responses:
+        "202":
+          description: Solicitud fiscal durable encolada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiscalVoucher"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/vouchers/{voucher_id}:
+    get:
+      operationId: getFiscalVoucher
+      tags: [Fiscal]
+      parameters:
+        - $ref: "#/components/parameters/VoucherID"
+      responses:
+        "200":
+          description: Comprobante y snapshot fiscal inmutable para consulta y ajustes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiscalVoucherDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/vouchers/{voucher_id}/pdf:
+    get:
+      operationId: getFiscalVoucherPDF
+      tags: [Fiscal]
+      parameters:
+        - $ref: "#/components/parameters/VoucherID"
+      responses:
+        "200":
+          description: PDF fiscal inmutable generado desde el snapshot autorizado.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/credit-notes:
+    post:
+      operationId: createFiscalCreditNote
+      tags: [Fiscal]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FiscalAdjustmentInput"
+      responses:
+        "202":
+          description: Nota de crédito encolada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiscalVoucher"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/debit-notes:
+    post:
+      operationId: createFiscalDebitNote
+      tags: [Fiscal]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FiscalAdjustmentInput"
+      responses:
+        "202":
+          description: Nota de débito encolada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiscalVoucher"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/iva-simple/{period}:
+    get:
+      operationId: getIVASimple
+      tags: [Fiscal]
+      parameters:
+        - name: period
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+        - name: environment
+          in: query
+          required: false
+          description: Ambiente fiscal aislado; producción es el predeterminado para libros impositivos.
+          schema:
+            type: string
+            enum: [homologation, production]
+            default: production
+      responses:
+        "200":
+          description: Posición IVA y archivos de trabajo compatibles con IVA Simple.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IVASimpleReport"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/iva-simple/{period}/workflow:
+    get:
+      operationId: getIVASimpleWorkflow
+      tags: [Fiscal]
+      parameters:
+        - name: period
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+        - name: environment
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/FiscalEnvironment"
+      responses:
+        "200":
+          description: Período IVA Simple persistido y sus artefactos inmutables.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IVASimpleWorkflowPeriod"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/iva-simple/{period}/prepare:
+    post:
+      operationId: prepareIVASimpleWorkflow
+      tags: [Fiscal]
+      description: >-
+        Crea el borrador del período o vuelve a tomar un snapshot de sus
+        comprobantes mientras continúe abierto.
+      parameters:
+        - name: period
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+        - name: environment
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/FiscalEnvironment"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IVASimplePrepareInput"
+      responses:
+        "200":
+          description: Borrador actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IVASimpleWorkflowPeriod"
+        "201":
+          description: Borrador creado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IVASimpleWorkflowPeriod"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/iva-simple/{period}/close:
+    post:
+      operationId: closeIVASimpleWorkflow
+      tags: [Fiscal]
+      parameters:
+        - name: period
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+        - name: environment
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/FiscalEnvironment"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IVASimpleTransitionInput"
+      responses:
+        "200":
+          description: Período cerrado luego de conciliar documentos y asientos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IVASimpleWorkflowPeriod"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/iva-simple/{period}/export:
+    post:
+      operationId: exportIVASimpleWorkflow
+      tags: [Fiscal]
+      parameters:
+        - name: period
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+        - name: environment
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/FiscalEnvironment"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IVASimpleTransitionInput"
+      responses:
+        "201":
+          description: ZIP inmutable generado y persistido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IVASimpleExportArtifact"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/iva-simple/{period}/reopen:
+    post:
+      operationId: reopenIVASimpleWorkflow
+      tags: [Fiscal]
+      parameters:
+        - name: period
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+        - name: environment
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/FiscalEnvironment"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IVASimpleTransitionInput"
+      responses:
+        "200":
+          description: Período reabierto; eventos y exportaciones anteriores se conservan.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IVASimpleWorkflowPeriod"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/fiscal/iva-simple/{period}/exports/{export_id}:
+    get:
+      operationId: downloadIVASimpleExport
+      tags: [Fiscal]
+      parameters:
+        - name: period
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+        - name: export_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: environment
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/FiscalEnvironment"
+      responses:
+        "200":
+          description: Artefacto ZIP inmutable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IVASimpleExportArtifact"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /webhooks/clerk:
     post:
       operationId: receiveClerkWebhook
@@ -912,6 +2810,62 @@ components:
       schema:
         type: string
         format: uuid
+    AccountID:
+      name: account_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DraftID:
+      name: draft_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    EntryID:
+      name: entry_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PeriodID:
+      name: period_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    FinancialAccountID:
+      name: financial_account_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    StatementImportID:
+      name: statement_import_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReconciliationID:
+      name: reconciliation_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    VoucherID:
+      name: voucher_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
   requestBodies:
     LifecycleCommand:
       required: true
@@ -949,9 +2903,21 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
     Conflict:
       description: >-
-        Conflicto con el estado actual (`IAM_ROLE_CONFLICT`,
+        Conflicto con el estado actual (`VERSION_CONFLICT`,
+        `RESOURCE_DUPLICATE`, `INVALID_TRANSITION`,
+        `ACCOUNTING_PERIOD_CLOSED`, `RESOURCE_IMMUTABLE`,
+        `FISCAL_AUTHORIZATION_UNCERTAIN`, `FISCAL_PRODUCTION_NOT_READY`,
+        `IAM_ROLE_CONFLICT`,
         `IAM_INVITATION_PENDING`, `IDEMPOTENCY_KEY_CONFLICT` o
         `IDEMPOTENCY_IN_PROGRESS`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unprocessable:
+      description: >-
+        La operación es sintácticamente válida pero no satisface una garantía
+        contable (`ACCOUNTING_UNBALANCED`).
       content:
         application/json:
           schema:
@@ -1023,6 +2989,10 @@ components:
         - team:invitation:create
         - team:invitation:manage
         - sessions:manage:self
+        - accounting:view
+        - accounting:manage
+        - fiscal:view
+        - fiscal:manage
     AssignableRole:
       type: string
       description: >-
@@ -1275,6 +3245,34 @@ components:
           $ref: "#/components/schemas/MembershipStatus"
         sync_status:
           $ref: "#/components/schemas/SyncStatus"
+    DelegatedBusinessPermission:
+      type: string
+      enum: [accounting:manage, fiscal:manage]
+    MemberBusinessPermissionsInput:
+      type: object
+      additionalProperties: false
+      required: [permissions]
+      properties:
+        permissions:
+          type: array
+          uniqueItems: true
+          maxItems: 2
+          items:
+            $ref: "#/components/schemas/DelegatedBusinessPermission"
+    MemberBusinessPermissions:
+      type: object
+      additionalProperties: false
+      required: [member_id, permissions]
+      properties:
+        member_id:
+          type: string
+          format: uuid
+        permissions:
+          type: array
+          uniqueItems: true
+          maxItems: 2
+          items:
+            $ref: "#/components/schemas/DelegatedBusinessPermission"
     Invitation:
       type: object
       required: [id, email, role, status, expires_at, sync_status]
@@ -1443,6 +3441,1792 @@ components:
           type: integer
           format: int64
           minimum: 1
+    DecimalAmount:
+      type: string
+      description: Decimal exacto serializado como string; nunca IEEE-754.
+      pattern: "^-?(0|[1-9][0-9]{0,17})(\\.[0-9]{1,6})?$"
+      example: "1250.50"
+    CurrencyCode:
+      type: string
+      pattern: "^[A-Z]{3}$"
+      example: ARS
+    AccountingAccountType:
+      type: string
+      enum: [asset, liability, equity, income, cost, expense]
+    AccountingNormalBalance:
+      type: string
+      enum: [debit, credit]
+    MonetaryClassification:
+      type: string
+      enum: [monetary, non_monetary, not_applicable]
+    AccountingAccount:
+      type: object
+      additionalProperties: false
+      required:
+        [id, code, name, account_type, normal_balance, monetary_classification, postable, lifecycle_state, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        account_type:
+          $ref: "#/components/schemas/AccountingAccountType"
+        normal_balance:
+          $ref: "#/components/schemas/AccountingNormalBalance"
+        monetary_classification:
+          $ref: "#/components/schemas/MonetaryClassification"
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        postable:
+          type: boolean
+        lifecycle_state:
+          $ref: "#/components/schemas/LifecycleState"
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+    AccountingAccountInput:
+      type: object
+      additionalProperties: false
+      required: [code, name, account_type, normal_balance, monetary_classification, postable]
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: "^[0-9A-Za-z.-]+$"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        account_type:
+          $ref: "#/components/schemas/AccountingAccountType"
+        normal_balance:
+          $ref: "#/components/schemas/AccountingNormalBalance"
+        monetary_classification:
+          $ref: "#/components/schemas/MonetaryClassification"
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        postable:
+          type: boolean
+    UpdateAccountingAccountInput:
+      allOf:
+        - $ref: "#/components/schemas/AccountingAccountInput"
+        - type: object
+          required: [version]
+          properties:
+            version:
+              type: integer
+              format: int64
+              minimum: 1
+    AccountingAccountList:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountingAccount"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    AccountingMapping:
+      type: object
+      additionalProperties: false
+      required: [role, account_id, account_code, account_name, version]
+      properties:
+        role:
+          type: string
+        account_id:
+          type: string
+          format: uuid
+        account_code:
+          type: string
+        account_name:
+          type: string
+        version:
+          type: integer
+          format: int64
+    AccountingMappingInput:
+      type: object
+      additionalProperties: false
+      required: [role, account_id]
+      properties:
+        role:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{1,63}$"
+        account_id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+    JournalLineInput:
+      type: object
+      additionalProperties: false
+      required: [account_id, debit, credit]
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        debit:
+          $ref: "#/components/schemas/DecimalAmount"
+        credit:
+          $ref: "#/components/schemas/DecimalAmount"
+        transaction_currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        transaction_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        exchange_rate:
+          $ref: "#/components/schemas/DecimalAmount"
+        party_id:
+          type: string
+          format: uuid
+          nullable: true
+        memo:
+          type: string
+          maxLength: 500
+    JournalLine:
+      allOf:
+        - $ref: "#/components/schemas/JournalLineInput"
+        - type: object
+          required: [id, line_number]
+          properties:
+            id:
+              type: string
+              format: uuid
+            line_number:
+              type: integer
+              minimum: 1
+    JournalDraftInput:
+      type: object
+      additionalProperties: false
+      required: [accounting_date, description, currency, lines]
+      properties:
+        accounting_date:
+          type: string
+          format: date
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        lines:
+          type: array
+          minItems: 2
+          maxItems: 500
+          items:
+            $ref: "#/components/schemas/JournalLineInput"
+    UpdateJournalDraftInput:
+      allOf:
+        - $ref: "#/components/schemas/JournalDraftInput"
+        - type: object
+          required: [version]
+          properties:
+            version:
+              type: integer
+              format: int64
+              minimum: 1
+    JournalDraft:
+      type: object
+      additionalProperties: false
+      required: [id, accounting_date, description, currency, lines, total_debit, total_credit, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        accounting_date:
+          type: string
+          format: date
+        description:
+          type: string
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalLine"
+        total_debit:
+          $ref: "#/components/schemas/DecimalAmount"
+        total_credit:
+          $ref: "#/components/schemas/DecimalAmount"
+        version:
+          type: integer
+          format: int64
+    JournalDraftList:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalDraft"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    JournalEntry:
+      type: object
+      additionalProperties: false
+      required:
+        [id, entry_number, accounting_date, description, currency, lines, total_debit, total_credit, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        entry_number:
+          type: integer
+          format: int64
+          minimum: 1
+        accounting_date:
+          type: string
+          format: date
+        description:
+          type: string
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        source_type:
+          type: string
+        source_id:
+          type: string
+          format: uuid
+          nullable: true
+        reverses_entry_id:
+          type: string
+          format: uuid
+          nullable: true
+        reversal_reason:
+          type: string
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalLine"
+        total_debit:
+          $ref: "#/components/schemas/DecimalAmount"
+        total_credit:
+          $ref: "#/components/schemas/DecimalAmount"
+        created_at:
+          type: string
+          format: date-time
+    JournalEntryList:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalEntry"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    AccountingOpenItemType:
+      type: string
+      enum: [receivable, payable]
+    AccountingPaymentMethod:
+      type: string
+      enum: [cash, bank_transfer, card, wallet, check]
+    AccountingOpenItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - item_type
+        - party_id
+        - account_id
+        - origin_entry_id
+        - source_type
+        - source_id
+        - issued_at
+        - currency
+        - original_amount
+        - original_functional_amount
+        - open_amount
+        - open_functional_amount
+      properties:
+        id:
+          type: string
+          format: uuid
+        item_type:
+          $ref: "#/components/schemas/AccountingOpenItemType"
+        party_id:
+          type: string
+          format: uuid
+        account_id:
+          type: string
+          format: uuid
+        origin_entry_id:
+          type: string
+          format: uuid
+        source_type:
+          type: string
+        source_id:
+          type: string
+          format: uuid
+        issued_at:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        original_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        original_functional_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        open_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        open_functional_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+    AccountingOpenItemList:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountingOpenItem"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    AccountingSettlementInput:
+      type: object
+      additionalProperties: false
+      required:
+        - open_item_id
+        - accounting_date
+        - payment_method
+        - amount
+        - exchange_rate
+        - exchange_rate_date
+        - exchange_rate_source
+      properties:
+        open_item_id:
+          type: string
+          format: uuid
+        accounting_date:
+          type: string
+          format: date
+        payment_method:
+          $ref: "#/components/schemas/AccountingPaymentMethod"
+        amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        exchange_rate:
+          $ref: "#/components/schemas/DecimalAmount"
+        exchange_rate_date:
+          type: string
+          format: date
+        exchange_rate_source:
+          type: string
+          minLength: 1
+          maxLength: 120
+    VersionedCommandInput:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        reason:
+          type: string
+          maxLength: 500
+    ReverseJournalEntryInput:
+      type: object
+      additionalProperties: false
+      required: [accounting_date, reason]
+      properties:
+        accounting_date:
+          type: string
+          format: date
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    AccountingPeriodState:
+      type: string
+      enum: [open, soft_closed, locked]
+    AccountingPeriodInput:
+      type: object
+      additionalProperties: false
+      required: [start_date, end_date]
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+    AccountingPeriod:
+      type: object
+      additionalProperties: false
+      required: [id, start_date, end_date, state, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        state:
+          $ref: "#/components/schemas/AccountingPeriodState"
+        version:
+          type: integer
+          format: int64
+        checklist:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [code, clear]
+            properties:
+              code:
+                type: string
+              clear:
+                type: boolean
+              count:
+                type: integer
+                minimum: 0
+    AnnualClosingDraftInput:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+    PeriodTransitionInput:
+      type: object
+      additionalProperties: false
+      required: [desired_state, version, reason]
+      properties:
+        desired_state:
+          $ref: "#/components/schemas/AccountingPeriodState"
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    FinancialAccountType:
+      type: string
+      enum: [cash, bank, card, wallet]
+    FinancialAccountInput:
+      type: object
+      additionalProperties: false
+      required: [ledger_account_id, account_type, name, currency]
+      properties:
+        ledger_account_id:
+          type: string
+          format: uuid
+        account_type:
+          $ref: "#/components/schemas/FinancialAccountType"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        institution_name:
+          type: string
+          maxLength: 160
+        external_reference:
+          type: string
+          maxLength: 160
+    UpdateFinancialAccountInput:
+      allOf:
+        - $ref: "#/components/schemas/FinancialAccountInput"
+        - type: object
+          required: [version, archived]
+          properties:
+            version:
+              type: integer
+              format: int64
+              minimum: 1
+            archived:
+              type: boolean
+    FinancialAccount:
+      allOf:
+        - $ref: "#/components/schemas/FinancialAccountInput"
+        - type: object
+          required: [id, ledger_account_code, ledger_account_name, archived, version]
+          properties:
+            id:
+              type: string
+              format: uuid
+            ledger_account_code:
+              type: string
+            ledger_account_name:
+              type: string
+            archived:
+              type: boolean
+            version:
+              type: integer
+              format: int64
+              minimum: 1
+    StatementImportFormat:
+      type: string
+      enum: [csv, xlsx, ofx]
+    StatementImportInput:
+      type: object
+      additionalProperties: false
+      required: [financial_account_id, file_name, format, currency, content_base64]
+      properties:
+        financial_account_id:
+          type: string
+          format: uuid
+        file_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        format:
+          $ref: "#/components/schemas/StatementImportFormat"
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        content_base64:
+          type: string
+          format: byte
+          maxLength: 13981016
+    StatementMovement:
+      type: object
+      additionalProperties: false
+      required: [id, booked_at, value_at, description, reference, amount, currency, fingerprint]
+      properties:
+        id:
+          type: string
+          format: uuid
+        booked_at:
+          type: string
+          format: date
+        value_at:
+          type: string
+          format: date
+        description:
+          type: string
+        reference:
+          type: string
+        amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        fingerprint:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+    StatementImport:
+      type: object
+      additionalProperties: false
+      required: [id, financial_account_id, file_name, format, sha256, currency, imported_at, movements]
+      properties:
+        id:
+          type: string
+          format: uuid
+        financial_account_id:
+          type: string
+          format: uuid
+        file_name:
+          type: string
+        format:
+          $ref: "#/components/schemas/StatementImportFormat"
+        sha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        imported_at:
+          type: string
+          format: date-time
+        movements:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatementMovement"
+    ReconciliationState:
+      type: string
+      enum: [draft, completed, reopened]
+    ReconciliationMatchInput:
+      type: object
+      additionalProperties: false
+      required: [statement_movement_id, journal_line_id, statement_amount, ledger_amount]
+      properties:
+        statement_movement_id:
+          type: string
+          format: uuid
+        journal_line_id:
+          type: string
+          format: uuid
+        statement_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        ledger_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+    ReconciliationMatch:
+      allOf:
+        - $ref: "#/components/schemas/ReconciliationMatchInput"
+        - type: object
+          required: [id, created_at]
+          properties:
+            id:
+              type: string
+              format: uuid
+            created_at:
+              type: string
+              format: date-time
+    ReconciliationSuggestion:
+      type: object
+      additionalProperties: false
+      required: [statement_movement_id, journal_line_id, amount, score, reasons]
+      properties:
+        statement_movement_id:
+          type: string
+          format: uuid
+        journal_line_id:
+          type: string
+          format: uuid
+        amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        reasons:
+          type: array
+          items:
+            type: string
+    ReconciliationInput:
+      type: object
+      additionalProperties: false
+      required: [account_id, period_start, statement_date, opening_balance, statement_balance, currency, matches]
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        period_start:
+          type: string
+          format: date
+        statement_date:
+          type: string
+          format: date
+        opening_balance:
+          $ref: "#/components/schemas/DecimalAmount"
+        statement_balance:
+          $ref: "#/components/schemas/DecimalAmount"
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        matches:
+          type: array
+          maxItems: 10000
+          items:
+            $ref: "#/components/schemas/ReconciliationMatchInput"
+    UpdateReconciliationInput:
+      type: object
+      additionalProperties: false
+      required: [version, opening_balance, statement_balance, matches]
+      properties:
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        opening_balance:
+          $ref: "#/components/schemas/DecimalAmount"
+        statement_balance:
+          $ref: "#/components/schemas/DecimalAmount"
+        matches:
+          type: array
+          maxItems: 10000
+          items:
+            $ref: "#/components/schemas/ReconciliationMatchInput"
+    Reconciliation:
+      type: object
+      additionalProperties: false
+      required: [id, account_id, period_start, statement_date, opening_balance, statement_balance, ledger_balance, difference, currency, state, version, matches]
+      properties:
+        id:
+          type: string
+          format: uuid
+        account_id:
+          type: string
+          format: uuid
+        period_start:
+          type: string
+          format: date
+        statement_date:
+          type: string
+          format: date
+        opening_balance:
+          $ref: "#/components/schemas/DecimalAmount"
+        statement_balance:
+          $ref: "#/components/schemas/DecimalAmount"
+        ledger_balance:
+          $ref: "#/components/schemas/DecimalAmount"
+        difference:
+          $ref: "#/components/schemas/DecimalAmount"
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        state:
+          $ref: "#/components/schemas/ReconciliationState"
+        version:
+          type: integer
+          format: int64
+        matches:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReconciliationMatch"
+    ReconciliationList:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Reconciliation"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    AccountingReportRow:
+      type: object
+      additionalProperties: false
+      required: [key, label, debit, credit, balance]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        debit:
+          $ref: "#/components/schemas/DecimalAmount"
+        credit:
+          $ref: "#/components/schemas/DecimalAmount"
+        balance:
+          $ref: "#/components/schemas/DecimalAmount"
+    AccountingReport:
+      type: object
+      additionalProperties: false
+      required: [report, from, to, currency, rows, total_debit, total_credit]
+      properties:
+        report:
+          type: string
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountingReportRow"
+        total_debit:
+          $ref: "#/components/schemas/DecimalAmount"
+        total_credit:
+          $ref: "#/components/schemas/DecimalAmount"
+    InflationAdjustmentInput:
+      type: object
+      additionalProperties: false
+      required: [period_id]
+      properties:
+        period_id:
+          type: string
+          format: uuid
+    InflationIndexInput:
+      type: object
+      additionalProperties: false
+      required: [period, value, source, source_document]
+      properties:
+        period:
+          type: string
+          pattern: "^[0-9]{4}-[0-9]{2}$"
+        value:
+          $ref: "#/components/schemas/DecimalAmount"
+        source:
+          type: string
+          minLength: 1
+          maxLength: 120
+        source_document:
+          type: string
+          minLength: 1
+          maxLength: 4096
+          description: Referencia o contenido normalizado usado para calcular el checksum.
+    InflationAdjustmentLine:
+      type: object
+      additionalProperties: false
+      required: [account_id, account_code, account_name, origin_date, origin_index, closing_index, coefficient, historical, restated, adjustment]
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        account_code:
+          type: string
+        account_name:
+          type: string
+        origin_date:
+          type: string
+          format: date
+        origin_index:
+          $ref: "#/components/schemas/DecimalAmount"
+        closing_index:
+          $ref: "#/components/schemas/DecimalAmount"
+        coefficient:
+          $ref: "#/components/schemas/DecimalAmount"
+        historical:
+          $ref: "#/components/schemas/DecimalAmount"
+        restated:
+          $ref: "#/components/schemas/DecimalAmount"
+        adjustment:
+          $ref: "#/components/schemas/DecimalAmount"
+    InflationAdjustment:
+      type: object
+      additionalProperties: false
+      required: [id, period_id, closing_date, source, source_checksum, recpam, lines, draft]
+      properties:
+        id:
+          type: string
+          format: uuid
+        period_id:
+          type: string
+          format: uuid
+        closing_date:
+          type: string
+          format: date
+        source:
+          type: string
+        source_checksum:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        recpam:
+          $ref: "#/components/schemas/DecimalAmount"
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/InflationAdjustmentLine"
+        draft:
+          $ref: "#/components/schemas/JournalDraft"
+    ClosingExchangeRateInput:
+      type: object
+      additionalProperties: false
+      required: [currency, rate, date, source, source_checksum]
+      properties:
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        rate:
+          $ref: "#/components/schemas/DecimalAmount"
+        date:
+          type: string
+          format: date
+        source:
+          type: string
+          minLength: 1
+          maxLength: 120
+        source_reference:
+          type: string
+          maxLength: 500
+        source_checksum:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+    CurrencyRevaluationInput:
+      type: object
+      additionalProperties: false
+      required: [closing_date, rates]
+      properties:
+        closing_date:
+          type: string
+          format: date
+        rates:
+          type: array
+          minItems: 1
+          maxItems: 32
+          items:
+            $ref: "#/components/schemas/ClosingExchangeRateInput"
+    CurrencyRevaluationLine:
+      type: object
+      additionalProperties: false
+      required: [account_id, account_code, account_name, currency, currency_amount, carrying_amount, closing_rate, revalued_amount, exchange_difference]
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        account_code:
+          type: string
+        account_name:
+          type: string
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        currency_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        carrying_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        closing_rate:
+          $ref: "#/components/schemas/DecimalAmount"
+        revalued_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        exchange_difference:
+          $ref: "#/components/schemas/DecimalAmount"
+    CurrencyRevaluation:
+      type: object
+      additionalProperties: false
+      required: [id, closing_date, functional_currency, source_checksum, rates, lines, total_gain, total_loss, net_result, draft]
+      properties:
+        id:
+          type: string
+          format: uuid
+        closing_date:
+          type: string
+          format: date
+        functional_currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        source_checksum:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        rates:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClosingExchangeRateInput"
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/CurrencyRevaluationLine"
+        total_gain:
+          $ref: "#/components/schemas/DecimalAmount"
+        total_loss:
+          $ref: "#/components/schemas/DecimalAmount"
+        net_result:
+          $ref: "#/components/schemas/DecimalAmount"
+        draft:
+          $ref: "#/components/schemas/JournalDraft"
+    FiscalEnvironment:
+      type: string
+      enum: [homologation, production]
+    ArgentinaTaxCondition:
+      type: string
+      enum: [registered, monotributo, exempt, not_responsible]
+    FiscalAuthorizationState:
+      type: string
+      enum: [queued, processing, authorized, rejected, uncertain]
+    FiscalConcept:
+      type: string
+      enum: [products, services, mixed]
+    FiscalVoucherKind:
+      type: string
+      enum: [invoice_a, invoice_b, invoice_c, credit_note_a, credit_note_b, credit_note_c, debit_note_a, debit_note_b, debit_note_c]
+    ArgentinaFiscalSettingsInput:
+      type: object
+      additionalProperties: false
+      required: [cuit, legal_name, tax_address, tax_condition, activity_start_date, environment, functional_currency, version]
+      properties:
+        cuit:
+          type: string
+          pattern: "^[0-9]{11}$"
+        legal_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        tax_address:
+          type: string
+          minLength: 1
+          maxLength: 300
+        tax_condition:
+          $ref: "#/components/schemas/ArgentinaTaxCondition"
+        activity_start_date:
+          type: string
+          format: date
+        environment:
+          $ref: "#/components/schemas/FiscalEnvironment"
+        functional_currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+    ArgentinaFiscalSettings:
+      allOf:
+        - $ref: "#/components/schemas/ArgentinaFiscalSettingsInput"
+        - type: object
+          required: [country_code, production_ready]
+          properties:
+            country_code:
+              type: string
+              enum: [AR]
+            production_ready:
+              type: boolean
+            certificate_expires_at:
+              type: string
+              format: date-time
+              nullable: true
+    FiscalHomologationStatus:
+      type: string
+      enum: [succeeded, failed]
+    FiscalHomologationCheck:
+      type: object
+      additionalProperties: false
+      required:
+        [ordinal, kind, name, status, detail, evidence, evidence_sha256, started_at, completed_at]
+      properties:
+        ordinal:
+          type: integer
+          minimum: 1
+        kind:
+          type: string
+          enum: [configuration, certificate, wsaa, wsfe_last_authorized, local_matrix]
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/FiscalHomologationStatus"
+        point_of_sale:
+          type: integer
+          nullable: true
+        voucher_type:
+          type: integer
+          nullable: true
+        detail:
+          type: string
+          description: Detalle operativo sin credenciales ni datos secretos.
+        evidence:
+          type: object
+          additionalProperties: true
+        evidence_sha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+    FiscalHomologationRun:
+      type: object
+      additionalProperties: false
+      required:
+        [id, status, point_of_sale_count, check_count, success_count, failure_count, evidence_sha256, evidence_note, started_at, completed_at, checks]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/FiscalHomologationStatus"
+        certificate_fingerprint:
+          type: string
+          nullable: true
+        point_of_sale_count:
+          type: integer
+          minimum: 0
+        check_count:
+          type: integer
+          minimum: 1
+        success_count:
+          type: integer
+          minimum: 0
+        failure_count:
+          type: integer
+          minimum: 0
+        evidence_sha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        evidence_note:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/FiscalHomologationCheck"
+    FiscalCertificateInput:
+      type: object
+      additionalProperties: false
+      required: [environment, certificate_pem, private_key_pem]
+      properties:
+        environment:
+          $ref: "#/components/schemas/FiscalEnvironment"
+        certificate_pem:
+          type: string
+          minLength: 64
+        private_key_pem:
+          type: string
+          minLength: 64
+    FiscalCertificate:
+      type: object
+      additionalProperties: false
+      required: [id, environment, fingerprint, valid_from, expires_at, active]
+      properties:
+        id:
+          type: string
+          format: uuid
+        environment:
+          $ref: "#/components/schemas/FiscalEnvironment"
+        fingerprint:
+          type: string
+        valid_from:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        active:
+          type: boolean
+    FiscalPointOfSaleInput:
+      type: object
+      additionalProperties: false
+      required: [number, environment]
+      properties:
+        number:
+          type: integer
+          minimum: 1
+          maximum: 99999
+        environment:
+          $ref: "#/components/schemas/FiscalEnvironment"
+        name:
+          type: string
+          maxLength: 120
+    FiscalPointOfSale:
+      allOf:
+        - $ref: "#/components/schemas/FiscalPointOfSaleInput"
+        - type: object
+          required: [id, active]
+          properties:
+            id:
+              type: string
+              format: uuid
+            active:
+              type: boolean
+    FiscalTaxComponent:
+      type: object
+      additionalProperties: false
+      required: [kind, rate, taxable_base, amount]
+      properties:
+        kind:
+          type: string
+          enum: [vat, exempt, non_taxed, other_tax, withholding, perception]
+        rate:
+          $ref: "#/components/schemas/DecimalAmount"
+        taxable_base:
+          $ref: "#/components/schemas/DecimalAmount"
+        amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        authority_code:
+          type: integer
+          minimum: 1
+          maximum: 99
+          description: Código de tributo informado a ARCA; obligatorio para tributos no IVA.
+        description:
+          type: string
+          minLength: 1
+          maxLength: 120
+        jurisdiction:
+          type: string
+          maxLength: 32
+    FiscalVoucherLineInput:
+      type: object
+      additionalProperties: false
+      required: [description, quantity, unit_price, subtotal, taxes]
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+        quantity:
+          $ref: "#/components/schemas/DecimalAmount"
+        unit_price:
+          $ref: "#/components/schemas/DecimalAmount"
+        subtotal:
+          $ref: "#/components/schemas/DecimalAmount"
+        cost_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+          description: Costo total confirmado de la línea en moneda funcional; no se envía a ARCA ni se imprime.
+        cost_confirmed:
+          type: boolean
+          default: false
+        taxes:
+          type: array
+          items:
+            $ref: "#/components/schemas/FiscalTaxComponent"
+    FiscalVoucherInput:
+      type: object
+      additionalProperties: false
+      required:
+        [environment, source_type, source_id, point_of_sale_id, concept, receiver_document_type, receiver_document_number, receiver_tax_condition, sale_condition, payment_method, currency, exchange_rate, lines]
+      properties:
+        environment:
+          $ref: "#/components/schemas/FiscalEnvironment"
+        source_type:
+          type: string
+          description: >-
+            Documento comercial de venta que origina la autorización de ARCA.
+            Las compras se registran por el recurso dedicado y las NC/ND por
+            sus comandos específicos.
+          enum: [sale]
+        source_id:
+          type: string
+          format: uuid
+        point_of_sale_id:
+          type: string
+          format: uuid
+        concept:
+          $ref: "#/components/schemas/FiscalConcept"
+        receiver_name:
+          type: string
+          maxLength: 200
+        receiver_document_type:
+          type: string
+          enum: [CUIT, CUIL, DNI, CONSUMER_FINAL]
+        receiver_document_number:
+          type: string
+          maxLength: 20
+        receiver_tax_condition:
+          type: string
+        sale_condition:
+          type: string
+          enum: [cash, credit]
+          description: Define si el asiento cancela contra un medio de cobro o genera una partida por cobrar.
+        party_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Cliente contable; obligatorio para venta a crédito y omitido para consumidor sin cuenta corriente.
+        payment_method:
+          type: string
+          enum: [cash, bank_transfer, card, wallet, check]
+          description: Cuenta funcional o clearing usada por el posteo; en crédito queda como medio original para NC/reintegros.
+        service_from:
+          type: string
+          format: date
+        service_to:
+          type: string
+          format: date
+        payment_due_date:
+          type: string
+          format: date
+        accounting_due_date:
+          type: string
+          format: date
+          description: Vencimiento de la cuenta corriente; obligatorio para venta a crédito.
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        exchange_rate:
+          $ref: "#/components/schemas/DecimalAmount"
+        exchange_rate_source:
+          type: string
+          maxLength: 80
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/FiscalVoucherLineInput"
+    FiscalVoucher:
+      type: object
+      additionalProperties: false
+      required:
+        [id, environment, state, source_type, source_id, concept, currency, total, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        environment:
+          $ref: "#/components/schemas/FiscalEnvironment"
+        state:
+          $ref: "#/components/schemas/FiscalAuthorizationState"
+        kind:
+          $ref: "#/components/schemas/FiscalVoucherKind"
+        source_type:
+          type: string
+        source_id:
+          type: string
+          format: uuid
+        concept:
+          $ref: "#/components/schemas/FiscalConcept"
+        point_of_sale:
+          type: integer
+        voucher_number:
+          type: integer
+          format: int64
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        total:
+          $ref: "#/components/schemas/DecimalAmount"
+        cae:
+          type: string
+          nullable: true
+        cae_expires_at:
+          type: string
+          format: date
+          nullable: true
+        associated_voucher_id:
+          type: string
+          format: uuid
+          nullable: true
+        observations:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    FiscalVoucherSnapshotLine:
+      type: object
+      additionalProperties: false
+      required:
+        [position, description, quantity, unit_price, tax_treatment, subtotal, vat_rate, vat_amount, total]
+      properties:
+        position:
+          type: integer
+          minimum: 1
+        description:
+          type: string
+        quantity:
+          $ref: "#/components/schemas/DecimalAmount"
+        unit_price:
+          $ref: "#/components/schemas/DecimalAmount"
+        tax_treatment:
+          type: string
+          enum: [taxable, exempt, non_taxed]
+        subtotal:
+          $ref: "#/components/schemas/DecimalAmount"
+        vat_rate:
+          $ref: "#/components/schemas/DecimalAmount"
+        vat_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        total:
+          $ref: "#/components/schemas/DecimalAmount"
+    FiscalVoucherDetail:
+      allOf:
+        - $ref: "#/components/schemas/FiscalVoucher"
+        - type: object
+          required:
+            [issue_date, receiver_name, receiver_document_type, receiver_document_number, receiver_tax_condition, exchange_rate, lines]
+          properties:
+            issue_date:
+              type: string
+              format: date
+            service_from:
+              type: string
+              format: date
+            service_to:
+              type: string
+              format: date
+            payment_due_date:
+              type: string
+              format: date
+            receiver_name:
+              type: string
+            receiver_document_type:
+              type: string
+              enum: [CUIT, CUIL, DNI, CONSUMER_FINAL]
+            receiver_document_number:
+              type: string
+            receiver_tax_condition:
+              type: string
+            exchange_rate:
+              $ref: "#/components/schemas/DecimalAmount"
+            exchange_rate_source:
+              type: string
+            lines:
+              type: array
+              minItems: 1
+              items:
+                $ref: "#/components/schemas/FiscalVoucherSnapshotLine"
+    FiscalVoucherList:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FiscalVoucher"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    FiscalAdjustmentInput:
+      type: object
+      additionalProperties: false
+      required: [associated_voucher_id, reason, lines]
+      properties:
+        associated_voucher_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+        lines:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/FiscalVoucherLineInput"
+    FiscalPurchaseLineInput:
+      type: object
+      additionalProperties: false
+      required:
+        [description, quantity, unit_of_measure, unit_price, tax_treatment, vat_rate, net_amount, vat_amount, total_amount]
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+        quantity:
+          $ref: "#/components/schemas/DecimalAmount"
+        unit_of_measure:
+          type: string
+          minLength: 1
+          maxLength: 32
+        unit_price:
+          $ref: "#/components/schemas/DecimalAmount"
+        discount_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        tax_treatment:
+          type: string
+          enum: [taxable, exempt, non_taxed]
+        vat_rate:
+          $ref: "#/components/schemas/DecimalAmount"
+        net_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        vat_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        total_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        inventory:
+          type: boolean
+          default: false
+    FiscalPurchaseTaxInput:
+      type: object
+      additionalProperties: false
+      required:
+        [kind, authority_code, description, taxable_base, rate, amount]
+      properties:
+        kind:
+          type: string
+          enum: [vat, other_tax, withholding, perception]
+        authority_code:
+          type: string
+          minLength: 1
+          maxLength: 32
+        jurisdiction:
+          type: string
+          maxLength: 32
+        description:
+          type: string
+          minLength: 1
+          maxLength: 160
+        taxable_base:
+          $ref: "#/components/schemas/DecimalAmount"
+        rate:
+          $ref: "#/components/schemas/DecimalAmount"
+        amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        creditable:
+          type: boolean
+          default: false
+    FiscalPurchaseVoucherInput:
+      type: object
+      additionalProperties: false
+      required:
+        [environment, source_id, supplier_id, supplier_tax_id, supplier_name, voucher_type, point_of_sale, voucher_number, issue_date, currency, exchange_rate, exchange_rate_date, exchange_rate_source, lines, taxes]
+      properties:
+        environment:
+          $ref: "#/components/schemas/FiscalEnvironment"
+        source_id:
+          type: string
+          format: uuid
+        supplier_id:
+          type: string
+          format: uuid
+        supplier_tax_id:
+          type: string
+          pattern: "^[0-9]{11}$"
+        supplier_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        voucher_type:
+          type: integer
+          enum: [1, 2, 3, 6, 7, 8, 11, 12, 13]
+        point_of_sale:
+          type: integer
+          minimum: 1
+          maximum: 99999
+        voucher_number:
+          type: integer
+          format: int64
+          minimum: 1
+        issue_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        exchange_rate:
+          $ref: "#/components/schemas/DecimalAmount"
+        exchange_rate_date:
+          type: string
+          format: date
+        exchange_rate_source:
+          type: string
+          minLength: 1
+          maxLength: 80
+        source_reference:
+          type: string
+          maxLength: 160
+        associated_purchase_voucher_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: >-
+            Factura de compra original. Es obligatoria para notas de crédito y
+            débito y debe pertenecer al mismo proveedor, ambiente y letra.
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/FiscalPurchaseLineInput"
+        taxes:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/FiscalPurchaseTaxInput"
+    FiscalPurchaseVoucher:
+      type: object
+      additionalProperties: false
+      required:
+        [id, environment, supplier_id, supplier_tax_id, supplier_name, voucher_type, point_of_sale, voucher_number, issue_date, currency, exchange_rate, net_amount, exempt_amount, non_taxed_amount, vat_amount, other_taxes_amount, withholding_amount, perception_amount, total_amount, version, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        environment:
+          $ref: "#/components/schemas/FiscalEnvironment"
+        supplier_id:
+          type: string
+          format: uuid
+        supplier_tax_id:
+          type: string
+        supplier_name:
+          type: string
+        voucher_type:
+          type: integer
+        point_of_sale:
+          type: integer
+        voucher_number:
+          type: integer
+          format: int64
+        issue_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        exchange_rate:
+          $ref: "#/components/schemas/DecimalAmount"
+        net_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        exempt_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        non_taxed_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        vat_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        other_taxes_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        withholding_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        perception_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        total_amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        version:
+          type: integer
+          format: int64
+        journal_entry_id:
+          type: string
+          format: uuid
+          nullable: true
+        associated_purchase_voucher_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    FiscalPurchaseVoucherList:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FiscalPurchaseVoucher"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    IVASimpleReport:
+      type: object
+      additionalProperties: false
+      required: [period, sales_net, output_vat, purchases_net, input_vat, withholdings, perceptions, balance, validation_errors]
+      properties:
+        period:
+          type: string
+        sales_net:
+          $ref: "#/components/schemas/DecimalAmount"
+        output_vat:
+          $ref: "#/components/schemas/DecimalAmount"
+        purchases_net:
+          $ref: "#/components/schemas/DecimalAmount"
+        input_vat:
+          $ref: "#/components/schemas/DecimalAmount"
+        withholdings:
+          $ref: "#/components/schemas/DecimalAmount"
+        perceptions:
+          $ref: "#/components/schemas/DecimalAmount"
+        balance:
+          $ref: "#/components/schemas/DecimalAmount"
+        sales_file:
+          type: string
+          description: Archivo de trabajo codificado en base64.
+        purchases_file:
+          type: string
+          description: Archivo de trabajo codificado en base64.
+        validation_errors:
+          type: array
+          items:
+            type: string
+    IVASimpleWorkflowStatus:
+      type: string
+      enum: [draft, closed, exported]
+    IVASimplePrepareInput:
+      type: object
+      additionalProperties: false
+      properties:
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+          nullable: true
+          description: >-
+            Obligatoria al volver a preparar un borrador existente; debe
+            omitirse al crear el período por primera vez.
+        opening_balance:
+          $ref: "#/components/schemas/DecimalAmount"
+    IVASimpleTransitionInput:
+      type: object
+      additionalProperties: false
+      required: [version, reason]
+      properties:
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    IVASimpleExportSummary:
+      type: object
+      additionalProperties: false
+      required:
+        [id, export_version, filename, media_type, sha256, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        export_version:
+          type: integer
+          minimum: 1
+        filename:
+          type: string
+        media_type:
+          type: string
+        sha256:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        created_at:
+          type: string
+          format: date-time
+    IVASimpleExportArtifact:
+      allOf:
+        - $ref: "#/components/schemas/IVASimpleExportSummary"
+        - type: object
+          additionalProperties: false
+          required: [content_base64]
+          properties:
+            content_base64:
+              type: string
+              format: byte
+    IVASimpleWorkflowPeriod:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - period
+        - environment
+        - status
+        - opening_balance
+        - report
+        - version
+        - exports
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        period:
+          type: string
+          pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+        environment:
+          $ref: "#/components/schemas/FiscalEnvironment"
+        status:
+          $ref: "#/components/schemas/IVASimpleWorkflowStatus"
+        opening_balance:
+          $ref: "#/components/schemas/DecimalAmount"
+        closing_balance:
+          $ref: "#/components/schemas/DecimalAmount"
+          nullable: true
+        report:
+          $ref: "#/components/schemas/IVASimpleReport"
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        exports:
+          type: array
+          items:
+            $ref: "#/components/schemas/IVASimpleExportSummary"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+        exported_at:
+          type: string
+          format: date-time
+          nullable: true
     LifecycleCommandInput:
       type: object
       additionalProperties: false

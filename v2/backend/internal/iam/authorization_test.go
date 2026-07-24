@@ -52,6 +52,13 @@ func TestPermissionsAreFixedAndReturnedAsCopy(t *testing.T) {
 	if slices.Contains(Permissions(RoleMember), PermissionInvitationCreate) {
 		t.Fatal("member may create invitations")
 	}
+	if !slices.Contains(Permissions(RoleMember), PermissionAccountingView) ||
+		slices.Contains(Permissions(RoleMember), PermissionAccountingManage) {
+		t.Fatal("member accounting permissions are not read-only")
+	}
+	if !slices.Contains(Permissions(RoleAdmin), PermissionFiscalManage) {
+		t.Fatal("admin lacks fiscal management")
+	}
 
 	owner[0] = "mutated"
 	if HasPermission(RoleOwner, "mutated") {

@@ -17,6 +17,7 @@ import (
 	"github.com/devpablocristo/pymes/v2/backend/internal/administration"
 	"github.com/devpablocristo/pymes/v2/backend/internal/api"
 	"github.com/devpablocristo/pymes/v2/backend/internal/config"
+	"github.com/devpablocristo/pymes/v2/backend/internal/fiscal"
 	productiam "github.com/devpablocristo/pymes/v2/backend/internal/iam"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -96,6 +97,9 @@ type IAMDependencies struct {
 	WebhookInbox          WebhookInbox
 	OutboxAppender        OutboxAppender
 	Administration        AdministrationService
+	FiscalKMS             fiscal.KMS
+	FiscalObjects         fiscal.ObjectStore
+	FiscalKMSKeyReference string
 	Now                   func() time.Time
 }
 
@@ -113,6 +117,9 @@ type IAMAPI struct {
 	webhookInbox          WebhookInbox
 	outboxAppender        OutboxAppender
 	administration        AdministrationService
+	fiscalKMS             fiscal.KMS
+	fiscalObjects         fiscal.ObjectStore
+	fiscalKMSKeyReference string
 	now                   func() time.Time
 }
 
@@ -128,6 +135,9 @@ func NewIAMAPI(clerk config.ClerkConfig, dependencies ...IAMDependencies) *IAMAP
 		handler.webhookInbox = dependencies[0].WebhookInbox
 		handler.outboxAppender = dependencies[0].OutboxAppender
 		handler.administration = dependencies[0].Administration
+		handler.fiscalKMS = dependencies[0].FiscalKMS
+		handler.fiscalObjects = dependencies[0].FiscalObjects
+		handler.fiscalKMSKeyReference = dependencies[0].FiscalKMSKeyReference
 		if dependencies[0].Now != nil {
 			handler.now = dependencies[0].Now
 		}
@@ -220,6 +230,11 @@ func (h *IAMAPI) withinOrganizationTx(
 	}
 	if errors.Is(err, errIAMInvitationPending) {
 		writeAPIError(w, http.StatusConflict, "IAM_INVITATION_PENDING", "A pending invitation already exists")
+		return false
+	}
+	var businessError *businessRequestError
+	if errors.As(err, &businessError) {
+		writeBusinessError(w, businessError.cause)
 		return false
 	}
 	if err != nil {
@@ -634,6 +649,7 @@ func loadCurrentSession(
 		membershipID   string
 		localRole      string
 		status         string
+		delegated      string
 	)
 	err := tx.QueryRow(ctx, `
 		SELECT
@@ -647,7 +663,13 @@ func loadCurrentSession(
 			coalesce(organization.external_id, ''),
 			membership.id::text,
 			membership.role,
-			membership.status
+			membership.status,
+			coalesce((
+				SELECT string_agg(permission_grant.permission, ',' ORDER BY permission_grant.permission)
+				  FROM iam.membership_permissions AS permission_grant
+				 WHERE permission_grant.membership_id = membership.id
+				   AND permission_grant.permission IN ('accounting:manage', 'fiscal:manage')
+			), '')
 		FROM iam.memberships AS membership
 		JOIN iam.organizations AS organization
 		  ON organization.id = membership.org_id
@@ -668,6 +690,7 @@ func loadCurrentSession(
 		&membershipID,
 		&localRole,
 		&status,
+		&delegated,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return api.CurrentSession{}, platformiam.ErrActiveMembershipRequired
@@ -701,6 +724,21 @@ func loadCurrentSession(
 	}
 
 	permissions := productiam.Permissions(effectiveRole)
+	knownPermissions := make(map[productiam.Permission]struct{}, len(permissions)+2)
+	for _, permission := range permissions {
+		knownPermissions[permission] = struct{}{}
+	}
+	for _, value := range strings.Split(delegated, ",") {
+		granted := productiam.Permission(strings.TrimSpace(value))
+		if granted == "" {
+			continue
+		}
+		if _, exists := knownPermissions[granted]; exists {
+			continue
+		}
+		permissions = append(permissions, granted)
+		knownPermissions[granted] = struct{}{}
+	}
 	permissionNames := make([]api.Permission, len(permissions))
 	for index, permission := range permissions {
 		permissionNames[index] = api.Permission(permission)

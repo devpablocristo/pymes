@@ -1,0 +1,7 @@
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  <soapenv:Body>
+    <loginCmsResponse>
+      <loginCmsReturn>&lt;loginTicketResponse version=&quot;1.0&quot;&gt;&lt;header&gt;&lt;expirationTime&gt;2026-07-25T03:00:00-03:00&lt;/expirationTime&gt;&lt;/header&gt;&lt;credentials&gt;&lt;token&gt;fixture-token&lt;/token&gt;&lt;sign&gt;fixture-sign&lt;/sign&gt;&lt;/credentials&gt;&lt;/loginTicketResponse&gt;</loginCmsReturn>
+    </loginCmsResponse>
+  </soapenv:Body>
+</soapenv:Envelope>

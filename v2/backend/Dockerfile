@@ -14,7 +14,9 @@ RUN CGO_ENABLED=0 GOOS=linux GOWORK=off go build \
 
 FROM alpine:3.22
 
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates \
+    && mkdir -p /var/lib/pymes/fiscal \
+    && chown -R 65532:65532 /var/lib/pymes
 
 COPY --from=build /out/pymes-v2-api /usr/local/bin/pymes-v2-api
 

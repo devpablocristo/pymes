@@ -16,6 +16,13 @@ lee, ejecuta ni importa código de `v1/`.
 Cada componente mantiene dependencias y checks propios. Los módulos de
 `platform` se consumen exclusivamente mediante versiones publicadas.
 
+El almacenamiento de certificados y comprobantes fiscales tiene adaptadores
+separados para desarrollo y producción. La configuración KMS/S3, el modelo de
+envelope encryption y los permisos mínimos están documentados en
+[`docs/v2/fiscal-secure-storage.md`](../docs/v2/fiscal-secure-storage.md).
+La arquitectura, las garantías y el flujo operativo del MVP están en
+[`docs/v2/accounting-fiscal-mvp.md`](../docs/v2/accounting-fiscal-mvp.md).
+
 ## Desarrollo local con Docker
 
 Requiere Docker con Compose. No requiere Go ni Node instalados en el host:

@@ -22,10 +22,44 @@ func TestIAMOpenAPIContract(t *testing.T) {
 	}
 
 	assertIAMOperations(t, spec)
+	assertBusinessOperations(t, spec)
 	assertSecurityBoundaries(t, spec)
 	assertMutationIdempotency(t, spec)
 	assertNoClientSelectedTenant(t, spec)
 	assertRoleAndLifecycleSchemas(t, spec)
+}
+
+func assertBusinessOperations(t *testing.T, spec *openapi3.T) {
+	t.Helper()
+
+	expected := map[string]string{
+		http.MethodGet + " /api/v1/accounting/accounts":                            "ListAccountingAccounts",
+		http.MethodPost + " /api/v1/accounting/accounts":                           "CreateAccountingAccount",
+		http.MethodPost + " /api/v1/accounting/periods":                            "CreateAccountingPeriod",
+		http.MethodPost + " /api/v1/accounting/statement-imports":                  "ImportAccountingStatement",
+		http.MethodGet + " /api/v1/accounting/reports/{report}/export":             "ExportAccountingReport",
+		http.MethodPost + " /api/v1/accounting/drafts/{draft_id}/post":             "PostJournalDraft",
+		http.MethodPost + " /api/v1/accounting/journal-entries/{entry_id}/reverse": "ReverseJournalEntry",
+		http.MethodGet + " /api/v1/accounting/reports/{report}":                    "GetAccountingReport",
+		http.MethodGet + " /api/v1/team/members/{member_id}/business-permissions":  "GetTeamMemberBusinessPermissions",
+		http.MethodPut + " /api/v1/team/members/{member_id}/business-permissions":  "UpdateTeamMemberBusinessPermissions",
+		http.MethodPut + " /api/v1/fiscal/settings":                                "UpdateFiscalSettings",
+		http.MethodGet + " /api/v1/fiscal/homologation/latest":                     "GetLatestFiscalHomologation",
+		http.MethodPost + " /api/v1/fiscal/production/enable":                      "EnableFiscalProduction",
+		http.MethodPost + " /api/v1/fiscal/purchase-vouchers":                      "CreateFiscalPurchaseVoucher",
+		http.MethodPost + " /api/v1/fiscal/vouchers":                               "CreateFiscalVoucher",
+		http.MethodGet + " /api/v1/fiscal/vouchers/{voucher_id}/pdf":               "GetFiscalVoucherPDF",
+		http.MethodPost + " /api/v1/fiscal/credit-notes":                           "CreateFiscalCreditNote",
+		http.MethodPost + " /api/v1/fiscal/debit-notes":                            "CreateFiscalDebitNote",
+		http.MethodGet + " /api/v1/fiscal/iva-simple/{period}":                     "GetIVASimple",
+	}
+	for route, operationID := range expected {
+		method, path, _ := strings.Cut(route, " ")
+		operation := operationAt(t, spec, method, path)
+		if operation.OperationID != operationID {
+			t.Errorf("%s %s operationId = %q, want %q", method, path, operation.OperationID, operationID)
+		}
+	}
 }
 
 func assertIAMOperations(t *testing.T, spec *openapi3.T) {
@@ -228,9 +262,42 @@ func assertRoleAndLifecycleSchemas(t *testing.T, spec *openapi3.T) {
 	}
 
 	permissions := enumStrings(t, spec, "Permission")
-	if len(permissions) != 8 || !slices.Contains(permissions, "sessions:manage:self") ||
+	if len(permissions) != 12 || !slices.Contains(permissions, "sessions:manage:self") ||
+		!slices.Contains(permissions, "accounting:manage") ||
+		!slices.Contains(permissions, "fiscal:manage") ||
 		slices.Contains(permissions, "team:ownership:transfer") {
 		t.Errorf("Permission does not expose the fixed IAM matrix: %v", permissions)
+	}
+	delegated := enumStrings(t, spec, "DelegatedBusinessPermission")
+	if !slices.Equal(delegated, []string{"accounting:manage", "fiscal:manage"}) {
+		t.Errorf("DelegatedBusinessPermission = %v", delegated)
+	}
+
+	fiscalVoucherInput := schemaAt(t, spec, "FiscalVoucherInput")
+	sourceType := fiscalVoucherInput.Properties["source_type"]
+	if sourceType == nil || sourceType.Value == nil ||
+		len(sourceType.Value.Enum) != 1 || sourceType.Value.Enum[0] != "sale" {
+		t.Errorf("FiscalVoucherInput source_type must accept outbound sales only")
+	}
+	if !slices.Contains(fiscalVoucherInput.Required, "environment") {
+		t.Error("FiscalVoucherInput must select its fiscal environment explicitly")
+	}
+	fiscalVoucher := schemaAt(t, spec, "FiscalVoucher")
+	if !slices.Contains(fiscalVoucher.Required, "environment") {
+		t.Error("FiscalVoucher must expose its isolated fiscal environment")
+	}
+	settingsInput := schemaAt(t, spec, "ArgentinaFiscalSettingsInput")
+	if !slices.Contains(settingsInput.Required, "activity_start_date") {
+		t.Error("Argentina fiscal settings must require the activity start date")
+	}
+	purchaseInput := schemaAt(t, spec, "FiscalPurchaseVoucherInput")
+	if purchaseInput.Properties["associated_purchase_voucher_id"] == nil {
+		t.Error("Purchase adjustments must be able to reference their original voucher")
+	}
+	listVouchers := operationAt(t, spec, http.MethodGet, "/api/v1/fiscal/vouchers")
+	environment := findParameter(listVouchers.Parameters, "environment")
+	if environment == nil || !environment.Required {
+		t.Error("Fiscal voucher listings must require an explicit environment")
 	}
 
 	currentSession := schemaAt(t, spec, "CurrentSession")

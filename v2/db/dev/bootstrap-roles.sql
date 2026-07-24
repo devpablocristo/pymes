@@ -21,16 +21,48 @@ BEGIN
             NOBYPASSRLS
             NOINHERIT;
     END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_roles WHERE rolname = 'pymes_fiscal_worker'
+    ) THEN
+        CREATE ROLE pymes_fiscal_worker
+            LOGIN
+            PASSWORD 'pymes_fiscal_worker'
+            NOBYPASSRLS
+            NOINHERIT;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1
+          FROM pg_roles
+         WHERE rolname = 'pymes_fiscal_accounting_worker'
+    ) THEN
+        CREATE ROLE pymes_fiscal_accounting_worker
+            LOGIN
+            PASSWORD 'pymes_fiscal_accounting_worker'
+            NOBYPASSRLS
+            NOINHERIT;
+    END IF;
 END
 $roles$;
 
 ALTER ROLE pymes_migrator PASSWORD 'pymes_migrator' BYPASSRLS NOINHERIT;
 ALTER ROLE pymes_backend PASSWORD 'pymes_backend' NOBYPASSRLS NOINHERIT;
 ALTER ROLE pymes_iam_worker PASSWORD 'pymes_iam_worker' NOBYPASSRLS NOINHERIT;
+ALTER ROLE pymes_fiscal_worker
+    PASSWORD 'pymes_fiscal_worker'
+    NOBYPASSRLS
+    NOINHERIT;
+ALTER ROLE pymes_fiscal_accounting_worker
+    PASSWORD 'pymes_fiscal_accounting_worker'
+    NOBYPASSRLS
+    NOINHERIT;
 
 GRANT CONNECT, CREATE, TEMPORARY ON DATABASE pymes_v2 TO pymes_migrator;
 GRANT CONNECT, TEMPORARY ON DATABASE pymes_v2 TO pymes_backend;
 GRANT CONNECT, TEMPORARY ON DATABASE pymes_v2 TO pymes_iam_worker;
+GRANT CONNECT, TEMPORARY ON DATABASE pymes_v2 TO pymes_fiscal_worker;
+GRANT CONNECT, TEMPORARY
+ON DATABASE pymes_v2
+TO pymes_fiscal_accounting_worker;
 GRANT USAGE, CREATE ON SCHEMA public TO pymes_migrator;
 
 DO $legacy$
@@ -42,7 +74,12 @@ BEGIN
     END IF;
     IF to_regnamespace('app') IS NOT NULL THEN
         GRANT USAGE, CREATE ON SCHEMA app TO pymes_migrator;
-        GRANT USAGE ON SCHEMA app TO pymes_backend, pymes_iam_worker;
+        GRANT USAGE ON SCHEMA app
+        TO
+            pymes_backend,
+            pymes_iam_worker,
+            pymes_fiscal_worker,
+            pymes_fiscal_accounting_worker;
     END IF;
 END
 $legacy$;

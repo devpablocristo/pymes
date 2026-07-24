@@ -28,6 +28,10 @@ const (
 	PermissionInvitationCreate   Permission = "team:invitation:create"
 	PermissionInvitationManage   Permission = "team:invitation:manage"
 	PermissionSessionsManageSelf Permission = "sessions:manage:self"
+	PermissionAccountingView     Permission = "accounting:view"
+	PermissionAccountingManage   Permission = "accounting:manage"
+	PermissionFiscalView         Permission = "fiscal:view"
+	PermissionFiscalManage       Permission = "fiscal:manage"
 )
 
 var permissionsByRole = map[Role][]Permission{
@@ -35,6 +39,8 @@ var permissionsByRole = map[Role][]Permission{
 		PermissionOrganizationView,
 		PermissionTeamView,
 		PermissionSessionsManageSelf,
+		PermissionAccountingView,
+		PermissionFiscalView,
 	},
 	RoleAdmin: {
 		PermissionOrganizationView,
@@ -44,6 +50,10 @@ var permissionsByRole = map[Role][]Permission{
 		PermissionInvitationCreate,
 		PermissionInvitationManage,
 		PermissionSessionsManageSelf,
+		PermissionAccountingView,
+		PermissionAccountingManage,
+		PermissionFiscalView,
+		PermissionFiscalManage,
 	},
 	RoleOwner: {
 		PermissionOrganizationView,
@@ -54,6 +64,10 @@ var permissionsByRole = map[Role][]Permission{
 		PermissionInvitationCreate,
 		PermissionInvitationManage,
 		PermissionSessionsManageSelf,
+		PermissionAccountingView,
+		PermissionAccountingManage,
+		PermissionFiscalView,
+		PermissionFiscalManage,
 	},
 }
 

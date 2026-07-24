@@ -10,14 +10,20 @@ RUN GOWORK=off go mod download
 
 COPY . .
 
-RUN mkdir -p /src/tmp /tmp/go-build \
-    && GOCACHE=/tmp/go-build GOWORK=off go build ./cmd/api ./cmd/iam-worker \
-    && chown -R 65532:65532 /src/tmp /tmp/go-build
+RUN mkdir -p /src/tmp /tmp/go-build /var/lib/pymes/fiscal \
+    && chown -R 65532:65532 /src/tmp /tmp/go-build /var/lib/pymes
 
 ENV HOME=/tmp
 ENV GOCACHE=/tmp/go-build
 
 USER 65532:65532
+
+RUN GOWORK=off go build \
+      ./cmd/api \
+      ./cmd/iam-worker \
+      ./cmd/fiscal-worker \
+      ./cmd/fiscal-accounting-worker \
+      ./cmd/fiscal-homologation
 
 ENTRYPOINT ["air"]
 CMD ["-c", ".air.api.toml"]

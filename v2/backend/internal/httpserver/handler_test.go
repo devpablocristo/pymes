@@ -328,7 +328,7 @@ func TestCurrentSessionRequiresActiveLocalMembership(t *testing.T) {
 	assertAPIError(t, response, http.StatusForbidden, "IAM_MEMBERSHIP_REQUIRED")
 }
 
-func TestCurrentSessionReturnsEffectiveLocalSession(t *testing.T) {
+func TestCurrentSessionReturnsEffectiveLocalSessionAndDelegatedBusinessPermissions(t *testing.T) {
 	now := time.Now().UTC()
 	claims := clerkadapter.SessionClaims{
 		Subject:                 "user_external",
@@ -358,6 +358,7 @@ func TestCurrentSessionReturnsEffectiveLocalSession(t *testing.T) {
 			active.MembershipID,
 			active.Role,
 			"active",
+			"accounting:manage,fiscal:manage",
 		}},
 	}
 	handler := currentSessionTestHandler(
@@ -416,7 +417,7 @@ func TestCurrentSessionReturnsEffectiveLocalSession(t *testing.T) {
 		permissionNames[index] = string(permission)
 	}
 	if got := strings.Join(permissionNames, ","); got !=
-		"organization:view,team:view,sessions:manage:self" {
+		"organization:view,team:view,sessions:manage:self,accounting:view,fiscal:view,accounting:manage,fiscal:manage" {
 		t.Fatalf("permissions = %q", got)
 	}
 }

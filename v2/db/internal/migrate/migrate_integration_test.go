@@ -48,6 +48,7 @@ func TestUpFromEmptyDatabaseIsRepeatableAcrossReconnect(t *testing.T) {
 	}
 	assertSchemaState(t, ctx, database)
 	assertTenantIsolationAndOwnerInvariant(t, ctx, database, databaseURL)
+	assertAccountingAndFiscalInvariants(t, ctx, database, databaseURL)
 }
 
 func openDatabase(t *testing.T, ctx context.Context, databaseURL string) *postgres.DB {
@@ -61,6 +62,15 @@ func openDatabase(t *testing.T, ctx context.Context, databaseURL string) *postgr
 
 func resetDatabase(t *testing.T, ctx context.Context, database *postgres.DB) {
 	t.Helper()
+	if _, err := database.Exec(ctx, "DROP SCHEMA IF EXISTS fiscal_ar CASCADE"); err != nil {
+		t.Fatalf("drop fiscal_ar schema: %v", err)
+	}
+	if _, err := database.Exec(ctx, "DROP SCHEMA IF EXISTS fiscal CASCADE"); err != nil {
+		t.Fatalf("drop fiscal schema: %v", err)
+	}
+	if _, err := database.Exec(ctx, "DROP SCHEMA IF EXISTS accounting CASCADE"); err != nil {
+		t.Fatalf("drop accounting schema: %v", err)
+	}
 	if _, err := database.Exec(ctx, "DROP SCHEMA IF EXISTS app CASCADE"); err != nil {
 		t.Fatalf("drop app schema: %v", err)
 	}
@@ -117,6 +127,32 @@ func assertSchemaState(t *testing.T, ctx context.Context, database *postgres.DB)
 	if !lifecycleAuditTableExists {
 		t.Fatal("lifecycle audit table does not exist")
 	}
+	for _, relation := range []string{
+		"accounting.accounts",
+		"accounting.journal_entries",
+		"accounting.journal_lines",
+		"accounting.reconciliations",
+		"fiscal.vouchers",
+		"fiscal.voucher_snapshots",
+		"fiscal.accounting_posting_intents",
+		"fiscal.purchase_vouchers",
+		"fiscal.iva_periods",
+		"fiscal.homologation_runs",
+		"fiscal.homologation_checks",
+		"fiscal_ar.settings",
+	} {
+		var exists bool
+		if err := database.QueryRow(
+			ctx,
+			"SELECT to_regclass($1) IS NOT NULL",
+			relation,
+		).Scan(&exists); err != nil {
+			t.Fatalf("query relation %s: %v", relation, err)
+		}
+		if !exists {
+			t.Fatalf("relation %s does not exist", relation)
+		}
+	}
 	var lifecycleColumnCount int
 	if err := database.QueryRow(ctx, `
 		SELECT count(*)
@@ -139,8 +175,8 @@ func assertSchemaState(t *testing.T, ctx context.Context, database *postgres.DB)
 	).Scan(&productMigrationCount); err != nil {
 		t.Fatalf("query product migrations: %v", err)
 	}
-	if productMigrationCount != 9 {
-		t.Fatalf("product migration count = %d, want 9", productMigrationCount)
+	if productMigrationCount != 18 {
+		t.Fatalf("product migration count = %d, want 18", productMigrationCount)
 	}
 
 	var iamMigrationCount int
@@ -199,6 +235,26 @@ func ensureTestRoles(t *testing.T, ctx context.Context, database *postgres.DB) {
 					NOBYPASSRLS
 					NOINHERIT;
 			END IF;
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_roles WHERE rolname = 'pymes_fiscal_worker'
+			) THEN
+				CREATE ROLE pymes_fiscal_worker
+					LOGIN
+					PASSWORD 'pymes_fiscal_worker'
+					NOBYPASSRLS
+					NOINHERIT;
+			END IF;
+			IF NOT EXISTS (
+				SELECT 1
+				  FROM pg_roles
+				 WHERE rolname = 'pymes_fiscal_accounting_worker'
+			) THEN
+				CREATE ROLE pymes_fiscal_accounting_worker
+					LOGIN
+					PASSWORD 'pymes_fiscal_accounting_worker'
+					NOBYPASSRLS
+					NOINHERIT;
+			END IF;
 		END
 		$roles$;
 		ALTER ROLE pymes_backend
@@ -209,6 +265,16 @@ func ensureTestRoles(t *testing.T, ctx context.Context, database *postgres.DB) {
 		ALTER ROLE pymes_iam_worker
 			LOGIN
 			PASSWORD 'pymes_iam_worker'
+			NOBYPASSRLS
+			NOINHERIT;
+		ALTER ROLE pymes_fiscal_worker
+			LOGIN
+			PASSWORD 'pymes_fiscal_worker'
+			NOBYPASSRLS
+			NOINHERIT;
+		ALTER ROLE pymes_fiscal_accounting_worker
+			LOGIN
+			PASSWORD 'pymes_fiscal_accounting_worker'
 			NOBYPASSRLS
 			NOINHERIT;
 	`); err != nil {
@@ -601,6 +667,61 @@ func openIAMWorkerPool(t *testing.T, ctx context.Context, databaseURL string) *p
 	if err := pool.Ping(ctx); err != nil {
 		pool.Close()
 		t.Fatalf("ping IAM worker pool: %v", err)
+	}
+	return pool
+}
+
+func openFiscalWorkerPool(
+	t *testing.T,
+	ctx context.Context,
+	databaseURL string,
+) *pgxpool.Pool {
+	t.Helper()
+	return openRolePool(
+		t,
+		ctx,
+		databaseURL,
+		"pymes_fiscal_worker",
+		"pymes_fiscal_worker",
+	)
+}
+
+func openFiscalAccountingWorkerPool(
+	t *testing.T,
+	ctx context.Context,
+	databaseURL string,
+) *pgxpool.Pool {
+	t.Helper()
+	return openRolePool(
+		t,
+		ctx,
+		databaseURL,
+		"pymes_fiscal_accounting_worker",
+		"pymes_fiscal_accounting_worker",
+	)
+}
+
+func openRolePool(
+	t *testing.T,
+	ctx context.Context,
+	databaseURL string,
+	role string,
+	password string,
+) *pgxpool.Pool {
+	t.Helper()
+	cfg, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		t.Fatalf("parse %s test database URL: %v", role, err)
+	}
+	cfg.ConnConfig.User = role
+	cfg.ConnConfig.Password = password
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatalf("open %s pool: %v", role, err)
+	}
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		t.Fatalf("ping %s pool: %v", role, err)
 	}
 	return pool
 }

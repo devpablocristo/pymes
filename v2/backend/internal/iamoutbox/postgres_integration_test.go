@@ -106,6 +106,9 @@ func TestPostgresProvisioningFinalizationIsIdempotent(t *testing.T) {
 		externalInvitation   string
 		invitationRole       string
 		invitationStatus     string
+		templateCode         string
+		accountCount         int
+		periodCount          int
 	)
 	if err := database.QueryRow(ctx, `
 		SELECT status
@@ -134,20 +137,43 @@ func TestPostgresProvisioningFinalizationIsIdempotent(t *testing.T) {
 	); err != nil {
 		t.Fatalf("load local invitation: %v", err)
 	}
+	if err := database.QueryRow(ctx, `
+		SELECT setting.chart_template_code, count(account.id)
+		  FROM accounting.organization_settings AS setting
+		  JOIN accounting.accounts AS account
+		    ON account.org_id = setting.org_id
+		 WHERE setting.org_id = $1::uuid
+		 GROUP BY setting.chart_template_code
+	`, result.OrganizationID).Scan(&templateCode, &accountCount); err != nil {
+		t.Fatalf("load default accounting chart: %v", err)
+	}
+	if err := database.QueryRow(ctx, `
+		SELECT count(*)
+		  FROM accounting.periods
+		 WHERE org_id = $1::uuid
+	`, result.OrganizationID).Scan(&periodCount); err != nil {
+		t.Fatalf("load initial accounting period: %v", err)
+	}
 	if requestStatus != "provisioned" ||
 		externalOrganization != organization.ID ||
 		invitationCount != 1 ||
 		externalInvitation != invitation.ID ||
 		invitationRole != LocalOwnerRole ||
-		invitationStatus != "pending" {
+		invitationStatus != "pending" ||
+		templateCode != "ar-pyme" ||
+		accountCount == 0 ||
+		periodCount != 1 {
 		t.Fatalf(
-			"final state = request:%q org:%q invitations:%d/%q/%q/%q",
+			"final state = request:%q org:%q invitations:%d/%q/%q/%q chart:%q/%d periods:%d",
 			requestStatus,
 			externalOrganization,
 			invitationCount,
 			externalInvitation,
 			invitationRole,
 			invitationStatus,
+			templateCode,
+			accountCount,
+			periodCount,
 		)
 	}
 }
@@ -286,6 +312,22 @@ func cleanupWorkerFixture(t *testing.T, database *postgres.DB, result provisioni
 		{
 			sql:  "DELETE FROM app.organization_provisioning_requests WHERE id = $1::uuid",
 			args: []any{result.RequestID},
+		},
+		{
+			sql:  "DELETE FROM accounting.account_mappings WHERE org_id = $1::uuid",
+			args: []any{result.OrganizationID},
+		},
+		{
+			sql:  "DELETE FROM accounting.periods WHERE org_id = $1::uuid",
+			args: []any{result.OrganizationID},
+		},
+		{
+			sql:  "DELETE FROM accounting.accounts WHERE org_id = $1::uuid",
+			args: []any{result.OrganizationID},
+		},
+		{
+			sql:  "DELETE FROM accounting.organization_settings WHERE org_id = $1::uuid",
+			args: []any{result.OrganizationID},
 		},
 		{
 			sql:  "DELETE FROM iam.invitations WHERE org_id = $1::uuid",

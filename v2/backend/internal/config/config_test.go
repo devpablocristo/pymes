@@ -31,6 +31,11 @@ func TestLoadFromDefaults(t *testing.T) {
 	if cfg.Clerk.Audience != "pymes-v2-api" {
 		t.Fatalf("Clerk.Audience = %q", cfg.Clerk.Audience)
 	}
+	if cfg.Fiscal.Backend != "local" ||
+		cfg.Fiscal.LocalDirectory != "tmp/fiscal" ||
+		cfg.Fiscal.LocalMasterKeyBase64 == "" {
+		t.Fatalf("Fiscal = %+v", cfg.Fiscal)
+	}
 }
 
 func TestLoadFromOverrides(t *testing.T) {
@@ -44,6 +49,8 @@ func TestLoadFromOverrides(t *testing.T) {
 		"PYMES_CLERK_SECRET_KEY":         "sk_test_value",
 		"PYMES_CLERK_ISSUER":             "https://example.clerk.accounts.dev/",
 		"PYMES_CLERK_AUTHORIZED_PARTIES": "http://127.0.0.1:15173, http://localhost:15173,http://127.0.0.1:15173",
+		"PYMES_FISCAL_STORAGE_DIR":       "/var/lib/pymes/fiscal",
+		"PYMES_FISCAL_MASTER_KEY":        "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=",
 	}))
 	if err != nil {
 		t.Fatalf("LoadFrom() error = %v", err)
@@ -59,6 +66,9 @@ func TestLoadFromOverrides(t *testing.T) {
 	}
 	if len(cfg.Clerk.AuthorizedParties) != 2 {
 		t.Fatalf("AuthorizedParties = %#v", cfg.Clerk.AuthorizedParties)
+	}
+	if cfg.Fiscal.LocalDirectory != "/var/lib/pymes/fiscal" {
+		t.Fatalf("Fiscal.LocalDirectory = %q", cfg.Fiscal.LocalDirectory)
 	}
 }
 
@@ -85,6 +95,55 @@ func TestLoadFromRequiresClerkInProduction(t *testing.T) {
 		"PYMES_ENVIRONMENT":  "production",
 	}))
 	if err == nil || !strings.Contains(err.Error(), "Clerk") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestLoadFromRequiresManagedFiscalStorageInProduction(t *testing.T) {
+	_, err := LoadFrom(environment(map[string]string{
+		"PYMES_DATABASE_URL":             "postgres://example",
+		"PYMES_ENVIRONMENT":              "production",
+		"PYMES_CLERK_PUBLISHABLE_KEY":    "pk_live_value",
+		"PYMES_CLERK_SECRET_KEY":         "sk_live_value",
+		"PYMES_CLERK_ISSUER":             "https://example.clerk.accounts.dev",
+		"PYMES_CLERK_AUTHORIZED_PARTIES": "https://pymes.example",
+	}))
+	if err == nil || !strings.Contains(err.Error(), "PYMES_FISCAL_STORAGE_BACKEND") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestLoadFromAcceptsCompleteManagedFiscalStorageInProduction(t *testing.T) {
+	cfg, err := LoadFrom(environment(map[string]string{
+		"PYMES_DATABASE_URL":               "postgres://example",
+		"PYMES_ENVIRONMENT":                "production",
+		"PYMES_CLERK_PUBLISHABLE_KEY":      "pk_live_value",
+		"PYMES_CLERK_SECRET_KEY":           "sk_live_value",
+		"PYMES_CLERK_ISSUER":               "https://example.clerk.accounts.dev",
+		"PYMES_CLERK_AUTHORIZED_PARTIES":   "https://pymes.example",
+		"PYMES_FISCAL_STORAGE_BACKEND":     "aws",
+		"PYMES_FISCAL_AWS_REGION":          "us-east-1",
+		"PYMES_FISCAL_KMS_KEY_ID":          "alias/pymes-fiscal",
+		"PYMES_FISCAL_S3_BUCKET":           "pymes-fiscal-private",
+		"PYMES_FISCAL_S3_PREFIX":           "production",
+		"PYMES_FISCAL_S3_FORCE_PATH_STYLE": "false",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Fiscal.Backend != "aws" ||
+		cfg.Fiscal.KMSKeyID != "alias/pymes-fiscal" ||
+		cfg.Fiscal.S3Bucket != "pymes-fiscal-private" {
+		t.Fatalf("Fiscal = %+v", cfg.Fiscal)
+	}
+}
+
+func TestLoadFromRejectsMalformedFiscalMasterKey(t *testing.T) {
+	_, err := LoadFrom(environment(map[string]string{
+		"PYMES_DATABASE_URL":      "postgres://example",
+		"PYMES_FISCAL_MASTER_KEY": "too-short",
+	}))
+	if err == nil || !strings.Contains(err.Error(), "PYMES_FISCAL_MASTER_KEY") {
 		t.Fatalf("error = %v", err)
 	}
 }

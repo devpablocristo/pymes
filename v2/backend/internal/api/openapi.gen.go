@@ -22,6 +22,159 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AccountingAccountType.
+const (
+	Asset     AccountingAccountType = "asset"
+	Cost      AccountingAccountType = "cost"
+	Equity    AccountingAccountType = "equity"
+	Expense   AccountingAccountType = "expense"
+	Income    AccountingAccountType = "income"
+	Liability AccountingAccountType = "liability"
+)
+
+// Valid indicates whether the value is a known member of the AccountingAccountType enum.
+func (e AccountingAccountType) Valid() bool {
+	switch e {
+	case Asset:
+		return true
+	case Cost:
+		return true
+	case Equity:
+		return true
+	case Expense:
+		return true
+	case Income:
+		return true
+	case Liability:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountingNormalBalance.
+const (
+	AccountingNormalBalanceCredit AccountingNormalBalance = "credit"
+	AccountingNormalBalanceDebit  AccountingNormalBalance = "debit"
+)
+
+// Valid indicates whether the value is a known member of the AccountingNormalBalance enum.
+func (e AccountingNormalBalance) Valid() bool {
+	switch e {
+	case AccountingNormalBalanceCredit:
+		return true
+	case AccountingNormalBalanceDebit:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountingOpenItemType.
+const (
+	Payable    AccountingOpenItemType = "payable"
+	Receivable AccountingOpenItemType = "receivable"
+)
+
+// Valid indicates whether the value is a known member of the AccountingOpenItemType enum.
+func (e AccountingOpenItemType) Valid() bool {
+	switch e {
+	case Payable:
+		return true
+	case Receivable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountingPaymentMethod.
+const (
+	AccountingPaymentMethodBankTransfer AccountingPaymentMethod = "bank_transfer"
+	AccountingPaymentMethodCard         AccountingPaymentMethod = "card"
+	AccountingPaymentMethodCash         AccountingPaymentMethod = "cash"
+	AccountingPaymentMethodCheck        AccountingPaymentMethod = "check"
+	AccountingPaymentMethodWallet       AccountingPaymentMethod = "wallet"
+)
+
+// Valid indicates whether the value is a known member of the AccountingPaymentMethod enum.
+func (e AccountingPaymentMethod) Valid() bool {
+	switch e {
+	case AccountingPaymentMethodBankTransfer:
+		return true
+	case AccountingPaymentMethodCard:
+		return true
+	case AccountingPaymentMethodCash:
+		return true
+	case AccountingPaymentMethodCheck:
+		return true
+	case AccountingPaymentMethodWallet:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountingPeriodState.
+const (
+	Locked     AccountingPeriodState = "locked"
+	Open       AccountingPeriodState = "open"
+	SoftClosed AccountingPeriodState = "soft_closed"
+)
+
+// Valid indicates whether the value is a known member of the AccountingPeriodState enum.
+func (e AccountingPeriodState) Valid() bool {
+	switch e {
+	case Locked:
+		return true
+	case Open:
+		return true
+	case SoftClosed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ArgentinaFiscalSettingsCountryCode.
+const (
+	AR ArgentinaFiscalSettingsCountryCode = "AR"
+)
+
+// Valid indicates whether the value is a known member of the ArgentinaFiscalSettingsCountryCode enum.
+func (e ArgentinaFiscalSettingsCountryCode) Valid() bool {
+	switch e {
+	case AR:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ArgentinaTaxCondition.
+const (
+	ArgentinaTaxConditionExempt         ArgentinaTaxCondition = "exempt"
+	ArgentinaTaxConditionMonotributo    ArgentinaTaxCondition = "monotributo"
+	ArgentinaTaxConditionNotResponsible ArgentinaTaxCondition = "not_responsible"
+	ArgentinaTaxConditionRegistered     ArgentinaTaxCondition = "registered"
+)
+
+// Valid indicates whether the value is a known member of the ArgentinaTaxCondition enum.
+func (e ArgentinaTaxCondition) Valid() bool {
+	switch e {
+	case ArgentinaTaxConditionExempt:
+		return true
+	case ArgentinaTaxConditionMonotributo:
+		return true
+	case ArgentinaTaxConditionNotResponsible:
+		return true
+	case ArgentinaTaxConditionRegistered:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AssignableRole.
 const (
 	AssignableRoleAdmin  AssignableRole = "admin"
@@ -34,6 +187,462 @@ func (e AssignableRole) Valid() bool {
 	case AssignableRoleAdmin:
 		return true
 	case AssignableRoleMember:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DelegatedBusinessPermission.
+const (
+	DelegatedBusinessPermissionAccountingManage DelegatedBusinessPermission = "accounting:manage"
+	DelegatedBusinessPermissionFiscalManage     DelegatedBusinessPermission = "fiscal:manage"
+)
+
+// Valid indicates whether the value is a known member of the DelegatedBusinessPermission enum.
+func (e DelegatedBusinessPermission) Valid() bool {
+	switch e {
+	case DelegatedBusinessPermissionAccountingManage:
+		return true
+	case DelegatedBusinessPermissionFiscalManage:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FinancialAccountType.
+const (
+	FinancialAccountTypeBank   FinancialAccountType = "bank"
+	FinancialAccountTypeCard   FinancialAccountType = "card"
+	FinancialAccountTypeCash   FinancialAccountType = "cash"
+	FinancialAccountTypeWallet FinancialAccountType = "wallet"
+)
+
+// Valid indicates whether the value is a known member of the FinancialAccountType enum.
+func (e FinancialAccountType) Valid() bool {
+	switch e {
+	case FinancialAccountTypeBank:
+		return true
+	case FinancialAccountTypeCard:
+		return true
+	case FinancialAccountTypeCash:
+		return true
+	case FinancialAccountTypeWallet:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalAuthorizationState.
+const (
+	FiscalAuthorizationStateAuthorized FiscalAuthorizationState = "authorized"
+	FiscalAuthorizationStateProcessing FiscalAuthorizationState = "processing"
+	FiscalAuthorizationStateQueued     FiscalAuthorizationState = "queued"
+	FiscalAuthorizationStateRejected   FiscalAuthorizationState = "rejected"
+	FiscalAuthorizationStateUncertain  FiscalAuthorizationState = "uncertain"
+)
+
+// Valid indicates whether the value is a known member of the FiscalAuthorizationState enum.
+func (e FiscalAuthorizationState) Valid() bool {
+	switch e {
+	case FiscalAuthorizationStateAuthorized:
+		return true
+	case FiscalAuthorizationStateProcessing:
+		return true
+	case FiscalAuthorizationStateQueued:
+		return true
+	case FiscalAuthorizationStateRejected:
+		return true
+	case FiscalAuthorizationStateUncertain:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalConcept.
+const (
+	Mixed    FiscalConcept = "mixed"
+	Products FiscalConcept = "products"
+	Services FiscalConcept = "services"
+)
+
+// Valid indicates whether the value is a known member of the FiscalConcept enum.
+func (e FiscalConcept) Valid() bool {
+	switch e {
+	case Mixed:
+		return true
+	case Products:
+		return true
+	case Services:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalEnvironment.
+const (
+	FiscalEnvironmentHomologation FiscalEnvironment = "homologation"
+	FiscalEnvironmentProduction   FiscalEnvironment = "production"
+)
+
+// Valid indicates whether the value is a known member of the FiscalEnvironment enum.
+func (e FiscalEnvironment) Valid() bool {
+	switch e {
+	case FiscalEnvironmentHomologation:
+		return true
+	case FiscalEnvironmentProduction:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalHomologationCheckKind.
+const (
+	Certificate        FiscalHomologationCheckKind = "certificate"
+	Configuration      FiscalHomologationCheckKind = "configuration"
+	LocalMatrix        FiscalHomologationCheckKind = "local_matrix"
+	Wsaa               FiscalHomologationCheckKind = "wsaa"
+	WsfeLastAuthorized FiscalHomologationCheckKind = "wsfe_last_authorized"
+)
+
+// Valid indicates whether the value is a known member of the FiscalHomologationCheckKind enum.
+func (e FiscalHomologationCheckKind) Valid() bool {
+	switch e {
+	case Certificate:
+		return true
+	case Configuration:
+		return true
+	case LocalMatrix:
+		return true
+	case Wsaa:
+		return true
+	case WsfeLastAuthorized:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalHomologationStatus.
+const (
+	FiscalHomologationStatusFailed    FiscalHomologationStatus = "failed"
+	FiscalHomologationStatusSucceeded FiscalHomologationStatus = "succeeded"
+)
+
+// Valid indicates whether the value is a known member of the FiscalHomologationStatus enum.
+func (e FiscalHomologationStatus) Valid() bool {
+	switch e {
+	case FiscalHomologationStatusFailed:
+		return true
+	case FiscalHomologationStatusSucceeded:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalPurchaseLineInputTaxTreatment.
+const (
+	FiscalPurchaseLineInputTaxTreatmentExempt   FiscalPurchaseLineInputTaxTreatment = "exempt"
+	FiscalPurchaseLineInputTaxTreatmentNonTaxed FiscalPurchaseLineInputTaxTreatment = "non_taxed"
+	FiscalPurchaseLineInputTaxTreatmentTaxable  FiscalPurchaseLineInputTaxTreatment = "taxable"
+)
+
+// Valid indicates whether the value is a known member of the FiscalPurchaseLineInputTaxTreatment enum.
+func (e FiscalPurchaseLineInputTaxTreatment) Valid() bool {
+	switch e {
+	case FiscalPurchaseLineInputTaxTreatmentExempt:
+		return true
+	case FiscalPurchaseLineInputTaxTreatmentNonTaxed:
+		return true
+	case FiscalPurchaseLineInputTaxTreatmentTaxable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalPurchaseTaxInputKind.
+const (
+	FiscalPurchaseTaxInputKindOtherTax    FiscalPurchaseTaxInputKind = "other_tax"
+	FiscalPurchaseTaxInputKindPerception  FiscalPurchaseTaxInputKind = "perception"
+	FiscalPurchaseTaxInputKindVat         FiscalPurchaseTaxInputKind = "vat"
+	FiscalPurchaseTaxInputKindWithholding FiscalPurchaseTaxInputKind = "withholding"
+)
+
+// Valid indicates whether the value is a known member of the FiscalPurchaseTaxInputKind enum.
+func (e FiscalPurchaseTaxInputKind) Valid() bool {
+	switch e {
+	case FiscalPurchaseTaxInputKindOtherTax:
+		return true
+	case FiscalPurchaseTaxInputKindPerception:
+		return true
+	case FiscalPurchaseTaxInputKindVat:
+		return true
+	case FiscalPurchaseTaxInputKindWithholding:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalPurchaseVoucherInputVoucherType.
+const (
+	N1  FiscalPurchaseVoucherInputVoucherType = 1
+	N11 FiscalPurchaseVoucherInputVoucherType = 11
+	N12 FiscalPurchaseVoucherInputVoucherType = 12
+	N13 FiscalPurchaseVoucherInputVoucherType = 13
+	N2  FiscalPurchaseVoucherInputVoucherType = 2
+	N3  FiscalPurchaseVoucherInputVoucherType = 3
+	N6  FiscalPurchaseVoucherInputVoucherType = 6
+	N7  FiscalPurchaseVoucherInputVoucherType = 7
+	N8  FiscalPurchaseVoucherInputVoucherType = 8
+)
+
+// Valid indicates whether the value is a known member of the FiscalPurchaseVoucherInputVoucherType enum.
+func (e FiscalPurchaseVoucherInputVoucherType) Valid() bool {
+	switch e {
+	case N1:
+		return true
+	case N11:
+		return true
+	case N12:
+		return true
+	case N13:
+		return true
+	case N2:
+		return true
+	case N3:
+		return true
+	case N6:
+		return true
+	case N7:
+		return true
+	case N8:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalTaxComponentKind.
+const (
+	FiscalTaxComponentKindExempt      FiscalTaxComponentKind = "exempt"
+	FiscalTaxComponentKindNonTaxed    FiscalTaxComponentKind = "non_taxed"
+	FiscalTaxComponentKindOtherTax    FiscalTaxComponentKind = "other_tax"
+	FiscalTaxComponentKindPerception  FiscalTaxComponentKind = "perception"
+	FiscalTaxComponentKindVat         FiscalTaxComponentKind = "vat"
+	FiscalTaxComponentKindWithholding FiscalTaxComponentKind = "withholding"
+)
+
+// Valid indicates whether the value is a known member of the FiscalTaxComponentKind enum.
+func (e FiscalTaxComponentKind) Valid() bool {
+	switch e {
+	case FiscalTaxComponentKindExempt:
+		return true
+	case FiscalTaxComponentKindNonTaxed:
+		return true
+	case FiscalTaxComponentKindOtherTax:
+		return true
+	case FiscalTaxComponentKindPerception:
+		return true
+	case FiscalTaxComponentKindVat:
+		return true
+	case FiscalTaxComponentKindWithholding:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalVoucherDetailReceiverDocumentType.
+const (
+	FiscalVoucherDetailReceiverDocumentTypeCONSUMERFINAL FiscalVoucherDetailReceiverDocumentType = "CONSUMER_FINAL"
+	FiscalVoucherDetailReceiverDocumentTypeCUIL          FiscalVoucherDetailReceiverDocumentType = "CUIL"
+	FiscalVoucherDetailReceiverDocumentTypeCUIT          FiscalVoucherDetailReceiverDocumentType = "CUIT"
+	FiscalVoucherDetailReceiverDocumentTypeDNI           FiscalVoucherDetailReceiverDocumentType = "DNI"
+)
+
+// Valid indicates whether the value is a known member of the FiscalVoucherDetailReceiverDocumentType enum.
+func (e FiscalVoucherDetailReceiverDocumentType) Valid() bool {
+	switch e {
+	case FiscalVoucherDetailReceiverDocumentTypeCONSUMERFINAL:
+		return true
+	case FiscalVoucherDetailReceiverDocumentTypeCUIL:
+		return true
+	case FiscalVoucherDetailReceiverDocumentTypeCUIT:
+		return true
+	case FiscalVoucherDetailReceiverDocumentTypeDNI:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalVoucherInputPaymentMethod.
+const (
+	FiscalVoucherInputPaymentMethodBankTransfer FiscalVoucherInputPaymentMethod = "bank_transfer"
+	FiscalVoucherInputPaymentMethodCard         FiscalVoucherInputPaymentMethod = "card"
+	FiscalVoucherInputPaymentMethodCash         FiscalVoucherInputPaymentMethod = "cash"
+	FiscalVoucherInputPaymentMethodCheck        FiscalVoucherInputPaymentMethod = "check"
+	FiscalVoucherInputPaymentMethodWallet       FiscalVoucherInputPaymentMethod = "wallet"
+)
+
+// Valid indicates whether the value is a known member of the FiscalVoucherInputPaymentMethod enum.
+func (e FiscalVoucherInputPaymentMethod) Valid() bool {
+	switch e {
+	case FiscalVoucherInputPaymentMethodBankTransfer:
+		return true
+	case FiscalVoucherInputPaymentMethodCard:
+		return true
+	case FiscalVoucherInputPaymentMethodCash:
+		return true
+	case FiscalVoucherInputPaymentMethodCheck:
+		return true
+	case FiscalVoucherInputPaymentMethodWallet:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalVoucherInputReceiverDocumentType.
+const (
+	FiscalVoucherInputReceiverDocumentTypeCONSUMERFINAL FiscalVoucherInputReceiverDocumentType = "CONSUMER_FINAL"
+	FiscalVoucherInputReceiverDocumentTypeCUIL          FiscalVoucherInputReceiverDocumentType = "CUIL"
+	FiscalVoucherInputReceiverDocumentTypeCUIT          FiscalVoucherInputReceiverDocumentType = "CUIT"
+	FiscalVoucherInputReceiverDocumentTypeDNI           FiscalVoucherInputReceiverDocumentType = "DNI"
+)
+
+// Valid indicates whether the value is a known member of the FiscalVoucherInputReceiverDocumentType enum.
+func (e FiscalVoucherInputReceiverDocumentType) Valid() bool {
+	switch e {
+	case FiscalVoucherInputReceiverDocumentTypeCONSUMERFINAL:
+		return true
+	case FiscalVoucherInputReceiverDocumentTypeCUIL:
+		return true
+	case FiscalVoucherInputReceiverDocumentTypeCUIT:
+		return true
+	case FiscalVoucherInputReceiverDocumentTypeDNI:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalVoucherInputSaleCondition.
+const (
+	FiscalVoucherInputSaleConditionCash   FiscalVoucherInputSaleCondition = "cash"
+	FiscalVoucherInputSaleConditionCredit FiscalVoucherInputSaleCondition = "credit"
+)
+
+// Valid indicates whether the value is a known member of the FiscalVoucherInputSaleCondition enum.
+func (e FiscalVoucherInputSaleCondition) Valid() bool {
+	switch e {
+	case FiscalVoucherInputSaleConditionCash:
+		return true
+	case FiscalVoucherInputSaleConditionCredit:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalVoucherInputSourceType.
+const (
+	Sale FiscalVoucherInputSourceType = "sale"
+)
+
+// Valid indicates whether the value is a known member of the FiscalVoucherInputSourceType enum.
+func (e FiscalVoucherInputSourceType) Valid() bool {
+	switch e {
+	case Sale:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalVoucherKind.
+const (
+	CreditNoteA FiscalVoucherKind = "credit_note_a"
+	CreditNoteB FiscalVoucherKind = "credit_note_b"
+	CreditNoteC FiscalVoucherKind = "credit_note_c"
+	DebitNoteA  FiscalVoucherKind = "debit_note_a"
+	DebitNoteB  FiscalVoucherKind = "debit_note_b"
+	DebitNoteC  FiscalVoucherKind = "debit_note_c"
+	InvoiceA    FiscalVoucherKind = "invoice_a"
+	InvoiceB    FiscalVoucherKind = "invoice_b"
+	InvoiceC    FiscalVoucherKind = "invoice_c"
+)
+
+// Valid indicates whether the value is a known member of the FiscalVoucherKind enum.
+func (e FiscalVoucherKind) Valid() bool {
+	switch e {
+	case CreditNoteA:
+		return true
+	case CreditNoteB:
+		return true
+	case CreditNoteC:
+		return true
+	case DebitNoteA:
+		return true
+	case DebitNoteB:
+		return true
+	case DebitNoteC:
+		return true
+	case InvoiceA:
+		return true
+	case InvoiceB:
+		return true
+	case InvoiceC:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalVoucherSnapshotLineTaxTreatment.
+const (
+	FiscalVoucherSnapshotLineTaxTreatmentExempt   FiscalVoucherSnapshotLineTaxTreatment = "exempt"
+	FiscalVoucherSnapshotLineTaxTreatmentNonTaxed FiscalVoucherSnapshotLineTaxTreatment = "non_taxed"
+	FiscalVoucherSnapshotLineTaxTreatmentTaxable  FiscalVoucherSnapshotLineTaxTreatment = "taxable"
+)
+
+// Valid indicates whether the value is a known member of the FiscalVoucherSnapshotLineTaxTreatment enum.
+func (e FiscalVoucherSnapshotLineTaxTreatment) Valid() bool {
+	switch e {
+	case FiscalVoucherSnapshotLineTaxTreatmentExempt:
+		return true
+	case FiscalVoucherSnapshotLineTaxTreatmentNonTaxed:
+		return true
+	case FiscalVoucherSnapshotLineTaxTreatmentTaxable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for IVASimpleWorkflowStatus.
+const (
+	IVASimpleWorkflowStatusClosed   IVASimpleWorkflowStatus = "closed"
+	IVASimpleWorkflowStatusDraft    IVASimpleWorkflowStatus = "draft"
+	IVASimpleWorkflowStatusExported IVASimpleWorkflowStatus = "exported"
+)
+
+// Valid indicates whether the value is a known member of the IVASimpleWorkflowStatus enum.
+func (e IVASimpleWorkflowStatus) Valid() bool {
+	switch e {
+	case IVASimpleWorkflowStatusClosed:
+		return true
+	case IVASimpleWorkflowStatusDraft:
+		return true
+	case IVASimpleWorkflowStatusExported:
 		return true
 	default:
 		return false
@@ -109,6 +718,27 @@ func (e MembershipStatus) Valid() bool {
 	}
 }
 
+// Defines values for MonetaryClassification.
+const (
+	Monetary      MonetaryClassification = "monetary"
+	NonMonetary   MonetaryClassification = "non_monetary"
+	NotApplicable MonetaryClassification = "not_applicable"
+)
+
+// Valid indicates whether the value is a known member of the MonetaryClassification enum.
+func (e MonetaryClassification) Valid() bool {
+	switch e {
+	case Monetary:
+		return true
+	case NonMonetary:
+		return true
+	case NotApplicable:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OrganizationStatus.
 const (
 	OrganizationStatusActive       OrganizationStatus = "active"
@@ -135,34 +765,46 @@ func (e OrganizationStatus) Valid() bool {
 
 // Defines values for Permission.
 const (
-	OrganizationUpdate   Permission = "organization:update"
-	OrganizationView     Permission = "organization:view"
-	SessionsManageSelf   Permission = "sessions:manage:self"
-	TeamInvitationCreate Permission = "team:invitation:create"
-	TeamInvitationManage Permission = "team:invitation:manage"
-	TeamMemberRemove     Permission = "team:member:remove"
-	TeamMemberUpdate     Permission = "team:member:update"
-	TeamView             Permission = "team:view"
+	PermissionAccountingManage     Permission = "accounting:manage"
+	PermissionAccountingView       Permission = "accounting:view"
+	PermissionFiscalManage         Permission = "fiscal:manage"
+	PermissionFiscalView           Permission = "fiscal:view"
+	PermissionOrganizationUpdate   Permission = "organization:update"
+	PermissionOrganizationView     Permission = "organization:view"
+	PermissionSessionsManageSelf   Permission = "sessions:manage:self"
+	PermissionTeamInvitationCreate Permission = "team:invitation:create"
+	PermissionTeamInvitationManage Permission = "team:invitation:manage"
+	PermissionTeamMemberRemove     Permission = "team:member:remove"
+	PermissionTeamMemberUpdate     Permission = "team:member:update"
+	PermissionTeamView             Permission = "team:view"
 )
 
 // Valid indicates whether the value is a known member of the Permission enum.
 func (e Permission) Valid() bool {
 	switch e {
-	case OrganizationUpdate:
+	case PermissionAccountingManage:
 		return true
-	case OrganizationView:
+	case PermissionAccountingView:
 		return true
-	case SessionsManageSelf:
+	case PermissionFiscalManage:
 		return true
-	case TeamInvitationCreate:
+	case PermissionFiscalView:
 		return true
-	case TeamInvitationManage:
+	case PermissionOrganizationUpdate:
 		return true
-	case TeamMemberRemove:
+	case PermissionOrganizationView:
 		return true
-	case TeamMemberUpdate:
+	case PermissionSessionsManageSelf:
 		return true
-	case TeamView:
+	case PermissionTeamInvitationCreate:
+		return true
+	case PermissionTeamInvitationManage:
+		return true
+	case PermissionTeamMemberRemove:
+		return true
+	case PermissionTeamMemberUpdate:
+		return true
+	case PermissionTeamView:
 		return true
 	default:
 		return false
@@ -181,6 +823,27 @@ func (e ProductRole) Valid() bool {
 	case ProductRoleOwner:
 		return true
 	case ProductRoleUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReconciliationState.
+const (
+	ReconciliationStateCompleted ReconciliationState = "completed"
+	ReconciliationStateDraft     ReconciliationState = "draft"
+	ReconciliationStateReopened  ReconciliationState = "reopened"
+)
+
+// Valid indicates whether the value is a known member of the ReconciliationState enum.
+func (e ReconciliationState) Valid() bool {
+	switch e {
+	case ReconciliationStateCompleted:
+		return true
+	case ReconciliationStateDraft:
+		return true
+	case ReconciliationStateReopened:
 		return true
 	default:
 		return false
@@ -259,6 +922,27 @@ func (e SessionStatus) Valid() bool {
 	}
 }
 
+// Defines values for StatementImportFormat.
+const (
+	StatementImportFormatCsv  StatementImportFormat = "csv"
+	StatementImportFormatOfx  StatementImportFormat = "ofx"
+	StatementImportFormatXlsx StatementImportFormat = "xlsx"
+)
+
+// Valid indicates whether the value is a known member of the StatementImportFormat enum.
+func (e StatementImportFormat) Valid() bool {
+	switch e {
+	case StatementImportFormatCsv:
+		return true
+	case StatementImportFormatOfx:
+		return true
+	case StatementImportFormatXlsx:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SyncStatus.
 const (
 	SyncStatusFailed  SyncStatus = "failed"
@@ -299,6 +983,362 @@ func (e UserStatus) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// Defines values for TransitionAccountingAccountParamsLifecycleAction.
+const (
+	Archive   TransitionAccountingAccountParamsLifecycleAction = "archive"
+	Restore   TransitionAccountingAccountParamsLifecycleAction = "restore"
+	Trash     TransitionAccountingAccountParamsLifecycleAction = "trash"
+	Unarchive TransitionAccountingAccountParamsLifecycleAction = "unarchive"
+)
+
+// Valid indicates whether the value is a known member of the TransitionAccountingAccountParamsLifecycleAction enum.
+func (e TransitionAccountingAccountParamsLifecycleAction) Valid() bool {
+	switch e {
+	case Archive:
+		return true
+	case Restore:
+		return true
+	case Trash:
+		return true
+	case Unarchive:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListFinancialAccountsParamsLifecycleState.
+const (
+	ListFinancialAccountsParamsLifecycleStateActive   ListFinancialAccountsParamsLifecycleState = "active"
+	ListFinancialAccountsParamsLifecycleStateArchived ListFinancialAccountsParamsLifecycleState = "archived"
+)
+
+// Valid indicates whether the value is a known member of the ListFinancialAccountsParamsLifecycleState enum.
+func (e ListFinancialAccountsParamsLifecycleState) Valid() bool {
+	switch e {
+	case ListFinancialAccountsParamsLifecycleStateActive:
+		return true
+	case ListFinancialAccountsParamsLifecycleStateArchived:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TransitionAccountingReconciliationParamsReconciliationAction.
+const (
+	Close  TransitionAccountingReconciliationParamsReconciliationAction = "close"
+	Reopen TransitionAccountingReconciliationParamsReconciliationAction = "reopen"
+)
+
+// Valid indicates whether the value is a known member of the TransitionAccountingReconciliationParamsReconciliationAction enum.
+func (e TransitionAccountingReconciliationParamsReconciliationAction) Valid() bool {
+	switch e {
+	case Close:
+		return true
+	case Reopen:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetAccountingReportParamsReport.
+const (
+	GetAccountingReportParamsReportAging             GetAccountingReportParamsReport = "aging"
+	GetAccountingReportParamsReportBalanceSheet      GetAccountingReportParamsReport = "balance-sheet"
+	GetAccountingReportParamsReportFinancialActivity GetAccountingReportParamsReport = "financial-activity"
+	GetAccountingReportParamsReportGeneralLedger     GetAccountingReportParamsReport = "general-ledger"
+	GetAccountingReportParamsReportIncomeStatement   GetAccountingReportParamsReport = "income-statement"
+	GetAccountingReportParamsReportJournal           GetAccountingReportParamsReport = "journal"
+	GetAccountingReportParamsReportTrialBalance      GetAccountingReportParamsReport = "trial-balance"
+	GetAccountingReportParamsReportVatPosition       GetAccountingReportParamsReport = "vat-position"
+)
+
+// Valid indicates whether the value is a known member of the GetAccountingReportParamsReport enum.
+func (e GetAccountingReportParamsReport) Valid() bool {
+	switch e {
+	case GetAccountingReportParamsReportAging:
+		return true
+	case GetAccountingReportParamsReportBalanceSheet:
+		return true
+	case GetAccountingReportParamsReportFinancialActivity:
+		return true
+	case GetAccountingReportParamsReportGeneralLedger:
+		return true
+	case GetAccountingReportParamsReportIncomeStatement:
+		return true
+	case GetAccountingReportParamsReportJournal:
+		return true
+	case GetAccountingReportParamsReportTrialBalance:
+		return true
+	case GetAccountingReportParamsReportVatPosition:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ExportAccountingReportParamsFormat.
+const (
+	ExportAccountingReportParamsFormatCsv  ExportAccountingReportParamsFormat = "csv"
+	ExportAccountingReportParamsFormatPdf  ExportAccountingReportParamsFormat = "pdf"
+	ExportAccountingReportParamsFormatXlsx ExportAccountingReportParamsFormat = "xlsx"
+)
+
+// Valid indicates whether the value is a known member of the ExportAccountingReportParamsFormat enum.
+func (e ExportAccountingReportParamsFormat) Valid() bool {
+	switch e {
+	case ExportAccountingReportParamsFormatCsv:
+		return true
+	case ExportAccountingReportParamsFormatPdf:
+		return true
+	case ExportAccountingReportParamsFormatXlsx:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ExportAccountingReportParamsReport.
+const (
+	ExportAccountingReportParamsReportAging             ExportAccountingReportParamsReport = "aging"
+	ExportAccountingReportParamsReportBalanceSheet      ExportAccountingReportParamsReport = "balance-sheet"
+	ExportAccountingReportParamsReportFinancialActivity ExportAccountingReportParamsReport = "financial-activity"
+	ExportAccountingReportParamsReportGeneralLedger     ExportAccountingReportParamsReport = "general-ledger"
+	ExportAccountingReportParamsReportIncomeStatement   ExportAccountingReportParamsReport = "income-statement"
+	ExportAccountingReportParamsReportJournal           ExportAccountingReportParamsReport = "journal"
+	ExportAccountingReportParamsReportTrialBalance      ExportAccountingReportParamsReport = "trial-balance"
+	ExportAccountingReportParamsReportVatPosition       ExportAccountingReportParamsReport = "vat-position"
+)
+
+// Valid indicates whether the value is a known member of the ExportAccountingReportParamsReport enum.
+func (e ExportAccountingReportParamsReport) Valid() bool {
+	switch e {
+	case ExportAccountingReportParamsReportAging:
+		return true
+	case ExportAccountingReportParamsReportBalanceSheet:
+		return true
+	case ExportAccountingReportParamsReportFinancialActivity:
+		return true
+	case ExportAccountingReportParamsReportGeneralLedger:
+		return true
+	case ExportAccountingReportParamsReportIncomeStatement:
+		return true
+	case ExportAccountingReportParamsReportJournal:
+		return true
+	case ExportAccountingReportParamsReportTrialBalance:
+		return true
+	case ExportAccountingReportParamsReportVatPosition:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetIVASimpleParamsEnvironment.
+const (
+	GetIVASimpleParamsEnvironmentHomologation GetIVASimpleParamsEnvironment = "homologation"
+	GetIVASimpleParamsEnvironmentProduction   GetIVASimpleParamsEnvironment = "production"
+)
+
+// Valid indicates whether the value is a known member of the GetIVASimpleParamsEnvironment enum.
+func (e GetIVASimpleParamsEnvironment) Valid() bool {
+	switch e {
+	case GetIVASimpleParamsEnvironmentHomologation:
+		return true
+	case GetIVASimpleParamsEnvironmentProduction:
+		return true
+	default:
+		return false
+	}
+}
+
+// AccountingAccount defines model for AccountingAccount.
+type AccountingAccount struct {
+	AccountType AccountingAccountType `json:"account_type"`
+	Code        string                `json:"code"`
+	Id          openapi_types.UUID    `json:"id"`
+
+	// LifecycleState Estado canónico administrado por Platform lifecycle.
+	LifecycleState         LifecycleState          `json:"lifecycle_state"`
+	MonetaryClassification MonetaryClassification  `json:"monetary_classification"`
+	Name                   string                  `json:"name"`
+	NormalBalance          AccountingNormalBalance `json:"normal_balance"`
+	ParentId               *openapi_types.UUID     `json:"parent_id,omitempty"`
+	Postable               bool                    `json:"postable"`
+	Version                int64                   `json:"version"`
+}
+
+// AccountingAccountInput defines model for AccountingAccountInput.
+type AccountingAccountInput struct {
+	AccountType            AccountingAccountType   `json:"account_type"`
+	Code                   string                  `json:"code"`
+	MonetaryClassification MonetaryClassification  `json:"monetary_classification"`
+	Name                   string                  `json:"name"`
+	NormalBalance          AccountingNormalBalance `json:"normal_balance"`
+	ParentId               *openapi_types.UUID     `json:"parent_id,omitempty"`
+	Postable               bool                    `json:"postable"`
+}
+
+// AccountingAccountList defines model for AccountingAccountList.
+type AccountingAccountList struct {
+	Items []AccountingAccount `json:"items"`
+	Page  PageInfo            `json:"page"`
+}
+
+// AccountingAccountType defines model for AccountingAccountType.
+type AccountingAccountType string
+
+// AccountingMapping defines model for AccountingMapping.
+type AccountingMapping struct {
+	AccountCode string             `json:"account_code"`
+	AccountId   openapi_types.UUID `json:"account_id"`
+	AccountName string             `json:"account_name"`
+	Role        string             `json:"role"`
+	Version     int64              `json:"version"`
+}
+
+// AccountingMappingInput defines model for AccountingMappingInput.
+type AccountingMappingInput struct {
+	AccountId openapi_types.UUID `json:"account_id"`
+	Role      string             `json:"role"`
+	Version   *int64             `json:"version,omitempty"`
+}
+
+// AccountingNormalBalance defines model for AccountingNormalBalance.
+type AccountingNormalBalance string
+
+// AccountingOpenItem defines model for AccountingOpenItem.
+type AccountingOpenItem struct {
+	AccountId openapi_types.UUID `json:"account_id"`
+
+	// Currency Example: ARS
+	Currency CurrencyCode           `json:"currency"`
+	DueDate  *openapi_types.Date    `json:"due_date,omitempty"`
+	Id       openapi_types.UUID     `json:"id"`
+	IssuedAt openapi_types.Date     `json:"issued_at"`
+	ItemType AccountingOpenItemType `json:"item_type"`
+
+	// OpenAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	OpenAmount DecimalAmount `json:"open_amount"`
+
+	// OpenFunctionalAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	OpenFunctionalAmount DecimalAmount      `json:"open_functional_amount"`
+	OriginEntryId        openapi_types.UUID `json:"origin_entry_id"`
+
+	// OriginalAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	OriginalAmount DecimalAmount `json:"original_amount"`
+
+	// OriginalFunctionalAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	OriginalFunctionalAmount DecimalAmount      `json:"original_functional_amount"`
+	PartyId                  openapi_types.UUID `json:"party_id"`
+	SourceId                 openapi_types.UUID `json:"source_id"`
+	SourceType               string             `json:"source_type"`
+}
+
+// AccountingOpenItemList defines model for AccountingOpenItemList.
+type AccountingOpenItemList struct {
+	Items []AccountingOpenItem `json:"items"`
+	Page  PageInfo             `json:"page"`
+}
+
+// AccountingOpenItemType defines model for AccountingOpenItemType.
+type AccountingOpenItemType string
+
+// AccountingPaymentMethod defines model for AccountingPaymentMethod.
+type AccountingPaymentMethod string
+
+// AccountingPeriod defines model for AccountingPeriod.
+type AccountingPeriod struct {
+	Checklist *[]struct {
+		Clear bool   `json:"clear"`
+		Code  string `json:"code"`
+		Count *int   `json:"count,omitempty"`
+	} `json:"checklist,omitempty"`
+	EndDate   openapi_types.Date    `json:"end_date"`
+	Id        openapi_types.UUID    `json:"id"`
+	StartDate openapi_types.Date    `json:"start_date"`
+	State     AccountingPeriodState `json:"state"`
+	Version   int64                 `json:"version"`
+}
+
+// AccountingPeriodInput defines model for AccountingPeriodInput.
+type AccountingPeriodInput struct {
+	EndDate   openapi_types.Date `json:"end_date"`
+	StartDate openapi_types.Date `json:"start_date"`
+}
+
+// AccountingPeriodState defines model for AccountingPeriodState.
+type AccountingPeriodState string
+
+// AccountingReport defines model for AccountingReport.
+type AccountingReport struct {
+	// Currency Example: ARS
+	Currency CurrencyCode          `json:"currency"`
+	From     openapi_types.Date    `json:"from"`
+	Report   string                `json:"report"`
+	Rows     []AccountingReportRow `json:"rows"`
+	To       openapi_types.Date    `json:"to"`
+
+	// TotalCredit Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	TotalCredit DecimalAmount `json:"total_credit"`
+
+	// TotalDebit Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	TotalDebit DecimalAmount `json:"total_debit"`
+}
+
+// AccountingReportRow defines model for AccountingReportRow.
+type AccountingReportRow struct {
+	// Balance Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Balance DecimalAmount `json:"balance"`
+
+	// Credit Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Credit DecimalAmount `json:"credit"`
+
+	// Debit Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Debit DecimalAmount `json:"debit"`
+	Key   string        `json:"key"`
+	Label string        `json:"label"`
+}
+
+// AccountingSettlementInput defines model for AccountingSettlementInput.
+type AccountingSettlementInput struct {
+	AccountingDate openapi_types.Date `json:"accounting_date"`
+
+	// Amount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Amount DecimalAmount `json:"amount"`
+
+	// ExchangeRate Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	ExchangeRate       DecimalAmount           `json:"exchange_rate"`
+	ExchangeRateDate   openapi_types.Date      `json:"exchange_rate_date"`
+	ExchangeRateSource string                  `json:"exchange_rate_source"`
+	OpenItemId         openapi_types.UUID      `json:"open_item_id"`
+	PaymentMethod      AccountingPaymentMethod `json:"payment_method"`
 }
 
 // AdminMembership defines model for AdminMembership.
@@ -364,8 +1404,65 @@ type AdminUserList struct {
 	Page  PageInfo    `json:"page"`
 }
 
+// AnnualClosingDraftInput defines model for AnnualClosingDraftInput.
+type AnnualClosingDraftInput struct {
+	Version int64 `json:"version"`
+}
+
+// ArgentinaFiscalSettings defines model for ArgentinaFiscalSettings.
+type ArgentinaFiscalSettings struct {
+	ActivityStartDate    openapi_types.Date                 `json:"activity_start_date"`
+	CertificateExpiresAt *time.Time                         `json:"certificate_expires_at,omitempty"`
+	CountryCode          ArgentinaFiscalSettingsCountryCode `json:"country_code"`
+	Cuit                 string                             `json:"cuit"`
+	Environment          FiscalEnvironment                  `json:"environment"`
+
+	// FunctionalCurrency Example: ARS
+	FunctionalCurrency CurrencyCode          `json:"functional_currency"`
+	LegalName          string                `json:"legal_name"`
+	ProductionReady    bool                  `json:"production_ready"`
+	TaxAddress         string                `json:"tax_address"`
+	TaxCondition       ArgentinaTaxCondition `json:"tax_condition"`
+	Version            int64                 `json:"version"`
+}
+
+// ArgentinaFiscalSettingsCountryCode defines model for ArgentinaFiscalSettings.CountryCode.
+type ArgentinaFiscalSettingsCountryCode string
+
+// ArgentinaFiscalSettingsInput defines model for ArgentinaFiscalSettingsInput.
+type ArgentinaFiscalSettingsInput struct {
+	ActivityStartDate openapi_types.Date `json:"activity_start_date"`
+	Cuit              string             `json:"cuit"`
+	Environment       FiscalEnvironment  `json:"environment"`
+
+	// FunctionalCurrency Example: ARS
+	FunctionalCurrency CurrencyCode          `json:"functional_currency"`
+	LegalName          string                `json:"legal_name"`
+	TaxAddress         string                `json:"tax_address"`
+	TaxCondition       ArgentinaTaxCondition `json:"tax_condition"`
+	Version            int64                 `json:"version"`
+}
+
+// ArgentinaTaxCondition defines model for ArgentinaTaxCondition.
+type ArgentinaTaxCondition string
+
 // AssignableRole Roles administrables dentro de un tenant. `owner` es un rol global del producto y no forma parte de una membresía.
 type AssignableRole string
+
+// ClosingExchangeRateInput defines model for ClosingExchangeRateInput.
+type ClosingExchangeRateInput struct {
+	// Currency Example: ARS
+	Currency CurrencyCode       `json:"currency"`
+	Date     openapi_types.Date `json:"date"`
+
+	// Rate Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Rate            DecimalAmount `json:"rate"`
+	Source          string        `json:"source"`
+	SourceChecksum  string        `json:"source_checksum"`
+	SourceReference *string       `json:"source_reference,omitempty"`
+}
 
 // CreateAdminTenantInput defines model for CreateAdminTenantInput.
 type CreateAdminTenantInput struct {
@@ -391,6 +1488,78 @@ type CreateInvitationInput struct {
 	Role AssignableRole `json:"role"`
 }
 
+// CurrencyCode Example: ARS
+type CurrencyCode = string
+
+// CurrencyRevaluation defines model for CurrencyRevaluation.
+type CurrencyRevaluation struct {
+	ClosingDate openapi_types.Date `json:"closing_date"`
+	Draft       JournalDraft       `json:"draft"`
+
+	// FunctionalCurrency Example: ARS
+	FunctionalCurrency CurrencyCode              `json:"functional_currency"`
+	Id                 openapi_types.UUID        `json:"id"`
+	Lines              []CurrencyRevaluationLine `json:"lines"`
+
+	// NetResult Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	NetResult      DecimalAmount              `json:"net_result"`
+	Rates          []ClosingExchangeRateInput `json:"rates"`
+	SourceChecksum string                     `json:"source_checksum"`
+
+	// TotalGain Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	TotalGain DecimalAmount `json:"total_gain"`
+
+	// TotalLoss Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	TotalLoss DecimalAmount `json:"total_loss"`
+}
+
+// CurrencyRevaluationInput defines model for CurrencyRevaluationInput.
+type CurrencyRevaluationInput struct {
+	ClosingDate openapi_types.Date         `json:"closing_date"`
+	Rates       []ClosingExchangeRateInput `json:"rates"`
+}
+
+// CurrencyRevaluationLine defines model for CurrencyRevaluationLine.
+type CurrencyRevaluationLine struct {
+	AccountCode string             `json:"account_code"`
+	AccountId   openapi_types.UUID `json:"account_id"`
+	AccountName string             `json:"account_name"`
+
+	// CarryingAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	CarryingAmount DecimalAmount `json:"carrying_amount"`
+
+	// ClosingRate Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	ClosingRate DecimalAmount `json:"closing_rate"`
+
+	// Currency Example: ARS
+	Currency CurrencyCode `json:"currency"`
+
+	// CurrencyAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	CurrencyAmount DecimalAmount `json:"currency_amount"`
+
+	// ExchangeDifference Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	ExchangeDifference DecimalAmount `json:"exchange_difference"`
+
+	// RevaluedAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	RevaluedAmount DecimalAmount `json:"revalued_amount"`
+}
+
 // CurrentSession defines model for CurrentSession.
 type CurrentSession struct {
 	Membership   Membership   `json:"membership"`
@@ -402,6 +1571,14 @@ type CurrentSession struct {
 	SessionId string `json:"session_id"`
 	User      User   `json:"user"`
 }
+
+// DecimalAmount Decimal exacto serializado como string; nunca IEEE-754.
+//
+// Example: 1250.50
+type DecimalAmount = string
+
+// DelegatedBusinessPermission defines model for DelegatedBusinessPermission.
+type DelegatedBusinessPermission string
 
 // DeviceSession defines model for DeviceSession.
 type DeviceSession struct {
@@ -424,6 +1601,712 @@ type ErrorResponse struct {
 		Message   string                  `json:"message"`
 		RequestId *string                 `json:"request_id,omitempty"`
 	} `json:"error"`
+}
+
+// FinancialAccount defines model for FinancialAccount.
+type FinancialAccount struct {
+	AccountType FinancialAccountType `json:"account_type"`
+	Archived    bool                 `json:"archived"`
+
+	// Currency Example: ARS
+	Currency          CurrencyCode       `json:"currency"`
+	ExternalReference *string            `json:"external_reference,omitempty"`
+	Id                openapi_types.UUID `json:"id"`
+	InstitutionName   *string            `json:"institution_name,omitempty"`
+	LedgerAccountCode string             `json:"ledger_account_code"`
+	LedgerAccountId   openapi_types.UUID `json:"ledger_account_id"`
+	LedgerAccountName string             `json:"ledger_account_name"`
+	Name              string             `json:"name"`
+	Version           int64              `json:"version"`
+}
+
+// FinancialAccountInput defines model for FinancialAccountInput.
+type FinancialAccountInput struct {
+	AccountType FinancialAccountType `json:"account_type"`
+
+	// Currency Example: ARS
+	Currency          CurrencyCode       `json:"currency"`
+	ExternalReference *string            `json:"external_reference,omitempty"`
+	InstitutionName   *string            `json:"institution_name,omitempty"`
+	LedgerAccountId   openapi_types.UUID `json:"ledger_account_id"`
+	Name              string             `json:"name"`
+}
+
+// FinancialAccountType defines model for FinancialAccountType.
+type FinancialAccountType string
+
+// FiscalAdjustmentInput defines model for FiscalAdjustmentInput.
+type FiscalAdjustmentInput struct {
+	AssociatedVoucherId openapi_types.UUID       `json:"associated_voucher_id"`
+	Lines               []FiscalVoucherLineInput `json:"lines"`
+	Reason              string                   `json:"reason"`
+}
+
+// FiscalAuthorizationState defines model for FiscalAuthorizationState.
+type FiscalAuthorizationState string
+
+// FiscalCertificate defines model for FiscalCertificate.
+type FiscalCertificate struct {
+	Active      bool               `json:"active"`
+	Environment FiscalEnvironment  `json:"environment"`
+	ExpiresAt   time.Time          `json:"expires_at"`
+	Fingerprint string             `json:"fingerprint"`
+	Id          openapi_types.UUID `json:"id"`
+	ValidFrom   time.Time          `json:"valid_from"`
+}
+
+// FiscalCertificateInput defines model for FiscalCertificateInput.
+type FiscalCertificateInput struct {
+	CertificatePem string            `json:"certificate_pem"`
+	Environment    FiscalEnvironment `json:"environment"`
+	PrivateKeyPem  string            `json:"private_key_pem"`
+}
+
+// FiscalConcept defines model for FiscalConcept.
+type FiscalConcept string
+
+// FiscalEnvironment defines model for FiscalEnvironment.
+type FiscalEnvironment string
+
+// FiscalHomologationCheck defines model for FiscalHomologationCheck.
+type FiscalHomologationCheck struct {
+	CompletedAt time.Time `json:"completed_at"`
+
+	// Detail Detalle operativo sin credenciales ni datos secretos.
+	Detail         string                      `json:"detail"`
+	Evidence       map[string]interface{}      `json:"evidence"`
+	EvidenceSha256 string                      `json:"evidence_sha256"`
+	Kind           FiscalHomologationCheckKind `json:"kind"`
+	Name           string                      `json:"name"`
+	Ordinal        int                         `json:"ordinal"`
+	PointOfSale    *int                        `json:"point_of_sale,omitempty"`
+	StartedAt      time.Time                   `json:"started_at"`
+	Status         FiscalHomologationStatus    `json:"status"`
+	VoucherType    *int                        `json:"voucher_type,omitempty"`
+}
+
+// FiscalHomologationCheckKind defines model for FiscalHomologationCheck.Kind.
+type FiscalHomologationCheckKind string
+
+// FiscalHomologationRun defines model for FiscalHomologationRun.
+type FiscalHomologationRun struct {
+	CertificateFingerprint *string                   `json:"certificate_fingerprint,omitempty"`
+	CheckCount             int                       `json:"check_count"`
+	Checks                 []FiscalHomologationCheck `json:"checks"`
+	CompletedAt            time.Time                 `json:"completed_at"`
+	EvidenceNote           string                    `json:"evidence_note"`
+	EvidenceSha256         string                    `json:"evidence_sha256"`
+	FailureCount           int                       `json:"failure_count"`
+	Id                     openapi_types.UUID        `json:"id"`
+	PointOfSaleCount       int                       `json:"point_of_sale_count"`
+	StartedAt              time.Time                 `json:"started_at"`
+	Status                 FiscalHomologationStatus  `json:"status"`
+	SuccessCount           int                       `json:"success_count"`
+}
+
+// FiscalHomologationStatus defines model for FiscalHomologationStatus.
+type FiscalHomologationStatus string
+
+// FiscalPointOfSale defines model for FiscalPointOfSale.
+type FiscalPointOfSale struct {
+	Active      bool               `json:"active"`
+	Environment FiscalEnvironment  `json:"environment"`
+	Id          openapi_types.UUID `json:"id"`
+	Name        *string            `json:"name,omitempty"`
+	Number      int                `json:"number"`
+}
+
+// FiscalPointOfSaleInput defines model for FiscalPointOfSaleInput.
+type FiscalPointOfSaleInput struct {
+	Environment FiscalEnvironment `json:"environment"`
+	Name        *string           `json:"name,omitempty"`
+	Number      int               `json:"number"`
+}
+
+// FiscalPurchaseLineInput defines model for FiscalPurchaseLineInput.
+type FiscalPurchaseLineInput struct {
+	Description string `json:"description"`
+
+	// DiscountAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	DiscountAmount *DecimalAmount `json:"discount_amount,omitempty"`
+	Inventory      *bool          `json:"inventory,omitempty"`
+
+	// NetAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	NetAmount DecimalAmount `json:"net_amount"`
+
+	// Quantity Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Quantity     DecimalAmount                       `json:"quantity"`
+	TaxTreatment FiscalPurchaseLineInputTaxTreatment `json:"tax_treatment"`
+
+	// TotalAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	TotalAmount   DecimalAmount `json:"total_amount"`
+	UnitOfMeasure string        `json:"unit_of_measure"`
+
+	// UnitPrice Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	UnitPrice DecimalAmount `json:"unit_price"`
+
+	// VatAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	VatAmount DecimalAmount `json:"vat_amount"`
+
+	// VatRate Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	VatRate DecimalAmount `json:"vat_rate"`
+}
+
+// FiscalPurchaseLineInputTaxTreatment defines model for FiscalPurchaseLineInput.TaxTreatment.
+type FiscalPurchaseLineInputTaxTreatment string
+
+// FiscalPurchaseTaxInput defines model for FiscalPurchaseTaxInput.
+type FiscalPurchaseTaxInput struct {
+	// Amount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Amount        DecimalAmount              `json:"amount"`
+	AuthorityCode string                     `json:"authority_code"`
+	Creditable    *bool                      `json:"creditable,omitempty"`
+	Description   string                     `json:"description"`
+	Jurisdiction  *string                    `json:"jurisdiction,omitempty"`
+	Kind          FiscalPurchaseTaxInputKind `json:"kind"`
+
+	// Rate Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Rate DecimalAmount `json:"rate"`
+
+	// TaxableBase Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	TaxableBase DecimalAmount `json:"taxable_base"`
+}
+
+// FiscalPurchaseTaxInputKind defines model for FiscalPurchaseTaxInput.Kind.
+type FiscalPurchaseTaxInputKind string
+
+// FiscalPurchaseVoucher defines model for FiscalPurchaseVoucher.
+type FiscalPurchaseVoucher struct {
+	AssociatedPurchaseVoucherId *openapi_types.UUID `json:"associated_purchase_voucher_id,omitempty"`
+	CreatedAt                   time.Time           `json:"created_at"`
+
+	// Currency Example: ARS
+	Currency    CurrencyCode        `json:"currency"`
+	DueDate     *openapi_types.Date `json:"due_date,omitempty"`
+	Environment FiscalEnvironment   `json:"environment"`
+
+	// ExchangeRate Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	ExchangeRate DecimalAmount `json:"exchange_rate"`
+
+	// ExemptAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	ExemptAmount   DecimalAmount       `json:"exempt_amount"`
+	Id             openapi_types.UUID  `json:"id"`
+	IssueDate      openapi_types.Date  `json:"issue_date"`
+	JournalEntryId *openapi_types.UUID `json:"journal_entry_id,omitempty"`
+
+	// NetAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	NetAmount DecimalAmount `json:"net_amount"`
+
+	// NonTaxedAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	NonTaxedAmount DecimalAmount `json:"non_taxed_amount"`
+
+	// OtherTaxesAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	OtherTaxesAmount DecimalAmount `json:"other_taxes_amount"`
+
+	// PerceptionAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	PerceptionAmount DecimalAmount      `json:"perception_amount"`
+	PointOfSale      int                `json:"point_of_sale"`
+	SupplierId       openapi_types.UUID `json:"supplier_id"`
+	SupplierName     string             `json:"supplier_name"`
+	SupplierTaxId    string             `json:"supplier_tax_id"`
+
+	// TotalAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	TotalAmount DecimalAmount `json:"total_amount"`
+
+	// VatAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	VatAmount     DecimalAmount `json:"vat_amount"`
+	Version       int64         `json:"version"`
+	VoucherNumber int64         `json:"voucher_number"`
+	VoucherType   int           `json:"voucher_type"`
+
+	// WithholdingAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	WithholdingAmount DecimalAmount `json:"withholding_amount"`
+}
+
+// FiscalPurchaseVoucherInput defines model for FiscalPurchaseVoucherInput.
+type FiscalPurchaseVoucherInput struct {
+	// AssociatedPurchaseVoucherId Factura de compra original. Es obligatoria para notas de crédito y débito y debe pertenecer al mismo proveedor, ambiente y letra.
+	AssociatedPurchaseVoucherId *openapi_types.UUID `json:"associated_purchase_voucher_id,omitempty"`
+
+	// Currency Example: ARS
+	Currency    CurrencyCode        `json:"currency"`
+	DueDate     *openapi_types.Date `json:"due_date,omitempty"`
+	Environment FiscalEnvironment   `json:"environment"`
+
+	// ExchangeRate Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	ExchangeRate       DecimalAmount                         `json:"exchange_rate"`
+	ExchangeRateDate   openapi_types.Date                    `json:"exchange_rate_date"`
+	ExchangeRateSource string                                `json:"exchange_rate_source"`
+	IssueDate          openapi_types.Date                    `json:"issue_date"`
+	Lines              []FiscalPurchaseLineInput             `json:"lines"`
+	PointOfSale        int                                   `json:"point_of_sale"`
+	SourceId           openapi_types.UUID                    `json:"source_id"`
+	SourceReference    *string                               `json:"source_reference,omitempty"`
+	SupplierId         openapi_types.UUID                    `json:"supplier_id"`
+	SupplierName       string                                `json:"supplier_name"`
+	SupplierTaxId      string                                `json:"supplier_tax_id"`
+	Taxes              []FiscalPurchaseTaxInput              `json:"taxes"`
+	VoucherNumber      int64                                 `json:"voucher_number"`
+	VoucherType        FiscalPurchaseVoucherInputVoucherType `json:"voucher_type"`
+}
+
+// FiscalPurchaseVoucherInputVoucherType defines model for FiscalPurchaseVoucherInput.VoucherType.
+type FiscalPurchaseVoucherInputVoucherType int
+
+// FiscalPurchaseVoucherList defines model for FiscalPurchaseVoucherList.
+type FiscalPurchaseVoucherList struct {
+	Items []FiscalPurchaseVoucher `json:"items"`
+	Page  PageInfo                `json:"page"`
+}
+
+// FiscalTaxComponent defines model for FiscalTaxComponent.
+type FiscalTaxComponent struct {
+	// Amount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Amount DecimalAmount `json:"amount"`
+
+	// AuthorityCode Código de tributo informado a ARCA; obligatorio para tributos no IVA.
+	AuthorityCode *int                   `json:"authority_code,omitempty"`
+	Description   *string                `json:"description,omitempty"`
+	Jurisdiction  *string                `json:"jurisdiction,omitempty"`
+	Kind          FiscalTaxComponentKind `json:"kind"`
+
+	// Rate Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Rate DecimalAmount `json:"rate"`
+
+	// TaxableBase Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	TaxableBase DecimalAmount `json:"taxable_base"`
+}
+
+// FiscalTaxComponentKind defines model for FiscalTaxComponent.Kind.
+type FiscalTaxComponentKind string
+
+// FiscalVoucher defines model for FiscalVoucher.
+type FiscalVoucher struct {
+	AssociatedVoucherId *openapi_types.UUID `json:"associated_voucher_id,omitempty"`
+	Cae                 *string             `json:"cae,omitempty"`
+	CaeExpiresAt        *openapi_types.Date `json:"cae_expires_at,omitempty"`
+	Concept             FiscalConcept       `json:"concept"`
+	CreatedAt           time.Time           `json:"created_at"`
+
+	// Currency Example: ARS
+	Currency     CurrencyCode             `json:"currency"`
+	Environment  FiscalEnvironment        `json:"environment"`
+	Id           openapi_types.UUID       `json:"id"`
+	Kind         *FiscalVoucherKind       `json:"kind,omitempty"`
+	Observations *[]string                `json:"observations,omitempty"`
+	PointOfSale  *int                     `json:"point_of_sale,omitempty"`
+	SourceId     openapi_types.UUID       `json:"source_id"`
+	SourceType   string                   `json:"source_type"`
+	State        FiscalAuthorizationState `json:"state"`
+
+	// Total Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Total         DecimalAmount `json:"total"`
+	UpdatedAt     time.Time     `json:"updated_at"`
+	VoucherNumber *int64        `json:"voucher_number,omitempty"`
+}
+
+// FiscalVoucherDetail defines model for FiscalVoucherDetail.
+type FiscalVoucherDetail struct {
+	AssociatedVoucherId *openapi_types.UUID `json:"associated_voucher_id,omitempty"`
+	Cae                 *string             `json:"cae,omitempty"`
+	CaeExpiresAt        *openapi_types.Date `json:"cae_expires_at,omitempty"`
+	Concept             FiscalConcept       `json:"concept"`
+	CreatedAt           time.Time           `json:"created_at"`
+
+	// Currency Example: ARS
+	Currency    CurrencyCode      `json:"currency"`
+	Environment FiscalEnvironment `json:"environment"`
+
+	// ExchangeRate Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	ExchangeRate           DecimalAmount                           `json:"exchange_rate"`
+	ExchangeRateSource     *string                                 `json:"exchange_rate_source,omitempty"`
+	Id                     openapi_types.UUID                      `json:"id"`
+	IssueDate              openapi_types.Date                      `json:"issue_date"`
+	Kind                   *FiscalVoucherKind                      `json:"kind,omitempty"`
+	Lines                  []FiscalVoucherSnapshotLine             `json:"lines"`
+	Observations           *[]string                               `json:"observations,omitempty"`
+	PaymentDueDate         *openapi_types.Date                     `json:"payment_due_date,omitempty"`
+	PointOfSale            *int                                    `json:"point_of_sale,omitempty"`
+	ReceiverDocumentNumber string                                  `json:"receiver_document_number"`
+	ReceiverDocumentType   FiscalVoucherDetailReceiverDocumentType `json:"receiver_document_type"`
+	ReceiverName           string                                  `json:"receiver_name"`
+	ReceiverTaxCondition   string                                  `json:"receiver_tax_condition"`
+	ServiceFrom            *openapi_types.Date                     `json:"service_from,omitempty"`
+	ServiceTo              *openapi_types.Date                     `json:"service_to,omitempty"`
+	SourceId               openapi_types.UUID                      `json:"source_id"`
+	SourceType             string                                  `json:"source_type"`
+	State                  FiscalAuthorizationState                `json:"state"`
+
+	// Total Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Total         DecimalAmount `json:"total"`
+	UpdatedAt     time.Time     `json:"updated_at"`
+	VoucherNumber *int64        `json:"voucher_number,omitempty"`
+}
+
+// FiscalVoucherDetailReceiverDocumentType defines model for FiscalVoucherDetail.ReceiverDocumentType.
+type FiscalVoucherDetailReceiverDocumentType string
+
+// FiscalVoucherInput defines model for FiscalVoucherInput.
+type FiscalVoucherInput struct {
+	// AccountingDueDate Vencimiento de la cuenta corriente; obligatorio para venta a crédito.
+	AccountingDueDate *openapi_types.Date `json:"accounting_due_date,omitempty"`
+	Concept           FiscalConcept       `json:"concept"`
+
+	// Currency Example: ARS
+	Currency    CurrencyCode      `json:"currency"`
+	Environment FiscalEnvironment `json:"environment"`
+
+	// ExchangeRate Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	ExchangeRate       DecimalAmount            `json:"exchange_rate"`
+	ExchangeRateSource *string                  `json:"exchange_rate_source,omitempty"`
+	Lines              []FiscalVoucherLineInput `json:"lines"`
+
+	// PartyId Cliente contable; obligatorio para venta a crédito y omitido para consumidor sin cuenta corriente.
+	PartyId        *openapi_types.UUID `json:"party_id,omitempty"`
+	PaymentDueDate *openapi_types.Date `json:"payment_due_date,omitempty"`
+
+	// PaymentMethod Cuenta funcional o clearing usada por el posteo; en crédito queda como medio original para NC/reintegros.
+	PaymentMethod          FiscalVoucherInputPaymentMethod        `json:"payment_method"`
+	PointOfSaleId          openapi_types.UUID                     `json:"point_of_sale_id"`
+	ReceiverDocumentNumber string                                 `json:"receiver_document_number"`
+	ReceiverDocumentType   FiscalVoucherInputReceiverDocumentType `json:"receiver_document_type"`
+	ReceiverName           *string                                `json:"receiver_name,omitempty"`
+	ReceiverTaxCondition   string                                 `json:"receiver_tax_condition"`
+
+	// SaleCondition Define si el asiento cancela contra un medio de cobro o genera una partida por cobrar.
+	SaleCondition FiscalVoucherInputSaleCondition `json:"sale_condition"`
+	ServiceFrom   *openapi_types.Date             `json:"service_from,omitempty"`
+	ServiceTo     *openapi_types.Date             `json:"service_to,omitempty"`
+	SourceId      openapi_types.UUID              `json:"source_id"`
+
+	// SourceType Documento comercial de venta que origina la autorización de ARCA. Las compras se registran por el recurso dedicado y las NC/ND por sus comandos específicos.
+	SourceType FiscalVoucherInputSourceType `json:"source_type"`
+}
+
+// FiscalVoucherInputPaymentMethod Cuenta funcional o clearing usada por el posteo; en crédito queda como medio original para NC/reintegros.
+type FiscalVoucherInputPaymentMethod string
+
+// FiscalVoucherInputReceiverDocumentType defines model for FiscalVoucherInput.ReceiverDocumentType.
+type FiscalVoucherInputReceiverDocumentType string
+
+// FiscalVoucherInputSaleCondition Define si el asiento cancela contra un medio de cobro o genera una partida por cobrar.
+type FiscalVoucherInputSaleCondition string
+
+// FiscalVoucherInputSourceType Documento comercial de venta que origina la autorización de ARCA. Las compras se registran por el recurso dedicado y las NC/ND por sus comandos específicos.
+type FiscalVoucherInputSourceType string
+
+// FiscalVoucherKind defines model for FiscalVoucherKind.
+type FiscalVoucherKind string
+
+// FiscalVoucherLineInput defines model for FiscalVoucherLineInput.
+type FiscalVoucherLineInput struct {
+	// CostAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	CostAmount    *DecimalAmount `json:"cost_amount,omitempty"`
+	CostConfirmed *bool          `json:"cost_confirmed,omitempty"`
+	Description   string         `json:"description"`
+
+	// Quantity Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Quantity DecimalAmount `json:"quantity"`
+
+	// Subtotal Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Subtotal DecimalAmount        `json:"subtotal"`
+	Taxes    []FiscalTaxComponent `json:"taxes"`
+
+	// UnitPrice Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	UnitPrice DecimalAmount `json:"unit_price"`
+}
+
+// FiscalVoucherList defines model for FiscalVoucherList.
+type FiscalVoucherList struct {
+	Items []FiscalVoucher `json:"items"`
+	Page  PageInfo        `json:"page"`
+}
+
+// FiscalVoucherSnapshotLine defines model for FiscalVoucherSnapshotLine.
+type FiscalVoucherSnapshotLine struct {
+	Description string `json:"description"`
+	Position    int    `json:"position"`
+
+	// Quantity Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Quantity DecimalAmount `json:"quantity"`
+
+	// Subtotal Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Subtotal     DecimalAmount                         `json:"subtotal"`
+	TaxTreatment FiscalVoucherSnapshotLineTaxTreatment `json:"tax_treatment"`
+
+	// Total Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Total DecimalAmount `json:"total"`
+
+	// UnitPrice Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	UnitPrice DecimalAmount `json:"unit_price"`
+
+	// VatAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	VatAmount DecimalAmount `json:"vat_amount"`
+
+	// VatRate Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	VatRate DecimalAmount `json:"vat_rate"`
+}
+
+// FiscalVoucherSnapshotLineTaxTreatment defines model for FiscalVoucherSnapshotLine.TaxTreatment.
+type FiscalVoucherSnapshotLineTaxTreatment string
+
+// IVASimpleExportArtifact defines model for IVASimpleExportArtifact.
+type IVASimpleExportArtifact struct {
+	ContentBase64 []byte             `json:"content_base64"`
+	CreatedAt     time.Time          `json:"created_at"`
+	ExportVersion int                `json:"export_version"`
+	Filename      string             `json:"filename"`
+	Id            openapi_types.UUID `json:"id"`
+	MediaType     string             `json:"media_type"`
+	Sha256        string             `json:"sha256"`
+}
+
+// IVASimpleExportSummary defines model for IVASimpleExportSummary.
+type IVASimpleExportSummary struct {
+	CreatedAt     time.Time          `json:"created_at"`
+	ExportVersion int                `json:"export_version"`
+	Filename      string             `json:"filename"`
+	Id            openapi_types.UUID `json:"id"`
+	MediaType     string             `json:"media_type"`
+	Sha256        string             `json:"sha256"`
+}
+
+// IVASimplePrepareInput defines model for IVASimplePrepareInput.
+type IVASimplePrepareInput struct {
+	// OpeningBalance Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	OpeningBalance *DecimalAmount `json:"opening_balance,omitempty"`
+
+	// Version Obligatoria al volver a preparar un borrador existente; debe omitirse al crear el período por primera vez.
+	Version *int64 `json:"version,omitempty"`
+}
+
+// IVASimpleReport defines model for IVASimpleReport.
+type IVASimpleReport struct {
+	// Balance Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Balance DecimalAmount `json:"balance"`
+
+	// InputVat Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	InputVat DecimalAmount `json:"input_vat"`
+
+	// OutputVat Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	OutputVat DecimalAmount `json:"output_vat"`
+
+	// Perceptions Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Perceptions DecimalAmount `json:"perceptions"`
+	Period      string        `json:"period"`
+
+	// PurchasesFile Archivo de trabajo codificado en base64.
+	PurchasesFile *string `json:"purchases_file,omitempty"`
+
+	// PurchasesNet Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	PurchasesNet DecimalAmount `json:"purchases_net"`
+
+	// SalesFile Archivo de trabajo codificado en base64.
+	SalesFile *string `json:"sales_file,omitempty"`
+
+	// SalesNet Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	SalesNet         DecimalAmount `json:"sales_net"`
+	ValidationErrors []string      `json:"validation_errors"`
+
+	// Withholdings Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Withholdings DecimalAmount `json:"withholdings"`
+}
+
+// IVASimpleTransitionInput defines model for IVASimpleTransitionInput.
+type IVASimpleTransitionInput struct {
+	Reason  string `json:"reason"`
+	Version int64  `json:"version"`
+}
+
+// IVASimpleWorkflowPeriod defines model for IVASimpleWorkflowPeriod.
+type IVASimpleWorkflowPeriod struct {
+	ClosedAt *time.Time `json:"closed_at,omitempty"`
+
+	// ClosingBalance Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	ClosingBalance *DecimalAmount           `json:"closing_balance,omitempty"`
+	CreatedAt      time.Time                `json:"created_at"`
+	Environment    FiscalEnvironment        `json:"environment"`
+	ExportedAt     *time.Time               `json:"exported_at,omitempty"`
+	Exports        []IVASimpleExportSummary `json:"exports"`
+	Id             openapi_types.UUID       `json:"id"`
+
+	// OpeningBalance Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	OpeningBalance DecimalAmount           `json:"opening_balance"`
+	Period         string                  `json:"period"`
+	Report         IVASimpleReport         `json:"report"`
+	Status         IVASimpleWorkflowStatus `json:"status"`
+	UpdatedAt      time.Time               `json:"updated_at"`
+	Version        int64                   `json:"version"`
+}
+
+// IVASimpleWorkflowStatus defines model for IVASimpleWorkflowStatus.
+type IVASimpleWorkflowStatus string
+
+// InflationAdjustment defines model for InflationAdjustment.
+type InflationAdjustment struct {
+	ClosingDate openapi_types.Date        `json:"closing_date"`
+	Draft       JournalDraft              `json:"draft"`
+	Id          openapi_types.UUID        `json:"id"`
+	Lines       []InflationAdjustmentLine `json:"lines"`
+	PeriodId    openapi_types.UUID        `json:"period_id"`
+
+	// Recpam Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Recpam         DecimalAmount `json:"recpam"`
+	Source         string        `json:"source"`
+	SourceChecksum string        `json:"source_checksum"`
+}
+
+// InflationAdjustmentInput defines model for InflationAdjustmentInput.
+type InflationAdjustmentInput struct {
+	PeriodId openapi_types.UUID `json:"period_id"`
+}
+
+// InflationAdjustmentLine defines model for InflationAdjustmentLine.
+type InflationAdjustmentLine struct {
+	AccountCode string             `json:"account_code"`
+	AccountId   openapi_types.UUID `json:"account_id"`
+	AccountName string             `json:"account_name"`
+
+	// Adjustment Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Adjustment DecimalAmount `json:"adjustment"`
+
+	// ClosingIndex Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	ClosingIndex DecimalAmount `json:"closing_index"`
+
+	// Coefficient Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Coefficient DecimalAmount `json:"coefficient"`
+
+	// Historical Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Historical DecimalAmount      `json:"historical"`
+	OriginDate openapi_types.Date `json:"origin_date"`
+
+	// OriginIndex Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	OriginIndex DecimalAmount `json:"origin_index"`
+
+	// Restated Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Restated DecimalAmount `json:"restated"`
+}
+
+// InflationIndexInput defines model for InflationIndexInput.
+type InflationIndexInput struct {
+	Period string `json:"period"`
+	Source string `json:"source"`
+
+	// SourceDocument Referencia o contenido normalizado usado para calcular el checksum.
+	SourceDocument string `json:"source_document"`
+
+	// Value Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Value DecimalAmount `json:"value"`
 }
 
 // Invitation defines model for Invitation.
@@ -449,6 +2332,139 @@ type InvitationList struct {
 // InvitationStatus Ciclo de vida local; el estado de sincronización se expone por separado.
 type InvitationStatus string
 
+// JournalDraft defines model for JournalDraft.
+type JournalDraft struct {
+	AccountingDate openapi_types.Date `json:"accounting_date"`
+
+	// Currency Example: ARS
+	Currency    CurrencyCode       `json:"currency"`
+	Description string             `json:"description"`
+	Id          openapi_types.UUID `json:"id"`
+	Lines       []JournalLine      `json:"lines"`
+
+	// TotalCredit Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	TotalCredit DecimalAmount `json:"total_credit"`
+
+	// TotalDebit Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	TotalDebit DecimalAmount `json:"total_debit"`
+	Version    int64         `json:"version"`
+}
+
+// JournalDraftInput defines model for JournalDraftInput.
+type JournalDraftInput struct {
+	AccountingDate openapi_types.Date `json:"accounting_date"`
+
+	// Currency Example: ARS
+	Currency    CurrencyCode       `json:"currency"`
+	Description string             `json:"description"`
+	Lines       []JournalLineInput `json:"lines"`
+}
+
+// JournalDraftList defines model for JournalDraftList.
+type JournalDraftList struct {
+	Items []JournalDraft `json:"items"`
+	Page  PageInfo       `json:"page"`
+}
+
+// JournalEntry defines model for JournalEntry.
+type JournalEntry struct {
+	AccountingDate openapi_types.Date `json:"accounting_date"`
+	CreatedAt      time.Time          `json:"created_at"`
+
+	// Currency Example: ARS
+	Currency        CurrencyCode        `json:"currency"`
+	Description     string              `json:"description"`
+	EntryNumber     int64               `json:"entry_number"`
+	Id              openapi_types.UUID  `json:"id"`
+	Lines           []JournalLine       `json:"lines"`
+	ReversalReason  *string             `json:"reversal_reason,omitempty"`
+	ReversesEntryId *openapi_types.UUID `json:"reverses_entry_id,omitempty"`
+	SourceId        *openapi_types.UUID `json:"source_id,omitempty"`
+	SourceType      *string             `json:"source_type,omitempty"`
+
+	// TotalCredit Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	TotalCredit DecimalAmount `json:"total_credit"`
+
+	// TotalDebit Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	TotalDebit DecimalAmount `json:"total_debit"`
+}
+
+// JournalEntryList defines model for JournalEntryList.
+type JournalEntryList struct {
+	Items []JournalEntry `json:"items"`
+	Page  PageInfo       `json:"page"`
+}
+
+// JournalLine defines model for JournalLine.
+type JournalLine struct {
+	AccountId openapi_types.UUID `json:"account_id"`
+
+	// Credit Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Credit DecimalAmount `json:"credit"`
+
+	// Debit Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Debit DecimalAmount `json:"debit"`
+
+	// ExchangeRate Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	ExchangeRate *DecimalAmount      `json:"exchange_rate,omitempty"`
+	Id           openapi_types.UUID  `json:"id"`
+	LineNumber   int                 `json:"line_number"`
+	Memo         *string             `json:"memo,omitempty"`
+	PartyId      *openapi_types.UUID `json:"party_id,omitempty"`
+
+	// TransactionAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	TransactionAmount *DecimalAmount `json:"transaction_amount,omitempty"`
+
+	// TransactionCurrency Example: ARS
+	TransactionCurrency *CurrencyCode `json:"transaction_currency,omitempty"`
+}
+
+// JournalLineInput defines model for JournalLineInput.
+type JournalLineInput struct {
+	AccountId openapi_types.UUID `json:"account_id"`
+
+	// Credit Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Credit DecimalAmount `json:"credit"`
+
+	// Debit Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Debit DecimalAmount `json:"debit"`
+
+	// ExchangeRate Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	ExchangeRate *DecimalAmount      `json:"exchange_rate,omitempty"`
+	Memo         *string             `json:"memo,omitempty"`
+	PartyId      *openapi_types.UUID `json:"party_id,omitempty"`
+
+	// TransactionAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	TransactionAmount *DecimalAmount `json:"transaction_amount,omitempty"`
+
+	// TransactionCurrency Example: ARS
+	TransactionCurrency *CurrencyCode `json:"transaction_currency,omitempty"`
+}
+
 // LifecycleCommandInput defines model for LifecycleCommandInput.
 type LifecycleCommandInput struct {
 	Reason *string `json:"reason,omitempty"`
@@ -468,6 +2484,17 @@ type Member struct {
 	User       User             `json:"user"`
 }
 
+// MemberBusinessPermissions defines model for MemberBusinessPermissions.
+type MemberBusinessPermissions struct {
+	MemberId    openapi_types.UUID            `json:"member_id"`
+	Permissions []DelegatedBusinessPermission `json:"permissions"`
+}
+
+// MemberBusinessPermissionsInput defines model for MemberBusinessPermissionsInput.
+type MemberBusinessPermissionsInput struct {
+	Permissions []DelegatedBusinessPermission `json:"permissions"`
+}
+
 // MemberList defines model for MemberList.
 type MemberList struct {
 	Items []Member `json:"items"`
@@ -485,6 +2512,9 @@ type Membership struct {
 
 // MembershipStatus defines model for MembershipStatus.
 type MembershipStatus string
+
+// MonetaryClassification defines model for MonetaryClassification.
+type MonetaryClassification string
 
 // Organization defines model for Organization.
 type Organization struct {
@@ -519,11 +2549,134 @@ type PageInfo struct {
 	Total      int     `json:"total"`
 }
 
+// PeriodTransitionInput defines model for PeriodTransitionInput.
+type PeriodTransitionInput struct {
+	DesiredState AccountingPeriodState `json:"desired_state"`
+	Reason       string                `json:"reason"`
+	Version      int64                 `json:"version"`
+}
+
 // Permission Permiso IAM efectivo derivado del rol efectivo.
 type Permission string
 
 // ProductRole Rol global del producto; `owner` tiene autoridad sobre todos los tenants y usuarios.
 type ProductRole string
+
+// Reconciliation defines model for Reconciliation.
+type Reconciliation struct {
+	AccountId openapi_types.UUID `json:"account_id"`
+
+	// Currency Example: ARS
+	Currency CurrencyCode `json:"currency"`
+
+	// Difference Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Difference DecimalAmount      `json:"difference"`
+	Id         openapi_types.UUID `json:"id"`
+
+	// LedgerBalance Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	LedgerBalance DecimalAmount         `json:"ledger_balance"`
+	Matches       []ReconciliationMatch `json:"matches"`
+
+	// OpeningBalance Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	OpeningBalance DecimalAmount       `json:"opening_balance"`
+	PeriodStart    openapi_types.Date  `json:"period_start"`
+	State          ReconciliationState `json:"state"`
+
+	// StatementBalance Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	StatementBalance DecimalAmount      `json:"statement_balance"`
+	StatementDate    openapi_types.Date `json:"statement_date"`
+	Version          int64              `json:"version"`
+}
+
+// ReconciliationInput defines model for ReconciliationInput.
+type ReconciliationInput struct {
+	AccountId openapi_types.UUID `json:"account_id"`
+
+	// Currency Example: ARS
+	Currency CurrencyCode               `json:"currency"`
+	Matches  []ReconciliationMatchInput `json:"matches"`
+
+	// OpeningBalance Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	OpeningBalance DecimalAmount      `json:"opening_balance"`
+	PeriodStart    openapi_types.Date `json:"period_start"`
+
+	// StatementBalance Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	StatementBalance DecimalAmount      `json:"statement_balance"`
+	StatementDate    openapi_types.Date `json:"statement_date"`
+}
+
+// ReconciliationList defines model for ReconciliationList.
+type ReconciliationList struct {
+	Items []Reconciliation `json:"items"`
+	Page  PageInfo         `json:"page"`
+}
+
+// ReconciliationMatch defines model for ReconciliationMatch.
+type ReconciliationMatch struct {
+	CreatedAt     time.Time          `json:"created_at"`
+	Id            openapi_types.UUID `json:"id"`
+	JournalLineId openapi_types.UUID `json:"journal_line_id"`
+
+	// LedgerAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	LedgerAmount DecimalAmount `json:"ledger_amount"`
+
+	// StatementAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	StatementAmount     DecimalAmount      `json:"statement_amount"`
+	StatementMovementId openapi_types.UUID `json:"statement_movement_id"`
+}
+
+// ReconciliationMatchInput defines model for ReconciliationMatchInput.
+type ReconciliationMatchInput struct {
+	JournalLineId openapi_types.UUID `json:"journal_line_id"`
+
+	// LedgerAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	LedgerAmount DecimalAmount `json:"ledger_amount"`
+
+	// StatementAmount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	StatementAmount     DecimalAmount      `json:"statement_amount"`
+	StatementMovementId openapi_types.UUID `json:"statement_movement_id"`
+}
+
+// ReconciliationState defines model for ReconciliationState.
+type ReconciliationState string
+
+// ReconciliationSuggestion defines model for ReconciliationSuggestion.
+type ReconciliationSuggestion struct {
+	// Amount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Amount              DecimalAmount      `json:"amount"`
+	JournalLineId       openapi_types.UUID `json:"journal_line_id"`
+	Reasons             []string           `json:"reasons"`
+	Score               int                `json:"score"`
+	StatementMovementId openapi_types.UUID `json:"statement_movement_id"`
+}
+
+// ReverseJournalEntryInput defines model for ReverseJournalEntryInput.
+type ReverseJournalEntryInput struct {
+	AccountingDate openapi_types.Date `json:"accounting_date"`
+	Reason         string             `json:"reason"`
+}
 
 // Role Rol efectivo; `owner` es global y las membresías tenant usan `admin|member`.
 type Role string
@@ -551,12 +2704,68 @@ type SessionList struct {
 // SessionStatus Estado normalizado de la sesión informado por Clerk.
 type SessionStatus string
 
+// StatementImport defines model for StatementImport.
+type StatementImport struct {
+	// Currency Example: ARS
+	Currency           CurrencyCode          `json:"currency"`
+	FileName           string                `json:"file_name"`
+	FinancialAccountId openapi_types.UUID    `json:"financial_account_id"`
+	Format             StatementImportFormat `json:"format"`
+	Id                 openapi_types.UUID    `json:"id"`
+	ImportedAt         time.Time             `json:"imported_at"`
+	Movements          []StatementMovement   `json:"movements"`
+	Sha256             string                `json:"sha256"`
+}
+
+// StatementImportFormat defines model for StatementImportFormat.
+type StatementImportFormat string
+
+// StatementImportInput defines model for StatementImportInput.
+type StatementImportInput struct {
+	ContentBase64 []byte `json:"content_base64"`
+
+	// Currency Example: ARS
+	Currency           CurrencyCode          `json:"currency"`
+	FileName           string                `json:"file_name"`
+	FinancialAccountId openapi_types.UUID    `json:"financial_account_id"`
+	Format             StatementImportFormat `json:"format"`
+}
+
+// StatementMovement defines model for StatementMovement.
+type StatementMovement struct {
+	// Amount Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	Amount   DecimalAmount      `json:"amount"`
+	BookedAt openapi_types.Date `json:"booked_at"`
+
+	// Currency Example: ARS
+	Currency    CurrencyCode       `json:"currency"`
+	Description string             `json:"description"`
+	Fingerprint string             `json:"fingerprint"`
+	Id          openapi_types.UUID `json:"id"`
+	Reference   string             `json:"reference"`
+	ValueAt     openapi_types.Date `json:"value_at"`
+}
+
 // SyncStatus defines model for SyncStatus.
 type SyncStatus string
 
 // TransferOwnershipInput defines model for TransferOwnershipInput.
 type TransferOwnershipInput struct {
 	MemberId openapi_types.UUID `json:"member_id"`
+}
+
+// UpdateAccountingAccountInput defines model for UpdateAccountingAccountInput.
+type UpdateAccountingAccountInput struct {
+	AccountType            AccountingAccountType   `json:"account_type"`
+	Code                   string                  `json:"code"`
+	MonetaryClassification MonetaryClassification  `json:"monetary_classification"`
+	Name                   string                  `json:"name"`
+	NormalBalance          AccountingNormalBalance `json:"normal_balance"`
+	ParentId               *openapi_types.UUID     `json:"parent_id,omitempty"`
+	Postable               bool                    `json:"postable"`
+	Version                int64                   `json:"version"`
 }
 
 // UpdateAdminTenantInput defines model for UpdateAdminTenantInput.
@@ -575,6 +2784,31 @@ type UpdateAdminUserInput struct {
 	Version     int64        `json:"version"`
 }
 
+// UpdateFinancialAccountInput defines model for UpdateFinancialAccountInput.
+type UpdateFinancialAccountInput struct {
+	AccountType FinancialAccountType `json:"account_type"`
+	Archived    bool                 `json:"archived"`
+
+	// Currency Example: ARS
+	Currency          CurrencyCode       `json:"currency"`
+	ExternalReference *string            `json:"external_reference,omitempty"`
+	InstitutionName   *string            `json:"institution_name,omitempty"`
+	LedgerAccountId   openapi_types.UUID `json:"ledger_account_id"`
+	Name              string             `json:"name"`
+	Version           int64              `json:"version"`
+}
+
+// UpdateJournalDraftInput defines model for UpdateJournalDraftInput.
+type UpdateJournalDraftInput struct {
+	AccountingDate openapi_types.Date `json:"accounting_date"`
+
+	// Currency Example: ARS
+	Currency    CurrencyCode       `json:"currency"`
+	Description string             `json:"description"`
+	Lines       []JournalLineInput `json:"lines"`
+	Version     int64              `json:"version"`
+}
+
 // UpdateMemberInput defines model for UpdateMemberInput.
 type UpdateMemberInput struct {
 	// Role Roles administrables dentro de un tenant. `owner` es un rol global del producto y no forma parte de una membresía.
@@ -584,6 +2818,22 @@ type UpdateMemberInput struct {
 // UpdateOrganizationInput defines model for UpdateOrganizationInput.
 type UpdateOrganizationInput struct {
 	Name string `json:"name"`
+}
+
+// UpdateReconciliationInput defines model for UpdateReconciliationInput.
+type UpdateReconciliationInput struct {
+	Matches []ReconciliationMatchInput `json:"matches"`
+
+	// OpeningBalance Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	OpeningBalance DecimalAmount `json:"opening_balance"`
+
+	// StatementBalance Decimal exacto serializado como string; nunca IEEE-754.
+	//
+	// Example: 1250.50
+	StatementBalance DecimalAmount `json:"statement_balance"`
+	Version          int64         `json:"version"`
 }
 
 // User defines model for User.
@@ -597,8 +2847,26 @@ type User struct {
 // UserStatus defines model for UserStatus.
 type UserStatus string
 
+// VersionedCommandInput defines model for VersionedCommandInput.
+type VersionedCommandInput struct {
+	Reason  *string `json:"reason,omitempty"`
+	Version int64   `json:"version"`
+}
+
+// AccountID defines model for AccountID.
+type AccountID = openapi_types.UUID
+
 // Cursor defines model for Cursor.
 type Cursor = string
+
+// DraftID defines model for DraftID.
+type DraftID = openapi_types.UUID
+
+// EntryID defines model for EntryID.
+type EntryID = openapi_types.UUID
+
+// FinancialAccountID defines model for FinancialAccountID.
+type FinancialAccountID = openapi_types.UUID
 
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
@@ -612,14 +2880,26 @@ type Limit = int
 // MemberID defines model for MemberID.
 type MemberID = openapi_types.UUID
 
+// PeriodID defines model for PeriodID.
+type PeriodID = openapi_types.UUID
+
+// ReconciliationID defines model for ReconciliationID.
+type ReconciliationID = openapi_types.UUID
+
 // SessionID defines model for SessionID.
 type SessionID = string
+
+// StatementImportID defines model for StatementImportID.
+type StatementImportID = openapi_types.UUID
 
 // TenantID defines model for TenantID.
 type TenantID = openapi_types.UUID
 
 // UserID defines model for UserID.
 type UserID = openapi_types.UUID
+
+// VoucherID defines model for VoucherID.
+type VoucherID = openapi_types.UUID
 
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorResponse
@@ -642,6 +2922,9 @@ type Unauthorized = ErrorResponse
 // Unavailable defines model for Unavailable.
 type Unavailable = ErrorResponse
 
+// Unprocessable defines model for Unprocessable.
+type Unprocessable = ErrorResponse
+
 // WebhookBadRequest defines model for WebhookBadRequest.
 type WebhookBadRequest = ErrorResponse
 
@@ -653,6 +2936,213 @@ type WebhookUnavailable = ErrorResponse
 
 // LifecycleCommand defines model for LifecycleCommand.
 type LifecycleCommand = LifecycleCommandInput
+
+// UpdateAccountingMappingsJSONBody defines parameters for UpdateAccountingMappings.
+type UpdateAccountingMappingsJSONBody = []AccountingMappingInput
+
+// UpdateAccountingMappingsParams defines parameters for UpdateAccountingMappings.
+type UpdateAccountingMappingsParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListAccountingAccountsParams defines parameters for ListAccountingAccounts.
+type ListAccountingAccountsParams struct {
+	Cursor         *Cursor         `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit          *Limit          `form:"limit,omitempty" json:"limit,omitempty"`
+	LifecycleState *LifecycleState `form:"lifecycle_state,omitempty" json:"lifecycle_state,omitempty"`
+	Query          *string         `form:"query,omitempty" json:"query,omitempty"`
+}
+
+// CreateAccountingAccountParams defines parameters for CreateAccountingAccount.
+type CreateAccountingAccountParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UpdateAccountingAccountParams defines parameters for UpdateAccountingAccount.
+type UpdateAccountingAccountParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// TransitionAccountingAccountParams defines parameters for TransitionAccountingAccount.
+type TransitionAccountingAccountParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// TransitionAccountingAccountParamsLifecycleAction defines parameters for TransitionAccountingAccount.
+type TransitionAccountingAccountParamsLifecycleAction string
+
+// CreateCurrencyRevaluationParams defines parameters for CreateCurrencyRevaluation.
+type CreateCurrencyRevaluationParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListJournalDraftsParams defines parameters for ListJournalDrafts.
+type ListJournalDraftsParams struct {
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// CreateJournalDraftParams defines parameters for CreateJournalDraft.
+type CreateJournalDraftParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UpdateJournalDraftParams defines parameters for UpdateJournalDraft.
+type UpdateJournalDraftParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// PostJournalDraftParams defines parameters for PostJournalDraft.
+type PostJournalDraftParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListFinancialAccountsParams defines parameters for ListFinancialAccounts.
+type ListFinancialAccountsParams struct {
+	LifecycleState *ListFinancialAccountsParamsLifecycleState `form:"lifecycle_state,omitempty" json:"lifecycle_state,omitempty"`
+	Query          *string                                    `form:"query,omitempty" json:"query,omitempty"`
+}
+
+// ListFinancialAccountsParamsLifecycleState defines parameters for ListFinancialAccounts.
+type ListFinancialAccountsParamsLifecycleState string
+
+// CreateFinancialAccountParams defines parameters for CreateFinancialAccount.
+type CreateFinancialAccountParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UpdateFinancialAccountParams defines parameters for UpdateFinancialAccount.
+type UpdateFinancialAccountParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// PreviewInflationAdjustmentParams defines parameters for PreviewInflationAdjustment.
+type PreviewInflationAdjustmentParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ImportInflationIndicesJSONBody defines parameters for ImportInflationIndices.
+type ImportInflationIndicesJSONBody = []InflationIndexInput
+
+// ImportInflationIndicesParams defines parameters for ImportInflationIndices.
+type ImportInflationIndicesParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListJournalEntriesParams defines parameters for ListJournalEntries.
+type ListJournalEntriesParams struct {
+	Cursor *Cursor             `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit              `form:"limit,omitempty" json:"limit,omitempty"`
+	From   *openapi_types.Date `form:"from,omitempty" json:"from,omitempty"`
+	To     *openapi_types.Date `form:"to,omitempty" json:"to,omitempty"`
+	Query  *string             `form:"query,omitempty" json:"query,omitempty"`
+}
+
+// ReverseJournalEntryParams defines parameters for ReverseJournalEntry.
+type ReverseJournalEntryParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListAccountingOpenItemsParams defines parameters for ListAccountingOpenItems.
+type ListAccountingOpenItemsParams struct {
+	Cursor   *Cursor                 `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit    *Limit                  `form:"limit,omitempty" json:"limit,omitempty"`
+	ItemType *AccountingOpenItemType `form:"item_type,omitempty" json:"item_type,omitempty"`
+	PartyId  *openapi_types.UUID     `form:"party_id,omitempty" json:"party_id,omitempty"`
+	Currency *CurrencyCode           `form:"currency,omitempty" json:"currency,omitempty"`
+
+	// AsOf Fecha contable de corte. Si se omite, devuelve el saldo actual.
+	AsOf     *openapi_types.Date `form:"as_of,omitempty" json:"as_of,omitempty"`
+	OpenOnly *bool               `form:"open_only,omitempty" json:"open_only,omitempty"`
+}
+
+// CreateAccountingPeriodParams defines parameters for CreateAccountingPeriod.
+type CreateAccountingPeriodParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateAnnualClosingDraftParams defines parameters for CreateAnnualClosingDraft.
+type CreateAnnualClosingDraftParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// TransitionAccountingPeriodParams defines parameters for TransitionAccountingPeriod.
+type TransitionAccountingPeriodParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateAccountingReceiptParams defines parameters for CreateAccountingReceipt.
+type CreateAccountingReceiptParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListAccountingReconciliationsParams defines parameters for ListAccountingReconciliations.
+type ListAccountingReconciliationsParams struct {
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// CreateAccountingReconciliationParams defines parameters for CreateAccountingReconciliation.
+type CreateAccountingReconciliationParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UpdateAccountingReconciliationParams defines parameters for UpdateAccountingReconciliation.
+type UpdateAccountingReconciliationParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// TransitionAccountingReconciliationParams defines parameters for TransitionAccountingReconciliation.
+type TransitionAccountingReconciliationParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// TransitionAccountingReconciliationParamsReconciliationAction defines parameters for TransitionAccountingReconciliation.
+type TransitionAccountingReconciliationParamsReconciliationAction string
+
+// GetAccountingReportParams defines parameters for GetAccountingReport.
+type GetAccountingReportParams struct {
+	From               openapi_types.Date  `form:"from" json:"from"`
+	To                 openapi_types.Date  `form:"to" json:"to"`
+	AccountId          *openapi_types.UUID `form:"account_id,omitempty" json:"account_id,omitempty"`
+	FinancialAccountId *openapi_types.UUID `form:"financial_account_id,omitempty" json:"financial_account_id,omitempty"`
+}
+
+// GetAccountingReportParamsReport defines parameters for GetAccountingReport.
+type GetAccountingReportParamsReport string
+
+// ExportAccountingReportParams defines parameters for ExportAccountingReport.
+type ExportAccountingReportParams struct {
+	Format             ExportAccountingReportParamsFormat `form:"format" json:"format"`
+	From               openapi_types.Date                 `form:"from" json:"from"`
+	To                 openapi_types.Date                 `form:"to" json:"to"`
+	AccountId          *openapi_types.UUID                `form:"account_id,omitempty" json:"account_id,omitempty"`
+	FinancialAccountId *openapi_types.UUID                `form:"financial_account_id,omitempty" json:"financial_account_id,omitempty"`
+}
+
+// ExportAccountingReportParamsFormat defines parameters for ExportAccountingReport.
+type ExportAccountingReportParamsFormat string
+
+// ExportAccountingReportParamsReport defines parameters for ExportAccountingReport.
+type ExportAccountingReportParamsReport string
+
+// ImportAccountingStatementParams defines parameters for ImportAccountingStatement.
+type ImportAccountingStatementParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// SuggestAccountingMatchesParams defines parameters for SuggestAccountingMatches.
+type SuggestAccountingMatchesParams struct {
+	FinancialAccountId openapi_types.UUID `form:"financial_account_id" json:"financial_account_id"`
+	From               openapi_types.Date `form:"from" json:"from"`
+	To                 openapi_types.Date `form:"to" json:"to"`
+	MaxDays            *int               `form:"max_days,omitempty" json:"max_days,omitempty"`
+}
+
+// CreateAccountingSupplierPaymentParams defines parameters for CreateAccountingSupplierPayment.
+type CreateAccountingSupplierPaymentParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
 
 // ListAdminTenantsParams defines parameters for ListAdminTenants.
 type ListAdminTenantsParams struct {
@@ -742,6 +3232,114 @@ type UnarchiveAdminUserParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// RotateFiscalCertificateParams defines parameters for RotateFiscalCertificate.
+type RotateFiscalCertificateParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateFiscalCreditNoteParams defines parameters for CreateFiscalCreditNote.
+type CreateFiscalCreditNoteParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateFiscalDebitNoteParams defines parameters for CreateFiscalDebitNote.
+type CreateFiscalDebitNoteParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// GetIVASimpleParams defines parameters for GetIVASimple.
+type GetIVASimpleParams struct {
+	// Environment Ambiente fiscal aislado; producción es el predeterminado para libros impositivos.
+	Environment *GetIVASimpleParamsEnvironment `form:"environment,omitempty" json:"environment,omitempty"`
+}
+
+// GetIVASimpleParamsEnvironment defines parameters for GetIVASimple.
+type GetIVASimpleParamsEnvironment string
+
+// CloseIVASimpleWorkflowParams defines parameters for CloseIVASimpleWorkflow.
+type CloseIVASimpleWorkflowParams struct {
+	Environment    FiscalEnvironment `form:"environment" json:"environment"`
+	IdempotencyKey IdempotencyKey    `json:"Idempotency-Key"`
+}
+
+// ExportIVASimpleWorkflowParams defines parameters for ExportIVASimpleWorkflow.
+type ExportIVASimpleWorkflowParams struct {
+	Environment    FiscalEnvironment `form:"environment" json:"environment"`
+	IdempotencyKey IdempotencyKey    `json:"Idempotency-Key"`
+}
+
+// DownloadIVASimpleExportParams defines parameters for DownloadIVASimpleExport.
+type DownloadIVASimpleExportParams struct {
+	Environment FiscalEnvironment `form:"environment" json:"environment"`
+}
+
+// PrepareIVASimpleWorkflowParams defines parameters for PrepareIVASimpleWorkflow.
+type PrepareIVASimpleWorkflowParams struct {
+	Environment    FiscalEnvironment `form:"environment" json:"environment"`
+	IdempotencyKey IdempotencyKey    `json:"Idempotency-Key"`
+}
+
+// ReopenIVASimpleWorkflowParams defines parameters for ReopenIVASimpleWorkflow.
+type ReopenIVASimpleWorkflowParams struct {
+	Environment    FiscalEnvironment `form:"environment" json:"environment"`
+	IdempotencyKey IdempotencyKey    `json:"Idempotency-Key"`
+}
+
+// GetIVASimpleWorkflowParams defines parameters for GetIVASimpleWorkflow.
+type GetIVASimpleWorkflowParams struct {
+	Environment FiscalEnvironment `form:"environment" json:"environment"`
+}
+
+// CreateFiscalPointOfSaleParams defines parameters for CreateFiscalPointOfSale.
+type CreateFiscalPointOfSaleParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// EnableFiscalProductionParams defines parameters for EnableFiscalProduction.
+type EnableFiscalProductionParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListFiscalPurchaseVouchersParams defines parameters for ListFiscalPurchaseVouchers.
+type ListFiscalPurchaseVouchersParams struct {
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+	Period *string `form:"period,omitempty" json:"period,omitempty"`
+	Query  *string `form:"query,omitempty" json:"query,omitempty"`
+}
+
+// CreateFiscalPurchaseVoucherParams defines parameters for CreateFiscalPurchaseVoucher.
+type CreateFiscalPurchaseVoucherParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// GetFiscalSettingsParams defines parameters for GetFiscalSettings.
+type GetFiscalSettingsParams struct {
+	// Environment Ambiente a consultar; homologación por defecto.
+	Environment *FiscalEnvironment `form:"environment,omitempty" json:"environment,omitempty"`
+}
+
+// UpdateFiscalSettingsParams defines parameters for UpdateFiscalSettings.
+type UpdateFiscalSettingsParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListFiscalVouchersParams defines parameters for ListFiscalVouchers.
+type ListFiscalVouchersParams struct {
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Environment Ambiente fiscal aislado que se desea consultar.
+	Environment FiscalEnvironment         `form:"environment" json:"environment"`
+	Status      *FiscalAuthorizationState `form:"status,omitempty" json:"status,omitempty"`
+	Query       *string                   `form:"query,omitempty" json:"query,omitempty"`
+}
+
+// CreateFiscalVoucherParams defines parameters for CreateFiscalVoucher.
+type CreateFiscalVoucherParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // UpdateCurrentOrganizationParams defines parameters for UpdateCurrentOrganization.
 type UpdateCurrentOrganizationParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
@@ -802,6 +3400,11 @@ type UpdateTeamMemberParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// UpdateTeamMemberBusinessPermissionsParams defines parameters for UpdateTeamMemberBusinessPermissions.
+type UpdateTeamMemberBusinessPermissionsParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // TransferOwnershipParams defines parameters for TransferOwnership.
 type TransferOwnershipParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
@@ -809,6 +3412,72 @@ type TransferOwnershipParams struct {
 
 // ReceiveClerkWebhookJSONBody defines parameters for ReceiveClerkWebhook.
 type ReceiveClerkWebhookJSONBody map[string]interface{}
+
+// UpdateAccountingMappingsJSONRequestBody defines body for UpdateAccountingMappings for application/json ContentType.
+type UpdateAccountingMappingsJSONRequestBody = UpdateAccountingMappingsJSONBody
+
+// CreateAccountingAccountJSONRequestBody defines body for CreateAccountingAccount for application/json ContentType.
+type CreateAccountingAccountJSONRequestBody = AccountingAccountInput
+
+// UpdateAccountingAccountJSONRequestBody defines body for UpdateAccountingAccount for application/json ContentType.
+type UpdateAccountingAccountJSONRequestBody = UpdateAccountingAccountInput
+
+// TransitionAccountingAccountJSONRequestBody defines body for TransitionAccountingAccount for application/json ContentType.
+type TransitionAccountingAccountJSONRequestBody = VersionedCommandInput
+
+// CreateCurrencyRevaluationJSONRequestBody defines body for CreateCurrencyRevaluation for application/json ContentType.
+type CreateCurrencyRevaluationJSONRequestBody = CurrencyRevaluationInput
+
+// CreateJournalDraftJSONRequestBody defines body for CreateJournalDraft for application/json ContentType.
+type CreateJournalDraftJSONRequestBody = JournalDraftInput
+
+// UpdateJournalDraftJSONRequestBody defines body for UpdateJournalDraft for application/json ContentType.
+type UpdateJournalDraftJSONRequestBody = UpdateJournalDraftInput
+
+// PostJournalDraftJSONRequestBody defines body for PostJournalDraft for application/json ContentType.
+type PostJournalDraftJSONRequestBody = VersionedCommandInput
+
+// CreateFinancialAccountJSONRequestBody defines body for CreateFinancialAccount for application/json ContentType.
+type CreateFinancialAccountJSONRequestBody = FinancialAccountInput
+
+// UpdateFinancialAccountJSONRequestBody defines body for UpdateFinancialAccount for application/json ContentType.
+type UpdateFinancialAccountJSONRequestBody = UpdateFinancialAccountInput
+
+// PreviewInflationAdjustmentJSONRequestBody defines body for PreviewInflationAdjustment for application/json ContentType.
+type PreviewInflationAdjustmentJSONRequestBody = InflationAdjustmentInput
+
+// ImportInflationIndicesJSONRequestBody defines body for ImportInflationIndices for application/json ContentType.
+type ImportInflationIndicesJSONRequestBody = ImportInflationIndicesJSONBody
+
+// ReverseJournalEntryJSONRequestBody defines body for ReverseJournalEntry for application/json ContentType.
+type ReverseJournalEntryJSONRequestBody = ReverseJournalEntryInput
+
+// CreateAccountingPeriodJSONRequestBody defines body for CreateAccountingPeriod for application/json ContentType.
+type CreateAccountingPeriodJSONRequestBody = AccountingPeriodInput
+
+// CreateAnnualClosingDraftJSONRequestBody defines body for CreateAnnualClosingDraft for application/json ContentType.
+type CreateAnnualClosingDraftJSONRequestBody = AnnualClosingDraftInput
+
+// TransitionAccountingPeriodJSONRequestBody defines body for TransitionAccountingPeriod for application/json ContentType.
+type TransitionAccountingPeriodJSONRequestBody = PeriodTransitionInput
+
+// CreateAccountingReceiptJSONRequestBody defines body for CreateAccountingReceipt for application/json ContentType.
+type CreateAccountingReceiptJSONRequestBody = AccountingSettlementInput
+
+// CreateAccountingReconciliationJSONRequestBody defines body for CreateAccountingReconciliation for application/json ContentType.
+type CreateAccountingReconciliationJSONRequestBody = ReconciliationInput
+
+// UpdateAccountingReconciliationJSONRequestBody defines body for UpdateAccountingReconciliation for application/json ContentType.
+type UpdateAccountingReconciliationJSONRequestBody = UpdateReconciliationInput
+
+// TransitionAccountingReconciliationJSONRequestBody defines body for TransitionAccountingReconciliation for application/json ContentType.
+type TransitionAccountingReconciliationJSONRequestBody = VersionedCommandInput
+
+// ImportAccountingStatementJSONRequestBody defines body for ImportAccountingStatement for application/json ContentType.
+type ImportAccountingStatementJSONRequestBody = StatementImportInput
+
+// CreateAccountingSupplierPaymentJSONRequestBody defines body for CreateAccountingSupplierPayment for application/json ContentType.
+type CreateAccountingSupplierPaymentJSONRequestBody = AccountingSettlementInput
 
 // CreateAdminTenantJSONRequestBody defines body for CreateAdminTenant for application/json ContentType.
 type CreateAdminTenantJSONRequestBody = CreateAdminTenantInput
@@ -852,6 +3521,42 @@ type TrashAdminUserJSONRequestBody = LifecycleCommandInput
 // UnarchiveAdminUserJSONRequestBody defines body for UnarchiveAdminUser for application/json ContentType.
 type UnarchiveAdminUserJSONRequestBody = LifecycleCommandInput
 
+// RotateFiscalCertificateJSONRequestBody defines body for RotateFiscalCertificate for application/json ContentType.
+type RotateFiscalCertificateJSONRequestBody = FiscalCertificateInput
+
+// CreateFiscalCreditNoteJSONRequestBody defines body for CreateFiscalCreditNote for application/json ContentType.
+type CreateFiscalCreditNoteJSONRequestBody = FiscalAdjustmentInput
+
+// CreateFiscalDebitNoteJSONRequestBody defines body for CreateFiscalDebitNote for application/json ContentType.
+type CreateFiscalDebitNoteJSONRequestBody = FiscalAdjustmentInput
+
+// CloseIVASimpleWorkflowJSONRequestBody defines body for CloseIVASimpleWorkflow for application/json ContentType.
+type CloseIVASimpleWorkflowJSONRequestBody = IVASimpleTransitionInput
+
+// ExportIVASimpleWorkflowJSONRequestBody defines body for ExportIVASimpleWorkflow for application/json ContentType.
+type ExportIVASimpleWorkflowJSONRequestBody = IVASimpleTransitionInput
+
+// PrepareIVASimpleWorkflowJSONRequestBody defines body for PrepareIVASimpleWorkflow for application/json ContentType.
+type PrepareIVASimpleWorkflowJSONRequestBody = IVASimplePrepareInput
+
+// ReopenIVASimpleWorkflowJSONRequestBody defines body for ReopenIVASimpleWorkflow for application/json ContentType.
+type ReopenIVASimpleWorkflowJSONRequestBody = IVASimpleTransitionInput
+
+// CreateFiscalPointOfSaleJSONRequestBody defines body for CreateFiscalPointOfSale for application/json ContentType.
+type CreateFiscalPointOfSaleJSONRequestBody = FiscalPointOfSaleInput
+
+// EnableFiscalProductionJSONRequestBody defines body for EnableFiscalProduction for application/json ContentType.
+type EnableFiscalProductionJSONRequestBody = VersionedCommandInput
+
+// CreateFiscalPurchaseVoucherJSONRequestBody defines body for CreateFiscalPurchaseVoucher for application/json ContentType.
+type CreateFiscalPurchaseVoucherJSONRequestBody = FiscalPurchaseVoucherInput
+
+// UpdateFiscalSettingsJSONRequestBody defines body for UpdateFiscalSettings for application/json ContentType.
+type UpdateFiscalSettingsJSONRequestBody = ArgentinaFiscalSettingsInput
+
+// CreateFiscalVoucherJSONRequestBody defines body for CreateFiscalVoucher for application/json ContentType.
+type CreateFiscalVoucherJSONRequestBody = FiscalVoucherInput
+
 // UpdateCurrentOrganizationJSONRequestBody defines body for UpdateCurrentOrganization for application/json ContentType.
 type UpdateCurrentOrganizationJSONRequestBody = UpdateOrganizationInput
 
@@ -860,6 +3565,9 @@ type CreateTeamInvitationJSONRequestBody = CreateInvitationInput
 
 // UpdateTeamMemberJSONRequestBody defines body for UpdateTeamMember for application/json ContentType.
 type UpdateTeamMemberJSONRequestBody = UpdateMemberInput
+
+// UpdateTeamMemberBusinessPermissionsJSONRequestBody defines body for UpdateTeamMemberBusinessPermissions for application/json ContentType.
+type UpdateTeamMemberBusinessPermissionsJSONRequestBody = MemberBusinessPermissionsInput
 
 // TransferOwnershipJSONRequestBody defines body for TransferOwnership for application/json ContentType.
 //
@@ -871,6 +3579,114 @@ type ReceiveClerkWebhookJSONRequestBody ReceiveClerkWebhookJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+
+	// (GET /api/v1/accounting/account-mappings)
+	ListAccountingMappings(w http.ResponseWriter, r *http.Request)
+
+	// (PUT /api/v1/accounting/account-mappings)
+	UpdateAccountingMappings(w http.ResponseWriter, r *http.Request, params UpdateAccountingMappingsParams)
+
+	// (GET /api/v1/accounting/accounts)
+	ListAccountingAccounts(w http.ResponseWriter, r *http.Request, params ListAccountingAccountsParams)
+
+	// (POST /api/v1/accounting/accounts)
+	CreateAccountingAccount(w http.ResponseWriter, r *http.Request, params CreateAccountingAccountParams)
+
+	// (GET /api/v1/accounting/accounts/{account_id})
+	GetAccountingAccount(w http.ResponseWriter, r *http.Request, accountId AccountID)
+
+	// (PUT /api/v1/accounting/accounts/{account_id})
+	UpdateAccountingAccount(w http.ResponseWriter, r *http.Request, accountId AccountID, params UpdateAccountingAccountParams)
+
+	// (POST /api/v1/accounting/accounts/{account_id}/{lifecycle_action})
+	TransitionAccountingAccount(w http.ResponseWriter, r *http.Request, accountId AccountID, lifecycleAction TransitionAccountingAccountParamsLifecycleAction, params TransitionAccountingAccountParams)
+
+	// (POST /api/v1/accounting/currency-revaluations)
+	CreateCurrencyRevaluation(w http.ResponseWriter, r *http.Request, params CreateCurrencyRevaluationParams)
+
+	// (GET /api/v1/accounting/drafts)
+	ListJournalDrafts(w http.ResponseWriter, r *http.Request, params ListJournalDraftsParams)
+
+	// (POST /api/v1/accounting/drafts)
+	CreateJournalDraft(w http.ResponseWriter, r *http.Request, params CreateJournalDraftParams)
+
+	// (PUT /api/v1/accounting/drafts/{draft_id})
+	UpdateJournalDraft(w http.ResponseWriter, r *http.Request, draftId DraftID, params UpdateJournalDraftParams)
+
+	// (POST /api/v1/accounting/drafts/{draft_id}/post)
+	PostJournalDraft(w http.ResponseWriter, r *http.Request, draftId DraftID, params PostJournalDraftParams)
+
+	// (GET /api/v1/accounting/financial-accounts)
+	ListFinancialAccounts(w http.ResponseWriter, r *http.Request, params ListFinancialAccountsParams)
+
+	// (POST /api/v1/accounting/financial-accounts)
+	CreateFinancialAccount(w http.ResponseWriter, r *http.Request, params CreateFinancialAccountParams)
+
+	// (PUT /api/v1/accounting/financial-accounts/{financial_account_id})
+	UpdateFinancialAccount(w http.ResponseWriter, r *http.Request, financialAccountId FinancialAccountID, params UpdateFinancialAccountParams)
+
+	// (POST /api/v1/accounting/inflation-adjustments)
+	PreviewInflationAdjustment(w http.ResponseWriter, r *http.Request, params PreviewInflationAdjustmentParams)
+
+	// (POST /api/v1/accounting/inflation-indices)
+	ImportInflationIndices(w http.ResponseWriter, r *http.Request, params ImportInflationIndicesParams)
+
+	// (GET /api/v1/accounting/journal-entries)
+	ListJournalEntries(w http.ResponseWriter, r *http.Request, params ListJournalEntriesParams)
+
+	// (GET /api/v1/accounting/journal-entries/{entry_id})
+	GetJournalEntry(w http.ResponseWriter, r *http.Request, entryId EntryID)
+
+	// (POST /api/v1/accounting/journal-entries/{entry_id}/reverse)
+	ReverseJournalEntry(w http.ResponseWriter, r *http.Request, entryId EntryID, params ReverseJournalEntryParams)
+
+	// (GET /api/v1/accounting/open-items)
+	ListAccountingOpenItems(w http.ResponseWriter, r *http.Request, params ListAccountingOpenItemsParams)
+
+	// (GET /api/v1/accounting/periods)
+	ListAccountingPeriods(w http.ResponseWriter, r *http.Request)
+
+	// (POST /api/v1/accounting/periods)
+	CreateAccountingPeriod(w http.ResponseWriter, r *http.Request, params CreateAccountingPeriodParams)
+
+	// (POST /api/v1/accounting/periods/{period_id}/annual-close-draft)
+	CreateAnnualClosingDraft(w http.ResponseWriter, r *http.Request, periodId PeriodID, params CreateAnnualClosingDraftParams)
+
+	// (POST /api/v1/accounting/periods/{period_id}/transition)
+	TransitionAccountingPeriod(w http.ResponseWriter, r *http.Request, periodId PeriodID, params TransitionAccountingPeriodParams)
+
+	// (POST /api/v1/accounting/receipts)
+	CreateAccountingReceipt(w http.ResponseWriter, r *http.Request, params CreateAccountingReceiptParams)
+
+	// (GET /api/v1/accounting/reconciliations)
+	ListAccountingReconciliations(w http.ResponseWriter, r *http.Request, params ListAccountingReconciliationsParams)
+
+	// (POST /api/v1/accounting/reconciliations)
+	CreateAccountingReconciliation(w http.ResponseWriter, r *http.Request, params CreateAccountingReconciliationParams)
+
+	// (GET /api/v1/accounting/reconciliations/{reconciliation_id})
+	GetAccountingReconciliation(w http.ResponseWriter, r *http.Request, reconciliationId ReconciliationID)
+
+	// (PUT /api/v1/accounting/reconciliations/{reconciliation_id})
+	UpdateAccountingReconciliation(w http.ResponseWriter, r *http.Request, reconciliationId ReconciliationID, params UpdateAccountingReconciliationParams)
+
+	// (POST /api/v1/accounting/reconciliations/{reconciliation_id}/{reconciliation_action})
+	TransitionAccountingReconciliation(w http.ResponseWriter, r *http.Request, reconciliationId ReconciliationID, reconciliationAction TransitionAccountingReconciliationParamsReconciliationAction, params TransitionAccountingReconciliationParams)
+
+	// (GET /api/v1/accounting/reports/{report})
+	GetAccountingReport(w http.ResponseWriter, r *http.Request, report GetAccountingReportParamsReport, params GetAccountingReportParams)
+
+	// (GET /api/v1/accounting/reports/{report}/export)
+	ExportAccountingReport(w http.ResponseWriter, r *http.Request, report ExportAccountingReportParamsReport, params ExportAccountingReportParams)
+
+	// (POST /api/v1/accounting/statement-imports)
+	ImportAccountingStatement(w http.ResponseWriter, r *http.Request, params ImportAccountingStatementParams)
+
+	// (GET /api/v1/accounting/statement-imports/{statement_import_id}/suggestions)
+	SuggestAccountingMatches(w http.ResponseWriter, r *http.Request, statementImportId StatementImportID, params SuggestAccountingMatchesParams)
+
+	// (POST /api/v1/accounting/supplier-payments)
+	CreateAccountingSupplierPayment(w http.ResponseWriter, r *http.Request, params CreateAccountingSupplierPaymentParams)
 
 	// (GET /api/v1/admin/tenants)
 	ListAdminTenants(w http.ResponseWriter, r *http.Request, params ListAdminTenantsParams)
@@ -926,6 +3742,72 @@ type ServerInterface interface {
 	// (POST /api/v1/admin/users/{user_id}/unarchive)
 	UnarchiveAdminUser(w http.ResponseWriter, r *http.Request, userId UserID, params UnarchiveAdminUserParams)
 
+	// (POST /api/v1/fiscal/certificates)
+	RotateFiscalCertificate(w http.ResponseWriter, r *http.Request, params RotateFiscalCertificateParams)
+
+	// (POST /api/v1/fiscal/credit-notes)
+	CreateFiscalCreditNote(w http.ResponseWriter, r *http.Request, params CreateFiscalCreditNoteParams)
+
+	// (POST /api/v1/fiscal/debit-notes)
+	CreateFiscalDebitNote(w http.ResponseWriter, r *http.Request, params CreateFiscalDebitNoteParams)
+
+	// (GET /api/v1/fiscal/homologation/latest)
+	GetLatestFiscalHomologation(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/v1/fiscal/iva-simple/{period})
+	GetIVASimple(w http.ResponseWriter, r *http.Request, period string, params GetIVASimpleParams)
+
+	// (POST /api/v1/fiscal/iva-simple/{period}/close)
+	CloseIVASimpleWorkflow(w http.ResponseWriter, r *http.Request, period string, params CloseIVASimpleWorkflowParams)
+
+	// (POST /api/v1/fiscal/iva-simple/{period}/export)
+	ExportIVASimpleWorkflow(w http.ResponseWriter, r *http.Request, period string, params ExportIVASimpleWorkflowParams)
+
+	// (GET /api/v1/fiscal/iva-simple/{period}/exports/{export_id})
+	DownloadIVASimpleExport(w http.ResponseWriter, r *http.Request, period string, exportId openapi_types.UUID, params DownloadIVASimpleExportParams)
+
+	// (POST /api/v1/fiscal/iva-simple/{period}/prepare)
+	PrepareIVASimpleWorkflow(w http.ResponseWriter, r *http.Request, period string, params PrepareIVASimpleWorkflowParams)
+
+	// (POST /api/v1/fiscal/iva-simple/{period}/reopen)
+	ReopenIVASimpleWorkflow(w http.ResponseWriter, r *http.Request, period string, params ReopenIVASimpleWorkflowParams)
+
+	// (GET /api/v1/fiscal/iva-simple/{period}/workflow)
+	GetIVASimpleWorkflow(w http.ResponseWriter, r *http.Request, period string, params GetIVASimpleWorkflowParams)
+
+	// (GET /api/v1/fiscal/points-of-sale)
+	ListFiscalPointsOfSale(w http.ResponseWriter, r *http.Request)
+
+	// (POST /api/v1/fiscal/points-of-sale)
+	CreateFiscalPointOfSale(w http.ResponseWriter, r *http.Request, params CreateFiscalPointOfSaleParams)
+
+	// (POST /api/v1/fiscal/production/enable)
+	EnableFiscalProduction(w http.ResponseWriter, r *http.Request, params EnableFiscalProductionParams)
+
+	// (GET /api/v1/fiscal/purchase-vouchers)
+	ListFiscalPurchaseVouchers(w http.ResponseWriter, r *http.Request, params ListFiscalPurchaseVouchersParams)
+
+	// (POST /api/v1/fiscal/purchase-vouchers)
+	CreateFiscalPurchaseVoucher(w http.ResponseWriter, r *http.Request, params CreateFiscalPurchaseVoucherParams)
+
+	// (GET /api/v1/fiscal/settings)
+	GetFiscalSettings(w http.ResponseWriter, r *http.Request, params GetFiscalSettingsParams)
+
+	// (PUT /api/v1/fiscal/settings)
+	UpdateFiscalSettings(w http.ResponseWriter, r *http.Request, params UpdateFiscalSettingsParams)
+
+	// (GET /api/v1/fiscal/vouchers)
+	ListFiscalVouchers(w http.ResponseWriter, r *http.Request, params ListFiscalVouchersParams)
+
+	// (POST /api/v1/fiscal/vouchers)
+	CreateFiscalVoucher(w http.ResponseWriter, r *http.Request, params CreateFiscalVoucherParams)
+
+	// (GET /api/v1/fiscal/vouchers/{voucher_id})
+	GetFiscalVoucher(w http.ResponseWriter, r *http.Request, voucherId VoucherID)
+
+	// (GET /api/v1/fiscal/vouchers/{voucher_id}/pdf)
+	GetFiscalVoucherPDF(w http.ResponseWriter, r *http.Request, voucherId VoucherID)
+
 	// (PATCH /api/v1/organization)
 	UpdateCurrentOrganization(w http.ResponseWriter, r *http.Request, params UpdateCurrentOrganizationParams)
 
@@ -965,6 +3847,12 @@ type ServerInterface interface {
 	// (PATCH /api/v1/team/members/{member_id})
 	UpdateTeamMember(w http.ResponseWriter, r *http.Request, memberId MemberID, params UpdateTeamMemberParams)
 
+	// (GET /api/v1/team/members/{member_id}/business-permissions)
+	GetTeamMemberBusinessPermissions(w http.ResponseWriter, r *http.Request, memberId MemberID)
+
+	// (PUT /api/v1/team/members/{member_id}/business-permissions)
+	UpdateTeamMemberBusinessPermissions(w http.ResponseWriter, r *http.Request, memberId MemberID, params UpdateTeamMemberBusinessPermissionsParams)
+
 	// (POST /api/v1/team/ownership-transfer)
 	//
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -982,6 +3870,1872 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListAccountingMappings operation middleware
+func (siw *ServerInterfaceWrapper) ListAccountingMappings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAccountingMappings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAccountingMappings operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAccountingMappings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateAccountingMappingsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAccountingMappings(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAccountingAccounts operation middleware
+func (siw *ServerInterfaceWrapper) ListAccountingAccounts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAccountingAccountsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "lifecycle_state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "lifecycle_state", r.URL.Query(), &params.LifecycleState, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "lifecycle_state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "lifecycle_state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAccountingAccounts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAccountingAccount operation middleware
+func (siw *ServerInterfaceWrapper) CreateAccountingAccount(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAccountingAccountParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAccountingAccount(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAccountingAccount operation middleware
+func (siw *ServerInterfaceWrapper) GetAccountingAccount(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "account_id" -------------
+	var accountId AccountID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "account_id", r.PathValue("account_id"), &accountId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAccountingAccount(w, r, accountId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAccountingAccount operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAccountingAccount(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "account_id" -------------
+	var accountId AccountID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "account_id", r.PathValue("account_id"), &accountId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateAccountingAccountParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAccountingAccount(w, r, accountId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TransitionAccountingAccount operation middleware
+func (siw *ServerInterfaceWrapper) TransitionAccountingAccount(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "account_id" -------------
+	var accountId AccountID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "account_id", r.PathValue("account_id"), &accountId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "lifecycle_action" -------------
+	var lifecycleAction TransitionAccountingAccountParamsLifecycleAction
+
+	err = runtime.BindStyledParameterWithOptions("simple", "lifecycle_action", r.PathValue("lifecycle_action"), &lifecycleAction, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "lifecycle_action", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params TransitionAccountingAccountParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TransitionAccountingAccount(w, r, accountId, lifecycleAction, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateCurrencyRevaluation operation middleware
+func (siw *ServerInterfaceWrapper) CreateCurrencyRevaluation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateCurrencyRevaluationParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateCurrencyRevaluation(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListJournalDrafts operation middleware
+func (siw *ServerInterfaceWrapper) ListJournalDrafts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListJournalDraftsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListJournalDrafts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateJournalDraft operation middleware
+func (siw *ServerInterfaceWrapper) CreateJournalDraft(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateJournalDraftParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateJournalDraft(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateJournalDraft operation middleware
+func (siw *ServerInterfaceWrapper) UpdateJournalDraft(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "draft_id" -------------
+	var draftId DraftID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "draft_id", r.PathValue("draft_id"), &draftId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "draft_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateJournalDraftParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateJournalDraft(w, r, draftId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostJournalDraft operation middleware
+func (siw *ServerInterfaceWrapper) PostJournalDraft(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "draft_id" -------------
+	var draftId DraftID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "draft_id", r.PathValue("draft_id"), &draftId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "draft_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostJournalDraftParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostJournalDraft(w, r, draftId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListFinancialAccounts operation middleware
+func (siw *ServerInterfaceWrapper) ListFinancialAccounts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListFinancialAccountsParams
+
+	// ------------- Optional query parameter "lifecycle_state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "lifecycle_state", r.URL.Query(), &params.LifecycleState, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "lifecycle_state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "lifecycle_state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListFinancialAccounts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateFinancialAccount operation middleware
+func (siw *ServerInterfaceWrapper) CreateFinancialAccount(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateFinancialAccountParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateFinancialAccount(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateFinancialAccount operation middleware
+func (siw *ServerInterfaceWrapper) UpdateFinancialAccount(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "financial_account_id" -------------
+	var financialAccountId FinancialAccountID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "financial_account_id", r.PathValue("financial_account_id"), &financialAccountId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "financial_account_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateFinancialAccountParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateFinancialAccount(w, r, financialAccountId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PreviewInflationAdjustment operation middleware
+func (siw *ServerInterfaceWrapper) PreviewInflationAdjustment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PreviewInflationAdjustmentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PreviewInflationAdjustment(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ImportInflationIndices operation middleware
+func (siw *ServerInterfaceWrapper) ImportInflationIndices(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ImportInflationIndicesParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ImportInflationIndices(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListJournalEntries operation middleware
+func (siw *ServerInterfaceWrapper) ListJournalEntries(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListJournalEntriesParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListJournalEntries(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetJournalEntry operation middleware
+func (siw *ServerInterfaceWrapper) GetJournalEntry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "entry_id" -------------
+	var entryId EntryID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "entry_id", r.PathValue("entry_id"), &entryId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "entry_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetJournalEntry(w, r, entryId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReverseJournalEntry operation middleware
+func (siw *ServerInterfaceWrapper) ReverseJournalEntry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "entry_id" -------------
+	var entryId EntryID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "entry_id", r.PathValue("entry_id"), &entryId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "entry_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReverseJournalEntryParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReverseJournalEntry(w, r, entryId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAccountingOpenItems operation middleware
+func (siw *ServerInterfaceWrapper) ListAccountingOpenItems(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAccountingOpenItemsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "item_type" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "item_type", r.URL.Query(), &params.ItemType, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "item_type"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "item_type", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "party_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "party_id", r.URL.Query(), &params.PartyId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "party_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "party_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "currency" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "currency", r.URL.Query(), &params.Currency, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "currency"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "currency", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "as_of" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "as_of", r.URL.Query(), &params.AsOf, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "as_of"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "as_of", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "open_only" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "open_only", r.URL.Query(), &params.OpenOnly, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "open_only"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "open_only", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAccountingOpenItems(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAccountingPeriods operation middleware
+func (siw *ServerInterfaceWrapper) ListAccountingPeriods(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAccountingPeriods(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAccountingPeriod operation middleware
+func (siw *ServerInterfaceWrapper) CreateAccountingPeriod(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAccountingPeriodParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAccountingPeriod(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAnnualClosingDraft operation middleware
+func (siw *ServerInterfaceWrapper) CreateAnnualClosingDraft(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "period_id" -------------
+	var periodId PeriodID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "period_id", r.PathValue("period_id"), &periodId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "period_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAnnualClosingDraftParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAnnualClosingDraft(w, r, periodId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TransitionAccountingPeriod operation middleware
+func (siw *ServerInterfaceWrapper) TransitionAccountingPeriod(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "period_id" -------------
+	var periodId PeriodID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "period_id", r.PathValue("period_id"), &periodId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "period_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params TransitionAccountingPeriodParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TransitionAccountingPeriod(w, r, periodId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAccountingReceipt operation middleware
+func (siw *ServerInterfaceWrapper) CreateAccountingReceipt(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAccountingReceiptParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAccountingReceipt(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAccountingReconciliations operation middleware
+func (siw *ServerInterfaceWrapper) ListAccountingReconciliations(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAccountingReconciliationsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAccountingReconciliations(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAccountingReconciliation operation middleware
+func (siw *ServerInterfaceWrapper) CreateAccountingReconciliation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAccountingReconciliationParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAccountingReconciliation(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAccountingReconciliation operation middleware
+func (siw *ServerInterfaceWrapper) GetAccountingReconciliation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "reconciliation_id" -------------
+	var reconciliationId ReconciliationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "reconciliation_id", r.PathValue("reconciliation_id"), &reconciliationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "reconciliation_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAccountingReconciliation(w, r, reconciliationId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAccountingReconciliation operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAccountingReconciliation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "reconciliation_id" -------------
+	var reconciliationId ReconciliationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "reconciliation_id", r.PathValue("reconciliation_id"), &reconciliationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "reconciliation_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateAccountingReconciliationParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAccountingReconciliation(w, r, reconciliationId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TransitionAccountingReconciliation operation middleware
+func (siw *ServerInterfaceWrapper) TransitionAccountingReconciliation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "reconciliation_id" -------------
+	var reconciliationId ReconciliationID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "reconciliation_id", r.PathValue("reconciliation_id"), &reconciliationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "reconciliation_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "reconciliation_action" -------------
+	var reconciliationAction TransitionAccountingReconciliationParamsReconciliationAction
+
+	err = runtime.BindStyledParameterWithOptions("simple", "reconciliation_action", r.PathValue("reconciliation_action"), &reconciliationAction, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "reconciliation_action", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params TransitionAccountingReconciliationParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TransitionAccountingReconciliation(w, r, reconciliationId, reconciliationAction, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAccountingReport operation middleware
+func (siw *ServerInterfaceWrapper) GetAccountingReport(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "report" -------------
+	var report GetAccountingReportParamsReport
+
+	err = runtime.BindStyledParameterWithOptions("simple", "report", r.PathValue("report"), &report, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "report", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAccountingReportParams
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "account_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "account_id", r.URL.Query(), &params.AccountId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "account_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "financial_account_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "financial_account_id", r.URL.Query(), &params.FinancialAccountId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "financial_account_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "financial_account_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAccountingReport(w, r, report, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExportAccountingReport operation middleware
+func (siw *ServerInterfaceWrapper) ExportAccountingReport(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "report" -------------
+	var report ExportAccountingReportParamsReport
+
+	err = runtime.BindStyledParameterWithOptions("simple", "report", r.PathValue("report"), &report, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "report", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExportAccountingReportParams
+
+	// ------------- Required query parameter "format" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "format", r.URL.Query(), &params.Format, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "format"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "format", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "account_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "account_id", r.URL.Query(), &params.AccountId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "account_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "financial_account_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "financial_account_id", r.URL.Query(), &params.FinancialAccountId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "financial_account_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "financial_account_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExportAccountingReport(w, r, report, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ImportAccountingStatement operation middleware
+func (siw *ServerInterfaceWrapper) ImportAccountingStatement(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ImportAccountingStatementParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ImportAccountingStatement(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SuggestAccountingMatches operation middleware
+func (siw *ServerInterfaceWrapper) SuggestAccountingMatches(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "statement_import_id" -------------
+	var statementImportId StatementImportID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "statement_import_id", r.PathValue("statement_import_id"), &statementImportId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "statement_import_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SuggestAccountingMatchesParams
+
+	// ------------- Required query parameter "financial_account_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "financial_account_id", r.URL.Query(), &params.FinancialAccountId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "financial_account_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "financial_account_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "max_days" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "max_days", r.URL.Query(), &params.MaxDays, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "max_days"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "max_days", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SuggestAccountingMatches(w, r, statementImportId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAccountingSupplierPayment operation middleware
+func (siw *ServerInterfaceWrapper) CreateAccountingSupplierPayment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAccountingSupplierPaymentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAccountingSupplierPayment(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListAdminTenants operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminTenants(w http.ResponseWriter, r *http.Request) {
@@ -1943,6 +6697,1039 @@ func (siw *ServerInterfaceWrapper) UnarchiveAdminUser(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// RotateFiscalCertificate operation middleware
+func (siw *ServerInterfaceWrapper) RotateFiscalCertificate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RotateFiscalCertificateParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RotateFiscalCertificate(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateFiscalCreditNote operation middleware
+func (siw *ServerInterfaceWrapper) CreateFiscalCreditNote(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateFiscalCreditNoteParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateFiscalCreditNote(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateFiscalDebitNote operation middleware
+func (siw *ServerInterfaceWrapper) CreateFiscalDebitNote(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateFiscalDebitNoteParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateFiscalDebitNote(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetLatestFiscalHomologation operation middleware
+func (siw *ServerInterfaceWrapper) GetLatestFiscalHomologation(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetLatestFiscalHomologation(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetIVASimple operation middleware
+func (siw *ServerInterfaceWrapper) GetIVASimple(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "period" -------------
+	var period string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "period", r.PathValue("period"), &period, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "period", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetIVASimpleParams
+
+	// ------------- Optional query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetIVASimple(w, r, period, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CloseIVASimpleWorkflow operation middleware
+func (siw *ServerInterfaceWrapper) CloseIVASimpleWorkflow(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "period" -------------
+	var period string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "period", r.PathValue("period"), &period, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "period", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CloseIVASimpleWorkflowParams
+
+	// ------------- Required query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CloseIVASimpleWorkflow(w, r, period, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExportIVASimpleWorkflow operation middleware
+func (siw *ServerInterfaceWrapper) ExportIVASimpleWorkflow(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "period" -------------
+	var period string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "period", r.PathValue("period"), &period, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "period", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExportIVASimpleWorkflowParams
+
+	// ------------- Required query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExportIVASimpleWorkflow(w, r, period, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DownloadIVASimpleExport operation middleware
+func (siw *ServerInterfaceWrapper) DownloadIVASimpleExport(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "period" -------------
+	var period string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "period", r.PathValue("period"), &period, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "period", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "export_id" -------------
+	var exportId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "export_id", r.PathValue("export_id"), &exportId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "export_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DownloadIVASimpleExportParams
+
+	// ------------- Required query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DownloadIVASimpleExport(w, r, period, exportId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PrepareIVASimpleWorkflow operation middleware
+func (siw *ServerInterfaceWrapper) PrepareIVASimpleWorkflow(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "period" -------------
+	var period string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "period", r.PathValue("period"), &period, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "period", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PrepareIVASimpleWorkflowParams
+
+	// ------------- Required query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PrepareIVASimpleWorkflow(w, r, period, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReopenIVASimpleWorkflow operation middleware
+func (siw *ServerInterfaceWrapper) ReopenIVASimpleWorkflow(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "period" -------------
+	var period string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "period", r.PathValue("period"), &period, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "period", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReopenIVASimpleWorkflowParams
+
+	// ------------- Required query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReopenIVASimpleWorkflow(w, r, period, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetIVASimpleWorkflow operation middleware
+func (siw *ServerInterfaceWrapper) GetIVASimpleWorkflow(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "period" -------------
+	var period string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "period", r.PathValue("period"), &period, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "period", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetIVASimpleWorkflowParams
+
+	// ------------- Required query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetIVASimpleWorkflow(w, r, period, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListFiscalPointsOfSale operation middleware
+func (siw *ServerInterfaceWrapper) ListFiscalPointsOfSale(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListFiscalPointsOfSale(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateFiscalPointOfSale operation middleware
+func (siw *ServerInterfaceWrapper) CreateFiscalPointOfSale(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateFiscalPointOfSaleParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateFiscalPointOfSale(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EnableFiscalProduction operation middleware
+func (siw *ServerInterfaceWrapper) EnableFiscalProduction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params EnableFiscalProductionParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EnableFiscalProduction(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListFiscalPurchaseVouchers operation middleware
+func (siw *ServerInterfaceWrapper) ListFiscalPurchaseVouchers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListFiscalPurchaseVouchersParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "period" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "period", r.URL.Query(), &params.Period, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "period"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "period", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListFiscalPurchaseVouchers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateFiscalPurchaseVoucher operation middleware
+func (siw *ServerInterfaceWrapper) CreateFiscalPurchaseVoucher(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateFiscalPurchaseVoucherParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateFiscalPurchaseVoucher(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFiscalSettings operation middleware
+func (siw *ServerInterfaceWrapper) GetFiscalSettings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetFiscalSettingsParams
+
+	// ------------- Optional query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFiscalSettings(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateFiscalSettings operation middleware
+func (siw *ServerInterfaceWrapper) UpdateFiscalSettings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateFiscalSettingsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateFiscalSettings(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListFiscalVouchers operation middleware
+func (siw *ServerInterfaceWrapper) ListFiscalVouchers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListFiscalVouchersParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListFiscalVouchers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateFiscalVoucher operation middleware
+func (siw *ServerInterfaceWrapper) CreateFiscalVoucher(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateFiscalVoucherParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateFiscalVoucher(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFiscalVoucher operation middleware
+func (siw *ServerInterfaceWrapper) GetFiscalVoucher(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "voucher_id" -------------
+	var voucherId VoucherID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "voucher_id", r.PathValue("voucher_id"), &voucherId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "voucher_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFiscalVoucher(w, r, voucherId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFiscalVoucherPDF operation middleware
+func (siw *ServerInterfaceWrapper) GetFiscalVoucherPDF(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "voucher_id" -------------
+	var voucherId VoucherID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "voucher_id", r.PathValue("voucher_id"), &voucherId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "voucher_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFiscalVoucherPDF(w, r, voucherId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // UpdateCurrentOrganization operation middleware
 func (siw *ServerInterfaceWrapper) UpdateCurrentOrganization(w http.ResponseWriter, r *http.Request) {
 
@@ -2528,6 +8315,86 @@ func (siw *ServerInterfaceWrapper) UpdateTeamMember(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// GetTeamMemberBusinessPermissions operation middleware
+func (siw *ServerInterfaceWrapper) GetTeamMemberBusinessPermissions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member_id" -------------
+	var memberId MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member_id", r.PathValue("member_id"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTeamMemberBusinessPermissions(w, r, memberId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateTeamMemberBusinessPermissions operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTeamMemberBusinessPermissions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member_id" -------------
+	var memberId MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member_id", r.PathValue("member_id"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateTeamMemberBusinessPermissionsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateTeamMemberBusinessPermissions(w, r, memberId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // TransferOwnership operation middleware
 func (siw *ServerInterfaceWrapper) TransferOwnership(w http.ResponseWriter, r *http.Request) {
 
@@ -2734,11 +8601,71 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/team/members", wrapper.ListTeamMembers)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/team/members/{member_id}", wrapper.RemoveTeamMember)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/team/members/{member_id}", wrapper.UpdateTeamMember)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/team/members/{member_id}/business-permissions", wrapper.GetTeamMemberBusinessPermissions)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/team/members/{member_id}/business-permissions", wrapper.UpdateTeamMemberBusinessPermissions)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/team/ownership-transfer", wrapper.TransferOwnership)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/team/invitations", wrapper.ListTeamInvitations)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/team/invitations", wrapper.CreateTeamInvitation)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/team/invitations/{invitation_id}/resend", wrapper.ResendTeamInvitation)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/team/invitations/{invitation_id}/revoke", wrapper.RevokeTeamInvitation)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/accounts", wrapper.ListAccountingAccounts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/accounts", wrapper.CreateAccountingAccount)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/accounts/{account_id}", wrapper.GetAccountingAccount)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/accounting/accounts/{account_id}", wrapper.UpdateAccountingAccount)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/accounts/{account_id}/{lifecycle_action}", wrapper.TransitionAccountingAccount)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/account-mappings", wrapper.ListAccountingMappings)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/accounting/account-mappings", wrapper.UpdateAccountingMappings)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/drafts", wrapper.ListJournalDrafts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/drafts", wrapper.CreateJournalDraft)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/accounting/drafts/{draft_id}", wrapper.UpdateJournalDraft)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/drafts/{draft_id}/post", wrapper.PostJournalDraft)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/journal-entries", wrapper.ListJournalEntries)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/journal-entries/{entry_id}", wrapper.GetJournalEntry)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/journal-entries/{entry_id}/reverse", wrapper.ReverseJournalEntry)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/open-items", wrapper.ListAccountingOpenItems)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/receipts", wrapper.CreateAccountingReceipt)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/supplier-payments", wrapper.CreateAccountingSupplierPayment)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/periods", wrapper.ListAccountingPeriods)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/periods", wrapper.CreateAccountingPeriod)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/periods/{period_id}/transition", wrapper.TransitionAccountingPeriod)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/periods/{period_id}/annual-close-draft", wrapper.CreateAnnualClosingDraft)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/financial-accounts", wrapper.ListFinancialAccounts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/financial-accounts", wrapper.CreateFinancialAccount)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/accounting/financial-accounts/{financial_account_id}", wrapper.UpdateFinancialAccount)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/statement-imports", wrapper.ImportAccountingStatement)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/statement-imports/{statement_import_id}/suggestions", wrapper.SuggestAccountingMatches)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/reconciliations", wrapper.ListAccountingReconciliations)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/reconciliations", wrapper.CreateAccountingReconciliation)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/reconciliations/{reconciliation_id}", wrapper.GetAccountingReconciliation)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/accounting/reconciliations/{reconciliation_id}", wrapper.UpdateAccountingReconciliation)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/reconciliations/{reconciliation_id}/{reconciliation_action}", wrapper.TransitionAccountingReconciliation)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/reports/{report}", wrapper.GetAccountingReport)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/reports/{report}/export", wrapper.ExportAccountingReport)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/inflation-indices", wrapper.ImportInflationIndices)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/inflation-adjustments", wrapper.PreviewInflationAdjustment)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/currency-revaluations", wrapper.CreateCurrencyRevaluation)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/fiscal/settings", wrapper.GetFiscalSettings)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/fiscal/settings", wrapper.UpdateFiscalSettings)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/fiscal/homologation/latest", wrapper.GetLatestFiscalHomologation)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/fiscal/production/enable", wrapper.EnableFiscalProduction)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/fiscal/certificates", wrapper.RotateFiscalCertificate)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/fiscal/points-of-sale", wrapper.ListFiscalPointsOfSale)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/fiscal/points-of-sale", wrapper.CreateFiscalPointOfSale)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/fiscal/purchase-vouchers", wrapper.ListFiscalPurchaseVouchers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/fiscal/purchase-vouchers", wrapper.CreateFiscalPurchaseVoucher)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/fiscal/vouchers", wrapper.ListFiscalVouchers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/fiscal/vouchers", wrapper.CreateFiscalVoucher)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/fiscal/vouchers/{voucher_id}", wrapper.GetFiscalVoucher)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/fiscal/vouchers/{voucher_id}/pdf", wrapper.GetFiscalVoucherPDF)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/fiscal/credit-notes", wrapper.CreateFiscalCreditNote)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/fiscal/debit-notes", wrapper.CreateFiscalDebitNote)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/fiscal/iva-simple/{period}", wrapper.GetIVASimple)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/fiscal/iva-simple/{period}/workflow", wrapper.GetIVASimpleWorkflow)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/fiscal/iva-simple/{period}/prepare", wrapper.PrepareIVASimpleWorkflow)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/fiscal/iva-simple/{period}/close", wrapper.CloseIVASimpleWorkflow)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/fiscal/iva-simple/{period}/export", wrapper.ExportIVASimpleWorkflow)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/fiscal/iva-simple/{period}/reopen", wrapper.ReopenIVASimpleWorkflow)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/fiscal/iva-simple/{period}/exports/{export_id}", wrapper.DownloadIVASimpleExport)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/webhooks/clerk", wrapper.ReceiveClerkWebhook)
 
 	return m
@@ -2749,90 +8676,248 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"Sf5bm8+c+ybd5qebT/8/AAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

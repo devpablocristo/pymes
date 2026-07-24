@@ -84,7 +84,8 @@ services:
         condition: service_completed_successfully
     volumes:
       - ./backend:/src
-      - pymes_v2_air_iam_worker:/src/tmp
+    tmpfs:
+      - /src/tmp:exec,mode=1777
     profiles: ["iam"]
     init: true
     stop_grace_period: 15s
@@ -117,13 +118,14 @@ services:
         condition: service_completed_successfully
     volumes:
       - ./backend:/src
-      - pymes_v2_air_api:/src/tmp
+    tmpfs:
+      - /src/tmp:exec,mode=1777
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/readyz"]
       interval: 2s
       timeout: 3s
       retries: 30
-      start_period: 2s
+      start_period: 30s
     init: true
     stop_grace_period: 15s
     restart: unless-stopped
@@ -142,6 +144,8 @@ services:
     volumes:
       - ./web:/src
       - pymes_v2_web_node_modules:/src/node_modules
+    tmpfs:
+      - /src/node_modules/.vite-temp:mode=1777
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/healthz"]
       interval: 2s
@@ -152,6 +156,4 @@ services:
 
 volumes:
   pymes_v2_postgres_data:
-  pymes_v2_air_api:
-  pymes_v2_air_iam_worker:
   pymes_v2_web_node_modules:

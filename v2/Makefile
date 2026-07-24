@@ -28,7 +28,7 @@ help:
 
 up:
 	docker compose stop backend web >/dev/null 2>&1 || true
-	docker compose rm -f migrate >/dev/null 2>&1 || true
+	docker compose rm -f db-bootstrap migrate >/dev/null 2>&1 || true
 	docker compose up --build --detach --wait --wait-timeout 180
 
 down:

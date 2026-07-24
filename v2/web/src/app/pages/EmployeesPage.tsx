@@ -125,34 +125,31 @@ export function EmployeesPage({
       <div className="directory-page__content">
         <section className="directory-section">
           <div className="directory-section__heading">
-            <div className="directory-section__title">
-              <EntityLifecycleTabs
-                label="Estado de empleados"
+            <div className="directory-section__controls">
+              <EntityLifecycleBulkToolbar
+                busy={Boolean(busy)}
+                onAction={(action) => void applyLifecycle(action)}
+                onClear={() => setSelectedIds([])}
+                selectedCount={selectedIds.length}
                 state={state}
-                onChange={(nextState) => {
-                  setState(nextState);
-                  setSelectedIds([]);
-                }}
               />
+              <div className="directory-section__filter-group">
+                <SectionSearch
+                  label="Buscar empleados"
+                  placeholder="Buscar empleados…"
+                  value={search}
+                  onChange={setSearch}
+                />
+                <EntityLifecycleTabs
+                  label="Estado de empleados"
+                  state={state}
+                  onChange={(nextState) => {
+                    setState(nextState);
+                    setSelectedIds([]);
+                  }}
+                />
+              </div>
             </div>
-            <div className="directory-section__actions">
-              <SectionSearch
-                label="Buscar empleados"
-                placeholder="Buscar empleados…"
-                value={search}
-                onChange={setSearch}
-              />
-            </div>
-          </div>
-
-          <div className="directory-section__toolbar">
-            <EntityLifecycleBulkToolbar
-              busy={Boolean(busy)}
-              onAction={(action) => void applyLifecycle(action)}
-              onClear={() => setSelectedIds([])}
-              selectedCount={selectedIds.length}
-              state={state}
-            />
           </div>
 
           {error ? (

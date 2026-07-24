@@ -345,64 +345,37 @@ export function AccessManagementPage() {
                 </button>
               ))}
             </nav>
-            <label className="platform-access__search">
-              <span aria-hidden="true">⌕</span>
-              <input
-                aria-label={`Buscar ${tabLabels[activeTab].toLowerCase()}`}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar…"
-                type="search"
-                value={query}
-              />
-            </label>
           </header>
 
           <div className="platform-access__panel">
             <div className="platform-access__heading access-management-page__heading">
-              <div>
-                <h2>{tabLabels[activeTab]}</h2>
+              <div className="directory-section__controls">
                 {selectedResourceState ? (
-                  <>
-                    <EntityLifecycleTabs
-                      label={`Estado de ${tabLabels[activeTab].toLowerCase()}`}
-                      state={selectedResourceState}
-                      onChange={(state) => {
-                        setResourceStates((current) => ({
-                          ...current,
-                          [activeTab]: state,
-                        }));
-                        setSelectedIds((current) => ({
-                          ...current,
-                          [activeTab]: [],
-                        }));
-                      }}
-                    />
-                    <EntityLifecycleBulkToolbar
-                      busy={Boolean(busy)}
-                      editOpen={Boolean(editingTenant)}
-                      onAction={(action) => void applyLifecycle(action)}
-                      onClear={() =>
-                        setSelectedIds((current) => ({
-                          ...current,
-                          [activeTab]: [],
-                        }))
-                      }
-                      onEdit={
-                        activeTab === "tenants" && selectedIds.tenants.length === 1
-                          ? () =>
-                              setEditingTenant(
-                                tenants.find(
-                                  (tenant) => tenant.id === selectedIds.tenants[0],
-                                ),
-                              )
-                          : activeTab === "tenants"
-                            ? () => undefined
-                            : undefined
-                      }
-                      selectedCount={selectedResourceIds.length}
-                      state={selectedResourceState}
-                    />
-                  </>
+                  <EntityLifecycleBulkToolbar
+                    busy={Boolean(busy)}
+                    editOpen={Boolean(editingTenant)}
+                    onAction={(action) => void applyLifecycle(action)}
+                    onClear={() =>
+                      setSelectedIds((current) => ({
+                        ...current,
+                        [activeTab]: [],
+                      }))
+                    }
+                    onEdit={
+                      activeTab === "tenants" && selectedIds.tenants.length === 1
+                        ? () =>
+                            setEditingTenant(
+                              tenants.find(
+                                (tenant) => tenant.id === selectedIds.tenants[0],
+                              ),
+                            )
+                        : activeTab === "tenants"
+                          ? () => undefined
+                          : undefined
+                    }
+                    selectedCount={selectedResourceIds.length}
+                    state={selectedResourceState}
+                  />
                 ) : null}
                 {activeTab === "invitations" ? (
                   <EntitySelectionToolbar
@@ -433,6 +406,34 @@ export function AccessManagementPage() {
                     selectedCount={selectedInvitationIds.length}
                   />
                 ) : null}
+                <div className="directory-section__filter-group">
+                  <label className="platform-access__search">
+                    <span aria-hidden="true">⌕</span>
+                    <input
+                      aria-label={`Buscar ${tabLabels[activeTab].toLowerCase()}`}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Buscar…"
+                      type="search"
+                      value={query}
+                    />
+                  </label>
+                  {selectedResourceState ? (
+                    <EntityLifecycleTabs
+                      label={`Estado de ${tabLabels[activeTab].toLowerCase()}`}
+                      state={selectedResourceState}
+                      onChange={(state) => {
+                        setResourceStates((current) => ({
+                          ...current,
+                          [activeTab]: state,
+                        }));
+                        setSelectedIds((current) => ({
+                          ...current,
+                          [activeTab]: [],
+                        }));
+                      }}
+                    />
+                  ) : null}
+                </div>
               </div>
             </div>
 

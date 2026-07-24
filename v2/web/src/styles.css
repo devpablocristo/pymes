@@ -721,6 +721,39 @@ body {
   text-align: center;
 }
 
+.directory-empty strong,
+.directory-empty span {
+  display: block;
+}
+
+.directory-empty strong {
+  margin-bottom: 0.35rem;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.directory-empty span {
+  font-size: var(--text-xs);
+}
+
+.directory-section__toolbar {
+  min-height: 2.4rem;
+  display: flex;
+  align-items: center;
+}
+
+.employees-page .entity-bulk-toolbar {
+  width: 100%;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.employees-page .entity-bulk-toolbar__buttons {
+  width: auto;
+}
+
 .employees-page .directory-table__primary {
   font-weight: 700;
 }

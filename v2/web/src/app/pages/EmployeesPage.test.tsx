@@ -51,7 +51,9 @@ test("uses row selection and one bulk lifecycle toolbar", async () => {
   expect(
     screen.queryByRole("columnheader", { name: "Acciones" }),
   ).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Archivar" })).toBeDisabled();
   await user.click(screen.getByRole("checkbox", { name: "Seleccionar Marina Sur" }));
+  expect(screen.getByText("1 seleccionado")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Archivar" }));
 
   expect(onLifecycle).toHaveBeenCalledWith(

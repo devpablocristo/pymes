@@ -126,7 +126,6 @@ export function EmployeesPage({
         <section className="directory-section">
           <div className="directory-section__heading">
             <div className="directory-section__title">
-              <h2>{t("nav.employees")}</h2>
               <EntityLifecycleTabs
                 label="Estado de empleados"
                 state={state}
@@ -135,16 +134,6 @@ export function EmployeesPage({
                   setSelectedIds([]);
                 }}
               />
-              <EntityLifecycleBulkToolbar
-                busy={Boolean(busy)}
-                onAction={(action) => void applyLifecycle(action)}
-                onClear={() => setSelectedIds([])}
-                selectedCount={selectedIds.length}
-                state={state}
-              />
-              <span className="settings-count" aria-label="Cantidad de empleados">
-                {visibleEmployees.length}
-              </span>
             </div>
             <div className="directory-section__actions">
               <SectionSearch
@@ -154,6 +143,16 @@ export function EmployeesPage({
                 onChange={setSearch}
               />
             </div>
+          </div>
+
+          <div className="directory-section__toolbar">
+            <EntityLifecycleBulkToolbar
+              busy={Boolean(busy)}
+              onAction={(action) => void applyLifecycle(action)}
+              onClear={() => setSelectedIds([])}
+              selectedCount={selectedIds.length}
+              state={state}
+            />
           </div>
 
           {error ? (
@@ -213,9 +212,16 @@ export function EmployeesPage({
                 {visibleEmployees.length === 0 ? (
                   <tr>
                     <td className="directory-empty" colSpan={7}>
-                      {items.length === 0
-                        ? "No hay empleados cargados."
-                        : "No hay empleados que coincidan con la búsqueda."}
+                      <strong>
+                        {items.length === 0
+                          ? "Todavía no hay empleados"
+                          : "No encontramos empleados"}
+                      </strong>
+                      <span>
+                        {items.length === 0
+                          ? "Cuando agregues empleados, aparecerán en esta lista."
+                          : "Probá con otra búsqueda o cambiá el estado seleccionado."}
+                      </span>
                     </td>
                   </tr>
                 ) : null}

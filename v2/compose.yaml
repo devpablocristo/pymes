@@ -14,7 +14,13 @@ services:
       - ./db/dev/bootstrap-roles.sql:/docker-entrypoint-initdb.d/05-bootstrap-roles.sql:ro
       - ./db/dev/init-test-database.sql:/docker-entrypoint-initdb.d/10-test-database.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pymes -d pymes_v2"]
+      test:
+        - CMD-SHELL
+        - >-
+          pg_isready -U pymes -d pymes_v2
+          && psql -U pymes -d pymes_v2 -tAc
+          "SELECT 1 FROM pg_database WHERE datname = 'pymes_v2_test'"
+          | grep -qx 1
       interval: 2s
       timeout: 3s
       retries: 15

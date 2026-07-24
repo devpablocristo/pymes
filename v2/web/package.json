@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@clerk/react": "6.12.6",
+    "@devpablocristo/platform-access-management": "0.1.0",
     "@devpablocristo/platform-browser": "0.2.1",
     "@devpablocristo/platform-http": "0.3.0",
     "@devpablocristo/platform-lifecycle": "0.1.1",

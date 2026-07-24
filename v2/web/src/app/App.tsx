@@ -1,8 +1,8 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ActiveOrganizationGuard, GlobalOwnerGuard, SignedInGuard } from "./guards/AuthGuards";
-import { AdminTenantsPage } from "./pages/AdminTenantsPage";
-import { AdminUsersPage } from "./pages/AdminUsersPage";
+import { AccessManagementPage } from "./pages/AccessManagementPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { EmployeesPage } from "./pages/EmployeesPage";
 import { NoAccessPage } from "./pages/NoAccessPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { OrganizationSettingsPage } from "./pages/OrganizationSettingsPage";
@@ -23,12 +23,14 @@ export function App() {
         <Route element={<ProductShell />}>
           <Route path="/settings/sessions" element={<SessionsPage />} />
           <Route element={<GlobalOwnerGuard />}>
-            <Route path="/admin/tenants" element={<AdminTenantsPage />} />
-            <Route path="/admin/users" element={<AdminUsersPage />} />
+            <Route path="/admin/users" element={<AccessManagementPage />} />
+            <Route path="/admin/tenants" element={<Navigate replace to="/admin/users" />} />
+            <Route path="/admin/invitations" element={<Navigate replace to="/admin/users" />} />
           </Route>
           <Route element={<ActiveOrganizationGuard />}>
             <Route index element={<Navigate replace to="/dashboard" />} />
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/employees" element={<EmployeesPage />} />
             <Route path="/settings/organization" element={<OrganizationSettingsPage />} />
             <Route path="/settings/team" element={<TeamPage />} />
           </Route>

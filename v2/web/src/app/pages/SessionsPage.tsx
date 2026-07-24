@@ -4,6 +4,7 @@ import { createIdempotencyKey } from "../../api/idempotency";
 import { useProductApi } from "../../api/ProductApiContext";
 import { useProductAuth } from "../../auth/AuthContext";
 import { useI18n } from "../providers/I18nProvider";
+import { SectionHeader, SectionSearch } from "../shell/SectionChrome";
 
 type SessionList = components["schemas"]["SessionList"];
 type DeviceSession = components["schemas"]["DeviceSession"];
@@ -16,6 +17,7 @@ export function SessionsPage() {
   const [error, setError] = useState<string>();
   const [revision, setRevision] = useState(0);
   const [revoking, setRevoking] = useState<string>();
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -25,7 +27,9 @@ export function SessionsPage() {
         signal: controller.signal,
         skipJSONContentType: true,
       })
-      .then((response) => setSessions(response.items))
+      .then((response) =>
+        setSessions(response.items.filter((session) => session.status === "active")),
+      )
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
         setError(cause instanceof Error ? cause.message : t("sessions.loadError"));
@@ -41,6 +45,19 @@ export function SessionsPage() {
       }),
     [language],
   );
+  const visibleSessions = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase(language === "es" ? "es" : "en");
+    if (!query) return sessions;
+    return sessions?.filter((session) =>
+      [
+        session.id,
+        session.status,
+        session.current ? t("sessions.current") : t("sessions.other"),
+        formatter.format(new Date(session.last_active_at)),
+        formatter.format(new Date(session.expires_at)),
+      ].some((value) => value.toLocaleLowerCase(language === "es" ? "es" : "en").includes(query)),
+    );
+  }, [formatter, language, search, sessions, t]);
 
   async function revoke(session: DeviceSession) {
     setRevoking(session.id);
@@ -67,19 +84,22 @@ export function SessionsPage() {
 
   return (
     <div className="settings-page">
-      <header className="page-topbar">
-        <div>
-          <h1>{t("sessions.title")}</h1>
-          <small>{t("settings.eyebrow")}</small>
-        </div>
-      </header>
+      <SectionHeader title={t("sessions.title")} subtitle={t("settings.eyebrow")} />
       <div className="settings-canvas">
         <div className="settings-heading">
           <div>
             <h2>{t("sessions.heading")}</h2>
             <p>{t("sessions.description")}</p>
           </div>
-          <span className="settings-count">{sessions?.length ?? "—"}</span>
+          <div className="settings-heading__actions">
+            <SectionSearch
+              label={`${t("nav.search")} ${t("sessions.title")}`}
+              placeholder={`${t("nav.search")}…`}
+              value={search}
+              onChange={setSearch}
+            />
+            <span className="settings-count">{visibleSessions?.length ?? "—"}</span>
+          </div>
         </div>
 
         {error ? (
@@ -100,16 +120,16 @@ export function SessionsPage() {
           </div>
         ) : null}
 
-        {sessions?.length === 0 ? (
+        {visibleSessions?.length === 0 ? (
           <div className="inline-state">
-            <strong>{t("sessions.emptyTitle")}</strong>
-            <span>{t("sessions.emptyBody")}</span>
+            <strong>{search ? t("shell.noResults") : t("sessions.emptyTitle")}</strong>
+            <span>{search ? t("nav.search") : t("sessions.emptyBody")}</span>
           </div>
         ) : null}
 
-        {sessions && sessions.length > 0 ? (
+        {visibleSessions && visibleSessions.length > 0 ? (
           <div className="settings-list">
-            {sessions.map((session) => (
+            {visibleSessions.map((session) => (
               <article className="settings-row" key={session.id}>
                 <span className="settings-row__icon" aria-hidden="true">
                   {session.current ? "●" : "○"}

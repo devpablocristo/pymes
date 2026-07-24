@@ -93,9 +93,22 @@ test("redirects home into the product console with one main landmark", async () 
   expect(window.location.pathname).toBe("/dashboard");
   expect(document.querySelectorAll("main")).toHaveLength(1);
   expect(screen.getByRole("link", { name: "Inicio" })).toHaveAttribute("aria-current", "page");
+  expect(screen.getByRole("link", { name: "Empleados" })).toHaveAttribute(
+    "href",
+    "/employees",
+  );
   expect(screen.getByText("Comercio Norte")).toBeInTheDocument();
   expect(screen.getByText("Ana Pérez")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Cerrar sesión" }));
+  expect(screen.queryByRole("link", { name: "Tenants" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Organización" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Equipo" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Sesiones" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Abrir menú de usuario" }));
+  expect(screen.getByRole("menuitem", { name: "Sesiones" })).toHaveAttribute(
+    "href",
+    "/settings/sessions",
+  );
+  fireEvent.click(screen.getByRole("menuitem", { name: "Cerrar sesión" }));
   expect(authValue.signOut).toHaveBeenCalledOnce();
   expect(screen.queryByText("Clientes")).not.toBeInTheDocument();
 });
@@ -153,7 +166,7 @@ test("sends a signed-in user without organizations to no access", async () => {
   expect(window.location.pathname).toBe("/no-access");
 });
 
-test("sends a global owner without organizations to tenant administration", async () => {
+test("sends a global owner without organizations to access administration", async () => {
   renderApp(
     createAuthValue({
       activeOrganizationId: undefined,
@@ -163,9 +176,9 @@ test("sends a global owner without organizations to tenant administration", asyn
   );
 
   expect(
-    await screen.findByRole("heading", { name: "Tenants" }),
+    await screen.findByRole("heading", { name: "Usuarios y Tenants" }),
   ).toBeInTheDocument();
-  expect(window.location.pathname).toBe("/admin/tenants");
+  expect(window.location.pathname).toBe("/admin/users");
 });
 
 test("automatically activates the only available organization", async () => {
@@ -235,8 +248,9 @@ test("persists language and theme through platform-browser", async () => {
   const firstRender = renderApp();
   await screen.findByRole("heading", { name: "Inicio" });
 
-  await user.click(screen.getByRole("button", { name: "Usar tema oscuro" }));
-  await user.click(screen.getByRole("button", { name: "Cambiar idioma" }));
+  await user.click(screen.getByRole("button", { name: "Abrir menú de usuario" }));
+  await user.click(screen.getByRole("menuitem", { name: "Usar tema oscuro" }));
+  await user.click(screen.getByRole("menuitem", { name: "Cambiar idioma" }));
 
   expect(document.documentElement).toHaveAttribute("data-theme", "dark");
   expect(document.documentElement).toHaveAttribute("lang", "en-US");
@@ -247,7 +261,8 @@ test("persists language and theme through platform-browser", async () => {
   renderApp();
 
   expect(await screen.findByRole("heading", { name: "Home" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Use light theme" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Open user menu" }));
+  expect(screen.getByRole("menuitem", { name: "Use light theme" })).toBeInTheDocument();
 });
 
 test("renders a useful 404 inside the console", async () => {

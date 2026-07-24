@@ -1,4 +1,5 @@
 import { useI18n } from "../providers/I18nProvider";
+import { SectionHeader } from "../shell/SectionChrome";
 import { EmptyState } from "../states/ContentStates";
 
 export function DashboardPage() {
@@ -6,16 +7,7 @@ export function DashboardPage() {
 
   return (
     <div className="dashboard-page">
-      <header className="page-topbar">
-        <div>
-          <h1>{t("dashboard.eyebrow")}</h1>
-          <small>Dashboard</small>
-        </div>
-        <span className="readiness-tag">
-          <span aria-hidden="true" />
-          {t("dashboard.emptyTag")}
-        </span>
-      </header>
+      <SectionHeader title={t("dashboard.eyebrow")} subtitle="Dashboard" />
 
       <div className="dashboard-canvas">
         <div className="dashboard-canvas__header">

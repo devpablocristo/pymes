@@ -50,6 +50,7 @@ function createAuthValue(overrides: Partial<AuthContextValue> = {}): AuthContext
     setActiveOrganization: vi.fn(async () => undefined),
     signOut: vi.fn(async () => undefined),
     ...overrides,
+    productRole: overrides.productRole ?? "owner",
   };
 }
 
@@ -140,6 +141,7 @@ test("sends a signed-in user without organizations to no access", async () => {
     createAuthValue({
       activeOrganizationId: undefined,
       organizations: [],
+      productRole: "user",
     }),
   );
 
@@ -149,6 +151,21 @@ test("sends a signed-in user without organizations to no access", async () => {
     }),
   ).toBeInTheDocument();
   expect(window.location.pathname).toBe("/no-access");
+});
+
+test("sends a global owner without organizations to tenant administration", async () => {
+  renderApp(
+    createAuthValue({
+      activeOrganizationId: undefined,
+      organizations: [],
+      productRole: "owner",
+    }),
+  );
+
+  expect(
+    await screen.findByRole("heading", { name: "Tenants" }),
+  ).toBeInTheDocument();
+  expect(window.location.pathname).toBe("/admin/tenants");
 });
 
 test("automatically activates the only available organization", async () => {

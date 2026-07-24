@@ -13,6 +13,7 @@ import (
 	platformidempotency "github.com/devpablocristo/platform/idempotency/go"
 	platformoutbox "github.com/devpablocristo/platform/outbox/go"
 	clerkadapter "github.com/devpablocristo/platform/sdks/clerk/go"
+	"github.com/devpablocristo/pymes/v2/backend/internal/administration"
 	"github.com/devpablocristo/pymes/v2/backend/internal/config"
 	"github.com/devpablocristo/pymes/v2/backend/internal/httpserver"
 	productiam "github.com/devpablocristo/pymes/v2/backend/internal/iam"
@@ -63,7 +64,6 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 		database.Close()
 		return nil, fmt.Errorf("configure IAM outbox: %w", err)
 	}
-
 	var verifier *clerkadapter.SessionVerifier
 	var clerkClient *clerkadapter.Client
 	var webhookVerifier *clerkadapter.WebhookVerifier
@@ -88,6 +88,20 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 			database.Close()
 			return nil, fmt.Errorf("configure Clerk webhook verifier: %w", err)
 		}
+	}
+	var administrationService *administration.Service
+	if clerkClient != nil {
+		var administrationProvider *administration.ClerkAdapter
+		administrationProvider, err = administration.NewClerkAdapter(clerkClient)
+		if err == nil {
+			administrationService, err = administration.NewService(database.Pool(), administrationProvider)
+		}
+	} else {
+		administrationService, err = administration.NewService(database.Pool())
+	}
+	if err != nil {
+		database.Close()
+		return nil, fmt.Errorf("configure administration service: %w", err)
 	}
 
 	var iamIdempotency *httpserver.IAMIdempotency
@@ -129,6 +143,7 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 					WebhookVerifier:       webhookVerifier,
 					WebhookInbox:          iamStore,
 					OutboxAppender:        outboxStore,
+					Administration:        administrationService,
 				}),
 				iamIdempotency,
 			),

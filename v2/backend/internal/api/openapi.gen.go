@@ -64,6 +64,27 @@ func (e InvitationStatus) Valid() bool {
 	}
 }
 
+// Defines values for LifecycleState.
+const (
+	LifecycleStateActive   LifecycleState = "active"
+	LifecycleStateArchived LifecycleState = "archived"
+	LifecycleStateTrashed  LifecycleState = "trashed"
+)
+
+// Valid indicates whether the value is a known member of the LifecycleState enum.
+func (e LifecycleState) Valid() bool {
+	switch e {
+	case LifecycleStateActive:
+		return true
+	case LifecycleStateArchived:
+		return true
+	case LifecycleStateTrashed:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MembershipStatus.
 const (
 	MembershipStatusActive      MembershipStatus = "active"
@@ -114,15 +135,14 @@ func (e OrganizationStatus) Valid() bool {
 
 // Defines values for Permission.
 const (
-	OrganizationUpdate    Permission = "organization:update"
-	OrganizationView      Permission = "organization:view"
-	SessionsManageSelf    Permission = "sessions:manage:self"
-	TeamInvitationCreate  Permission = "team:invitation:create"
-	TeamInvitationManage  Permission = "team:invitation:manage"
-	TeamMemberRemove      Permission = "team:member:remove"
-	TeamMemberUpdate      Permission = "team:member:update"
-	TeamOwnershipTransfer Permission = "team:ownership:transfer"
-	TeamView              Permission = "team:view"
+	OrganizationUpdate   Permission = "organization:update"
+	OrganizationView     Permission = "organization:view"
+	SessionsManageSelf   Permission = "sessions:manage:self"
+	TeamInvitationCreate Permission = "team:invitation:create"
+	TeamInvitationManage Permission = "team:invitation:manage"
+	TeamMemberRemove     Permission = "team:member:remove"
+	TeamMemberUpdate     Permission = "team:member:update"
+	TeamView             Permission = "team:view"
 )
 
 // Valid indicates whether the value is a known member of the Permission enum.
@@ -142,9 +162,25 @@ func (e Permission) Valid() bool {
 		return true
 	case TeamMemberUpdate:
 		return true
-	case TeamOwnershipTransfer:
-		return true
 	case TeamView:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProductRole.
+const (
+	ProductRoleOwner ProductRole = "owner"
+	ProductRoleUser  ProductRole = "user"
+)
+
+// Valid indicates whether the value is a known member of the ProductRole enum.
+func (e ProductRole) Valid() bool {
+	switch e {
+	case ProductRoleOwner:
+		return true
+	case ProductRoleUser:
 		return true
 	default:
 		return false
@@ -247,14 +283,111 @@ func (e SyncStatus) Valid() bool {
 	}
 }
 
-// AssignableRole Roles administrables mediante invitación o edición. `owner` sólo se obtiene con el comando atómico de transferencia de propiedad.
+// Defines values for UserStatus.
+const (
+	UserStatusActive   UserStatus = "active"
+	UserStatusDisabled UserStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the UserStatus enum.
+func (e UserStatus) Valid() bool {
+	switch e {
+	case UserStatusActive:
+		return true
+	case UserStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// AdminMembership defines model for AdminMembership.
+type AdminMembership struct {
+	Id openapi_types.UUID `json:"id"`
+
+	// Role Rol efectivo; `owner` es global y las membresías tenant usan `admin|member`.
+	Role       Role               `json:"role"`
+	Status     MembershipStatus   `json:"status"`
+	TenantId   openapi_types.UUID `json:"tenant_id"`
+	TenantName string             `json:"tenant_name"`
+}
+
+// AdminTenant defines model for AdminTenant.
+type AdminTenant struct {
+	ArchivedAt *time.Time         `json:"archived_at,omitempty"`
+	CreatedAt  time.Time          `json:"created_at"`
+	Id         openapi_types.UUID `json:"id"`
+
+	// LifecycleState Estado canónico administrado por Platform lifecycle.
+	LifecycleState LifecycleState     `json:"lifecycle_state"`
+	Name           string             `json:"name"`
+	PurgeAfter     *time.Time         `json:"purge_after,omitempty"`
+	Slug           string             `json:"slug"`
+	Status         OrganizationStatus `json:"status"`
+	SyncStatus     SyncStatus         `json:"sync_status"`
+	TrashedAt      *time.Time         `json:"trashed_at,omitempty"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+}
+
+// AdminTenantList defines model for AdminTenantList.
+type AdminTenantList struct {
+	Items []AdminTenant `json:"items"`
+	Page  PageInfo      `json:"page"`
+}
+
+// AdminUser defines model for AdminUser.
+type AdminUser struct {
+	ArchivedAt    *time.Time          `json:"archived_at,omitempty"`
+	AvatarUrl     *string             `json:"avatar_url,omitempty"`
+	CreatedAt     time.Time           `json:"created_at"`
+	DisplayName   string              `json:"display_name"`
+	Email         openapi_types.Email `json:"email"`
+	EmailVerified bool                `json:"email_verified"`
+	Id            openapi_types.UUID  `json:"id"`
+
+	// LifecycleState Estado canónico administrado por Platform lifecycle.
+	LifecycleState LifecycleState    `json:"lifecycle_state"`
+	Memberships    []AdminMembership `json:"memberships"`
+
+	// ProductRole Rol global del producto; `owner` tiene autoridad sobre todos los tenants y usuarios.
+	ProductRole ProductRole `json:"product_role"`
+	PurgeAfter  *time.Time  `json:"purge_after,omitempty"`
+	Status      UserStatus  `json:"status"`
+	TrashedAt   *time.Time  `json:"trashed_at,omitempty"`
+	UpdatedAt   time.Time   `json:"updated_at"`
+	Version     int64       `json:"version"`
+}
+
+// AdminUserList defines model for AdminUserList.
+type AdminUserList struct {
+	Items []AdminUser `json:"items"`
+	Page  PageInfo    `json:"page"`
+}
+
+// AssignableRole Roles administrables dentro de un tenant. `owner` es un rol global del producto y no forma parte de una membresía.
 type AssignableRole string
+
+// CreateAdminTenantInput defines model for CreateAdminTenantInput.
+type CreateAdminTenantInput struct {
+	AdminEmail openapi_types.Email `json:"admin_email"`
+	Name       string              `json:"name"`
+	Slug       string              `json:"slug"`
+}
+
+// CreateAdminUserInput defines model for CreateAdminUserInput.
+type CreateAdminUserInput struct {
+	Email openapi_types.Email `json:"email"`
+
+	// Role Rol efectivo; `owner` es global y las membresías tenant usan `admin|member`.
+	Role     Role               `json:"role"`
+	TenantId openapi_types.UUID `json:"tenant_id"`
+}
 
 // CreateInvitationInput defines model for CreateInvitationInput.
 type CreateInvitationInput struct {
 	Email openapi_types.Email `json:"email"`
 
-	// Role Roles administrables mediante invitación o edición. `owner` sólo se obtiene con el comando atómico de transferencia de propiedad.
+	// Role Roles administrables dentro de un tenant. `owner` es un rol global del producto y no forma parte de una membresía.
 	Role AssignableRole `json:"role"`
 }
 
@@ -298,7 +431,9 @@ type Invitation struct {
 	Email     openapi_types.Email `json:"email"`
 	ExpiresAt time.Time           `json:"expires_at"`
 	Id        openapi_types.UUID  `json:"id"`
-	Role      Role                `json:"role"`
+
+	// Role Rol efectivo; `owner` es global y las membresías tenant usan `admin|member`.
+	Role Role `json:"role"`
 
 	// Status Ciclo de vida local; el estado de sincronización se expone por separado.
 	Status     InvitationStatus `json:"status"`
@@ -314,13 +449,23 @@ type InvitationList struct {
 // InvitationStatus Ciclo de vida local; el estado de sincronización se expone por separado.
 type InvitationStatus string
 
+// LifecycleCommandInput defines model for LifecycleCommandInput.
+type LifecycleCommandInput struct {
+	Reason *string `json:"reason,omitempty"`
+}
+
+// LifecycleState Estado canónico administrado por Platform lifecycle.
+type LifecycleState string
+
 // Member defines model for Member.
 type Member struct {
-	Id         openapi_types.UUID `json:"id"`
-	Role       Role               `json:"role"`
-	Status     MembershipStatus   `json:"status"`
-	SyncStatus SyncStatus         `json:"sync_status"`
-	User       User               `json:"user"`
+	Id openapi_types.UUID `json:"id"`
+
+	// Role Rol efectivo; `owner` es global y las membresías tenant usan `admin|member`.
+	Role       Role             `json:"role"`
+	Status     MembershipStatus `json:"status"`
+	SyncStatus SyncStatus       `json:"sync_status"`
+	User       User             `json:"user"`
 }
 
 // MemberList defines model for MemberList.
@@ -360,6 +505,9 @@ type Organization struct {
 type OrganizationList struct {
 	Items []Organization `json:"items"`
 	Page  PageInfo       `json:"page"`
+
+	// ProductRole Rol global del producto; `owner` tiene autoridad sobre todos los tenants y usuarios.
+	ProductRole ProductRole `json:"product_role"`
 }
 
 // OrganizationStatus defines model for OrganizationStatus.
@@ -374,7 +522,10 @@ type PageInfo struct {
 // Permission Permiso IAM efectivo derivado del rol efectivo.
 type Permission string
 
-// Role defines model for Role.
+// ProductRole Rol global del producto; `owner` tiene autoridad sobre todos los tenants y usuarios.
+type ProductRole string
+
+// Role Rol efectivo; `owner` es global y las membresías tenant usan `admin|member`.
 type Role string
 
 // RuntimeConfig defines model for RuntimeConfig.
@@ -408,9 +559,25 @@ type TransferOwnershipInput struct {
 	MemberId openapi_types.UUID `json:"member_id"`
 }
 
+// UpdateAdminTenantInput defines model for UpdateAdminTenantInput.
+type UpdateAdminTenantInput struct {
+	Name *string `json:"name,omitempty"`
+	Slug *string `json:"slug,omitempty"`
+}
+
+// UpdateAdminUserInput defines model for UpdateAdminUserInput.
+type UpdateAdminUserInput struct {
+	DisplayName *string              `json:"display_name,omitempty"`
+	Email       *openapi_types.Email `json:"email,omitempty"`
+
+	// ProductRole Rol global del producto; `owner` tiene autoridad sobre todos los tenants y usuarios.
+	ProductRole *ProductRole `json:"product_role,omitempty"`
+	Version     int64        `json:"version"`
+}
+
 // UpdateMemberInput defines model for UpdateMemberInput.
 type UpdateMemberInput struct {
-	// Role Roles administrables mediante invitación o edición. `owner` sólo se obtiene con el comando atómico de transferencia de propiedad.
+	// Role Roles administrables dentro de un tenant. `owner` es un rol global del producto y no forma parte de una membresía.
 	Role AssignableRole `json:"role"`
 }
 
@@ -426,6 +593,9 @@ type User struct {
 	Email       openapi_types.Email `json:"email"`
 	Id          openapi_types.UUID  `json:"id"`
 }
+
+// UserStatus defines model for UserStatus.
+type UserStatus string
 
 // Cursor defines model for Cursor.
 type Cursor = string
@@ -445,6 +615,12 @@ type MemberID = openapi_types.UUID
 // SessionID defines model for SessionID.
 type SessionID = string
 
+// TenantID defines model for TenantID.
+type TenantID = openapi_types.UUID
+
+// UserID defines model for UserID.
+type UserID = openapi_types.UUID
+
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorResponse
 
@@ -453,6 +629,9 @@ type Conflict = ErrorResponse
 
 // Forbidden defines model for Forbidden.
 type Forbidden = ErrorResponse
+
+// NotFound defines model for NotFound.
+type NotFound = ErrorResponse
 
 // RateLimited defines model for RateLimited.
 type RateLimited = ErrorResponse
@@ -471,6 +650,97 @@ type WebhookUnauthorized = ErrorResponse
 
 // WebhookUnavailable defines model for WebhookUnavailable.
 type WebhookUnavailable = ErrorResponse
+
+// LifecycleCommand defines model for LifecycleCommand.
+type LifecycleCommand = LifecycleCommandInput
+
+// ListAdminTenantsParams defines parameters for ListAdminTenants.
+type ListAdminTenantsParams struct {
+	Cursor         *Cursor             `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit          *Limit              `form:"limit,omitempty" json:"limit,omitempty"`
+	Status         *OrganizationStatus `form:"status,omitempty" json:"status,omitempty"`
+	LifecycleState *LifecycleState     `form:"lifecycle_state,omitempty" json:"lifecycle_state,omitempty"`
+	Query          *string             `form:"query,omitempty" json:"query,omitempty"`
+}
+
+// CreateAdminTenantParams defines parameters for CreateAdminTenant.
+type CreateAdminTenantParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UpdateAdminTenantParams defines parameters for UpdateAdminTenant.
+type UpdateAdminTenantParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ArchiveAdminTenantParams defines parameters for ArchiveAdminTenant.
+type ArchiveAdminTenantParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// PurgeAdminTenantParams defines parameters for PurgeAdminTenant.
+type PurgeAdminTenantParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// RestoreAdminTenantParams defines parameters for RestoreAdminTenant.
+type RestoreAdminTenantParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// TrashAdminTenantParams defines parameters for TrashAdminTenant.
+type TrashAdminTenantParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UnarchiveAdminTenantParams defines parameters for UnarchiveAdminTenant.
+type UnarchiveAdminTenantParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListAdminUsersParams defines parameters for ListAdminUsers.
+type ListAdminUsersParams struct {
+	Cursor         *Cursor         `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit          *Limit          `form:"limit,omitempty" json:"limit,omitempty"`
+	Status         *UserStatus     `form:"status,omitempty" json:"status,omitempty"`
+	LifecycleState *LifecycleState `form:"lifecycle_state,omitempty" json:"lifecycle_state,omitempty"`
+	Query          *string         `form:"query,omitempty" json:"query,omitempty"`
+}
+
+// CreateAdminUserParams defines parameters for CreateAdminUser.
+type CreateAdminUserParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UpdateAdminUserParams defines parameters for UpdateAdminUser.
+type UpdateAdminUserParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ArchiveAdminUserParams defines parameters for ArchiveAdminUser.
+type ArchiveAdminUserParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// PurgeAdminUserParams defines parameters for PurgeAdminUser.
+type PurgeAdminUserParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// RestoreAdminUserParams defines parameters for RestoreAdminUser.
+type RestoreAdminUserParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// TrashAdminUserParams defines parameters for TrashAdminUser.
+type TrashAdminUserParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UnarchiveAdminUserParams defines parameters for UnarchiveAdminUser.
+type UnarchiveAdminUserParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
 
 // UpdateCurrentOrganizationParams defines parameters for UpdateCurrentOrganization.
 type UpdateCurrentOrganizationParams struct {
@@ -540,6 +810,48 @@ type TransferOwnershipParams struct {
 // ReceiveClerkWebhookJSONBody defines parameters for ReceiveClerkWebhook.
 type ReceiveClerkWebhookJSONBody map[string]interface{}
 
+// CreateAdminTenantJSONRequestBody defines body for CreateAdminTenant for application/json ContentType.
+type CreateAdminTenantJSONRequestBody = CreateAdminTenantInput
+
+// UpdateAdminTenantJSONRequestBody defines body for UpdateAdminTenant for application/json ContentType.
+type UpdateAdminTenantJSONRequestBody = UpdateAdminTenantInput
+
+// ArchiveAdminTenantJSONRequestBody defines body for ArchiveAdminTenant for application/json ContentType.
+type ArchiveAdminTenantJSONRequestBody = LifecycleCommandInput
+
+// PurgeAdminTenantJSONRequestBody defines body for PurgeAdminTenant for application/json ContentType.
+type PurgeAdminTenantJSONRequestBody = LifecycleCommandInput
+
+// RestoreAdminTenantJSONRequestBody defines body for RestoreAdminTenant for application/json ContentType.
+type RestoreAdminTenantJSONRequestBody = LifecycleCommandInput
+
+// TrashAdminTenantJSONRequestBody defines body for TrashAdminTenant for application/json ContentType.
+type TrashAdminTenantJSONRequestBody = LifecycleCommandInput
+
+// UnarchiveAdminTenantJSONRequestBody defines body for UnarchiveAdminTenant for application/json ContentType.
+type UnarchiveAdminTenantJSONRequestBody = LifecycleCommandInput
+
+// CreateAdminUserJSONRequestBody defines body for CreateAdminUser for application/json ContentType.
+type CreateAdminUserJSONRequestBody = CreateAdminUserInput
+
+// UpdateAdminUserJSONRequestBody defines body for UpdateAdminUser for application/json ContentType.
+type UpdateAdminUserJSONRequestBody = UpdateAdminUserInput
+
+// ArchiveAdminUserJSONRequestBody defines body for ArchiveAdminUser for application/json ContentType.
+type ArchiveAdminUserJSONRequestBody = LifecycleCommandInput
+
+// PurgeAdminUserJSONRequestBody defines body for PurgeAdminUser for application/json ContentType.
+type PurgeAdminUserJSONRequestBody = LifecycleCommandInput
+
+// RestoreAdminUserJSONRequestBody defines body for RestoreAdminUser for application/json ContentType.
+type RestoreAdminUserJSONRequestBody = LifecycleCommandInput
+
+// TrashAdminUserJSONRequestBody defines body for TrashAdminUser for application/json ContentType.
+type TrashAdminUserJSONRequestBody = LifecycleCommandInput
+
+// UnarchiveAdminUserJSONRequestBody defines body for UnarchiveAdminUser for application/json ContentType.
+type UnarchiveAdminUserJSONRequestBody = LifecycleCommandInput
+
 // UpdateCurrentOrganizationJSONRequestBody defines body for UpdateCurrentOrganization for application/json ContentType.
 type UpdateCurrentOrganizationJSONRequestBody = UpdateOrganizationInput
 
@@ -550,6 +862,8 @@ type CreateTeamInvitationJSONRequestBody = CreateInvitationInput
 type UpdateTeamMemberJSONRequestBody = UpdateMemberInput
 
 // TransferOwnershipJSONRequestBody defines body for TransferOwnership for application/json ContentType.
+//
+// Deprecated: this type has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 type TransferOwnershipJSONRequestBody = TransferOwnershipInput
 
 // ReceiveClerkWebhookJSONRequestBody defines body for ReceiveClerkWebhook for application/json ContentType.
@@ -557,6 +871,60 @@ type ReceiveClerkWebhookJSONRequestBody ReceiveClerkWebhookJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+
+	// (GET /api/v1/admin/tenants)
+	ListAdminTenants(w http.ResponseWriter, r *http.Request, params ListAdminTenantsParams)
+
+	// (POST /api/v1/admin/tenants)
+	CreateAdminTenant(w http.ResponseWriter, r *http.Request, params CreateAdminTenantParams)
+
+	// (GET /api/v1/admin/tenants/{tenant_id})
+	GetAdminTenant(w http.ResponseWriter, r *http.Request, tenantId TenantID)
+
+	// (PATCH /api/v1/admin/tenants/{tenant_id})
+	UpdateAdminTenant(w http.ResponseWriter, r *http.Request, tenantId TenantID, params UpdateAdminTenantParams)
+
+	// (POST /api/v1/admin/tenants/{tenant_id}/archive)
+	ArchiveAdminTenant(w http.ResponseWriter, r *http.Request, tenantId TenantID, params ArchiveAdminTenantParams)
+
+	// (DELETE /api/v1/admin/tenants/{tenant_id}/purge)
+	PurgeAdminTenant(w http.ResponseWriter, r *http.Request, tenantId TenantID, params PurgeAdminTenantParams)
+
+	// (POST /api/v1/admin/tenants/{tenant_id}/restore)
+	RestoreAdminTenant(w http.ResponseWriter, r *http.Request, tenantId TenantID, params RestoreAdminTenantParams)
+
+	// (POST /api/v1/admin/tenants/{tenant_id}/trash)
+	TrashAdminTenant(w http.ResponseWriter, r *http.Request, tenantId TenantID, params TrashAdminTenantParams)
+
+	// (POST /api/v1/admin/tenants/{tenant_id}/unarchive)
+	UnarchiveAdminTenant(w http.ResponseWriter, r *http.Request, tenantId TenantID, params UnarchiveAdminTenantParams)
+
+	// (GET /api/v1/admin/users)
+	ListAdminUsers(w http.ResponseWriter, r *http.Request, params ListAdminUsersParams)
+
+	// (POST /api/v1/admin/users)
+	CreateAdminUser(w http.ResponseWriter, r *http.Request, params CreateAdminUserParams)
+
+	// (GET /api/v1/admin/users/{user_id})
+	GetAdminUser(w http.ResponseWriter, r *http.Request, userId UserID)
+
+	// (PATCH /api/v1/admin/users/{user_id})
+	UpdateAdminUser(w http.ResponseWriter, r *http.Request, userId UserID, params UpdateAdminUserParams)
+
+	// (POST /api/v1/admin/users/{user_id}/archive)
+	ArchiveAdminUser(w http.ResponseWriter, r *http.Request, userId UserID, params ArchiveAdminUserParams)
+
+	// (DELETE /api/v1/admin/users/{user_id}/purge)
+	PurgeAdminUser(w http.ResponseWriter, r *http.Request, userId UserID, params PurgeAdminUserParams)
+
+	// (POST /api/v1/admin/users/{user_id}/restore)
+	RestoreAdminUser(w http.ResponseWriter, r *http.Request, userId UserID, params RestoreAdminUserParams)
+
+	// (POST /api/v1/admin/users/{user_id}/trash)
+	TrashAdminUser(w http.ResponseWriter, r *http.Request, userId UserID, params TrashAdminUserParams)
+
+	// (POST /api/v1/admin/users/{user_id}/unarchive)
+	UnarchiveAdminUser(w http.ResponseWriter, r *http.Request, userId UserID, params UnarchiveAdminUserParams)
 
 	// (PATCH /api/v1/organization)
 	UpdateCurrentOrganization(w http.ResponseWriter, r *http.Request, params UpdateCurrentOrganizationParams)
@@ -598,6 +966,8 @@ type ServerInterface interface {
 	UpdateTeamMember(w http.ResponseWriter, r *http.Request, memberId MemberID, params UpdateTeamMemberParams)
 
 	// (POST /api/v1/team/ownership-transfer)
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	TransferOwnership(w http.ResponseWriter, r *http.Request, params TransferOwnershipParams)
 
 	// (POST /webhooks/clerk)
@@ -612,6 +982,966 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListAdminTenants operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminTenants(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminTenantsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "lifecycle_state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "lifecycle_state", r.URL.Query(), &params.LifecycleState, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "lifecycle_state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "lifecycle_state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminTenants(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminTenant operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminTenant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAdminTenantParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminTenant(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminTenant operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminTenant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tenant_id" -------------
+	var tenantId TenantID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenant_id", r.PathValue("tenant_id"), &tenantId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminTenant(w, r, tenantId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminTenant operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminTenant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tenant_id" -------------
+	var tenantId TenantID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenant_id", r.PathValue("tenant_id"), &tenantId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateAdminTenantParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminTenant(w, r, tenantId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ArchiveAdminTenant operation middleware
+func (siw *ServerInterfaceWrapper) ArchiveAdminTenant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tenant_id" -------------
+	var tenantId TenantID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenant_id", r.PathValue("tenant_id"), &tenantId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ArchiveAdminTenantParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ArchiveAdminTenant(w, r, tenantId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PurgeAdminTenant operation middleware
+func (siw *ServerInterfaceWrapper) PurgeAdminTenant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tenant_id" -------------
+	var tenantId TenantID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenant_id", r.PathValue("tenant_id"), &tenantId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PurgeAdminTenantParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PurgeAdminTenant(w, r, tenantId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RestoreAdminTenant operation middleware
+func (siw *ServerInterfaceWrapper) RestoreAdminTenant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tenant_id" -------------
+	var tenantId TenantID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenant_id", r.PathValue("tenant_id"), &tenantId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RestoreAdminTenantParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RestoreAdminTenant(w, r, tenantId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TrashAdminTenant operation middleware
+func (siw *ServerInterfaceWrapper) TrashAdminTenant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tenant_id" -------------
+	var tenantId TenantID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenant_id", r.PathValue("tenant_id"), &tenantId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params TrashAdminTenantParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TrashAdminTenant(w, r, tenantId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnarchiveAdminTenant operation middleware
+func (siw *ServerInterfaceWrapper) UnarchiveAdminTenant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tenant_id" -------------
+	var tenantId TenantID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenant_id", r.PathValue("tenant_id"), &tenantId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UnarchiveAdminTenantParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnarchiveAdminTenant(w, r, tenantId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminUsers operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminUsers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminUsersParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "lifecycle_state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "lifecycle_state", r.URL.Query(), &params.LifecycleState, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "lifecycle_state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "lifecycle_state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminUsers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAdminUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminUser(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminUser(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateAdminUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminUser(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ArchiveAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) ArchiveAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ArchiveAdminUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ArchiveAdminUser(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PurgeAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) PurgeAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PurgeAdminUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PurgeAdminUser(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RestoreAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) RestoreAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RestoreAdminUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RestoreAdminUser(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TrashAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) TrashAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params TrashAdminUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TrashAdminUser(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnarchiveAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) UnarchiveAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UnarchiveAdminUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnarchiveAdminUser(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // UpdateCurrentOrganization operation middleware
 func (siw *ServerInterfaceWrapper) UpdateCurrentOrganization(w http.ResponseWriter, r *http.Request) {
@@ -1380,6 +2710,24 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/runtime-config", wrapper.GetRuntimeConfig)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/session", wrapper.GetCurrentSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/organizations", wrapper.ListMyOrganizations)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/tenants", wrapper.ListAdminTenants)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/tenants", wrapper.CreateAdminTenant)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/tenants/{tenant_id}", wrapper.GetAdminTenant)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/tenants/{tenant_id}", wrapper.UpdateAdminTenant)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/tenants/{tenant_id}/archive", wrapper.ArchiveAdminTenant)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/tenants/{tenant_id}/unarchive", wrapper.UnarchiveAdminTenant)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/tenants/{tenant_id}/trash", wrapper.TrashAdminTenant)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/tenants/{tenant_id}/restore", wrapper.RestoreAdminTenant)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/tenants/{tenant_id}/purge", wrapper.PurgeAdminTenant)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users", wrapper.ListAdminUsers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/users", wrapper.CreateAdminUser)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users/{user_id}", wrapper.GetAdminUser)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/users/{user_id}", wrapper.UpdateAdminUser)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/users/{user_id}/archive", wrapper.ArchiveAdminUser)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/users/{user_id}/unarchive", wrapper.UnarchiveAdminUser)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/users/{user_id}/trash", wrapper.TrashAdminUser)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/users/{user_id}/restore", wrapper.RestoreAdminUser)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/users/{user_id}/purge", wrapper.PurgeAdminUser)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/organization", wrapper.UpdateCurrentOrganization)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/sessions", wrapper.ListMySessions)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/sessions/{session_id}", wrapper.RevokeMySession)
@@ -1401,69 +2749,90 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -29,6 +29,14 @@ export function ActiveOrganizationGuard() {
   return <Outlet />;
 }
 
+export function GlobalOwnerGuard() {
+  const auth = useProductAuth();
+  if (auth.productRole !== "owner") {
+    return <Navigate replace to="/dashboard" />;
+  }
+  return <Outlet />;
+}
+
 export function AuthLoadError({
   code,
 }: {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/mail"
+	"regexp"
 	"strings"
 	"time"
 
@@ -75,6 +76,7 @@ type Event struct {
 	ResourceID             string     `json:"resource_id"`
 	ExternalResourceID     string     `json:"external_resource_id,omitempty"`
 	Name                   string     `json:"name,omitempty"`
+	Slug                   string     `json:"slug,omitempty"`
 	Email                  string     `json:"email,omitempty"`
 	Role                   string     `json:"role,omitempty"`
 	PreviousRole           string     `json:"previous_role,omitempty"`
@@ -117,6 +119,7 @@ func (event *Event) normalize() {
 	event.ResourceID = strings.TrimSpace(event.ResourceID)
 	event.ExternalResourceID = strings.TrimSpace(event.ExternalResourceID)
 	event.Name = strings.TrimSpace(event.Name)
+	event.Slug = strings.TrimSpace(event.Slug)
 	event.Email = strings.ToLower(strings.TrimSpace(event.Email))
 	event.Role = strings.TrimSpace(event.Role)
 	event.PreviousRole = strings.TrimSpace(event.PreviousRole)
@@ -159,6 +162,9 @@ func (event Event) validate(topic, expectedOperation string) error {
 		}
 		if event.Name == "" || len([]rune(event.Name)) > 120 || !event.AppliedLocally {
 			return fmt.Errorf("%w: organization update fields are inconsistent", ErrInvalidEvent)
+		}
+		if event.Slug != "" && !regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`).MatchString(event.Slug) {
+			return fmt.Errorf("%w: organization slug is invalid", ErrInvalidEvent)
 		}
 	case MemberRoleChangeTopic:
 		if !localRole(event.Role) || !localRole(event.PreviousRole) || event.Role == "owner" {

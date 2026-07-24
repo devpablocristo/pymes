@@ -16,7 +16,6 @@ import (
 	clerkadapter "github.com/devpablocristo/platform/sdks/clerk/go"
 	"github.com/devpablocristo/pymes/v2/backend/internal/api"
 	"github.com/devpablocristo/pymes/v2/backend/internal/config"
-	productiam "github.com/devpablocristo/pymes/v2/backend/internal/iam"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -358,66 +357,23 @@ func TestUpdateTeamMemberReplaysOutboxCommandWithoutSecondAppend(t *testing.T) {
 	}
 }
 
-func TestTransferOwnershipKeepsCurrentOwnerUntilProviderRoleIsVerified(t *testing.T) {
-	queryCalls := 0
-	tx := &mutationTx{
-		exec: func(_ context.Context, query string, _ ...any) (pgconn.CommandTag, error) {
-			if !strings.Contains(query, "pg_advisory_xact_lock") {
-				t.Fatalf("ownership mutated local roles before provider verification: %s", query)
-			}
-			return pgconn.NewCommandTag("SELECT 1"), nil
-		},
-		queryRow: func(_ context.Context, _ string, _ ...any) pgx.Row {
-			queryCalls++
-			switch queryCalls {
-			case 1:
-				return mutationRow{values: []any{
-					mutationActorMembership,
-					"owner",
-					"active",
-					"clerk_actor_membership",
-					mutationActorUser,
-					"owner@example.test",
-					"Owner User",
-					"",
-				}}
-			case 2:
-				return mutationRow{err: pgx.ErrNoRows}
-			case 3:
-				return mutationMemberRow("admin", "active", "clerk_target_membership")
-			default:
-				t.Fatalf("unexpected ownership query %d", queryCalls)
-				return mutationRow{err: pgx.ErrNoRows}
-			}
-		},
-	}
-	outbox := &mutationOutbox{}
+func TestTransferOwnershipIsRejectedBecauseOwnerIsProductWide(t *testing.T) {
 	response := performMutationRequest(
 		newMutationHandler(t, &mutationTransactor{
-			tx:     tx,
+			tx:     &mutationTx{},
 			active: mutationActiveMembership("owner"),
-		}, outbox),
+		}, &mutationOutbox{}),
 		http.MethodPost,
 		"/api/v1/team/ownership-transfer",
 		"ownership-safe-0001",
 		`{"member_id":"`+mutationTargetMember+`"}`,
 	)
 
-	if response.Code != http.StatusAccepted {
+	if response.Code != http.StatusConflict {
 		t.Fatalf("status = %d, body = %s", response.Code, response.Body)
 	}
-	member := decodeIAMIdentityResponse[api.Member](t, response)
-	if member.Role != api.RoleAdmin || member.SyncStatus != api.SyncStatusQueued {
-		t.Fatalf("queued ownership response = %+v", member)
-	}
-	if outbox.calls != 1 || outbox.input.Topic != ownershipTransferTopic {
-		t.Fatalf("ownership outbox = calls:%d input:%+v", outbox.calls, outbox.input)
-	}
-	event := decodeMutationEvent(t, outbox.input.Payload)
-	if event.AppliedLocally ||
-		event.Role != string(productiam.RoleOwner) ||
-		event.PreviousRole != string(productiam.RoleAdmin) {
-		t.Fatalf("ownership event = %+v", event)
+	if !strings.Contains(response.Body.String(), "product-wide") {
+		t.Fatalf("body = %s", response.Body)
 	}
 }
 

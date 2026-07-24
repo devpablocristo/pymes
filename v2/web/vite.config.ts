@@ -5,8 +5,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      "/api": "http://127.0.0.1:18080",
-      "/webhooks": "http://127.0.0.1:18080",
+      "/api": process.env.VITE_PROXY_TARGET ?? "http://127.0.0.1:18080",
+      "/webhooks": process.env.VITE_PROXY_TARGET ?? "http://127.0.0.1:18080",
     },
   },
   test: {

@@ -396,103 +396,19 @@ func (h *IAMAPI) TransferOwnership(
 	r *http.Request,
 	params api.TransferOwnershipParams,
 ) {
-	key, ok := validateIdempotencyKey(w, params.IdempotencyKey)
-	if !ok {
+	if _, ok := validateIdempotencyKey(w, params.IdempotencyKey); !ok {
 		return
 	}
 	var input api.TransferOwnershipInput
 	if !decodeIAMCommandBody(w, r, &input) {
 		return
 	}
-	if input.MemberId == uuid.Nil {
-		writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", "member_id must be a non-zero UUID")
-		return
-	}
-
-	var response api.Member
-	if !h.withinOrganizationTx(
+	writeAPIError(
 		w,
-		r,
-		func(
-			ctx context.Context,
-			tx pgx.Tx,
-			active platformiam.ActiveMembership,
-			claims clerkadapter.SessionClaims,
-		) error {
-			actorRole, err := effectiveActorRole(active, claims, productiam.PermissionOwnershipTransfer)
-			if err != nil {
-				return err
-			}
-			if actorRole != productiam.RoleOwner || input.MemberId.String() == active.MembershipID {
-				return errIAMForbidden
-			}
-			actor, err := loadMemberForUpdate(ctx, tx, active.MembershipID)
-			if err != nil {
-				return err
-			}
-			if actor.Status != string(platformiam.MembershipActive) ||
-				actor.Role != string(productiam.RoleOwner) {
-				return errIAMRoleConflict
-			}
-			commandKey := iamCommandKey(
-				active.OrganizationID,
-				active.UserID,
-				ownershipTransferOperation,
-				key,
-			)
-			stored, replay, err := loadIAMCommand(ctx, tx, commandKey)
-			if err != nil {
-				return err
-			}
-			target, err := loadMemberForUpdate(ctx, tx, input.MemberId.String())
-			if err != nil {
-				return err
-			}
-			if replay {
-				if !stored.matches(
-					ownershipTransferTopic,
-					ownershipTransferOperation,
-					active.OrganizationID,
-					active.UserID,
-				) ||
-					stored.Event.ResourceID != target.MembershipID {
-					return errIAMRoleConflict
-				}
-				response, err = mapMember(target, api.SyncStatusQueued)
-				return err
-			}
-			targetRole, err := productiam.ParseRole(target.Role)
-			if err != nil ||
-				target.Status != string(platformiam.MembershipActive) ||
-				targetRole == productiam.RoleOwner {
-				return errIAMRoleConflict
-			}
-
-			// external_id proves only that a provider membership once existed;
-			// it does not prove the current Clerk role. The worker first
-			// reconciles org:admin and only then swaps both local roles in one
-			// transaction, leaving the current owner authoritative until then.
-			appliedLocally := false
-			event := newIAMCommandEvent(
-				ownershipTransferOperation,
-				active,
-				claims,
-				target.MembershipID,
-			)
-			event.ExternalResourceID = target.ExternalID
-			event.Role = string(productiam.RoleOwner)
-			event.PreviousRole = string(targetRole)
-			event.AppliedLocally = appliedLocally
-			if err := h.appendIAMCommand(ctx, tx, commandKey, ownershipTransferTopic, event); err != nil {
-				return err
-			}
-			response, err = mapMember(target, api.SyncStatusQueued)
-			return err
-		},
-	) {
-		return
-	}
-	writeJSON(w, http.StatusAccepted, response)
+		http.StatusConflict,
+		"IAM_ROLE_CONFLICT",
+		"tenant ownership no longer exists; owners are product-wide and are managed from administration",
+	)
 }
 
 func (h *IAMAPI) CreateTeamInvitation(

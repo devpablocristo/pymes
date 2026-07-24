@@ -86,6 +86,181 @@ body {
   background: var(--color-bg);
 }
 
+.admin-canvas {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-create-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.admin-create-form label,
+.admin-dialog label {
+  min-width: 0;
+  display: grid;
+  gap: 0.4rem;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.admin-create-form input,
+.admin-create-form select,
+.admin-toolbar input,
+.admin-dialog input,
+.admin-dialog select {
+  width: 100%;
+  min-height: 2.65rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.admin-create-form button,
+.admin-dialog button {
+  min-height: 2.65rem;
+}
+
+.admin-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.admin-toolbar input {
+  max-width: 22rem;
+}
+
+.admin-row {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.admin-user-row {
+  grid-template-columns: auto auto minmax(0, 1fr);
+}
+
+.admin-lifecycle-tabs,
+.admin-lifecycle-toolbar,
+.admin-lifecycle-toolbar__buttons,
+.admin-lifecycle-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.admin-lifecycle-tabs {
+  flex-wrap: wrap;
+}
+
+.admin-lifecycle-tabs button,
+.admin-lifecycle-toolbar button {
+  min-height: 2.35rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.admin-lifecycle-tabs button.is-active {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.admin-lifecycle-toolbar {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.admin-lifecycle-toolbar__buttons {
+  flex-wrap: wrap;
+}
+
+.admin-lifecycle-toolbar button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.admin-lifecycle-toolbar button.settings-row__danger {
+  border-color: color-mix(in srgb, var(--coral-500) 45%, var(--color-border));
+  color: #a8442e;
+}
+
+.admin-lifecycle-toolbar__count {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.status-pill--archived {
+  color: var(--ink-600);
+  background: var(--cloud-100);
+}
+
+.status-pill--trashed {
+  color: #a8442e;
+  background: color-mix(in srgb, var(--coral-500) 16%, var(--color-surface));
+}
+
+.admin-dialog-backdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(15 23 42 / 55%);
+}
+
+.admin-dialog {
+  width: min(32rem, 100%);
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.admin-dialog h2 {
+  margin: 0;
+}
+
+.admin-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+@media (max-width: 900px) {
+  .admin-create-form {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .admin-user-row {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+}
+
 button,
 input,
 select {

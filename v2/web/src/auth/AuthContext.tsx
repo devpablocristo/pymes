@@ -30,6 +30,7 @@ export type AuthUser = {
 
 export type AuthContextValue = {
   status: AuthStatus;
+  productRole: "owner" | "user";
   error?: string;
   errorCode?: AuthErrorCode;
   sessionId?: string;
@@ -46,6 +47,7 @@ const unavailableAction = async () => undefined;
 
 const defaultValue: AuthContextValue = {
   status: "loading",
+  productRole: "user",
   organizations: [],
   getToken: unavailable,
   setActiveOrganization: unavailableAction,

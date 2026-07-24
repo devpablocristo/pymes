@@ -1,0 +1,19 @@
+root = "."
+tmp_dir = "tmp/api"
+
+[build]
+  bin = "./tmp/api/pymes-v2-api"
+  cmd = "GOWORK=off go build -o ./tmp/api/pymes-v2-api ./cmd/api"
+  delay = 750
+  exclude_dir = ["tmp", "vendor", "node_modules"]
+  exclude_regex = ["_test.go"]
+  include_ext = ["go", "sql", "tpl", "tmpl", "html"]
+  kill_delay = "500ms"
+  send_interrupt = true
+  stop_on_error = true
+
+[log]
+  time = false
+
+[misc]
+  clean_on_exit = true

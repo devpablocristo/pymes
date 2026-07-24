@@ -141,6 +141,12 @@ func assertNoClientSelectedTenant(t *testing.T, spec *openapi3.T) {
 	t.Helper()
 
 	for path, pathItem := range spec.Paths.Map() {
+		if strings.HasPrefix(path, "/api/v1/admin/") {
+			// Global-owner administration is the only boundary allowed to
+			// address a tenant explicitly. Its handlers verify the owner
+			// against the local authority before opening the transaction.
+			continue
+		}
 		assertParametersHaveNoTenantSelector(t, "path "+path, pathItem.Parameters)
 		for method, operation := range pathItem.Operations() {
 			assertParametersHaveNoTenantSelector(t, method+" "+path, operation.Parameters)
@@ -222,8 +228,8 @@ func assertRoleAndLifecycleSchemas(t *testing.T, spec *openapi3.T) {
 	}
 
 	permissions := enumStrings(t, spec, "Permission")
-	if len(permissions) != 9 || !slices.Contains(permissions, "sessions:manage:self") ||
-		!slices.Contains(permissions, "team:ownership:transfer") {
+	if len(permissions) != 8 || !slices.Contains(permissions, "sessions:manage:self") ||
+		slices.Contains(permissions, "team:ownership:transfer") {
 		t.Errorf("Permission does not expose the fixed IAM matrix: %v", permissions)
 	}
 

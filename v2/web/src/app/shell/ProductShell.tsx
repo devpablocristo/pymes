@@ -24,6 +24,7 @@ export function ProductShell() {
   );
   const userName = auth.user?.displayName || t("account.userFallback");
   const accountInitial = userName.trim().slice(0, 1).toUpperCase() || "P";
+  const isGlobalOwner = auth.productRole === "owner";
 
   const sections: AppShellNavSection[] = [
     {
@@ -37,6 +38,25 @@ export function ProductShell() {
         },
       ],
     },
+    ...(isGlobalOwner
+      ? [
+          {
+            label: "Administración",
+            items: [
+            {
+              to: "/admin/tenants",
+              label: "Tenants",
+              icon: <OrganizationIcon aria-hidden="true" />,
+            },
+            {
+              to: "/admin/users",
+              label: "Usuarios",
+              icon: <TeamIcon aria-hidden="true" />,
+            },
+            ],
+          },
+        ]
+      : []),
     {
       label: t("nav.settings"),
       items: [

@@ -1,5 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { ActiveOrganizationGuard, SignedInGuard } from "./guards/AuthGuards";
+import { ActiveOrganizationGuard, GlobalOwnerGuard, SignedInGuard } from "./guards/AuthGuards";
+import { AdminTenantsPage } from "./pages/AdminTenantsPage";
+import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { NoAccessPage } from "./pages/NoAccessPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
@@ -20,6 +22,10 @@ export function App() {
         <Route path="/no-access" element={<NoAccessPage />} />
         <Route element={<ProductShell />}>
           <Route path="/settings/sessions" element={<SessionsPage />} />
+          <Route element={<GlobalOwnerGuard />}>
+            <Route path="/admin/tenants" element={<AdminTenantsPage />} />
+            <Route path="/admin/users" element={<AdminUsersPage />} />
+          </Route>
           <Route element={<ActiveOrganizationGuard />}>
             <Route index element={<Navigate replace to="/dashboard" />} />
             <Route path="/dashboard" element={<DashboardPage />} />

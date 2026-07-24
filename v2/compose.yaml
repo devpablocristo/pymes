@@ -63,7 +63,8 @@ services:
   iam-worker:
     build:
       context: ./backend
-      dockerfile: Dockerfile.worker
+      dockerfile: Dockerfile.dev
+    command: ["-c", ".air.iam-worker.toml"]
     environment:
       PYMES_DATABASE_URL: postgres://pymes_iam_worker:pymes_iam_worker@postgres:5432/pymes_v2?sslmode=disable
       PYMES_CLERK_SECRET_KEY: ${PYMES_CLERK_SECRET_KEY:-}
@@ -75,6 +76,9 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+    volumes:
+      - ./backend:/src
+      - pymes_v2_air_iam_worker:/src/tmp
     profiles: ["iam"]
     init: true
     stop_grace_period: 15s
@@ -83,6 +87,8 @@ services:
   backend:
     build:
       context: ./backend
+      dockerfile: Dockerfile.dev
+    command: ["-c", ".air.api.toml"]
     environment:
       PYMES_HTTP_ADDR: :8080
       PYMES_DATABASE_URL: postgres://pymes_backend:pymes_backend@postgres:5432/pymes_v2?sslmode=disable
@@ -103,6 +109,9 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    volumes:
+      - ./backend:/src
+      - pymes_v2_air_api:/src/tmp
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/readyz"]
       interval: 2s
@@ -116,11 +125,17 @@ services:
   web:
     build:
       context: ./web
+      dockerfile: Dockerfile.dev
+    environment:
+      VITE_PROXY_TARGET: http://backend:8080
     ports:
       - "127.0.0.1:${PYMES_WEB_PORT:-15173}:8080"
     depends_on:
       backend:
         condition: service_healthy
+    volumes:
+      - ./web:/src
+      - pymes_v2_web_node_modules:/src/node_modules
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/healthz"]
       interval: 2s
@@ -131,3 +146,6 @@ services:
 
 volumes:
   pymes_v2_postgres_data:
+  pymes_v2_air_api:
+  pymes_v2_air_iam_worker:
+  pymes_v2_web_node_modules:

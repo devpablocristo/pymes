@@ -241,7 +241,7 @@ func assertProvisioningState(
 	if event.RequestID != result.RequestID ||
 		event.OrganizationID != result.OrganizationID ||
 		event.OwnerEmail != result.OwnerEmail ||
-		event.OwnerRole != "owner" ||
+		event.OwnerRole != "admin" ||
 		event.ProviderRole != "org:admin" {
 		t.Fatalf("outbox event = %#v, result = %#v", event, result)
 	}

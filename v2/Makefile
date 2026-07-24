@@ -13,8 +13,8 @@ export COMPOSE_PROFILES
 help:
 	@echo "Pymes v2"
 	@echo ""
-	@echo "  make up              Construye y levanta postgres, migrate, backend y web"
-	@echo "                       (también iam-worker cuando Clerk está configurado)"
+	@echo "  make up              Levanta el stack dev con hot reload de Go y React"
+	@echo "                       (también iam-worker con Air cuando Clerk está configurado)"
 	@echo "  make smoke           Verifica base, API y web"
 	@echo "  make clerk-check     Verifica la configuración remota de Clerk sin modificarla"
 	@echo "  make provision-org ORG_NAME='Acme' ORG_SLUG=acme OWNER_EMAIL=owner@example.com"
@@ -54,7 +54,7 @@ smoke:
 	docker compose exec -T postgres sh -ec \
 		'test "$$(psql -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''idempotency/core'\''")" = 1'
 	docker compose exec -T postgres sh -ec \
-		'test "$$(psql -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 7'
+		'test "$$(psql -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 9'
 
 clerk-check:
 	./scripts/check-clerk-config.sh

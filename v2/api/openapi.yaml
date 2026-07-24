@@ -8,6 +8,7 @@ servers:
 tags:
   - name: Runtime
   - name: Identity
+  - name: Administration
   - name: Organization
   - name: Team
   - name: Webhooks
@@ -63,6 +64,460 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/admin/tenants:
+    get:
+      operationId: listAdminTenants
+      tags: [Administration]
+      description: Lista global de tenants; requiere rol global owner.
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/OrganizationStatus"
+        - name: lifecycle_state
+          in: query
+          schema:
+            $ref: "#/components/schemas/LifecycleState"
+        - name: query
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+      responses:
+        "200":
+          description: Tenants visibles para el owner global.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTenantList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      operationId: createAdminTenant
+      tags: [Administration]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAdminTenantInput"
+      responses:
+        "202":
+          description: Provisionamiento local confirmado y sincronización con Clerk en curso.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTenant"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/admin/tenants/{tenant_id}:
+    get:
+      operationId: getAdminTenant
+      tags: [Administration]
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: Tenant global.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTenant"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    patch:
+      operationId: updateAdminTenant
+      tags: [Administration]
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAdminTenantInput"
+      responses:
+        "202":
+          description: Tenant actualizado localmente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTenant"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/admin/tenants/{tenant_id}/archive:
+    post:
+      operationId: archiveAdminTenant
+      tags: [Administration]
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/LifecycleCommand"
+      responses:
+        "204":
+          description: Tenant archivado y excluido de los flujos activos.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/admin/tenants/{tenant_id}/unarchive:
+    post:
+      operationId: unarchiveAdminTenant
+      tags: [Administration]
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/LifecycleCommand"
+      responses:
+        "204":
+          description: Tenant desarchivado y nuevamente activo.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/admin/tenants/{tenant_id}/trash:
+    post:
+      operationId: trashAdminTenant
+      tags: [Administration]
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/LifecycleCommand"
+      responses:
+        "204":
+          description: Tenant movido a la papelera.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/admin/tenants/{tenant_id}/restore:
+    post:
+      operationId: restoreAdminTenant
+      tags: [Administration]
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/LifecycleCommand"
+      responses:
+        "204":
+          description: Tenant restaurado desde la papelera.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/admin/tenants/{tenant_id}/purge:
+    delete:
+      operationId: purgeAdminTenant
+      tags: [Administration]
+      description: Purga irreversible; sólo admite tenants en la papelera.
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/LifecycleCommand"
+      responses:
+        "204":
+          description: Tenant purgado.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/admin/users:
+    get:
+      operationId: listAdminUsers
+      tags: [Administration]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/UserStatus"
+        - name: lifecycle_state
+          in: query
+          schema:
+            $ref: "#/components/schemas/LifecycleState"
+        - name: query
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+      responses:
+        "200":
+          description: Usuarios globales.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      operationId: createAdminUser
+      tags: [Administration]
+      description: Invita por email a un usuario y lo asigna a un tenant.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAdminUserInput"
+      responses:
+        "202":
+          description: Invitación creada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invitation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/admin/users/{user_id}:
+    get:
+      operationId: getAdminUser
+      tags: [Administration]
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+      responses:
+        "200":
+          description: Usuario global.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    patch:
+      operationId: updateAdminUser
+      tags: [Administration]
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAdminUserInput"
+      responses:
+        "202":
+          description: Usuario actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/admin/users/{user_id}/archive:
+    post:
+      operationId: archiveAdminUser
+      tags: [Administration]
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/LifecycleCommand"
+      responses:
+        "204":
+          description: Usuario archivado y acceso cortado.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/admin/users/{user_id}/unarchive:
+    post:
+      operationId: unarchiveAdminUser
+      tags: [Administration]
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/LifecycleCommand"
+      responses:
+        "204":
+          description: Usuario desarchivado.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/admin/users/{user_id}/trash:
+    post:
+      operationId: trashAdminUser
+      tags: [Administration]
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/LifecycleCommand"
+      responses:
+        "204":
+          description: Usuario movido a la papelera y acceso cortado.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/admin/users/{user_id}/restore:
+    post:
+      operationId: restoreAdminUser
+      tags: [Administration]
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/LifecycleCommand"
+      responses:
+        "204":
+          description: Usuario restaurado desde la papelera.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/admin/users/{user_id}/purge:
+    delete:
+      operationId: purgeAdminUser
+      tags: [Administration]
+      description: Purga irreversible; exige usuario en la papelera.
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/LifecycleCommand"
+      responses:
+        "204":
+          description: Usuario purgado.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "503":
           $ref: "#/components/responses/Unavailable"
   /api/v1/organization:
@@ -223,6 +678,11 @@ paths:
     post:
       operationId: transferOwnership
       tags: [Team]
+      deprecated: true
+      description: >-
+        Compatibilidad temporal. La propiedad ya no pertenece al tenant:
+        `owner` es un rol global de Pymes administrado mediante `/api/v1/admin/users`.
+        Este endpoint siempre responde `409`.
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -232,12 +692,6 @@ paths:
             schema:
               $ref: "#/components/schemas/TransferOwnershipInput"
       responses:
-        "202":
-          description: Transferencia segura iniciada.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Member"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -444,6 +898,27 @@ components:
       schema:
         type: string
         format: uuid
+    TenantID:
+      name: tenant_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    UserID:
+      name: user_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  requestBodies:
+    LifecycleCommand:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/LifecycleCommandInput"
   responses:
     BadRequest:
       description: Request inválido (`REQUEST_INVALID`).
@@ -462,6 +937,12 @@ components:
         Identidad válida sin acceso suficiente
         (`AUTH_ORGANIZATION_REQUIRED`, `IAM_MEMBERSHIP_REQUIRED` o
         `IAM_FORBIDDEN`).
+      content:
+        application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Recurso inexistente o no visible (`RESOURCE_NOT_FOUND`).
       content:
         application/json:
           schema:
@@ -517,7 +998,19 @@ components:
   schemas:
     Role:
       type: string
+      description: Rol efectivo; `owner` es global y las membresías tenant usan `admin|member`.
       enum: [owner, admin, member]
+    ProductRole:
+      type: string
+      description: Rol global del producto; `owner` tiene autoridad sobre todos los tenants y usuarios.
+      enum: [owner, user]
+    UserStatus:
+      type: string
+      enum: [active, disabled]
+    LifecycleState:
+      type: string
+      description: Estado canónico administrado por Platform lifecycle.
+      enum: [active, archived, trashed]
     Permission:
       type: string
       description: Permiso IAM efectivo derivado del rol efectivo.
@@ -529,13 +1022,12 @@ components:
         - team:member:remove
         - team:invitation:create
         - team:invitation:manage
-        - team:ownership:transfer
         - sessions:manage:self
     AssignableRole:
       type: string
       description: >-
-        Roles administrables mediante invitación o edición. `owner` sólo se
-        obtiene con el comando atómico de transferencia de propiedad.
+        Roles administrables dentro de un tenant. `owner` es un rol global del
+        producto y no forma parte de una membresía.
       enum: [admin, member]
     OrganizationStatus:
       type: string
@@ -610,6 +1102,111 @@ components:
           description: Referencia opaca usada únicamente con Clerk.setActive().
         sync_status:
           $ref: "#/components/schemas/SyncStatus"
+    AdminTenant:
+      type: object
+      additionalProperties: false
+      required: [id, name, slug, status, lifecycle_state, sync_status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          $ref: "#/components/schemas/OrganizationStatus"
+        lifecycle_state:
+          $ref: "#/components/schemas/LifecycleState"
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+        trashed_at:
+          type: string
+          format: date-time
+          nullable: true
+        purge_after:
+          type: string
+          format: date-time
+          nullable: true
+        sync_status:
+          $ref: "#/components/schemas/SyncStatus"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    AdminMembership:
+      type: object
+      additionalProperties: false
+      required: [id, tenant_id, tenant_name, role, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        tenant_name:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        status:
+          $ref: "#/components/schemas/MembershipStatus"
+    AdminUser:
+      type: object
+      additionalProperties: false
+      required:
+        [id, email, email_verified, display_name, status, lifecycle_state, product_role, memberships, version, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        email_verified:
+          type: boolean
+        display_name:
+          type: string
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        lifecycle_state:
+          $ref: "#/components/schemas/LifecycleState"
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+        trashed_at:
+          type: string
+          format: date-time
+          nullable: true
+        purge_after:
+          type: string
+          format: date-time
+          nullable: true
+        product_role:
+          $ref: "#/components/schemas/ProductRole"
+        memberships:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminMembership"
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
     Membership:
       type: object
       required: [id, role, status]
@@ -709,12 +1306,36 @@ components:
           nullable: true
     OrganizationList:
       type: object
-      required: [items, page]
+      required: [items, page, product_role]
       properties:
         items:
           type: array
           items:
             $ref: "#/components/schemas/Organization"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+        product_role:
+          $ref: "#/components/schemas/ProductRole"
+    AdminTenantList:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminTenant"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    AdminUserList:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUser"
         page:
           $ref: "#/components/schemas/PageInfo"
     SessionList:
@@ -756,6 +1377,79 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+    CreateAdminTenantInput:
+      type: object
+      additionalProperties: false
+      required: [name, slug, admin_email]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        slug:
+          type: string
+          minLength: 2
+          maxLength: 63
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        admin_email:
+          type: string
+          format: email
+          maxLength: 320
+    UpdateAdminTenantInput:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        slug:
+          type: string
+          minLength: 2
+          maxLength: 63
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    CreateAdminUserInput:
+      type: object
+      additionalProperties: false
+      required: [email, tenant_id, role]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        tenant_id:
+          type: string
+          format: uuid
+        role:
+          $ref: "#/components/schemas/Role"
+    UpdateAdminUserInput:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      required: [version]
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        product_role:
+          $ref: "#/components/schemas/ProductRole"
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+    LifecycleCommandInput:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          type: string
+          maxLength: 500
     UpdateMemberInput:
       type: object
       required: [role]

@@ -53,6 +53,234 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/tenants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Lista global de tenants; requiere rol global owner. */
+        get: operations["listAdminTenants"];
+        put?: never;
+        post: operations["createAdminTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/tenants/{tenant_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAdminTenant"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateAdminTenant"];
+        trace?: never;
+    };
+    "/api/v1/admin/tenants/{tenant_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["archiveAdminTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/tenants/{tenant_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["unarchiveAdminTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/tenants/{tenant_id}/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["trashAdminTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/tenants/{tenant_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["restoreAdminTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/tenants/{tenant_id}/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Purga irreversible; sólo admite tenants en la papelera. */
+        delete: operations["purgeAdminTenant"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAdminUsers"];
+        put?: never;
+        /** @description Invita por email a un usuario y lo asigna a un tenant. */
+        post: operations["createAdminUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAdminUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateAdminUser"];
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["archiveAdminUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["unarchiveAdminUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["trashAdminUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["restoreAdminUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Purga irreversible; exige usuario en la papelera. */
+        delete: operations["purgeAdminUser"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organization": {
         parameters: {
             query?: never;
@@ -144,6 +372,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * @deprecated
+         * @description Compatibilidad temporal. La propiedad ya no pertenece al tenant: `owner` es un rol global de Pymes administrado mediante `/api/v1/admin/users`. Este endpoint siempre responde `409`.
+         */
         post: operations["transferOwnership"];
         delete?: never;
         options?: never;
@@ -220,15 +452,30 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @enum {string} */
+        /**
+         * @description Rol efectivo; `owner` es global y las membresías tenant usan `admin|member`.
+         * @enum {string}
+         */
         Role: "owner" | "admin" | "member";
+        /**
+         * @description Rol global del producto; `owner` tiene autoridad sobre todos los tenants y usuarios.
+         * @enum {string}
+         */
+        ProductRole: "owner" | "user";
+        /** @enum {string} */
+        UserStatus: "active" | "disabled";
+        /**
+         * @description Estado canónico administrado por Platform lifecycle.
+         * @enum {string}
+         */
+        LifecycleState: "active" | "archived" | "trashed";
         /**
          * @description Permiso IAM efectivo derivado del rol efectivo.
          * @enum {string}
          */
-        Permission: "organization:view" | "organization:update" | "team:view" | "team:member:update" | "team:member:remove" | "team:invitation:create" | "team:invitation:manage" | "team:ownership:transfer" | "sessions:manage:self";
+        Permission: "organization:view" | "organization:update" | "team:view" | "team:member:update" | "team:member:remove" | "team:invitation:create" | "team:invitation:manage" | "sessions:manage:self";
         /**
-         * @description Roles administrables mediante invitación o edición. `owner` sólo se obtiene con el comando atómico de transferencia de propiedad.
+         * @description Roles administrables dentro de un tenant. `owner` es un rol global del producto y no forma parte de una membresía.
          * @enum {string}
          */
         AssignableRole: "admin" | "member";
@@ -277,6 +524,60 @@ export interface components {
             /** @description Referencia opaca usada únicamente con Clerk.setActive(). */
             switch_key?: string;
             sync_status: components["schemas"]["SyncStatus"];
+        };
+        AdminTenant: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            slug: string;
+            status: components["schemas"]["OrganizationStatus"];
+            lifecycle_state: components["schemas"]["LifecycleState"];
+            /** Format: date-time */
+            archived_at?: string | null;
+            /** Format: date-time */
+            trashed_at?: string | null;
+            /** Format: date-time */
+            purge_after?: string | null;
+            sync_status: components["schemas"]["SyncStatus"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        AdminMembership: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            tenant_id: string;
+            tenant_name: string;
+            role: components["schemas"]["Role"];
+            status: components["schemas"]["MembershipStatus"];
+        };
+        AdminUser: {
+            /** Format: uuid */
+            id: string;
+            /** Format: email */
+            email: string;
+            email_verified: boolean;
+            display_name: string;
+            /** Format: uri */
+            avatar_url?: string | null;
+            status: components["schemas"]["UserStatus"];
+            lifecycle_state: components["schemas"]["LifecycleState"];
+            /** Format: date-time */
+            archived_at?: string | null;
+            /** Format: date-time */
+            trashed_at?: string | null;
+            /** Format: date-time */
+            purge_after?: string | null;
+            product_role: components["schemas"]["ProductRole"];
+            memberships: components["schemas"]["AdminMembership"][];
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
         };
         Membership: {
             /** Format: uuid */
@@ -331,6 +632,15 @@ export interface components {
         OrganizationList: {
             items: components["schemas"]["Organization"][];
             page: components["schemas"]["PageInfo"];
+            product_role: components["schemas"]["ProductRole"];
+        };
+        AdminTenantList: {
+            items: components["schemas"]["AdminTenant"][];
+            page: components["schemas"]["PageInfo"];
+        };
+        AdminUserList: {
+            items: components["schemas"]["AdminUser"][];
+            page: components["schemas"]["PageInfo"];
         };
         SessionList: {
             items: components["schemas"]["DeviceSession"][];
@@ -346,6 +656,34 @@ export interface components {
         };
         UpdateOrganizationInput: {
             name: string;
+        };
+        CreateAdminTenantInput: {
+            name: string;
+            slug: string;
+            /** Format: email */
+            admin_email: string;
+        };
+        UpdateAdminTenantInput: {
+            name?: string;
+            slug?: string;
+        };
+        CreateAdminUserInput: {
+            /** Format: email */
+            email: string;
+            /** Format: uuid */
+            tenant_id: string;
+            role: components["schemas"]["Role"];
+        };
+        UpdateAdminUserInput: {
+            display_name?: string;
+            /** Format: email */
+            email?: string;
+            product_role?: components["schemas"]["ProductRole"];
+            /** Format: int64 */
+            version: number;
+        };
+        LifecycleCommandInput: {
+            reason?: string;
         };
         UpdateMemberInput: {
             role: components["schemas"]["AssignableRole"];
@@ -392,6 +730,15 @@ export interface components {
         };
         /** @description Identidad válida sin acceso suficiente (`AUTH_ORGANIZATION_REQUIRED`, `IAM_MEMBERSHIP_REQUIRED` o `IAM_FORBIDDEN`). */
         Forbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description Recurso inexistente o no visible (`RESOURCE_NOT_FOUND`). */
+        NotFound: {
             headers: {
                 [name: string]: unknown;
             };
@@ -462,8 +809,16 @@ export interface components {
         SessionID: string;
         MemberID: string;
         InvitationID: string;
+        TenantID: string;
+        UserID: string;
     };
-    requestBodies: never;
+    requestBodies: {
+        LifecycleCommand: {
+            content: {
+                "application/json": components["schemas"]["LifecycleCommandInput"];
+            };
+        };
+    };
     headers: never;
     pathItems: never;
 }
@@ -535,6 +890,518 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listAdminTenants: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+                status?: components["schemas"]["OrganizationStatus"];
+                lifecycle_state?: components["schemas"]["LifecycleState"];
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tenants visibles para el owner global. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTenantList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createAdminTenant: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAdminTenantInput"];
+            };
+        };
+        responses: {
+            /** @description Provisionamiento local confirmado y sincronización con Clerk en curso. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTenant"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getAdminTenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: components["parameters"]["TenantID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tenant global. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTenant"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    updateAdminTenant: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tenant_id: components["parameters"]["TenantID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAdminTenantInput"];
+            };
+        };
+        responses: {
+            /** @description Tenant actualizado localmente. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTenant"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    archiveAdminTenant: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tenant_id: components["parameters"]["TenantID"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["LifecycleCommand"];
+        responses: {
+            /** @description Tenant archivado y excluido de los flujos activos. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    unarchiveAdminTenant: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tenant_id: components["parameters"]["TenantID"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["LifecycleCommand"];
+        responses: {
+            /** @description Tenant desarchivado y nuevamente activo. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    trashAdminTenant: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tenant_id: components["parameters"]["TenantID"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["LifecycleCommand"];
+        responses: {
+            /** @description Tenant movido a la papelera. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    restoreAdminTenant: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tenant_id: components["parameters"]["TenantID"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["LifecycleCommand"];
+        responses: {
+            /** @description Tenant restaurado desde la papelera. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    purgeAdminTenant: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tenant_id: components["parameters"]["TenantID"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["LifecycleCommand"];
+        responses: {
+            /** @description Tenant purgado. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listAdminUsers: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+                status?: components["schemas"]["UserStatus"];
+                lifecycle_state?: components["schemas"]["LifecycleState"];
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usuarios globales. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createAdminUser: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAdminUserInput"];
+            };
+        };
+        responses: {
+            /** @description Invitación creada. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invitation"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getAdminUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usuario global. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUser"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    updateAdminUser: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                user_id: components["parameters"]["UserID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAdminUserInput"];
+            };
+        };
+        responses: {
+            /** @description Usuario actualizado. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUser"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    archiveAdminUser: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                user_id: components["parameters"]["UserID"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["LifecycleCommand"];
+        responses: {
+            /** @description Usuario archivado y acceso cortado. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    unarchiveAdminUser: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                user_id: components["parameters"]["UserID"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["LifecycleCommand"];
+        responses: {
+            /** @description Usuario desarchivado. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    trashAdminUser: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                user_id: components["parameters"]["UserID"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["LifecycleCommand"];
+        responses: {
+            /** @description Usuario movido a la papelera y acceso cortado. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    restoreAdminUser: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                user_id: components["parameters"]["UserID"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["LifecycleCommand"];
+        responses: {
+            /** @description Usuario restaurado desde la papelera. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    purgeAdminUser: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                user_id: components["parameters"]["UserID"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["LifecycleCommand"];
+        responses: {
+            /** @description Usuario purgado. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             503: components["responses"]["Unavailable"];
         };
     };
@@ -728,15 +1595,6 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Transferencia segura iniciada. */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Member"];
-                };
-            };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];

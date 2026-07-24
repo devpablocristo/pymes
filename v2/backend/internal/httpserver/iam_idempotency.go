@@ -169,8 +169,15 @@ func isIAMCommand(r *http.Request) bool {
 }
 
 func isIdentityScopedCommand(r *http.Request) bool {
-	return r != nil &&
-		r.Method == http.MethodDelete &&
+	if r == nil {
+		return false
+	}
+	if strings.HasPrefix(r.URL.Path, "/api/v1/admin/") {
+		return r.Method == http.MethodPost ||
+			r.Method == http.MethodPatch ||
+			r.Method == http.MethodDelete
+	}
+	return r.Method == http.MethodDelete &&
 		strings.HasPrefix(r.URL.Path, "/api/v1/sessions/")
 }
 

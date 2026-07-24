@@ -22,6 +22,10 @@ import { clearTenantCaches } from "./tenantCache";
 
 type RuntimeConfig = components["schemas"]["RuntimeConfig"];
 type OrganizationList = components["schemas"]["OrganizationList"];
+type OrganizationDirectory = {
+  organizations: OrganizationList["items"];
+  productRole: OrganizationList["product_role"];
+};
 
 function createClerkTokenProvider(
   getToken: () => Promise<string | null | undefined>,
@@ -56,6 +60,7 @@ type RuntimeAuthProviderProps = PropsWithChildren<{
 
 const loadingValue: AuthContextValue = {
   status: "loading",
+  productRole: "user",
   organizations: [],
   getToken: async () => null,
   setActiveOrganization: async () => undefined,
@@ -163,6 +168,7 @@ function ClerkAuthBridge({
   const clerk = useClerk();
   const { user } = useUser();
   const [organizations, setOrganizations] = useState<AuthOrganization[]>([]);
+  const [productRole, setProductRole] = useState<"owner" | "user">("user");
   const [directoryStatus, setDirectoryStatus] = useState<
     "idle" | "loading" | "ready" | "error"
   >("idle");
@@ -183,6 +189,7 @@ function ClerkAuthBridge({
   useEffect(() => {
     if (!auth.isLoaded || !auth.isSignedIn) {
       setOrganizations([]);
+      setProductRole("user");
       setDirectoryStatus("idle");
       setDirectoryError(undefined);
       return;
@@ -204,7 +211,7 @@ function ClerkAuthBridge({
       controller.signal,
     )
       .then((response) => {
-        const admitted = response.map<AuthOrganization>((organization) => {
+        const admitted = response.organizations.map<AuthOrganization>((organization) => {
           if (!organization.switch_key) {
             throw new Error("organization switch key unavailable");
           }
@@ -217,11 +224,13 @@ function ClerkAuthBridge({
           };
         });
         setOrganizations(admitted);
+        setProductRole(response.productRole);
         setDirectoryStatus("ready");
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
         setOrganizations([]);
+        setProductRole("user");
         setDirectoryStatus("error");
         setDirectoryError(toAuthBridgeError(cause));
       });
@@ -255,6 +264,7 @@ function ClerkAuthBridge({
     );
     return {
       status: "signed-in",
+      productRole,
       sessionId: auth.sessionId ?? undefined,
       activeOrganizationId: activeOrganization?.id,
       organizations,
@@ -282,7 +292,7 @@ function ClerkAuthBridge({
         await clerk.signOut({ redirectUrl: "/sign-in" });
       },
     };
-  }, [auth, clerk, directoryError, directoryStatus, organizations, user]);
+  }, [auth, clerk, directoryError, directoryStatus, organizations, productRole, user]);
 
   return <AuthValueProvider value={value}>{children}</AuthValueProvider>;
 }
@@ -291,10 +301,11 @@ async function loadOrganizationDirectory(
   getToken: () => Promise<string | null>,
   fetchImpl: typeof fetch,
   signal: AbortSignal,
-): Promise<OrganizationList["items"]> {
+): Promise<OrganizationDirectory> {
   const organizations: OrganizationList["items"] = [];
   const seenCursors = new Set<string>();
   let cursor: string | undefined;
+  let productRole: OrganizationList["product_role"] | undefined;
 
   for (;;) {
     const query = new URLSearchParams({ limit: "100" });
@@ -307,9 +318,15 @@ async function loadOrganizationDirectory(
       signal,
     );
     organizations.push(...response.items);
+    if (productRole !== undefined && productRole !== response.product_role) {
+      throw new Error("organization directory changed product role during pagination");
+    }
+    productRole = response.product_role;
 
     const nextCursor = response.page.next_cursor?.trim() || undefined;
-    if (!nextCursor) return organizations;
+    if (!nextCursor) {
+      return { organizations, productRole };
+    }
     if (seenCursors.has(nextCursor)) {
       throw new Error("organization directory returned a repeated cursor");
     }
@@ -323,7 +340,7 @@ async function loadAuthorizedOrganizationDirectory(
   refreshToken: () => Promise<string | null>,
   fetchImpl: typeof fetch,
   signal: AbortSignal,
-): Promise<OrganizationList["items"]> {
+): Promise<OrganizationDirectory> {
   try {
     return await loadOrganizationDirectory(getToken, fetchImpl, signal);
   } catch (cause: unknown) {

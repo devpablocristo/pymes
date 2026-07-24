@@ -206,8 +206,7 @@ export function TeamPage() {
                       <small>{t(`roles.${member.role}`)}</small>
                     </div>
                     {canUpdateMember(data.session, member) ||
-                    canRemoveMember(data.session, member) ||
-                    canTransferOwnership(data.session, member) ? (
+                    canRemoveMember(data.session, member) ? (
                       <div className="settings-row__actions">
                         {canUpdateMember(data.session, member) ? (
                           <select
@@ -226,22 +225,6 @@ export function TeamPage() {
                             <option value="member">{t("roles.member")}</option>
                             <option value="admin">{t("roles.admin")}</option>
                           </select>
-                        ) : null}
-                        {canTransferOwnership(data.session, member) ? (
-                          <button
-                            type="button"
-                            disabled={Boolean(busy)}
-                            onClick={() =>
-                              void command(
-                                `ownership-${member.id}`,
-                                "/api/v1/team/ownership-transfer",
-                                "POST",
-                                { member_id: member.id },
-                              )
-                            }
-                          >
-                            {t("team.transfer")}
-                          </button>
                         ) : null}
                         {canRemoveMember(data.session, member) ? (
                           <button
@@ -360,18 +343,5 @@ function canRemoveMember(
   return (
     session.permissions.includes("team:member:remove") &&
     isManageableTarget(session, member)
-  );
-}
-
-function canTransferOwnership(
-  session: CurrentSession,
-  member: MemberList["items"][number],
-) {
-  return (
-    session.role === "owner" &&
-    member.id !== session.membership.id &&
-    member.role !== "owner" &&
-    member.status === "active" &&
-    session.permissions.includes("team:ownership:transfer")
   );
 }

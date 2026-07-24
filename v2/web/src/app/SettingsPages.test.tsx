@@ -31,6 +31,7 @@ function createAuthValue(
     setActiveOrganization: vi.fn(async () => undefined),
     signOut: vi.fn(async () => undefined),
     ...overrides,
+    productRole: overrides.productRole ?? "owner",
   };
 }
 
@@ -172,6 +173,128 @@ test("admins with the effective permission can list invitation state", async () 
   expect(screen.getByRole("heading", { name: "Invitaciones" })).toBeInTheDocument();
 });
 
+test("global owners create tenants with an initial tenant admin", async () => {
+  const user = userEvent.setup();
+  const request = renderSettings(
+    "/admin/tenants",
+    createAuthValue(),
+    async (path, options) => {
+      if (path === "/api/v1/admin/tenants?limit=100&lifecycle_state=active") {
+        return { items: [], page: { total: 0 } };
+      }
+      if (path === "/api/v1/admin/tenants") {
+        const requestOptions = options as {
+          method?: string;
+          headers?: Record<string, string>;
+          body?: string;
+        };
+        expect(requestOptions.method).toBe("POST");
+        expect(requestOptions.headers?.["Idempotency-Key"]).toBeTruthy();
+        expect(JSON.parse(requestOptions.body ?? "{}")).toEqual({
+          name: "Pymes Base",
+          slug: "pymes-base",
+          admin_email: "admin@example.test",
+        });
+        return {};
+      }
+      throw new Error(`unexpected request ${path}`);
+    },
+  );
+
+  await user.type(await screen.findByRole("textbox", { name: "Nombre" }), "Pymes Base");
+  await user.type(screen.getByRole("textbox", { name: "Slug" }), "Pymes-Base");
+  await user.type(
+    screen.getByRole("textbox", { name: "Administrador inicial" }),
+    "Admin@Example.Test",
+  );
+  await user.click(screen.getByRole("button", { name: "Crear tenant" }));
+
+  await waitFor(() =>
+    expect(
+      request.mock.calls.some(([path]) => path === "/api/v1/admin/tenants"),
+    ).toBe(true),
+  );
+});
+
+test("global owners promote a product user without changing tenant roles", async () => {
+  const user = userEvent.setup();
+  const request = renderSettings(
+    "/admin/users",
+    createAuthValue(),
+    async (path, options) => {
+      if (path === "/api/v1/admin/users?limit=100&lifecycle_state=active") {
+        return {
+          items: [{
+            id: "55555555-5555-4555-8555-555555555555",
+            email: "user@example.test",
+            email_verified: true,
+            display_name: "Usuario Base",
+            status: "active",
+            lifecycle_state: "active",
+            product_role: "user",
+            memberships: [{
+              id: "66666666-6666-4666-8666-666666666666",
+              tenant_id: activeOrganization.id,
+              tenant_name: activeOrganization.name,
+              role: "member",
+              status: "active",
+            }],
+            version: 9,
+            created_at: "2026-07-20T12:00:00Z",
+            updated_at: "2026-07-20T12:00:00Z",
+          }],
+          page: { total: 1 },
+        };
+      }
+      if (path === "/api/v1/admin/tenants?limit=100&status=active&lifecycle_state=active") {
+        return {
+          items: [{
+            id: activeOrganization.id,
+            name: activeOrganization.name,
+            slug: activeOrganization.slug,
+            status: "active",
+            lifecycle_state: "active",
+            sync_status: "synced",
+            created_at: "2026-07-20T12:00:00Z",
+            updated_at: "2026-07-20T12:00:00Z",
+          }],
+          page: { total: 1 },
+        };
+      }
+      if (path === "/api/v1/admin/users/55555555-5555-4555-8555-555555555555") {
+        const requestOptions = options as {
+          method?: string;
+          headers?: Record<string, string>;
+          body?: string;
+        };
+        expect(requestOptions.method).toBe("PATCH");
+        expect(requestOptions.headers?.["Idempotency-Key"]).toBeTruthy();
+        expect(JSON.parse(requestOptions.body ?? "{}")).toEqual({
+          display_name: "Usuario Base",
+          email: "user@example.test",
+          product_role: "owner",
+          version: 9,
+        });
+        return {};
+      }
+      throw new Error(`unexpected request ${path}`);
+    },
+  );
+
+  await user.click(await screen.findByRole("checkbox", { name: "Seleccionar Usuario Base" }));
+  await user.click(screen.getByRole("button", { name: "Editar" }));
+  await user.selectOptions(screen.getByRole("combobox", { name: "Rol global" }), "owner");
+  await user.click(screen.getByRole("button", { name: "Guardar" }));
+
+  await waitFor(() =>
+    expect(
+      request.mock.calls.some(
+        ([path]) => path === "/api/v1/admin/users/55555555-5555-4555-8555-555555555555",
+      ),
+    ).toBe(true),
+  );
+});
+
 test("owners invite an admin without sending a tenant identifier", async () => {
   const user = userEvent.setup();
   const request = renderSettings(
@@ -187,7 +310,6 @@ test("owners invite an admin without sending a tenant identifier", async () => {
           "team:member:remove",
           "team:invitation:create",
           "team:invitation:manage",
-          "team:ownership:transfer",
         ]);
       }
       if (path === "/api/v1/team/members?limit=100") {

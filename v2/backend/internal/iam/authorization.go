@@ -27,7 +27,6 @@ const (
 	PermissionMemberRemove       Permission = "team:member:remove"
 	PermissionInvitationCreate   Permission = "team:invitation:create"
 	PermissionInvitationManage   Permission = "team:invitation:manage"
-	PermissionOwnershipTransfer  Permission = "team:ownership:transfer"
 	PermissionSessionsManageSelf Permission = "sessions:manage:self"
 )
 
@@ -54,7 +53,6 @@ var permissionsByRole = map[Role][]Permission{
 		PermissionMemberRemove,
 		PermissionInvitationCreate,
 		PermissionInvitationManage,
-		PermissionOwnershipTransfer,
 		PermissionSessionsManageSelf,
 	},
 }
@@ -97,8 +95,8 @@ func HasPermission(role Role, permission Permission) bool {
 	return slices.Contains(permissionsByRole[role], permission)
 }
 
-// CanInvite enforces that admins can invite only members and owners can invite
-// admins or members. Ownership is assigned exclusively by transfer.
+// CanInvite enforces that tenant admins can invite only members while global
+// owners can invite tenant admins or members.
 func CanInvite(actor, invited Role) bool {
 	switch actor {
 	case RoleOwner:
@@ -110,8 +108,8 @@ func CanInvite(actor, invited Role) bool {
 	}
 }
 
-// CanChangeRole excludes ownership changes. A request involving the current or
-// desired owner must use the atomic ownership-transfer command.
+// CanChangeRole excludes the product-wide owner role from tenant membership
+// changes.
 func CanChangeRole(actor, current, desired Role) bool {
 	if !actor.Valid() || !current.Valid() || !desired.Valid() {
 		return false

@@ -113,9 +113,22 @@ func (repository *PostgresRepository) Prepare(
 		}
 		prepared.Actor, err = store.GetMembership(txContext, event.ActorMembershipID)
 		if err != nil {
-			return fmt.Errorf("iam sync: load actor membership: %w", err)
-		}
-		if prepared.Actor.OrganizationID != event.OrganizationID ||
+			var globalOwner bool
+			if event.ActorMembershipID != event.ActorUserID {
+				return fmt.Errorf("iam sync: load actor membership: %w", err)
+			}
+			if queryErr := tx.QueryRow(txContext, `
+				SELECT EXISTS (
+					SELECT 1 FROM app.global_user_roles
+					WHERE user_id = $1::uuid AND role = 'owner' AND status = 'active'
+				)
+			`, event.ActorUserID).Scan(&globalOwner); queryErr != nil {
+				return fmt.Errorf("iam sync: load global actor: %w", queryErr)
+			}
+			if !globalOwner {
+				return fmt.Errorf("%w: actor does not match command", ErrDurableConflict)
+			}
+		} else if prepared.Actor.OrganizationID != event.OrganizationID ||
 			prepared.Actor.UserID != event.ActorUserID {
 			return fmt.Errorf("%w: actor does not match command", ErrDurableConflict)
 		}

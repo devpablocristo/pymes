@@ -14,6 +14,7 @@ import (
 	platformiam "github.com/devpablocristo/platform/iam/go"
 	platformoutbox "github.com/devpablocristo/platform/outbox/go"
 	clerkadapter "github.com/devpablocristo/platform/sdks/clerk/go"
+	"github.com/devpablocristo/pymes/v2/backend/internal/administration"
 	"github.com/devpablocristo/pymes/v2/backend/internal/api"
 	"github.com/devpablocristo/pymes/v2/backend/internal/config"
 	productiam "github.com/devpablocristo/pymes/v2/backend/internal/iam"
@@ -63,6 +64,28 @@ type SessionTransactor interface {
 	) error
 }
 
+type AdministrationService interface {
+	IsOwner(context.Context, string) (bool, error)
+	ListTenants(context.Context, string, administration.TenantFilter) ([]administration.Tenant, error)
+	GetTenant(context.Context, string, string) (administration.Tenant, error)
+	CreateTenant(context.Context, string, administration.CreateTenantInput) (administration.Tenant, error)
+	UpdateTenant(context.Context, string, string, string, administration.UpdateTenantInput) (administration.Tenant, error)
+	ArchiveTenant(context.Context, string, string, string) error
+	UnarchiveTenant(context.Context, string, string, string) error
+	TrashTenant(context.Context, string, string, string) error
+	RestoreTenant(context.Context, string, string, string) error
+	PurgeTenant(context.Context, string, string, string) error
+	ListUsers(context.Context, string, administration.UserFilter) ([]administration.User, error)
+	GetUser(context.Context, string, string) (administration.User, error)
+	CreateUser(context.Context, string, string, administration.CreateUserInput) (administration.Invitation, error)
+	UpdateUser(context.Context, string, string, administration.UpdateUserInput) (administration.User, error)
+	ArchiveUser(context.Context, string, string, string) error
+	UnarchiveUser(context.Context, string, string, string) error
+	TrashUser(context.Context, string, string, string) error
+	RestoreUser(context.Context, string, string, string) error
+	PurgeUser(context.Context, string, string, string) error
+}
+
 type IAMDependencies struct {
 	Verifier              ClerkSessionVerifier
 	IdentityVerifier      ClerkIdentityVerifier
@@ -72,6 +95,7 @@ type IAMDependencies struct {
 	WebhookVerifier       ClerkWebhookVerifier
 	WebhookInbox          WebhookInbox
 	OutboxAppender        OutboxAppender
+	Administration        AdministrationService
 	Now                   func() time.Time
 }
 
@@ -88,6 +112,7 @@ type IAMAPI struct {
 	webhookVerifier       ClerkWebhookVerifier
 	webhookInbox          WebhookInbox
 	outboxAppender        OutboxAppender
+	administration        AdministrationService
 	now                   func() time.Time
 }
 
@@ -102,6 +127,7 @@ func NewIAMAPI(clerk config.ClerkConfig, dependencies ...IAMDependencies) *IAMAP
 		handler.webhookVerifier = dependencies[0].WebhookVerifier
 		handler.webhookInbox = dependencies[0].WebhookInbox
 		handler.outboxAppender = dependencies[0].OutboxAppender
+		handler.administration = dependencies[0].Administration
 		if dependencies[0].Now != nil {
 			handler.now = dependencies[0].Now
 		}
@@ -225,6 +251,17 @@ func (h *IAMAPI) ListMyOrganizations(
 		writeAPIError(w, http.StatusServiceUnavailable, "IAM_UNAVAILABLE", "IAM is unavailable")
 		return
 	}
+	productRole := api.ProductRoleUser
+	if h.administration != nil {
+		owner, ownerErr := h.administration.IsOwner(r.Context(), claims.Subject)
+		if ownerErr != nil {
+			writeAPIError(w, http.StatusServiceUnavailable, "IAM_UNAVAILABLE", "IAM is unavailable")
+			return
+		}
+		if owner {
+			productRole = api.ProductRoleOwner
+		}
+	}
 	start, end, nextCursor, err := pageBounds(params.Cursor, params.Limit, len(organizations))
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", err.Error())
@@ -249,7 +286,8 @@ func (h *IAMAPI) ListMyOrganizations(
 		})
 	}
 	writeJSON(w, http.StatusOK, api.OrganizationList{
-		Items: items,
+		Items:       items,
+		ProductRole: productRole,
 		Page: api.PageInfo{
 			NextCursor: nextCursor,
 			Total:      len(organizations),

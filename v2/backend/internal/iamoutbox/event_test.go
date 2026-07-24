@@ -25,7 +25,7 @@ func TestDecodeProvisionOrganizationEventIsStrict(t *testing.T) {
 		{name: "unsupported version", raw: strings.Replace(string(valid), `"schema_version":1`, `"schema_version":2`, 1)},
 		{name: "invalid request ID", raw: strings.Replace(string(valid), validProvisionEvent().RequestID, "not-a-uuid", 1)},
 		{name: "non canonical email", raw: strings.Replace(string(valid), "owner@example.test", "OWNER@example.test", 1)},
-		{name: "wrong local role", raw: strings.Replace(string(valid), `"owner_role":"owner"`, `"owner_role":"admin"`, 1)},
+		{name: "wrong local role", raw: strings.Replace(string(valid), `"owner_role":"admin"`, `"owner_role":"owner"`, 1)},
 		{name: "wrong provider role", raw: strings.Replace(string(valid), `"provider_role":"org:admin"`, `"provider_role":"org:member"`, 1)},
 	}
 	for _, test := range tests {

@@ -335,7 +335,7 @@ func (request provisioningRequest) eventPayload() ([]byte, error) {
 		Name:           request.Name,
 		Slug:           request.Slug,
 		OwnerEmail:     request.OwnerEmail,
-		OwnerRole:      "owner",
+		OwnerRole:      "admin",
 		ProviderRole:   "org:admin",
 	})
 	if err != nil {

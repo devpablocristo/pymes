@@ -27,6 +27,9 @@ export function SelectOrganizationPage() {
   if (auth.activeOrganizationId) {
     return <Navigate replace to="/dashboard" />;
   }
+  if (auth.productRole === "owner" && auth.organizations.length === 0) {
+    return <Navigate replace to="/admin/tenants" />;
+  }
   if (auth.organizations.length === 0) {
     return <Navigate replace to="/no-access" />;
   }

@@ -53,6 +53,7 @@ const configuredRuntime = {
 };
 
 const organizationDirectory = {
+  product_role: "owner",
   items: [
     {
       id: "11111111-1111-4111-8111-111111111111",
@@ -180,12 +181,14 @@ describe("RuntimeAuthProvider local organization authority", () => {
     fetchImpl
       .mockResolvedValueOnce(
         jsonResponse({
+          product_role: "owner",
           items: [organizationDirectory.items[0]],
           page: { total: 2, next_cursor: "cursor-2" },
         }),
       )
       .mockResolvedValueOnce(
         jsonResponse({
+          product_role: "owner",
           items: [organizationDirectory.items[1]],
           page: { total: 2 },
         }),

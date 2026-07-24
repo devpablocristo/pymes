@@ -17,7 +17,7 @@ import (
 const (
 	ProvisionOrganizationTopic = "iam.organization.provision.requested.v1"
 	ProviderClerk              = "clerk"
-	LocalOwnerRole             = "owner"
+	LocalOwnerRole             = "admin"
 	ClerkAdministratorRole     = "org:admin"
 )
 

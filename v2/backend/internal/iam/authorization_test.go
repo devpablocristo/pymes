@@ -43,8 +43,8 @@ func TestEffectiveRoleIsIntersectionWithProviderCeiling(t *testing.T) {
 
 func TestPermissionsAreFixedAndReturnedAsCopy(t *testing.T) {
 	owner := Permissions(RoleOwner)
-	if !slices.Contains(owner, PermissionOwnershipTransfer) {
-		t.Fatal("owner lacks ownership transfer")
+	if !slices.Contains(owner, PermissionOrganizationUpdate) {
+		t.Fatal("owner lacks organization update")
 	}
 	if slices.Contains(Permissions(RoleAdmin), PermissionOrganizationUpdate) {
 		t.Fatal("admin may update organization")

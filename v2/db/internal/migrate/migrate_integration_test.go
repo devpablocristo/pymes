@@ -107,6 +107,29 @@ func assertSchemaState(t *testing.T, ctx context.Context, database *postgres.DB)
 	if !provisioningOutboxViewExists {
 		t.Fatal("organization provisioning outbox view does not exist")
 	}
+	var lifecycleAuditTableExists bool
+	if err := database.QueryRow(
+		ctx,
+		"SELECT to_regclass('app.lifecycle_audit_events') IS NOT NULL",
+	).Scan(&lifecycleAuditTableExists); err != nil {
+		t.Fatalf("query lifecycle audit table: %v", err)
+	}
+	if !lifecycleAuditTableExists {
+		t.Fatal("lifecycle audit table does not exist")
+	}
+	var lifecycleColumnCount int
+	if err := database.QueryRow(ctx, `
+		SELECT count(*)
+		FROM information_schema.columns
+		WHERE table_schema = 'iam'
+		  AND table_name IN ('organizations', 'users')
+		  AND column_name IN ('archived_at', 'trashed_at', 'purge_after')
+	`).Scan(&lifecycleColumnCount); err != nil {
+		t.Fatalf("query lifecycle columns: %v", err)
+	}
+	if lifecycleColumnCount != 6 {
+		t.Fatalf("lifecycle column count = %d, want 6", lifecycleColumnCount)
+	}
 
 	var productMigrationCount int
 	if err := database.QueryRow(
@@ -116,8 +139,8 @@ func assertSchemaState(t *testing.T, ctx context.Context, database *postgres.DB)
 	).Scan(&productMigrationCount); err != nil {
 		t.Fatalf("query product migrations: %v", err)
 	}
-	if productMigrationCount != 7 {
-		t.Fatalf("product migration count = %d, want 7", productMigrationCount)
+	if productMigrationCount != 9 {
+		t.Fatalf("product migration count = %d, want 9", productMigrationCount)
 	}
 
 	var iamMigrationCount int
@@ -240,8 +263,8 @@ func assertTenantIsolationAndOwnerInvariant(
 			id, org_id, user_id, provider, external_id, role, status, joined_at
 		)
 		VALUES
-			($5, $1, $3, 'clerk', 'membership_a', 'owner', 'active', now()),
-			($6, $2, $4, 'clerk', 'membership_b', 'owner', 'active', now()),
+			($5, $1, $3, 'clerk', 'membership_a', 'admin', 'active', now()),
+			($6, $2, $4, 'clerk', 'membership_b', 'admin', 'active', now()),
 			($7, $1, $8, 'clerk', 'membership_pending', 'member', 'active', now())
 	`,
 		orgA,
@@ -254,6 +277,12 @@ func assertTenantIsolationAndOwnerInvariant(
 		userPending,
 	); err != nil {
 		t.Fatalf("seed IAM memberships: %v", err)
+	}
+	if _, err := database.Exec(ctx, `
+		INSERT INTO app.global_user_roles (user_id, role, status)
+		VALUES ($1, 'owner', 'active')
+	`, userA); err != nil {
+		t.Fatalf("seed global owner: %v", err)
 	}
 	if _, err := database.Exec(ctx, `
 		INSERT INTO iam.invitations (
@@ -278,7 +307,7 @@ func assertTenantIsolationAndOwnerInvariant(
 		)
 		VALUES ($1, 'clerk', 'not-owner@example.test', 'owner', 'pending', now() + interval '1 day')
 	`, orgA); err == nil {
-		t.Fatal("owner invitation outside provisioning was accepted")
+		t.Fatal("tenant owner invitation was accepted")
 	}
 	if _, err := database.Exec(ctx, `
 		INSERT INTO iam.organizations (id, provider, name, slug, status)
@@ -329,12 +358,12 @@ func assertTenantIsolationAndOwnerInvariant(
 			$1,
 			'clerk',
 			'bootstrap-owner@example.test',
-			'owner',
+			'admin',
 			'pending',
 			now() + interval '1 day'
 		)
 	`, orgBootstrap, inviteBoot); err != nil {
-		t.Fatalf("matching bootstrap owner invitation was rejected: %v", err)
+		t.Fatalf("bootstrap admin invitation was rejected: %v", err)
 	}
 	if _, err := database.Exec(ctx, `
 		INSERT INTO public.platform_outbox_messages (
@@ -461,31 +490,56 @@ func assertTenantIsolationAndOwnerInvariant(
 	if _, err := ownerTx.Exec(ctx, `
 		SELECT
 			set_config('app.user_id', $1, true),
-			set_config('app.org_id', $2, true)
+			set_config('app.org_id', $2, true),
+			set_config('app.actor_provider', 'clerk', true),
+			set_config('app.actor_subject', 'user_a', true)
 	`, userA, orgA); err != nil {
 		t.Fatalf("set owner context: %v", err)
 	}
+	assertTxCount(t, ctx, ownerTx, "SELECT count(*) FROM iam.organizations", 3)
+	assertTxCount(t, ctx, ownerTx, "SELECT count(*) FROM iam.memberships", 3)
+	assertTxCount(t, ctx, ownerTx, "SELECT count(*) FROM iam.invitations", 3)
+	assertTxCount(
+		t,
+		ctx,
+		ownerTx,
+		"SELECT count(*) FROM iam.organizations WHERE id = $1",
+		1,
+		orgB,
+	)
+	var effectiveRole string
+	if err := ownerTx.QueryRow(
+		ctx,
+		`SELECT role FROM iam.resolve_active_membership('clerk', 'user_a', 'org_a')`,
+	).Scan(&effectiveRole); err != nil {
+		t.Fatalf("resolve global owner membership: %v", err)
+	}
+	if effectiveRole != "owner" {
+		t.Fatalf("effective global owner role = %q", effectiveRole)
+	}
 	if _, err := ownerTx.Exec(
 		ctx,
-		"UPDATE iam.memberships SET role = 'admin' WHERE id = $1",
-		membershipA,
+		`UPDATE iam.organizations SET archived_at = now() WHERE id = $1`,
+		orgA,
 	); err != nil {
-		t.Fatalf("stage invalid owner demotion: %v", err)
+		t.Fatalf("archive organization fixture: %v", err)
 	}
-	if err := ownerTx.Commit(ctx); err == nil {
-		t.Fatal("owner demotion committed without transfer")
-	}
-
-	var role string
-	if err := database.QueryRow(
+	assertTxCount(
+		t,
 		ctx,
-		"SELECT role FROM iam.memberships WHERE id = $1",
-		membershipA,
-	).Scan(&role); err != nil {
-		t.Fatalf("read owner role after rollback: %v", err)
+		ownerTx,
+		"SELECT count(*) FROM iam.resolve_active_membership('clerk', 'user_a', 'org_a')",
+		0,
+	)
+	if _, err := ownerTx.Exec(
+		ctx,
+		`UPDATE iam.organizations SET archived_at = NULL WHERE id = $1`,
+		orgA,
+	); err != nil {
+		t.Fatalf("unarchive organization fixture: %v", err)
 	}
-	if role != "owner" {
-		t.Fatalf("owner role after rollback = %q", role)
+	if err := ownerTx.Commit(ctx); err != nil {
+		t.Fatalf("commit global owner transaction: %v", err)
 	}
 
 	worker := openIAMWorkerPool(t, ctx, databaseURL)

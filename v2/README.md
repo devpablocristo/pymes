@@ -9,8 +9,9 @@ lee, ejecuta ni importa código de `v1/`.
 - [`db/`](db/) contiene el migrador y las migraciones PostgreSQL nuevas.
 - [`web/`](web/) es la aplicación React responsive.
 - [`compose.yaml`](compose.yaml) levanta PostgreSQL 16, el migrador one-shot,
-  la API y la web para desarrollo local. Con Clerk configurado también inicia
-  el worker IAM que consume el outbox.
+  la API y la web para desarrollo local. La API y los workers Go usan Air; la
+  consola usa el HMR de Vite. Con Clerk configurado también inicia el worker
+  IAM que consume el outbox.
 
 Cada componente mantiene dependencias y checks propios. Los módulos de
 `platform` se consumen exclusivamente mediante versiones publicadas.
@@ -26,7 +27,11 @@ make smoke
 
 La web queda disponible en `http://localhost:15173`, la API en
 `http://localhost:18080` y PostgreSQL en `127.0.0.1:55433`. El job `migrate`
-termina antes de que se inicie el backend.
+termina antes de que se inicie el backend. Los cambios en `backend/**/*.go`
+recompilan el proceso correspondiente con Air y los cambios en `web/src`
+se reflejan mediante Vite sin reconstruir imágenes. Las configuraciones
+`.air.api.toml`, `.air.iam-worker.toml` y `.air.iam-sync-worker.toml` mantienen
+el mismo flujo para cada binario de larga duración.
 
 Sin claves Clerk el stack permanece saludable, pero toda la superficie IAM
 responde en modo cerrado con `AUTH_NOT_CONFIGURED`; no existe un bypass local.

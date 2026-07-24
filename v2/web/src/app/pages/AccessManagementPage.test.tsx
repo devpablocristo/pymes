@@ -127,13 +127,19 @@ test("applies and reverses lifecycle transitions for users and tenants", async (
     </AppProviders>,
   );
 
-  await user.click(await screen.findByRole("button", { name: "Archivar" }));
+  await user.click(
+    await screen.findByRole("checkbox", { name: "Seleccionar Marina Sur" }),
+  );
+  await user.click(screen.getByRole("button", { name: "Archivar" }));
   expect(request).toHaveBeenCalledWith(
     "/api/v1/admin/users/user-2/archive",
     expect.objectContaining({ method: "POST" }),
   );
 
   await user.click(screen.getByRole("tab", { name: "Archivados" }));
+  await user.click(
+    await screen.findByRole("checkbox", { name: "Seleccionar Marina Sur" }),
+  );
   await user.click(await screen.findByRole("button", { name: "Desarchivar" }));
   expect(request).toHaveBeenCalledWith(
     "/api/v1/admin/users/user-2/unarchive",
@@ -141,6 +147,9 @@ test("applies and reverses lifecycle transitions for users and tenants", async (
   );
 
   await user.click(screen.getByRole("tab", { name: "Tenants" }));
+  await user.click(
+    await screen.findByRole("checkbox", { name: "Seleccionar Comercio Sur" }),
+  );
   await user.click(await screen.findByRole("button", { name: "Papelera" }));
   expect(request).toHaveBeenCalledWith(
     "/api/v1/admin/tenants/tenant-2/trash",
@@ -148,12 +157,18 @@ test("applies and reverses lifecycle transitions for users and tenants", async (
   );
 
   await user.click(screen.getByRole("tab", { name: "Papelera" }));
+  await user.click(
+    await screen.findByRole("checkbox", { name: "Seleccionar Comercio Sur" }),
+  );
   await user.click(await screen.findByRole("button", { name: "Restaurar" }));
   expect(request).toHaveBeenCalledWith(
     "/api/v1/admin/tenants/tenant-2/restore",
     expect.objectContaining({ method: "POST" }),
   );
 
+  await user.click(
+    await screen.findByRole("checkbox", { name: "Seleccionar Comercio Sur" }),
+  );
   await user.click(screen.getByRole("button", { name: "Eliminar definitivamente" }));
   expect(request).toHaveBeenCalledWith(
     "/api/v1/admin/tenants/tenant-2/purge",

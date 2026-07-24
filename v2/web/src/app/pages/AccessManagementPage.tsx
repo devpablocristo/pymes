@@ -2,7 +2,6 @@ import {
   matchesAccessSearch,
   normalizeAccessSearch,
   type AccessTab,
-  type ResourceState,
 } from "@devpablocristo/platform-access-management";
 import "@devpablocristo/platform-access-management/styles.css";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -10,6 +9,14 @@ import type { components } from "../../api/schema.generated";
 import { createIdempotencyKey } from "../../api/idempotency";
 import { useProductApi } from "../../api/ProductApiContext";
 import { useProductAuth } from "../../auth/AuthContext";
+import {
+  EntityLifecycleBulkToolbar,
+  EntityLifecycleTabs,
+  EntitySelectionToolbar,
+  toApiLifecycleState,
+  type EntityLifecycleAction,
+  type EntityLifecycleState,
+} from "../components/EntityLifecycle";
 import { SectionHeader } from "../shell/SectionChrome";
 
 type AdminTenant = components["schemas"]["AdminTenant"];
@@ -19,30 +26,18 @@ type AdminUserList = components["schemas"]["AdminUserList"];
 type Invitation = components["schemas"]["Invitation"];
 type InvitationList = components["schemas"]["InvitationList"];
 
-type LifecycleAction = "archive" | "unarchive" | "trash" | "restore" | "purge";
-
 const tabLabels: Record<AccessTab, string> = {
   users: "Usuarios",
   tenants: "Tenants",
   invitations: "Invitaciones",
 };
 
-const resourceStateLabels: Record<ResourceState, string> = {
-  active: "Activos",
-  archived: "Archivados",
-  trash: "Papelera",
-};
-
-function apiLifecycleState(state: ResourceState) {
-  return state === "trash" ? "trashed" : state;
-}
-
 export function AccessManagementPage() {
   const api = useProductApi();
   const auth = useProductAuth();
   const [activeTab, setActiveTab] = useState<AccessTab>("users");
   const [resourceStates, setResourceStates] = useState<
-    Record<"users" | "tenants", ResourceState>
+    Record<"users" | "tenants", EntityLifecycleState>
   >({
     users: "active",
     tenants: "active",
@@ -50,6 +45,10 @@ export function AccessManagementPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [tenants, setTenants] = useState<AdminTenant[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [selectedIds, setSelectedIds] = useState<
+    Record<"users" | "tenants", string[]>
+  >({ users: [], tenants: [] });
+  const [selectedInvitationIds, setSelectedInvitationIds] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
@@ -66,6 +65,8 @@ export function AccessManagementPage() {
   );
   const selectedResourceState =
     activeTab === "invitations" ? undefined : resourceStates[activeTab];
+  const selectedResourceIds =
+    activeTab === "invitations" ? [] : selectedIds[activeTab];
 
   useEffect(() => {
     const controller = new AbortController();
@@ -76,14 +77,14 @@ export function AccessManagementPage() {
       activeTab === "users"
         ? api
             .request<AdminUserList>(
-              `/api/v1/admin/users?limit=100&lifecycle_state=${apiLifecycleState(resourceStates.users)}`,
+              `/api/v1/admin/users?limit=100&lifecycle_state=${toApiLifecycleState(resourceStates.users)}`,
               { signal: controller.signal, skipJSONContentType: true },
             )
             .then((response) => setUsers(response.items))
         : activeTab === "tenants"
           ? api
               .request<AdminTenantList>(
-                `/api/v1/admin/tenants?limit=100&lifecycle_state=${apiLifecycleState(resourceStates.tenants)}`,
+                `/api/v1/admin/tenants?limit=100&lifecycle_state=${toApiLifecycleState(resourceStates.tenants)}`,
                 { signal: controller.signal, skipJSONContentType: true },
               )
               .then((response) => setTenants(response.items))
@@ -188,22 +189,45 @@ export function AccessManagementPage() {
     }
   }
 
-  async function lifecycle(
-    resource: "users" | "tenants",
-    resourceId: string,
-    action: LifecycleAction,
-  ) {
+  async function applyLifecycle(action: EntityLifecycleAction) {
+    if (activeTab === "invitations") return;
+    const resource = activeTab;
+    const ids = selectedIds[resource];
+    if (ids.length === 0) return;
     if (
       action === "purge" &&
       !window.confirm("Esta acción elimina el registro definitivamente. ¿Continuar?")
     ) {
       return;
     }
-    await command(
-      `admin-${resource}-${action}-${resourceId}`,
-      `/api/v1/admin/${resource}/${encodeURIComponent(resourceId)}/${action}`,
-      action === "purge" ? "DELETE" : "POST",
-    );
+    setBusy(`bulk-${resource}-${action}`);
+    setError(undefined);
+    setNotice(undefined);
+    try {
+      for (const resourceId of ids) {
+        await api.request(
+          `/api/v1/admin/${resource}/${encodeURIComponent(resourceId)}/${action}`,
+          {
+            method: action === "purge" ? "DELETE" : "POST",
+            headers: {
+              "Idempotency-Key": createIdempotencyKey(
+                `admin-${resource}-${action}-${resourceId}`,
+              ),
+            },
+            body: JSON.stringify({}),
+          },
+        );
+      }
+      setSelectedIds((current) => ({ ...current, [resource]: [] }));
+      setNotice("Cambio guardado.");
+      setRevision((current) => current + 1);
+    } catch (cause: unknown) {
+      setError(
+        cause instanceof Error ? cause.message : "No pudimos aplicar el cambio.",
+      );
+    } finally {
+      setBusy(undefined);
+    }
   }
 
   async function updateTenant(event: FormEvent<HTMLFormElement>) {
@@ -241,9 +265,64 @@ export function AccessManagementPage() {
 
   function selectTab(tab: AccessTab) {
     setActiveTab(tab);
+    setSelectedIds({ users: [], tenants: [] });
+    setSelectedInvitationIds([]);
     setQuery("");
     setError(undefined);
     setNotice(undefined);
+  }
+
+  function toggleSelected(
+    resource: "users" | "tenants",
+    id: string,
+    checked: boolean,
+  ) {
+    setSelectedIds((current) => ({
+      ...current,
+      [resource]: checked
+        ? Array.from(new Set([...current[resource], id]))
+        : current[resource].filter((candidate) => candidate !== id),
+    }));
+  }
+
+  function toggleInvitation(id: string, checked: boolean) {
+    setSelectedInvitationIds((current) =>
+      checked
+        ? Array.from(new Set([...current, id]))
+        : current.filter((candidate) => candidate !== id),
+    );
+  }
+
+  async function applyInvitationAction(action: "resend" | "revoke") {
+    if (selectedInvitationIds.length === 0) return;
+    setBusy(`bulk-invitations-${action}`);
+    setError(undefined);
+    setNotice(undefined);
+    try {
+      for (const id of selectedInvitationIds) {
+        await api.request(
+          `/api/v1/team/invitations/${encodeURIComponent(id)}/${action}`,
+          {
+            method: "POST",
+            headers: {
+              "Idempotency-Key": createIdempotencyKey(
+                `team-invitation-${action}-${id}`,
+              ),
+            },
+            body: JSON.stringify({}),
+          },
+        );
+      }
+      setSelectedInvitationIds([]);
+      setNotice("Cambio guardado.");
+      setRevision((current) => current + 1);
+    } catch (cause: unknown) {
+      setError(
+        cause instanceof Error ? cause.message : "No pudimos aplicar el cambio.",
+      );
+    } finally {
+      setBusy(undefined);
+    }
   }
 
   return (
@@ -283,45 +362,78 @@ export function AccessManagementPage() {
               <div>
                 <h2>{tabLabels[activeTab]}</h2>
                 {selectedResourceState ? (
-                  <div
-                    className="lifecycle-tabs"
-                    role="tablist"
-                    aria-label={`Estado de ${tabLabels[activeTab].toLowerCase()}`}
-                  >
-                    {(Object.keys(resourceStateLabels) as ResourceState[]).map(
-                      (state) => (
-                        <button
-                          aria-selected={selectedResourceState === state}
-                          className={
-                            selectedResourceState === state ? "is-active" : ""
-                          }
-                          key={state}
-                          onClick={() =>
-                            setResourceStates((current) => ({
-                              ...current,
-                              [activeTab]: state,
-                            }))
-                          }
-                          role="tab"
-                          type="button"
-                        >
-                          {resourceStateLabels[state]}
-                        </button>
-                      ),
-                    )}
-                  </div>
+                  <>
+                    <EntityLifecycleTabs
+                      label={`Estado de ${tabLabels[activeTab].toLowerCase()}`}
+                      state={selectedResourceState}
+                      onChange={(state) => {
+                        setResourceStates((current) => ({
+                          ...current,
+                          [activeTab]: state,
+                        }));
+                        setSelectedIds((current) => ({
+                          ...current,
+                          [activeTab]: [],
+                        }));
+                      }}
+                    />
+                    <EntityLifecycleBulkToolbar
+                      busy={Boolean(busy)}
+                      editOpen={Boolean(editingTenant)}
+                      onAction={(action) => void applyLifecycle(action)}
+                      onClear={() =>
+                        setSelectedIds((current) => ({
+                          ...current,
+                          [activeTab]: [],
+                        }))
+                      }
+                      onEdit={
+                        activeTab === "tenants" && selectedIds.tenants.length === 1
+                          ? () =>
+                              setEditingTenant(
+                                tenants.find(
+                                  (tenant) => tenant.id === selectedIds.tenants[0],
+                                ),
+                              )
+                          : activeTab === "tenants"
+                            ? () => undefined
+                            : undefined
+                      }
+                      selectedCount={selectedResourceIds.length}
+                      state={selectedResourceState}
+                    />
+                  </>
+                ) : null}
+                {activeTab === "invitations" ? (
+                  <EntitySelectionToolbar
+                    actions={[
+                      {
+                        id: "resend",
+                        label: "Reenviar",
+                        onClick: () => void applyInvitationAction("resend"),
+                      },
+                      {
+                        id: "revoke",
+                        label: "Revocar",
+                        danger: true,
+                        disabled: selectedInvitationIds.some(
+                          (id) =>
+                            invitations.find((invitation) => invitation.id === id)
+                              ?.status !== "pending",
+                        ),
+                        onClick: () => void applyInvitationAction("revoke"),
+                      },
+                    ]}
+                    busy={Boolean(busy)}
+                    createLabel="Nueva invitación"
+                    onClear={() => setSelectedInvitationIds([])}
+                    onCreate={
+                      activeOrganization ? () => setInvitationOpen(true) : undefined
+                    }
+                    selectedCount={selectedInvitationIds.length}
+                  />
                 ) : null}
               </div>
-
-              {activeTab === "invitations" && activeOrganization ? (
-                <button
-                  className="platform-access__primary"
-                  onClick={() => setInvitationOpen(true)}
-                  type="button"
-                >
-                  + Nueva invitación
-                </button>
-              ) : null}
             </div>
 
             {error ? (
@@ -343,44 +455,28 @@ export function AccessManagementPage() {
               <>
                 {activeTab === "users" ? (
                   <UsersTable
-                    busy={busy}
                     currentEmail={auth.user?.email}
                     items={visibleUsers}
-                    state={resourceStates.users}
-                    onLifecycle={(id, action) =>
-                      void lifecycle("users", id, action)
+                    selectedIds={selectedIds.users}
+                    onToggle={(id, checked) =>
+                      toggleSelected("users", id, checked)
                     }
                   />
                 ) : null}
                 {activeTab === "tenants" ? (
                   <TenantsTable
-                    busy={busy}
                     items={visibleTenants}
-                    state={resourceStates.tenants}
-                    onEdit={setEditingTenant}
-                    onLifecycle={(id, action) =>
-                      void lifecycle("tenants", id, action)
+                    selectedIds={selectedIds.tenants}
+                    onToggle={(id, checked) =>
+                      toggleSelected("tenants", id, checked)
                     }
                   />
                 ) : null}
                 {activeTab === "invitations" ? (
                   <InvitationsTable
-                    busy={busy}
                     items={visibleInvitations}
-                    onResend={(id) =>
-                      void command(
-                        `team-invitation-resend-${id}`,
-                        `/api/v1/team/invitations/${encodeURIComponent(id)}/resend`,
-                        "POST",
-                      )
-                    }
-                    onRevoke={(id) =>
-                      void command(
-                        `team-invitation-revoke-${id}`,
-                        `/api/v1/team/invitations/${encodeURIComponent(id)}/revoke`,
-                        "POST",
-                      )
-                    }
+                    selectedIds={selectedInvitationIds}
+                    onToggle={toggleInvitation}
                   />
                 ) : null}
               </>
@@ -505,32 +601,38 @@ export function AccessManagementPage() {
 }
 
 function UsersTable({
-  busy,
   currentEmail,
   items,
-  onLifecycle,
-  state,
+  onToggle,
+  selectedIds,
 }: {
-  busy?: string;
   currentEmail?: string;
   items: AdminUser[];
-  onLifecycle: (id: string, action: LifecycleAction) => void;
-  state: ResourceState;
+  onToggle: (id: string, checked: boolean) => void;
+  selectedIds: string[];
 }) {
   return (
     <div className="directory-table-wrap">
       <table>
         <thead>
           <tr>
+            <th className="entity-select-cell" />
             <th>Email</th>
             <th>Nombre</th>
             <th>Tenants y roles</th>
-            <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
           {items.map((user) => (
             <tr key={user.id}>
+              <td className="entity-select-cell">
+                <input
+                  aria-label={`Seleccionar ${user.display_name || user.email}`}
+                  checked={selectedIds.includes(user.id)}
+                  onChange={(event) => onToggle(user.id, event.currentTarget.checked)}
+                  type="checkbox"
+                />
+              </td>
               <td>
                 {user.email}
                 {currentEmail?.toLowerCase() === user.email.toLowerCase() ? (
@@ -546,14 +648,6 @@ function UsersTable({
                   )
                   .join(", ") || "—"}
               </td>
-              <td>
-                <LifecycleActions
-                  busy={busy}
-                  id={user.id}
-                  onAction={onLifecycle}
-                  state={state}
-                />
-              </td>
             </tr>
           ))}
         </tbody>
@@ -566,54 +660,41 @@ function UsersTable({
 }
 
 function TenantsTable({
-  busy,
   items,
-  onEdit,
-  onLifecycle,
-  state,
+  onToggle,
+  selectedIds,
 }: {
-  busy?: string;
   items: AdminTenant[];
-  onEdit: (tenant: AdminTenant) => void;
-  onLifecycle: (id: string, action: LifecycleAction) => void;
-  state: ResourceState;
+  onToggle: (id: string, checked: boolean) => void;
+  selectedIds: string[];
 }) {
   return (
     <div className="directory-table-wrap">
       <table>
         <thead>
           <tr>
+            <th className="entity-select-cell" />
             <th>Tenant</th>
             <th>Slug</th>
             <th>Estado</th>
-            <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
           {items.map((tenant) => (
             <tr key={tenant.id}>
+              <td className="entity-select-cell">
+                <input
+                  aria-label={`Seleccionar ${tenant.name}`}
+                  checked={selectedIds.includes(tenant.id)}
+                  onChange={(event) =>
+                    onToggle(tenant.id, event.currentTarget.checked)
+                  }
+                  type="checkbox"
+                />
+              </td>
               <td>{tenant.name}</td>
               <td>{tenant.slug}</td>
               <td>{tenant.status}</td>
-              <td>
-                <div className="directory-row-actions">
-                  {state === "active" ? (
-                    <button
-                      disabled={Boolean(busy)}
-                      onClick={() => onEdit(tenant)}
-                      type="button"
-                    >
-                      Editar
-                    </button>
-                  ) : null}
-                  <LifecycleActions
-                    busy={busy}
-                    id={tenant.id}
-                    onAction={onLifecycle}
-                    state={state}
-                  />
-                </div>
-              </td>
             </tr>
           ))}
         </tbody>
@@ -625,116 +706,44 @@ function TenantsTable({
   );
 }
 
-function LifecycleActions({
-  busy,
-  id,
-  onAction,
-  state,
-}: {
-  busy?: string;
-  id: string;
-  onAction: (id: string, action: LifecycleAction) => void;
-  state: ResourceState;
-}) {
-  const disabled = Boolean(busy);
-  if (state === "active") {
-    return (
-      <div className="directory-row-actions">
-        <button disabled={disabled} onClick={() => onAction(id, "archive")} type="button">
-          Archivar
-        </button>
-        <button
-          className="is-danger"
-          disabled={disabled}
-          onClick={() => onAction(id, "trash")}
-          type="button"
-        >
-          Papelera
-        </button>
-      </div>
-    );
-  }
-  if (state === "archived") {
-    return (
-      <div className="directory-row-actions">
-        <button
-          disabled={disabled}
-          onClick={() => onAction(id, "unarchive")}
-          type="button"
-        >
-          Desarchivar
-        </button>
-      </div>
-    );
-  }
-  return (
-    <div className="directory-row-actions">
-      <button disabled={disabled} onClick={() => onAction(id, "restore")} type="button">
-        Restaurar
-      </button>
-      <button
-        className="is-danger"
-        disabled={disabled}
-        onClick={() => onAction(id, "purge")}
-        type="button"
-      >
-        Eliminar definitivamente
-      </button>
-    </div>
-  );
-}
-
 function InvitationsTable({
-  busy,
   items,
-  onResend,
-  onRevoke,
+  onToggle,
+  selectedIds,
 }: {
-  busy?: string;
   items: Invitation[];
-  onResend: (id: string) => void;
-  onRevoke: (id: string) => void;
+  onToggle: (id: string, checked: boolean) => void;
+  selectedIds: string[];
 }) {
   return (
     <div className="directory-table-wrap">
       <table>
         <thead>
           <tr>
+            <th className="entity-select-cell" />
             <th>Email</th>
             <th>Rol</th>
             <th>Estado</th>
             <th>Vence</th>
-            <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
           {items.map((invitation) => (
             <tr key={invitation.id}>
+              <td className="entity-select-cell">
+                <input
+                  aria-label={`Seleccionar ${invitation.email}`}
+                  checked={selectedIds.includes(invitation.id)}
+                  onChange={(event) =>
+                    onToggle(invitation.id, event.currentTarget.checked)
+                  }
+                  type="checkbox"
+                />
+              </td>
               <td>{invitation.email}</td>
               <td>{invitation.role}</td>
               <td>{invitation.status}</td>
               <td>{new Date(invitation.expires_at).toLocaleDateString("es-AR")}</td>
-              <td>
-                <div className="directory-row-actions">
-                  <button
-                    disabled={Boolean(busy)}
-                    onClick={() => onResend(invitation.id)}
-                    type="button"
-                  >
-                    Reenviar
-                  </button>
-                  {invitation.status === "pending" ? (
-                    <button
-                      className="is-danger"
-                      disabled={Boolean(busy)}
-                      onClick={() => onRevoke(invitation.id)}
-                      type="button"
-                    >
-                      Revocar
-                    </button>
-                  ) : null}
-                </div>
-              </td>
             </tr>
           ))}
         </tbody>

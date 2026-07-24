@@ -1,4 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  EntityLifecycleBulkToolbar,
+  EntityLifecycleTabs,
+  type EntityLifecycleAction,
+  type EntityLifecycleState,
+} from "../components/EntityLifecycle";
 import { useI18n } from "../providers/I18nProvider";
 import { SectionHeader, SectionSearch } from "../shell/SectionChrome";
 
@@ -11,10 +17,15 @@ export type EmployeeListItem = {
   phone?: string | null;
   status: string;
   hire_date?: string | null;
+  lifecycle_state?: "active" | "archived" | "trashed";
 };
 
 type EmployeesPageProps = {
   employees?: readonly EmployeeListItem[];
+  onLifecycle?: (
+    employee: EmployeeListItem,
+    action: EntityLifecycleAction,
+  ) => Promise<void> | void;
 };
 
 const statusLabels: Record<string, string> = {
@@ -23,25 +34,90 @@ const statusLabels: Record<string, string> = {
   terminated: "Baja",
 };
 
-export function EmployeesPage({ employees = [] }: EmployeesPageProps) {
+const emptyEmployees: readonly EmployeeListItem[] = [];
+
+export function EmployeesPage({
+  employees = emptyEmployees,
+  onLifecycle,
+}: EmployeesPageProps) {
   const { language, t } = useI18n();
   const [search, setSearch] = useState("");
+  const [state, setState] = useState<EntityLifecycleState>("active");
+  const [items, setItems] = useState<EmployeeListItem[]>([...employees]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [busy, setBusy] = useState<string>();
+  const [error, setError] = useState<string>();
+
+  useEffect(() => setItems([...employees]), [employees]);
+
   const visibleEmployees = useMemo(() => {
     const locale = language === "es" ? "es" : "en";
     const query = search.trim().toLocaleLowerCase(locale);
-    if (!query) return employees;
-    return employees.filter((employee) =>
-      [
-        employee.first_name,
-        employee.last_name,
-        employee.position,
-        employee.email,
-        employee.phone,
-        statusLabels[employee.status] ?? employee.status,
-        employee.hire_date,
-      ].some((value) => String(value ?? "").toLocaleLowerCase(locale).includes(query)),
+    const lifecycleState = state === "trash" ? "trashed" : state;
+    return items.filter(
+      (employee) =>
+        (employee.lifecycle_state ?? "active") === lifecycleState &&
+        (!query ||
+          [
+            employee.first_name,
+            employee.last_name,
+            employee.position,
+            employee.email,
+            employee.phone,
+            statusLabels[employee.status] ?? employee.status,
+            employee.hire_date,
+          ].some((value) =>
+            String(value ?? "").toLocaleLowerCase(locale).includes(query),
+          )),
     );
-  }, [employees, language, search]);
+  }, [items, language, search, state]);
+
+  async function applyLifecycle(action: EntityLifecycleAction) {
+    if (selectedIds.length === 0) return;
+    if (
+      action === "purge" &&
+      !window.confirm("Esta acción elimina el empleado definitivamente. ¿Continuar?")
+    ) {
+      return;
+    }
+    setBusy(`bulk-${action}`);
+    setError(undefined);
+    try {
+      for (const employeeID of selectedIds) {
+        const employee = items.find((candidate) => candidate.id === employeeID);
+        if (employee) await onLifecycle?.(employee, action);
+      }
+      if (action === "purge") {
+        setItems((current) =>
+          current.filter((item) => !selectedIds.includes(item.id)),
+        );
+        setSelectedIds([]);
+        return;
+      }
+      const lifecycleState =
+        action === "archive"
+          ? "archived"
+          : action === "trash"
+            ? "trashed"
+            : "active";
+      setItems((current) =>
+        current.map((item) =>
+          selectedIds.includes(item.id)
+            ? { ...item, lifecycle_state: lifecycleState }
+            : item,
+        ),
+      );
+      setSelectedIds([]);
+    } catch (cause: unknown) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "No pudimos cambiar el estado del empleado.",
+      );
+    } finally {
+      setBusy(undefined);
+    }
+  }
 
   return (
     <div className="directory-page employees-page">
@@ -51,6 +127,21 @@ export function EmployeesPage({ employees = [] }: EmployeesPageProps) {
           <div className="directory-section__heading">
             <div className="directory-section__title">
               <h2>{t("nav.employees")}</h2>
+              <EntityLifecycleTabs
+                label="Estado de empleados"
+                state={state}
+                onChange={(nextState) => {
+                  setState(nextState);
+                  setSelectedIds([]);
+                }}
+              />
+              <EntityLifecycleBulkToolbar
+                busy={Boolean(busy)}
+                onAction={(action) => void applyLifecycle(action)}
+                onClear={() => setSelectedIds([])}
+                selectedCount={selectedIds.length}
+                state={state}
+              />
               <span className="settings-count" aria-label="Cantidad de empleados">
                 {visibleEmployees.length}
               </span>
@@ -65,10 +156,17 @@ export function EmployeesPage({ employees = [] }: EmployeesPageProps) {
             </div>
           </div>
 
+          {error ? (
+            <div className="inline-state inline-state--error" role="alert">
+              {error}
+            </div>
+          ) : null}
+
           <div className="directory-table-wrap">
             <table className="directory-table" aria-label={t("nav.employees")}>
               <thead>
                 <tr>
+                  <th className="entity-select-cell" />
                   <th>Nombre</th>
                   <th>Puesto</th>
                   <th>Email</th>
@@ -84,6 +182,21 @@ export function EmployeesPage({ employees = [] }: EmployeesPageProps) {
                     .join(" ");
                   return (
                     <tr key={employee.id}>
+                      <td className="entity-select-cell">
+                        <input
+                          aria-label={`Seleccionar ${fullName || employee.id}`}
+                          checked={selectedIds.includes(employee.id)}
+                          onChange={(event) => {
+                            const checked = event.currentTarget.checked;
+                            setSelectedIds((current) =>
+                              checked
+                                ? Array.from(new Set([...current, employee.id]))
+                                : current.filter((id) => id !== employee.id),
+                            );
+                          }}
+                          type="checkbox"
+                        />
+                      </td>
                       <td className="directory-table__primary">{fullName || "—"}</td>
                       <td>{employee.position || "—"}</td>
                       <td>{employee.email || "—"}</td>
@@ -99,8 +212,8 @@ export function EmployeesPage({ employees = [] }: EmployeesPageProps) {
                 })}
                 {visibleEmployees.length === 0 ? (
                   <tr>
-                    <td className="directory-empty" colSpan={6}>
-                      {employees.length === 0
+                    <td className="directory-empty" colSpan={7}>
+                      {items.length === 0
                         ? "No hay empleados cargados."
                         : "No hay empleados que coincidan con la búsqueda."}
                     </td>

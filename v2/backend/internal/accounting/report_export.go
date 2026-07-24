@@ -106,6 +106,97 @@ func TrialBalanceReportTable(trial TrialBalance) ReportTable {
 	}
 }
 
+// TrialBalancePageReportTable exports the dedicated six-column Argentine
+// Balance de sumas y saldos. Signed balances are split into debtor and
+// creditor columns so exports never rely on ambiguous negative amounts.
+func TrialBalancePageReportTable(page TrialBalancePage) ReportTable {
+	rows := make([][]ReportCell, 0, len(page.Items)+2)
+	for _, row := range page.Items {
+		openingDebit, openingCredit := trialBalanceSides(row.OpeningBalance)
+		closingDebit, closingCredit := trialBalanceSides(row.ClosingBalance)
+		rows = append(rows, []ReportCell{
+			TextReportCell(row.Code),
+			TextReportCell(row.Name),
+			TextReportCell(string(row.Class)),
+			TextReportCell(string(row.NormalBalance)),
+			TextReportCell(strings.Join(row.Path, " > ")),
+			TextReportCell(string(row.LifecycleState)),
+			DecimalReportCell(openingDebit),
+			DecimalReportCell(openingCredit),
+			DecimalReportCell(row.Debit),
+			DecimalReportCell(row.Credit),
+			DecimalReportCell(closingDebit),
+			DecimalReportCell(closingCredit),
+		})
+	}
+	rows = append(rows, []ReportCell{
+		TextReportCell(""),
+		TextReportCell("TOTAL"),
+		TextReportCell(""),
+		TextReportCell(""),
+		TextReportCell(""),
+		TextReportCell(""),
+		DecimalReportCell(page.Totals.OpeningDebit),
+		DecimalReportCell(page.Totals.OpeningCredit),
+		DecimalReportCell(page.Totals.Debit),
+		DecimalReportCell(page.Totals.Credit),
+		DecimalReportCell(page.Totals.ClosingDebit),
+		DecimalReportCell(page.Totals.ClosingCredit),
+	})
+	openingControlDebit, openingControlCredit := trialBalanceSides(
+		page.Totals.OpeningDifference,
+	)
+	movementControlDebit, movementControlCredit := trialBalanceSides(
+		page.Totals.MovementDifference,
+	)
+	closingControlDebit, closingControlCredit := trialBalanceSides(
+		page.Totals.ClosingDifference,
+	)
+	rows = append(rows, []ReportCell{
+		TextReportCell(""),
+		TextReportCell("DIFERENCIA DE CONTROL"),
+		TextReportCell(""),
+		TextReportCell(""),
+		TextReportCell(""),
+		TextReportCell(""),
+		DecimalReportCell(openingControlDebit),
+		DecimalReportCell(openingControlCredit),
+		DecimalReportCell(movementControlDebit),
+		DecimalReportCell(movementControlCredit),
+		DecimalReportCell(closingControlDebit),
+		DecimalReportCell(closingControlCredit),
+	})
+	return ReportTable{
+		Title:    "Balance de sumas y saldos",
+		Subtitle: reportPeriod(page.From, page.To),
+		Columns: []string{
+			"Código",
+			"Cuenta",
+			"Clase",
+			"Naturaleza",
+			"Ruta",
+			"Estado",
+			"Saldo inicial deudor",
+			"Saldo inicial acreedor",
+			"Debe",
+			"Haber",
+			"Saldo final deudor",
+			"Saldo final acreedor",
+		},
+		Rows: rows,
+	}
+}
+
+func trialBalanceSides(balance Decimal) (Decimal, Decimal) {
+	if balance.Sign() > 0 {
+		return balance.Abs(), Zero
+	}
+	if balance.Sign() < 0 {
+		return Zero, balance.Abs()
+	}
+	return Zero, Zero
+}
+
 func GeneralLedgerReportTable(ledger GeneralLedger) ReportTable {
 	rows := make([][]ReportCell, 0, len(ledger.Lines)+2)
 	rows = append(rows, []ReportCell{
@@ -139,6 +230,94 @@ func GeneralLedgerReportTable(ledger GeneralLedger) ReportTable {
 		Subtitle: reportPeriod(ledger.From, ledger.To),
 		Columns:  []string{"Fecha", "Asiento", "Concepto", "Debe", "Haber", "Saldo"},
 		Rows:     rows,
+	}
+}
+
+// GeneralLedgerPageReportTable exports the dedicated Mayor endpoint. Unlike
+// the legacy report compatibility table, it preserves reference, origin and
+// line memo and shows balances without relying on a signed display value.
+func GeneralLedgerPageReportTable(ledger GeneralLedgerPage) ReportTable {
+	rows := make([][]ReportCell, 0, len(ledger.Items)+2)
+	rows = append(rows, generalLedgerExportRow(
+		ledger.From,
+		"",
+		"",
+		"",
+		"Saldo inicial",
+		Zero,
+		Zero,
+		ledger.OpeningBalance,
+	))
+	for _, line := range ledger.Items {
+		detail := line.Description
+		if strings.TrimSpace(line.Memo) != "" {
+			detail += " · " + strings.TrimSpace(line.Memo)
+		}
+		rows = append(rows, generalLedgerExportRow(
+			line.Date,
+			strconv.FormatInt(line.EntryNumber, 10),
+			line.Reference,
+			line.Origin,
+			detail,
+			line.Debit,
+			line.Credit,
+			line.Balance,
+		))
+	}
+	rows = append(rows, generalLedgerExportRow(
+		ledger.To,
+		"",
+		"",
+		"",
+		"Saldo final",
+		Zero,
+		Zero,
+		ledger.ClosingBalance,
+	))
+	return ReportTable{
+		Title:    "Libro Mayor · " + ledger.Account.Code + " " + ledger.Account.Name,
+		Subtitle: reportPeriod(ledger.From, ledger.To),
+		Columns: []string{
+			"Fecha",
+			"Asiento",
+			"Referencia",
+			"Origen",
+			"Detalle",
+			"Debe",
+			"Haber",
+			"Saldo deudor",
+			"Saldo acreedor",
+		},
+		Rows: rows,
+	}
+}
+
+func generalLedgerExportRow(
+	date time.Time,
+	entryNumber string,
+	reference string,
+	origin string,
+	detail string,
+	debit Decimal,
+	credit Decimal,
+	balance Decimal,
+) []ReportCell {
+	debtor, creditor := Zero, Zero
+	if balance.Sign() > 0 {
+		debtor = balance.Abs()
+	} else if balance.Sign() < 0 {
+		creditor = balance.Abs()
+	}
+	return []ReportCell{
+		TextReportCell(date.Format("2006-01-02")),
+		TextReportCell(entryNumber),
+		TextReportCell(reference),
+		TextReportCell(origin),
+		TextReportCell(detail),
+		DecimalReportCell(debit),
+		DecimalReportCell(credit),
+		DecimalReportCell(debtor),
+		DecimalReportCell(creditor),
 	}
 }
 

@@ -10,6 +10,152 @@ import (
 	"github.com/google/uuid"
 )
 
+func TestAccountWorkflowSeparatesGroupsAndPostingAccounts(t *testing.T) {
+	t.Parallel()
+
+	_, service, scope := serviceFixture(t)
+	if _, err := service.CreateAccount(
+		context.Background(),
+		scope,
+		CreateAccountCommand{
+			Code:     "1.1.99",
+			Name:     "Cuenta sin rubro",
+			Class:    AccountAsset,
+			Monetary: Monetary,
+			Postable: true,
+			NodeType: AccountPosting,
+		},
+	); !errors.Is(err, ErrInvalidAccountParent) {
+		t.Fatalf("posting account without parent error = %v", err)
+	}
+
+	group, err := service.CreateAccount(
+		context.Background(),
+		scope,
+		CreateAccountCommand{
+			Code:     "1.9",
+			Name:     "Otros activos",
+			Class:    AccountAsset,
+			Monetary: NotApplicable,
+			NodeType: AccountGroup,
+		},
+	)
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	posting, err := service.CreateAccount(
+		context.Background(),
+		scope,
+		CreateAccountCommand{
+			Code:     "1.9.01",
+			Name:     "Cuenta operativa",
+			Class:    AccountAsset,
+			Monetary: Monetary,
+			ParentID: &group.ID,
+			Postable: true,
+			NodeType: AccountPosting,
+		},
+	)
+	if err != nil {
+		t.Fatalf("create posting account: %v", err)
+	}
+	if posting.NodeType != AccountPosting || !posting.Postable {
+		t.Fatalf("created posting account = %#v", posting)
+	}
+}
+
+func TestUsedAccountAllowsOnlyNameUpdateAndMappingBlocksArchive(t *testing.T) {
+	t.Parallel()
+
+	repository, service, scope := serviceFixture(t)
+	groupID := uuid.New()
+	accountID := uuid.New()
+	repository.accounts[groupID] = Account{
+		ID: groupID, Code: "1.9", Name: "Otros activos",
+		Class: AccountAsset, NormalBalance: NormalDebit,
+		Monetary: NotApplicable, NodeType: AccountGroup, Version: 1,
+	}
+	repository.accounts[accountID] = Account{
+		ID: accountID, Code: "1.9.01", Name: "Original",
+		Class: AccountAsset, NormalBalance: NormalDebit,
+		Monetary: Monetary, ParentID: &groupID, Postable: true,
+		NodeType: AccountPosting, Version: 1,
+	}
+	repository.mappings["cash"] = AccountMapping{
+		Role: "cash", AccountID: accountID, Version: 1,
+	}
+
+	updated, err := service.UpdateAccount(
+		context.Background(),
+		scope,
+		UpdateAccountCommand{
+			ID: accountID, ExpectedVersion: 1, Code: "1.9.01",
+			Name: "Nombre actualizado", Class: AccountAsset,
+			NormalBalance: NormalDebit, Monetary: Monetary,
+			ParentID: &groupID, Postable: true, NodeType: AccountPosting,
+		},
+	)
+	if err != nil {
+		t.Fatalf("rename used account: %v", err)
+	}
+	if updated.Name != "Nombre actualizado" {
+		t.Fatalf("updated name = %q", updated.Name)
+	}
+	if _, err := service.UpdateAccount(
+		context.Background(),
+		scope,
+		UpdateAccountCommand{
+			ID: accountID, ExpectedVersion: 2, Code: "1.9.02",
+			Name: updated.Name, Class: AccountAsset,
+			NormalBalance: NormalDebit, Monetary: Monetary,
+			ParentID: &groupID, Postable: true, NodeType: AccountPosting,
+		},
+	); !errors.Is(err, ErrAccountStructureLocked) {
+		t.Fatalf("structural update error = %v", err)
+	}
+	if _, err := service.ArchiveAccount(
+		context.Background(), scope, accountID, 2, "Reorganización",
+	); !errors.Is(err, ErrAccountMapped) {
+		t.Fatalf("archive mapped account error = %v", err)
+	}
+}
+
+func TestMappingCatalogRejectsAliasesAndIncompatibleAccounts(t *testing.T) {
+	t.Parallel()
+
+	repository, service, scope := serviceFixture(t)
+	accountID := uuid.New()
+	repository.accounts[accountID] = Account{
+		ID: accountID, Code: "4.9.01", Name: "Ingreso",
+		Class: AccountRevenue, NormalBalance: NormalCredit,
+		Monetary: NonMonetary, Postable: true,
+		NodeType: AccountPosting, Version: 1,
+	}
+	repository.mappingDefinitions["accounts_receivable"] =
+		AccountMappingDefinition{
+			Role: "accounts_receivable", Alias: true,
+			CompatibleAccountClasses:  []AccountClass{AccountAsset},
+			CompatibleNormalBalances:  []NormalBalance{NormalDebit},
+			CompatibleMonetaryClasses: []MonetaryClassification{Monetary},
+		}
+	if _, err := service.SetAccountMapping(
+		context.Background(), scope, "accounts_receivable", accountID, 0,
+	); !errors.Is(err, ErrMappingIncompatible) {
+		t.Fatalf("alias mapping error = %v", err)
+	}
+	repository.mappingDefinitions["cash"] = AccountMappingDefinition{
+		Role:                      "cash",
+		CompatibleAccountClasses:  []AccountClass{AccountAsset},
+		CompatibleNormalBalances:  []NormalBalance{NormalDebit},
+		CompatibleMonetaryClasses: []MonetaryClassification{Monetary},
+	}
+	if _, err := service.SetAccountMapping(
+		context.Background(), scope, "cash", accountID, 0,
+	); !errors.Is(err, ErrMappingIncompatible) {
+		t.Fatalf("incompatible mapping error = %v", err)
+	}
+}
+
 func TestServicePostsIdempotentlyInsideTenantBoundary(t *testing.T) {
 	t.Parallel()
 
@@ -741,6 +887,7 @@ func (transactor *serviceTransactor) WithinTenant(
 type serviceRepository struct {
 	accounts             map[uuid.UUID]Account
 	mappings             map[string]AccountMapping
+	mappingDefinitions   map[string]AccountMappingDefinition
 	drafts               map[uuid.UUID]Draft
 	postedDraft          map[uuid.UUID]uuid.UUID
 	entries              map[uuid.UUID]JournalEntry
@@ -756,6 +903,12 @@ type serviceRepository struct {
 	revaluations         map[uuid.UUID]CurrencyRevaluationWorkpaper
 	fxPositions          []CurrencyRevaluationPosition
 	reportLines          []ReportLine
+	generalLedgerPage    GeneralLedgerPage
+	lastGeneralLedger    GeneralLedgerFilter
+	generalLedgerCalls   int
+	trialBalancePage     TrialBalancePage
+	lastTrialBalance     TrialBalanceFilter
+	trialBalanceCalls    int
 	closedReconciliation bool
 	directReversalOnCall int
 	directReversalCalls  int
@@ -765,11 +918,12 @@ type serviceRepository struct {
 func newServiceRepository() *serviceRepository {
 	periodID := uuid.New()
 	return &serviceRepository{
-		accounts:    make(map[uuid.UUID]Account),
-		mappings:    make(map[string]AccountMapping),
-		drafts:      make(map[uuid.UUID]Draft),
-		postedDraft: make(map[uuid.UUID]uuid.UUID),
-		entries:     make(map[uuid.UUID]JournalEntry),
+		accounts:           make(map[uuid.UUID]Account),
+		mappings:           make(map[string]AccountMapping),
+		mappingDefinitions: make(map[string]AccountMappingDefinition),
+		drafts:             make(map[uuid.UUID]Draft),
+		postedDraft:        make(map[uuid.UUID]uuid.UUID),
+		entries:            make(map[uuid.UUID]JournalEntry),
 		periods: map[uuid.UUID]Period{
 			periodID: {
 				ID:        periodID,
@@ -799,12 +953,53 @@ func (repository *serviceRepository) ListAccounts(_ context.Context, includeArch
 	return result, nil
 }
 
+func (repository *serviceRepository) ListAccountDetails(
+	ctx context.Context,
+	includeTrashed bool,
+) ([]AccountDetail, error) {
+	result := make([]AccountDetail, 0, len(repository.accounts))
+	for id, account := range repository.accounts {
+		if !includeTrashed && account.TrashedAt != nil {
+			continue
+		}
+		detail, err := repository.GetAccountDetail(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, detail)
+	}
+	return result, nil
+}
+
 func (repository *serviceRepository) GetAccount(_ context.Context, id uuid.UUID) (Account, error) {
 	account, ok := repository.accounts[id]
 	if !ok {
 		return Account{}, ErrNotFound
 	}
 	return account, nil
+}
+
+func (repository *serviceRepository) GetAccountDetail(
+	_ context.Context,
+	id uuid.UUID,
+) (AccountDetail, error) {
+	account, ok := repository.accounts[id]
+	if !ok {
+		return AccountDetail{}, ErrNotFound
+	}
+	usage, _ := repository.AccountUsage(context.Background(), id)
+	roles := make([]string, 0)
+	for role, mapping := range repository.mappings {
+		if mapping.AccountID == id {
+			roles = append(roles, role)
+		}
+	}
+	return AccountDetail{
+		Account:      account,
+		Usage:        usage,
+		Capabilities: BuildAccountCapabilities(account, usage),
+		MappingRoles: roles,
+	}, nil
 }
 
 func (repository *serviceRepository) CreateAccount(_ context.Context, account Account) (Account, error) {
@@ -825,11 +1020,28 @@ func (repository *serviceRepository) UpdateAccount(_ context.Context, account Ac
 	return account, nil
 }
 
-func (repository *serviceRepository) AccountUsage(_ context.Context, id uuid.UUID) (int64, int64, int64, error) {
+func (repository *serviceRepository) AccountUsage(
+	_ context.Context,
+	id uuid.UUID,
+) (AccountUsage, error) {
 	if _, ok := repository.accounts[id]; !ok {
-		return 0, 0, 0, ErrNotFound
+		return AccountUsage{}, ErrNotFound
 	}
-	return 0, 0, 0, nil
+	usage := AccountUsage{}
+	for _, mapping := range repository.mappings {
+		if mapping.AccountID == id {
+			usage.Mappings++
+		}
+	}
+	for _, child := range repository.accounts {
+		if child.ParentID != nil && *child.ParentID == id {
+			usage.Children++
+			if child.ArchivedAt == nil && child.TrashedAt == nil {
+				usage.ActiveChildren++
+			}
+		}
+	}
+	return usage, nil
 }
 
 func (repository *serviceRepository) ArchiveAccount(_ context.Context, id uuid.UUID, version int64, at time.Time, _ string) (Account, error) {
@@ -855,12 +1067,18 @@ func (repository *serviceRepository) RestoreAccount(_ context.Context, id uuid.U
 		return Account{}, ErrVersionConflict
 	}
 	account.ArchivedAt = nil
+	account.TrashedAt = nil
 	account.Version++
 	repository.accounts[id] = account
 	return account, nil
 }
 
-func (repository *serviceRepository) DeleteUnusedAccount(_ context.Context, id uuid.UUID, version int64) error {
+func (repository *serviceRepository) TrashUnusedAccount(
+	_ context.Context,
+	id uuid.UUID,
+	version int64,
+	_ string,
+) error {
 	account, ok := repository.accounts[id]
 	if !ok {
 		return ErrNotFound
@@ -868,8 +1086,33 @@ func (repository *serviceRepository) DeleteUnusedAccount(_ context.Context, id u
 	if account.Version != version {
 		return ErrVersionConflict
 	}
-	delete(repository.accounts, id)
+	now := time.Now()
+	account.TrashedAt = &now
+	account.ArchivedAt = nil
+	account.Version++
+	repository.accounts[id] = account
 	return nil
+}
+
+func (repository *serviceRepository) ListMappingDefinitions(
+	context.Context,
+) ([]AccountMappingDefinition, error) {
+	result := make([]AccountMappingDefinition, 0, len(repository.mappingDefinitions))
+	for _, definition := range repository.mappingDefinitions {
+		result = append(result, definition)
+	}
+	return result, nil
+}
+
+func (repository *serviceRepository) GetMappingDefinition(
+	_ context.Context,
+	role string,
+) (AccountMappingDefinition, error) {
+	definition, ok := repository.mappingDefinitions[role]
+	if !ok {
+		return AccountMappingDefinition{}, ErrNotFound
+	}
+	return definition, nil
 }
 
 func (repository *serviceRepository) ListMappings(context.Context) ([]AccountMapping, error) {
@@ -1032,6 +1275,24 @@ func (repository *serviceRepository) TouchesClosedReconciliation(
 
 func (repository *serviceRepository) ListJournal(context.Context, JournalFilter) (PageResult[JournalEntry], error) {
 	return PageResult[JournalEntry]{}, nil
+}
+
+func (repository *serviceRepository) ListGeneralLedger(
+	_ context.Context,
+	filter GeneralLedgerFilter,
+) (GeneralLedgerPage, error) {
+	repository.lastGeneralLedger = filter
+	repository.generalLedgerCalls++
+	return repository.generalLedgerPage, nil
+}
+
+func (repository *serviceRepository) ListTrialBalance(
+	_ context.Context,
+	filter TrialBalanceFilter,
+) (TrialBalancePage, error) {
+	repository.lastTrialBalance = filter
+	repository.trialBalanceCalls++
+	return repository.trialBalancePage, nil
 }
 
 func (repository *serviceRepository) ReportLines(context.Context, time.Time, time.Time) ([]ReportLine, error) {

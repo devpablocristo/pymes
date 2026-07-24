@@ -900,7 +900,25 @@ paths:
             maxLength: 120
         - name: postable
           in: query
-          description: Filtra cuentas que admiten o no imputaciones.
+          deprecated: true
+          description: Compatibilidad; usar node_type.
+          schema:
+            type: boolean
+        - name: node_type
+          in: query
+          schema:
+            $ref: "#/components/schemas/AccountingAccountNodeType"
+        - name: account_type
+          in: query
+          schema:
+            $ref: "#/components/schemas/AccountingAccountType"
+        - name: parent_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: used
+          in: query
           schema:
             type: boolean
       responses:
@@ -944,6 +962,54 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/accounts/tree:
+    get:
+      operationId: getAccountingAccountsTree
+      tags: [Accounting]
+      parameters:
+        - name: lifecycle_state
+          in: query
+          schema:
+            $ref: "#/components/schemas/LifecycleState"
+        - name: query
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+        - name: node_type
+          in: query
+          schema:
+            $ref: "#/components/schemas/AccountingAccountNodeType"
+        - name: account_type
+          in: query
+          schema:
+            $ref: "#/components/schemas/AccountingAccountType"
+        - name: parent_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: used
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Árbol contable completo, ordenado naturalmente y con ancestros de las coincidencias.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingAccountTree"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
   /api/v1/accounting/accounts/{account_id}:
@@ -958,7 +1024,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AccountingAccount"
+                $ref: "#/components/schemas/AccountingAccountDetail"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -996,6 +1062,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
         "503":
           $ref: "#/components/responses/Unavailable"
   /api/v1/accounting/accounts/{account_id}/{lifecycle_action}:
@@ -1086,6 +1154,27 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/account-mapping-definitions:
+    get:
+      operationId: listAccountingMappingDefinitions
+      tags: [Accounting]
+      responses:
+        "200":
+          description: Catálogo canónico de roles funcionales y compatibilidades.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AccountingMappingDefinition"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
   /api/v1/accounting/drafts:
@@ -1368,6 +1457,245 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/general-ledger:
+    get:
+      operationId: getGeneralLedger
+      tags: [Accounting]
+      parameters:
+        - name: account_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: query
+          in: query
+          description: Busca número de asiento, referencia, origen, detalle o memo de línea.
+          schema:
+            type: string
+            maxLength: 160
+        - name: origin
+          in: query
+          description: Origen efectivo del asiento; para asientos manuales coincide con su clase.
+          schema:
+            type: string
+            maxLength: 120
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Movimientos y saldos exactos de una cuenta imputable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneralLedger"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/general-ledger/export:
+    get:
+      operationId: exportGeneralLedger
+      tags: [Accounting]
+      parameters:
+        - name: account_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: format
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [csv, xlsx, pdf]
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: query
+          in: query
+          schema:
+            type: string
+            maxLength: 160
+        - name: origin
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+      responses:
+        "200":
+          description: Libro Mayor exportado con los mismos filtros de consulta.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/trial-balance:
+    get:
+      operationId: getTrialBalance
+      tags: [Accounting]
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: query
+          in: query
+          description: Busca por código, nombre o ruta de la cuenta.
+          schema:
+            type: string
+            maxLength: 160
+        - name: account_class
+          in: query
+          schema:
+            $ref: "#/components/schemas/AccountingAccountType"
+        - name: include_zero
+          in: query
+          description: Incluye además cuentas imputables activas sin saldo ni movimientos; las archivadas sólo aparecen con historia y las cuentas en papelera nunca se incluyen.
+          schema:
+            type: boolean
+            default: false
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Balance de sumas y saldos exacto, filtrable y paginado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrialBalance"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/trial-balance/export:
+    get:
+      operationId: exportTrialBalance
+      tags: [Accounting]
+      parameters:
+        - name: format
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [csv, xlsx, pdf]
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: query
+          in: query
+          schema:
+            type: string
+            maxLength: 160
+        - name: account_class
+          in: query
+          schema:
+            $ref: "#/components/schemas/AccountingAccountType"
+        - name: include_zero
+          in: query
+          description: Incluye además cuentas imputables activas sin saldo ni movimientos; las archivadas sólo aparecen con historia y las cuentas en papelera nunca se incluyen.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Balance de sumas y saldos completo con los mismos filtros.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
   /api/v1/accounting/open-items:
@@ -3553,6 +3881,9 @@ components:
     AccountingAccountType:
       type: string
       enum: [asset, liability, equity, income, cost, expense]
+    AccountingAccountNodeType:
+      type: string
+      enum: [group, posting]
     AccountingNormalBalance:
       type: string
       enum: [debit, credit]
@@ -3575,7 +3906,7 @@ components:
       type: object
       additionalProperties: false
       required:
-        [id, code, name, account_type, normal_balance, monetary_classification, postable, lifecycle_state, version]
+        [id, code, name, node_type, account_type, normal_balance, monetary_classification, postable, lifecycle_state, version]
       properties:
         id:
           type: string
@@ -3584,6 +3915,8 @@ components:
           type: string
         name:
           type: string
+        node_type:
+          $ref: "#/components/schemas/AccountingAccountNodeType"
         account_type:
           $ref: "#/components/schemas/AccountingAccountType"
         normal_balance:
@@ -3596,6 +3929,8 @@ components:
           nullable: true
         postable:
           type: boolean
+          deprecated: true
+          description: Compatibilidad; equivale a node_type=posting.
         lifecycle_state:
           $ref: "#/components/schemas/LifecycleState"
         version:
@@ -3605,7 +3940,7 @@ components:
     AccountingAccountInput:
       type: object
       additionalProperties: false
-      required: [code, name, account_type, normal_balance, monetary_classification, postable]
+      required: [code, name, node_type, account_type, normal_balance, monetary_classification]
       properties:
         code:
           type: string
@@ -3616,6 +3951,8 @@ components:
           type: string
           minLength: 1
           maxLength: 160
+        node_type:
+          $ref: "#/components/schemas/AccountingAccountNodeType"
         account_type:
           $ref: "#/components/schemas/AccountingAccountType"
         normal_balance:
@@ -3628,6 +3965,8 @@ components:
           nullable: true
         postable:
           type: boolean
+          deprecated: true
+          description: Compatibilidad temporal. Si se envía junto con node_type, ambos deben coincidir.
     UpdateAccountingAccountInput:
       allOf:
         - $ref: "#/components/schemas/AccountingAccountInput"
@@ -3646,9 +3985,181 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/AccountingAccount"
+            $ref: "#/components/schemas/AccountingAccountSummary"
         page:
           $ref: "#/components/schemas/PageInfo"
+    AccountingAccountUsage:
+      type: object
+      additionalProperties: false
+      required:
+        [used, journal_lines, draft_lines, mappings, financial_accounts, active_financial_accounts, open_items, inflation_lines, revaluation_lines, children, active_children, total_dependencies]
+      properties:
+        used:
+          type: boolean
+        journal_lines:
+          type: integer
+          minimum: 0
+        draft_lines:
+          type: integer
+          minimum: 0
+        mappings:
+          type: integer
+          minimum: 0
+        financial_accounts:
+          type: integer
+          minimum: 0
+        active_financial_accounts:
+          type: integer
+          minimum: 0
+        open_items:
+          type: integer
+          minimum: 0
+        inflation_lines:
+          type: integer
+          minimum: 0
+        revaluation_lines:
+          type: integer
+          minimum: 0
+        children:
+          type: integer
+          minimum: 0
+        active_children:
+          type: integer
+          minimum: 0
+        total_dependencies:
+          type: integer
+          minimum: 0
+    AccountingAccountCapabilities:
+      type: object
+      additionalProperties: false
+      required:
+        [can_edit_name, can_edit_structure, can_duplicate, can_archive, can_trash, can_restore, edit_blockers, archive_blockers, trash_blockers, restore_blockers]
+      properties:
+        can_edit_name:
+          type: boolean
+        can_edit_structure:
+          type: boolean
+        can_duplicate:
+          type: boolean
+        can_archive:
+          type: boolean
+        can_trash:
+          type: boolean
+        can_restore:
+          type: boolean
+        edit_blockers:
+          type: array
+          description: Códigos estables y localizables; nunca mensajes del backend.
+          items:
+            type: string
+        archive_blockers:
+          type: array
+          description: Códigos estables y localizables; nunca mensajes del backend.
+          items:
+            type: string
+        trash_blockers:
+          type: array
+          description: Códigos estables y localizables; nunca mensajes del backend.
+          items:
+            type: string
+        restore_blockers:
+          type: array
+          description: Códigos estables y localizables; nunca mensajes del backend.
+          items:
+            type: string
+    AccountingAccountSummary:
+      type: object
+      additionalProperties: false
+      required:
+        [id, code, name, node_type, account_type, normal_balance, monetary_classification, postable, lifecycle_state, version, depth, path, has_children, used, mapped, system_managed, context_only, capabilities]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        node_type:
+          $ref: "#/components/schemas/AccountingAccountNodeType"
+        account_type:
+          $ref: "#/components/schemas/AccountingAccountType"
+        normal_balance:
+          $ref: "#/components/schemas/AccountingNormalBalance"
+        monetary_classification:
+          $ref: "#/components/schemas/MonetaryClassification"
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        postable:
+          type: boolean
+          deprecated: true
+        lifecycle_state:
+          $ref: "#/components/schemas/LifecycleState"
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        depth:
+          type: integer
+          minimum: 0
+        path:
+          type: array
+          items:
+            type: string
+            format: uuid
+        has_children:
+          type: boolean
+        used:
+          type: boolean
+        mapped:
+          type: boolean
+        system_managed:
+          type: boolean
+        context_only:
+          type: boolean
+        capabilities:
+          $ref: "#/components/schemas/AccountingAccountCapabilities"
+    AccountingAccountDetail:
+      allOf:
+        - $ref: "#/components/schemas/AccountingAccountSummary"
+        - type: object
+          additionalProperties: false
+          required: [usage, mapped_roles]
+          properties:
+            usage:
+              $ref: "#/components/schemas/AccountingAccountUsage"
+            mapped_roles:
+              type: array
+              items:
+                type: string
+    AccountingAccountLifecycleTotals:
+      type: object
+      additionalProperties: false
+      required: [active, archived, trashed]
+      properties:
+        active:
+          type: integer
+          minimum: 0
+        archived:
+          type: integer
+          minimum: 0
+        trashed:
+          type: integer
+          minimum: 0
+    AccountingAccountTree:
+      type: object
+      additionalProperties: false
+      required: [items, totals]
+      properties:
+        items:
+          type: array
+          description: Recorrido preordenado; cada relación jerárquica se determina por parent_id.
+          items:
+            $ref: "#/components/schemas/AccountingAccountSummary"
+        totals:
+          $ref: "#/components/schemas/AccountingAccountLifecycleTotals"
     AccountingMapping:
       type: object
       additionalProperties: false
@@ -3681,6 +4192,44 @@ components:
           type: integer
           format: int64
           minimum: 1
+    AccountingMappingDefinition:
+      type: object
+      additionalProperties: false
+      required:
+        [role, is_alias, label_es, label_en, description_es, description_en, required, display_order, compatible_account_types, compatible_normal_balances, compatible_monetary_classifications]
+      properties:
+        role:
+          type: string
+        canonical_role:
+          type: string
+          nullable: true
+        is_alias:
+          type: boolean
+        label_es:
+          type: string
+        label_en:
+          type: string
+        description_es:
+          type: string
+        description_en:
+          type: string
+        required:
+          type: boolean
+        display_order:
+          type: integer
+          minimum: 0
+        compatible_account_types:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountingAccountType"
+        compatible_normal_balances:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountingNormalBalance"
+        compatible_monetary_classifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonetaryClassification"
     JournalLineInput:
       type: object
       additionalProperties: false
@@ -4554,6 +5103,180 @@ components:
           $ref: "#/components/schemas/DecimalAmount"
         total_credit:
           $ref: "#/components/schemas/DecimalAmount"
+    GeneralLedgerBalanceSide:
+      type: string
+      enum: [debit, credit, zero]
+    GeneralLedgerBalance:
+      type: object
+      additionalProperties: false
+      required: [amount, side]
+      properties:
+        amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        side:
+          $ref: "#/components/schemas/GeneralLedgerBalanceSide"
+    GeneralLedgerLine:
+      type: object
+      additionalProperties: false
+      required:
+        [entry_id, line_id, entry_number, line_number, accounting_date, reference, origin, description, memo, debit, credit, balance]
+      properties:
+        entry_id:
+          type: string
+          format: uuid
+        line_id:
+          type: string
+          format: uuid
+        entry_number:
+          type: integer
+          format: int64
+          minimum: 1
+        line_number:
+          type: integer
+          minimum: 1
+        accounting_date:
+          type: string
+          format: date
+        reference:
+          type: string
+        origin:
+          type: string
+        description:
+          type: string
+        memo:
+          type: string
+        debit:
+          $ref: "#/components/schemas/DecimalAmount"
+        credit:
+          $ref: "#/components/schemas/DecimalAmount"
+        balance:
+          $ref: "#/components/schemas/GeneralLedgerBalance"
+    GeneralLedger:
+      type: object
+      additionalProperties: false
+      required:
+        [account, currency, from, to, opening_balance, closing_balance, total_debit, total_credit, items, page]
+      properties:
+        account:
+          $ref: "#/components/schemas/AccountingAccount"
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        opening_balance:
+          $ref: "#/components/schemas/GeneralLedgerBalance"
+        closing_balance:
+          $ref: "#/components/schemas/GeneralLedgerBalance"
+        total_debit:
+          $ref: "#/components/schemas/DecimalAmount"
+        total_credit:
+          $ref: "#/components/schemas/DecimalAmount"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeneralLedgerLine"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    TrialBalanceSide:
+      type: string
+      enum: [debit, credit, zero]
+    TrialBalanceBalance:
+      type: object
+      additionalProperties: false
+      required: [amount, side]
+      properties:
+        amount:
+          $ref: "#/components/schemas/DecimalAmount"
+        side:
+          $ref: "#/components/schemas/TrialBalanceSide"
+    TrialBalanceItem:
+      type: object
+      additionalProperties: false
+      required:
+        [account_id, code, name, account_class, normal_balance, lifecycle_state, path, opening_balance, debit, credit, closing_balance]
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        account_class:
+          $ref: "#/components/schemas/AccountingAccountType"
+        normal_balance:
+          $ref: "#/components/schemas/AccountingNormalBalance"
+        lifecycle_state:
+          $ref: "#/components/schemas/LifecycleState"
+        path:
+          type: array
+          description: Nombres de los ancestros y de la cuenta, en orden jerárquico.
+          items:
+            type: string
+        opening_balance:
+          $ref: "#/components/schemas/TrialBalanceBalance"
+        debit:
+          $ref: "#/components/schemas/DecimalAmount"
+        credit:
+          $ref: "#/components/schemas/DecimalAmount"
+        closing_balance:
+          $ref: "#/components/schemas/TrialBalanceBalance"
+    TrialBalanceTotals:
+      type: object
+      additionalProperties: false
+      required:
+        [opening_debit, opening_credit, movement_debit, movement_credit, closing_debit, closing_credit]
+      properties:
+        opening_debit:
+          $ref: "#/components/schemas/DecimalAmount"
+        opening_credit:
+          $ref: "#/components/schemas/DecimalAmount"
+        movement_debit:
+          $ref: "#/components/schemas/DecimalAmount"
+        movement_credit:
+          $ref: "#/components/schemas/DecimalAmount"
+        closing_debit:
+          $ref: "#/components/schemas/DecimalAmount"
+        closing_credit:
+          $ref: "#/components/schemas/DecimalAmount"
+    TrialBalanceControls:
+      type: object
+      additionalProperties: false
+      required: [opening_difference, movement_difference, closing_difference]
+      properties:
+        opening_difference:
+          $ref: "#/components/schemas/DecimalAmount"
+        movement_difference:
+          $ref: "#/components/schemas/DecimalAmount"
+        closing_difference:
+          $ref: "#/components/schemas/DecimalAmount"
+    TrialBalance:
+      type: object
+      additionalProperties: false
+      required: [currency, from, to, items, totals, controls, page]
+      properties:
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrialBalanceItem"
+        totals:
+          $ref: "#/components/schemas/TrialBalanceTotals"
+        controls:
+          $ref: "#/components/schemas/TrialBalanceControls"
+        page:
+          $ref: "#/components/schemas/PageInfo"
     InflationAdjustmentInput:
       type: object
       additionalProperties: false

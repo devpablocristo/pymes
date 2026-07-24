@@ -24,6 +24,13 @@ func (h *IAMAPI) ListAccountingMappings(w http.ResponseWriter, r *http.Request) 
 	h.listAccountingMappings(w, r)
 }
 
+func (h *IAMAPI) ListAccountingMappingDefinitions(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	h.listAccountingMappingDefinitions(w, r)
+}
+
 func (h *IAMAPI) GetAccountingSettings(w http.ResponseWriter, r *http.Request) {
 	h.getAccountingSettings(w, r)
 }
@@ -34,6 +41,14 @@ func (h *IAMAPI) UpdateAccountingMappings(w http.ResponseWriter, r *http.Request
 
 func (h *IAMAPI) ListAccountingAccounts(w http.ResponseWriter, r *http.Request, params api.ListAccountingAccountsParams) {
 	h.listAccountingAccounts(w, r, params)
+}
+
+func (h *IAMAPI) GetAccountingAccountsTree(
+	w http.ResponseWriter,
+	r *http.Request,
+	params api.GetAccountingAccountsTreeParams,
+) {
+	h.getAccountingAccountsTree(w, r, params)
 }
 
 func (h *IAMAPI) CreateAccountingAccount(w http.ResponseWriter, r *http.Request, params api.CreateAccountingAccountParams) {
@@ -224,6 +239,38 @@ func (h *IAMAPI) ExportAccountingReport(
 	params api.ExportAccountingReportParams,
 ) {
 	h.exportAccountingReport(w, r, report, params)
+}
+
+func (h *IAMAPI) GetGeneralLedger(
+	w http.ResponseWriter,
+	r *http.Request,
+	params api.GetGeneralLedgerParams,
+) {
+	h.getGeneralLedger(w, r, params)
+}
+
+func (h *IAMAPI) ExportGeneralLedger(
+	w http.ResponseWriter,
+	r *http.Request,
+	params api.ExportGeneralLedgerParams,
+) {
+	h.exportGeneralLedger(w, r, params)
+}
+
+func (h *IAMAPI) GetTrialBalance(
+	w http.ResponseWriter,
+	r *http.Request,
+	params api.GetTrialBalanceParams,
+) {
+	h.getTrialBalance(w, r, params)
+}
+
+func (h *IAMAPI) ExportTrialBalance(
+	w http.ResponseWriter,
+	r *http.Request,
+	params api.ExportTrialBalanceParams,
+) {
+	h.exportTrialBalance(w, r, params)
 }
 
 func (h *IAMAPI) ImportInflationIndices(w http.ResponseWriter, r *http.Request, params api.ImportInflationIndicesParams) {

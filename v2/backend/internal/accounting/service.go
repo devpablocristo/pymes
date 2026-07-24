@@ -42,6 +42,7 @@ type CreateAccountCommand struct {
 	Monetary      MonetaryClassification
 	ParentID      *uuid.UUID
 	Postable      bool
+	NodeType      AccountNodeType
 }
 
 func (s *Service) CreateAccount(
@@ -58,13 +59,21 @@ func (s *Service) CreateAccount(
 		Monetary:      command.Monetary,
 		ParentID:      command.ParentID,
 		Postable:      command.Postable,
+		NodeType:      command.NodeType,
 		Version:       1,
 	}
 	if account.NormalBalance == "" {
 		account.NormalBalance = DefaultNormalBalance(account.Class)
 	}
 	if account.Monetary == "" {
-		account.Monetary = Monetary
+		if account.Postable {
+			account.Monetary = Monetary
+		} else {
+			account.Monetary = NotApplicable
+		}
+	}
+	if account.NodeType == "" {
+		account.NodeType = account.EffectiveNodeType()
 	}
 	if err := validateAccountForMutation(account); err != nil {
 		return Account{}, err
@@ -76,8 +85,9 @@ func (s *Service) CreateAccount(
 			if err != nil {
 				return err
 			}
-			if parent.Postable || parent.ArchivedAt != nil || parent.Class != account.Class {
-				return fmt.Errorf("%w: invalid account parent", ErrConflict)
+			if parent.Postable || parent.ArchivedAt != nil ||
+				parent.TrashedAt != nil || parent.Class != account.Class {
+				return ErrInvalidAccountParent
 			}
 		}
 		var err error
@@ -97,6 +107,7 @@ type UpdateAccountCommand struct {
 	Monetary        MonetaryClassification
 	ParentID        *uuid.UUID
 	Postable        bool
+	NodeType        AccountNodeType
 }
 
 func (s *Service) UpdateAccount(
@@ -113,6 +124,20 @@ func (s *Service) UpdateAccount(
 		if err != nil {
 			return err
 		}
+		original := current
+		if current.LifecycleState() != AccountActive {
+			return ErrAccountArchived
+		}
+		if current.SystemManaged {
+			return ErrAccountProtected
+		}
+		if command.NodeType != "" &&
+			command.NodeType != current.EffectiveNodeType() {
+			return ErrAccountStructureLocked
+		}
+		if command.Postable != current.Postable {
+			return ErrAccountStructureLocked
+		}
 		current.Code = strings.TrimSpace(command.Code)
 		current.Name = strings.TrimSpace(command.Name)
 		current.Class = command.Class
@@ -120,6 +145,7 @@ func (s *Service) UpdateAccount(
 		current.Monetary = command.Monetary
 		current.ParentID = command.ParentID
 		current.Postable = command.Postable
+		current.NodeType = current.EffectiveNodeType()
 		if err := validateAccountForMutation(current); err != nil {
 			return err
 		}
@@ -128,9 +154,22 @@ func (s *Service) UpdateAccount(
 			if parentErr != nil {
 				return parentErr
 			}
-			if parent.Postable || parent.ArchivedAt != nil || parent.Class != current.Class {
-				return fmt.Errorf("%w: invalid account parent", ErrConflict)
+			if parent.Postable || parent.ArchivedAt != nil ||
+				parent.TrashedAt != nil || parent.Class != current.Class {
+				return ErrInvalidAccountParent
 			}
+		}
+		usage, usageErr := repos.AccountUsage(ctx, command.ID)
+		if usageErr != nil {
+			return usageErr
+		}
+		if usage.StructureLocked() &&
+			(original.Code != current.Code ||
+				original.Class != current.Class ||
+				original.NormalBalance != current.NormalBalance ||
+				original.Monetary != current.Monetary ||
+				!sameOptionalUUID(original.ParentID, current.ParentID)) {
+			return ErrAccountStructureLocked
 		}
 		updated, err = repos.UpdateAccount(ctx, current, command.ExpectedVersion)
 		return err
@@ -143,22 +182,36 @@ func (s *Service) ArchiveAccount(
 	scope Scope,
 	id uuid.UUID,
 	expectedVersion int64,
+	reasons ...string,
 ) (Account, error) {
 	if id == uuid.Nil || expectedVersion <= 0 {
 		return Account{}, fmt.Errorf("%w: account id and version are required", ErrInvalidArgument)
 	}
 	var account Account
 	err := s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
-		postings, mappings, children, err := repos.AccountUsage(ctx, id)
+		detail, err := repos.GetAccountDetail(ctx, id)
 		if err != nil {
 			return err
 		}
-		if children > 0 {
-			return fmt.Errorf("%w: archive child accounts first", ErrAccountInUse)
+		if detail.Account.SystemManaged {
+			return ErrAccountProtected
 		}
-		_ = postings
-		_ = mappings
-		account, err = repos.ArchiveAccount(ctx, id, expectedVersion, s.clock.Now(), scope.ActorID)
+		if detail.Account.LifecycleState() != AccountActive {
+			return ErrConflict
+		}
+		if detail.Usage.Mappings > 0 {
+			return ErrAccountMapped
+		}
+		if detail.Usage.ActiveFinancialAccounts > 0 {
+			return ErrFinancialAccountLinked
+		}
+		if detail.Usage.ActiveChildren > 0 {
+			return ErrAccountHasActiveChildren
+		}
+		account, err = repos.ArchiveAccount(
+			ctx, id, expectedVersion, s.clock.Now(),
+			optionalReason(reasons, "Archivo de cuenta"),
+		)
 		return err
 	})
 	return account, err
@@ -169,11 +222,25 @@ func (s *Service) RestoreAccount(
 	scope Scope,
 	id uuid.UUID,
 	expectedVersion int64,
+	reasons ...string,
 ) (Account, error) {
+	if id == uuid.Nil || expectedVersion <= 0 {
+		return Account{}, fmt.Errorf("%w: account id and version are required", ErrInvalidArgument)
+	}
 	var account Account
 	err := s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
+		detail, detailErr := repos.GetAccountDetail(ctx, id)
+		if detailErr != nil {
+			return detailErr
+		}
+		if detail.Account.LifecycleState() == AccountActive {
+			return ErrConflict
+		}
 		var err error
-		account, err = repos.RestoreAccount(ctx, id, expectedVersion, scope.ActorID)
+		account, err = repos.RestoreAccount(
+			ctx, id, expectedVersion,
+			optionalReason(reasons, "Restauración de cuenta"),
+		)
 		return err
 	})
 	return account, err
@@ -184,17 +251,55 @@ func (s *Service) TrashUnusedAccount(
 	scope Scope,
 	id uuid.UUID,
 	expectedVersion int64,
+	reasons ...string,
 ) error {
 	return s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
-		postings, mappings, children, err := repos.AccountUsage(ctx, id)
+		detail, err := repos.GetAccountDetail(ctx, id)
 		if err != nil {
 			return err
 		}
-		if postings != 0 || mappings != 0 || children != 0 {
+		if detail.Account.SystemManaged {
+			return ErrAccountProtected
+		}
+		if detail.Account.LifecycleState() != AccountActive {
+			return ErrConflict
+		}
+		if detail.Usage.HasDependencies() {
 			return ErrAccountInUse
 		}
-		return repos.DeleteUnusedAccount(ctx, id, expectedVersion)
+		return repos.TrashUnusedAccount(
+			ctx, id, expectedVersion,
+			optionalReason(reasons, "Envío a papelera"),
+		)
 	})
+}
+
+func (s *Service) ListAccountDetails(
+	ctx context.Context,
+	scope Scope,
+	includeTrashed bool,
+) ([]AccountDetail, error) {
+	var details []AccountDetail
+	err := s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
+		var err error
+		details, err = repos.ListAccountDetails(ctx, includeTrashed)
+		return err
+	})
+	return details, err
+}
+
+func (s *Service) GetAccountDetail(
+	ctx context.Context,
+	scope Scope,
+	id uuid.UUID,
+) (AccountDetail, error) {
+	var detail AccountDetail
+	err := s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
+		var err error
+		detail, err = repos.GetAccountDetail(ctx, id)
+		return err
+	})
+	return detail, err
 }
 
 func (s *Service) ListAccounts(
@@ -217,17 +322,26 @@ func (s *Service) SetAccountMapping(
 	role string,
 	accountID uuid.UUID,
 	expectedVersion int64,
+	reasons ...string,
 ) (AccountMapping, error) {
 	mapping := AccountMapping{
 		Role:      strings.TrimSpace(role),
 		AccountID: accountID,
 		UpdatedBy: scope.ActorID,
+		Reason:    optionalReason(reasons, "Actualización de mapping funcional"),
 	}
 	if err := mapping.Validate(); err != nil {
 		return AccountMapping{}, err
 	}
 	var saved AccountMapping
 	err := s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
+		definition, err := repos.GetMappingDefinition(ctx, mapping.Role)
+		if err != nil {
+			return err
+		}
+		if definition.Alias {
+			return ErrMappingIncompatible
+		}
 		account, err := repos.GetAccount(ctx, accountID)
 		if err != nil {
 			return err
@@ -235,13 +349,63 @@ func (s *Service) SetAccountMapping(
 		if !account.Postable {
 			return ErrAccountNotPostable
 		}
-		if account.ArchivedAt != nil {
+		if account.ArchivedAt != nil || account.TrashedAt != nil {
 			return ErrAccountArchived
+		}
+		if account.TrashedAt != nil ||
+			!mappingDefinitionAccepts(definition, account) {
+			return ErrMappingIncompatible
 		}
 		saved, err = repos.SetMapping(ctx, mapping, expectedVersion)
 		return err
 	})
 	return saved, err
+}
+
+func (s *Service) ListAccountMappingDefinitions(
+	ctx context.Context,
+	scope Scope,
+) ([]AccountMappingDefinition, error) {
+	var definitions []AccountMappingDefinition
+	err := s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
+		var err error
+		definitions, err = repos.ListMappingDefinitions(ctx)
+		return err
+	})
+	return definitions, err
+}
+
+func optionalReason(reasons []string, fallback string) string {
+	if len(reasons) > 0 && strings.TrimSpace(reasons[0]) != "" {
+		return strings.TrimSpace(reasons[0])
+	}
+	return fallback
+}
+
+func sameOptionalUUID(left *uuid.UUID, right *uuid.UUID) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
+}
+
+func mappingDefinitionAccepts(
+	definition AccountMappingDefinition,
+	account Account,
+) bool {
+	classAccepted := false
+	for _, class := range definition.CompatibleAccountClasses {
+		classAccepted = classAccepted || class == account.Class
+	}
+	balanceAccepted := false
+	for _, balance := range definition.CompatibleNormalBalances {
+		balanceAccepted = balanceAccepted || balance == account.NormalBalance
+	}
+	monetaryAccepted := false
+	for _, monetary := range definition.CompatibleMonetaryClasses {
+		monetaryAccepted = monetaryAccepted || monetary == account.Monetary
+	}
+	return classAccepted && balanceAccepted && monetaryAccepted
 }
 
 func (s *Service) ListAccountMappings(
@@ -821,6 +985,62 @@ func (s *Service) GeneralLedger(
 		}
 		result = BuildGeneralLedger(account, from, to, opening, lines)
 		return nil
+	})
+	return result, err
+}
+
+// ListGeneralLedger returns a cursor-paginated Mayor for exactly one posting
+// account. Archived posting accounts remain readable because their history is
+// part of the permanent accounting record; groups and trashed accounts are
+// deliberately rejected.
+func (s *Service) ListGeneralLedger(
+	ctx context.Context,
+	scope Scope,
+	filter GeneralLedgerFilter,
+) (GeneralLedgerPage, error) {
+	if err := filter.Validate(); err != nil {
+		return GeneralLedgerPage{}, err
+	}
+	filter = filter.normalized()
+	var result GeneralLedgerPage
+	err := s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
+		account, err := repos.GetAccount(ctx, filter.AccountID)
+		if err != nil {
+			return err
+		}
+		if account.LifecycleState() == AccountTrashed {
+			return ErrNotFound
+		}
+		if account.EffectiveNodeType() != AccountPosting {
+			return ErrAccountNotPostable
+		}
+		result, err = repos.ListGeneralLedger(ctx, filter)
+		if err != nil {
+			return err
+		}
+		result.Account = account
+		return nil
+	})
+	return result, err
+}
+
+// ListTrialBalance returns the dedicated Balance de sumas y saldos. The
+// repository derives every amount from immutable posted journal entries; no
+// secondary balance store participates in the calculation.
+func (s *Service) ListTrialBalance(
+	ctx context.Context,
+	scope Scope,
+	filter TrialBalanceFilter,
+) (TrialBalancePage, error) {
+	if err := filter.Validate(); err != nil {
+		return TrialBalancePage{}, err
+	}
+	filter = filter.normalized()
+	var result TrialBalancePage
+	err := s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
+		var err error
+		result, err = repos.ListTrialBalance(ctx, filter)
+		return err
 	})
 	return result, err
 }

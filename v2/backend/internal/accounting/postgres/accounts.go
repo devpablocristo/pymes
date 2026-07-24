@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,8 +24,10 @@ const accountColumns = `
 	monetary_class,
 	parent_id,
 	posting_allowed,
+	coalesce(system_key, ''),
 	version,
 	archived_at,
+	trashed_at,
 	created_at,
 	updated_at
 `
@@ -39,7 +42,7 @@ func (repository *Repository) ListAccounts(
 		 WHERE org_id = $1
 		   AND trashed_at IS NULL
 		   AND ($2 OR archived_at IS NULL)
-		 ORDER BY code, id
+		 ORDER BY accounting.account_code_sort_key(code), id
 	`, repository.orgID, includeArchived)
 	if err != nil {
 		return nil, mapError(err)
@@ -59,6 +62,82 @@ func (repository *Repository) ListAccounts(
 	return accounts, nil
 }
 
+func (repository *Repository) ListAccountDetails(
+	ctx context.Context,
+	includeTrashed bool,
+) ([]accounting.AccountDetail, error) {
+	rows, err := repository.tx.Query(ctx, `
+		SELECT `+accountColumns+`,
+			(SELECT count(*) FROM accounting.journal_lines
+			  WHERE org_id = account.org_id AND account_id = account.id),
+			(SELECT count(*) FROM accounting.draft_lines
+			  WHERE org_id = account.org_id AND account_id = account.id),
+			(SELECT count(*) FROM accounting.account_mappings
+			  WHERE org_id = account.org_id AND account_id = account.id),
+			(SELECT count(*) FROM accounting.accounts
+			  WHERE org_id = account.org_id AND parent_id = account.id),
+			(SELECT count(*) FROM accounting.accounts
+			  WHERE org_id = account.org_id AND parent_id = account.id
+			    AND archived_at IS NULL AND trashed_at IS NULL),
+			(SELECT count(*) FROM accounting.financial_accounts
+			  WHERE org_id = account.org_id
+			    AND ledger_account_id = account.id),
+			(SELECT count(*) FROM accounting.financial_accounts
+			  WHERE org_id = account.org_id
+			    AND ledger_account_id = account.id AND archived_at IS NULL),
+			(SELECT count(*) FROM accounting.open_items
+			  WHERE org_id = account.org_id AND account_id = account.id),
+			(SELECT count(*) FROM accounting.inflation_run_lines
+			  WHERE org_id = account.org_id AND account_id = account.id),
+			(SELECT count(*) FROM accounting.currency_revaluation_lines
+			  WHERE org_id = account.org_id AND account_id = account.id),
+			(
+				WITH RECURSIVE ancestors AS (
+					SELECT parent.id, parent.parent_id,
+					       parent.archived_at, parent.trashed_at
+					  FROM accounting.accounts AS parent
+					 WHERE parent.org_id = account.org_id
+					   AND parent.id = account.parent_id
+					UNION ALL
+					SELECT parent.id, parent.parent_id,
+					       parent.archived_at, parent.trashed_at
+					  FROM accounting.accounts AS parent
+					  JOIN ancestors ON ancestors.parent_id = parent.id
+					 WHERE parent.org_id = account.org_id
+				)
+				SELECT count(*) FROM ancestors
+				 WHERE archived_at IS NOT NULL OR trashed_at IS NOT NULL
+			),
+			ARRAY(
+				SELECT mapping.mapping_key
+				  FROM accounting.account_mappings AS mapping
+				 WHERE mapping.org_id = account.org_id
+				   AND mapping.account_id = account.id
+				 ORDER BY mapping.mapping_key
+			)
+		  FROM accounting.accounts AS account
+		 WHERE account.org_id = $1
+		   AND ($2 OR account.trashed_at IS NULL)
+		 ORDER BY accounting.account_code_sort_key(account.code), account.id
+	`, repository.orgID, includeTrashed)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	defer rows.Close()
+	result := make([]accounting.AccountDetail, 0)
+	for rows.Next() {
+		detail, scanErr := scanAccountDetail(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		result = append(result, detail)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, mapError(err)
+	}
+	return result, nil
+}
+
 func (repository *Repository) GetAccount(
 	ctx context.Context,
 	id uuid.UUID,
@@ -76,10 +155,60 @@ func (repository *Repository) GetAccount(
 	return account, nil
 }
 
+func (repository *Repository) GetAccountDetail(
+	ctx context.Context,
+	id uuid.UUID,
+) (accounting.AccountDetail, error) {
+	account, err := scanAccount(repository.tx.QueryRow(ctx, `
+		SELECT `+accountColumns+`
+		  FROM accounting.accounts
+		 WHERE org_id = $1
+		   AND id = $2
+	`, repository.orgID, id))
+	if err != nil {
+		return accounting.AccountDetail{}, mapError(err)
+	}
+	usage, err := repository.AccountUsage(ctx, id)
+	if err != nil {
+		return accounting.AccountDetail{}, err
+	}
+	rows, err := repository.tx.Query(ctx, `
+		SELECT mapping_key
+		  FROM accounting.account_mappings
+		 WHERE org_id = $1
+		   AND account_id = $2
+		 ORDER BY mapping_key
+	`, repository.orgID, id)
+	if err != nil {
+		return accounting.AccountDetail{}, mapError(err)
+	}
+	defer rows.Close()
+	roles := make([]string, 0)
+	for rows.Next() {
+		var role string
+		if err := rows.Scan(&role); err != nil {
+			return accounting.AccountDetail{}, mapError(err)
+		}
+		roles = append(roles, role)
+	}
+	if err := rows.Err(); err != nil {
+		return accounting.AccountDetail{}, mapError(err)
+	}
+	return accounting.AccountDetail{
+		Account:      account,
+		Usage:        usage,
+		Capabilities: accounting.BuildAccountCapabilities(account, usage),
+		MappingRoles: roles,
+	}, nil
+}
+
 func (repository *Repository) CreateAccount(
 	ctx context.Context,
 	account accounting.Account,
 ) (accounting.Account, error) {
+	if err := repository.setAccountingReason(ctx, "Creación de cuenta"); err != nil {
+		return accounting.Account{}, err
+	}
 	created, err := scanAccount(repository.tx.QueryRow(ctx, `
 		INSERT INTO accounting.accounts (
 			org_id,
@@ -115,6 +244,9 @@ func (repository *Repository) UpdateAccount(
 	account accounting.Account,
 	expectedVersion int64,
 ) (accounting.Account, error) {
+	if err := repository.setAccountingReason(ctx, "Actualización de cuenta"); err != nil {
+		return accounting.Account{}, err
+	}
 	updated, err := scanAccount(repository.tx.QueryRow(ctx, `
 		UPDATE accounting.accounts
 		   SET code = $3,
@@ -151,20 +283,68 @@ func (repository *Repository) UpdateAccount(
 func (repository *Repository) AccountUsage(
 	ctx context.Context,
 	id uuid.UUID,
-) (postings int64, mappings int64, children int64, err error) {
-	err = repository.tx.QueryRow(ctx, `
+) (accounting.AccountUsage, error) {
+	var usage accounting.AccountUsage
+	err := repository.tx.QueryRow(ctx, `
 		SELECT
 			(SELECT count(*) FROM accounting.journal_lines
+			  WHERE org_id = $1 AND account_id = $2),
+			(SELECT count(*) FROM accounting.draft_lines
 			  WHERE org_id = $1 AND account_id = $2),
 			(SELECT count(*) FROM accounting.account_mappings
 			  WHERE org_id = $1 AND account_id = $2),
 			(SELECT count(*) FROM accounting.accounts
-			  WHERE org_id = $1 AND parent_id = $2 AND trashed_at IS NULL)
-	`, repository.orgID, id).Scan(&postings, &mappings, &children)
+			  WHERE org_id = $1 AND parent_id = $2),
+			(SELECT count(*) FROM accounting.accounts
+			  WHERE org_id = $1 AND parent_id = $2
+			    AND archived_at IS NULL AND trashed_at IS NULL),
+			(SELECT count(*) FROM accounting.financial_accounts
+			  WHERE org_id = $1 AND ledger_account_id = $2),
+			(SELECT count(*) FROM accounting.financial_accounts
+			  WHERE org_id = $1 AND ledger_account_id = $2
+			    AND archived_at IS NULL),
+			(SELECT count(*) FROM accounting.open_items
+			  WHERE org_id = $1 AND account_id = $2),
+			(SELECT count(*) FROM accounting.inflation_run_lines
+			  WHERE org_id = $1 AND account_id = $2),
+			(SELECT count(*) FROM accounting.currency_revaluation_lines
+			  WHERE org_id = $1 AND account_id = $2),
+			(
+				WITH RECURSIVE ancestors AS (
+					SELECT parent.id, parent.parent_id,
+					       parent.archived_at, parent.trashed_at
+					  FROM accounting.accounts AS account
+					  JOIN accounting.accounts AS parent
+					    ON parent.org_id = account.org_id
+					   AND parent.id = account.parent_id
+					 WHERE account.org_id = $1 AND account.id = $2
+					UNION ALL
+					SELECT parent.id, parent.parent_id,
+					       parent.archived_at, parent.trashed_at
+					  FROM accounting.accounts AS parent
+					  JOIN ancestors ON ancestors.parent_id = parent.id
+					 WHERE parent.org_id = $1
+				)
+				SELECT count(*) FROM ancestors
+				 WHERE archived_at IS NOT NULL OR trashed_at IS NOT NULL
+			)
+	`, repository.orgID, id).Scan(
+		&usage.JournalLines,
+		&usage.DraftLines,
+		&usage.Mappings,
+		&usage.Children,
+		&usage.ActiveChildren,
+		&usage.FinancialAccounts,
+		&usage.ActiveFinancialAccounts,
+		&usage.OpenItems,
+		&usage.InflationLines,
+		&usage.RevaluationLines,
+		&usage.InactiveAncestors,
+	)
 	if err != nil {
-		return 0, 0, 0, mapError(err)
+		return accounting.AccountUsage{}, mapError(err)
 	}
-	return postings, mappings, children, nil
+	return usage, nil
 }
 
 func (repository *Repository) ArchiveAccount(
@@ -172,8 +352,11 @@ func (repository *Repository) ArchiveAccount(
 	id uuid.UUID,
 	expectedVersion int64,
 	at time.Time,
-	_ string,
+	reason string,
 ) (accounting.Account, error) {
+	if err := repository.setAccountingReason(ctx, reason); err != nil {
+		return accounting.Account{}, err
+	}
 	account, err := scanAccount(repository.tx.QueryRow(ctx, `
 		UPDATE accounting.accounts
 		   SET archived_at = $4,
@@ -200,18 +383,21 @@ func (repository *Repository) RestoreAccount(
 	ctx context.Context,
 	id uuid.UUID,
 	expectedVersion int64,
-	_ string,
+	reason string,
 ) (accounting.Account, error) {
+	if err := repository.setAccountingReason(ctx, reason); err != nil {
+		return accounting.Account{}, err
+	}
 	account, err := scanAccount(repository.tx.QueryRow(ctx, `
 		UPDATE accounting.accounts
 		   SET archived_at = NULL,
+		       trashed_at = NULL,
 		       version = version + 1,
 		       updated_at = now()
 		 WHERE org_id = $1
 		   AND id = $2
 		   AND version = $3
-		   AND archived_at IS NOT NULL
-		   AND trashed_at IS NULL
+		   AND (archived_at IS NOT NULL OR trashed_at IS NOT NULL)
 		RETURNING `+accountColumns,
 		repository.orgID,
 		id,
@@ -223,11 +409,15 @@ func (repository *Repository) RestoreAccount(
 	return account, nil
 }
 
-func (repository *Repository) DeleteUnusedAccount(
+func (repository *Repository) TrashUnusedAccount(
 	ctx context.Context,
 	id uuid.UUID,
 	expectedVersion int64,
+	reason string,
 ) error {
+	if err := repository.setAccountingReason(ctx, reason); err != nil {
+		return err
+	}
 	commandTag, err := repository.tx.Exec(ctx, `
 		UPDATE accounting.accounts
 		   SET trashed_at = now(),
@@ -246,6 +436,67 @@ func (repository *Repository) DeleteUnusedAccount(
 		return accounting.ErrVersionConflict
 	}
 	return nil
+}
+
+func (repository *Repository) ListMappingDefinitions(
+	ctx context.Context,
+) ([]accounting.AccountMappingDefinition, error) {
+	rows, err := repository.tx.Query(ctx, `
+		SELECT
+			role,
+			label_es,
+			label_en,
+			description_es,
+			description_en,
+			required,
+			compatible_account_classes,
+			compatible_normal_balances,
+			compatible_monetary_classes,
+			coalesce(canonical_role, ''),
+			is_alias,
+			display_order
+		  FROM accounting.account_mapping_definitions
+		 ORDER BY display_order, role
+	`)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	defer rows.Close()
+	result := make([]accounting.AccountMappingDefinition, 0)
+	for rows.Next() {
+		definition, scanErr := scanMappingDefinition(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		result = append(result, definition)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, mapError(err)
+	}
+	return result, nil
+}
+
+func (repository *Repository) GetMappingDefinition(
+	ctx context.Context,
+	role string,
+) (accounting.AccountMappingDefinition, error) {
+	return scanMappingDefinition(repository.tx.QueryRow(ctx, `
+		SELECT
+			role,
+			label_es,
+			label_en,
+			description_es,
+			description_en,
+			required,
+			compatible_account_classes,
+			compatible_normal_balances,
+			compatible_monetary_classes,
+			coalesce(canonical_role, ''),
+			is_alias,
+			display_order
+		  FROM accounting.account_mapping_definitions
+		 WHERE role = $1
+	`, role))
 }
 
 func (repository *Repository) ListMappings(
@@ -349,6 +600,9 @@ func (repository *Repository) SetMapping(
 	mapping accounting.AccountMapping,
 	expectedVersion int64,
 ) (accounting.AccountMapping, error) {
+	if err := repository.setAccountingReason(ctx, mapping.Reason); err != nil {
+		return accounting.AccountMapping{}, err
+	}
 	var row scanner
 	if expectedVersion <= 0 {
 		row = repository.tx.QueryRow(ctx, `
@@ -396,14 +650,116 @@ func scanAccount(row scanner) (accounting.Account, error) {
 		&account.Monetary,
 		&account.ParentID,
 		&account.Postable,
+		&account.SystemKey,
 		&account.Version,
 		&account.ArchivedAt,
+		&account.TrashedAt,
 		&account.CreatedAt,
 		&account.UpdatedAt,
 	); err != nil {
 		return accounting.Account{}, mapError(err)
 	}
+	account.NodeType = account.EffectiveNodeType()
+	account.SystemManaged = account.SystemKey != ""
 	return account, nil
+}
+
+func scanMappingDefinition(row scanner) (accounting.AccountMappingDefinition, error) {
+	var definition accounting.AccountMappingDefinition
+	var classes []string
+	var balances []string
+	var monetaryClasses []string
+	if err := row.Scan(
+		&definition.Role,
+		&definition.LabelES,
+		&definition.LabelEN,
+		&definition.DescriptionES,
+		&definition.DescriptionEN,
+		&definition.Required,
+		&classes,
+		&balances,
+		&monetaryClasses,
+		&definition.CanonicalRole,
+		&definition.Alias,
+		&definition.DisplayOrder,
+	); err != nil {
+		return accounting.AccountMappingDefinition{}, mapError(err)
+	}
+	for _, class := range classes {
+		definition.CompatibleAccountClasses = append(
+			definition.CompatibleAccountClasses,
+			accounting.AccountClass(class),
+		)
+	}
+	for _, balance := range balances {
+		definition.CompatibleNormalBalances = append(
+			definition.CompatibleNormalBalances,
+			accounting.NormalBalance(balance),
+		)
+	}
+	for _, monetaryClass := range monetaryClasses {
+		definition.CompatibleMonetaryClasses = append(
+			definition.CompatibleMonetaryClasses,
+			accounting.MonetaryClassification(monetaryClass),
+		)
+	}
+	return definition, nil
+}
+
+func scanAccountDetail(row scanner) (accounting.AccountDetail, error) {
+	var detail accounting.AccountDetail
+	if err := row.Scan(
+		&detail.Account.ID,
+		&detail.Account.Code,
+		&detail.Account.Name,
+		&detail.Account.Class,
+		&detail.Account.NormalBalance,
+		&detail.Account.Monetary,
+		&detail.Account.ParentID,
+		&detail.Account.Postable,
+		&detail.Account.SystemKey,
+		&detail.Account.Version,
+		&detail.Account.ArchivedAt,
+		&detail.Account.TrashedAt,
+		&detail.Account.CreatedAt,
+		&detail.Account.UpdatedAt,
+		&detail.Usage.JournalLines,
+		&detail.Usage.DraftLines,
+		&detail.Usage.Mappings,
+		&detail.Usage.Children,
+		&detail.Usage.ActiveChildren,
+		&detail.Usage.FinancialAccounts,
+		&detail.Usage.ActiveFinancialAccounts,
+		&detail.Usage.OpenItems,
+		&detail.Usage.InflationLines,
+		&detail.Usage.RevaluationLines,
+		&detail.Usage.InactiveAncestors,
+		&detail.MappingRoles,
+	); err != nil {
+		return accounting.AccountDetail{}, mapError(err)
+	}
+	detail.Account.NodeType = detail.Account.EffectiveNodeType()
+	detail.Account.SystemManaged = detail.Account.SystemKey != ""
+	detail.Capabilities = accounting.BuildAccountCapabilities(
+		detail.Account,
+		detail.Usage,
+	)
+	return detail, nil
+}
+
+func (repository *Repository) setAccountingReason(ctx context.Context, reason string) error {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return nil
+	}
+	if _, err := repository.tx.Exec(
+		ctx,
+		"SELECT set_config('app.accounting_reason', $1, true)",
+		reason,
+	); err != nil {
+		return mapError(err)
+	}
+	return nil
 }
 
 func optimisticError(err error) error {

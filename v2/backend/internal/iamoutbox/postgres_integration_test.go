@@ -301,6 +301,12 @@ func cleanupWorkerFixture(t *testing.T, database *postgres.DB, result provisioni
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	tx, err := database.Pool().Begin(ctx)
+	if err != nil {
+		t.Errorf("begin cleanup transaction: %v", err)
+		return
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
 	queries := []struct {
 		sql  string
 		args []any
@@ -322,6 +328,18 @@ func cleanupWorkerFixture(t *testing.T, database *postgres.DB, result provisioni
 			args: []any{result.OrganizationID},
 		},
 		{
+			sql: "ALTER TABLE accounting.account_events " +
+				"DISABLE TRIGGER accounting_account_events_immutable",
+		},
+		{
+			sql:  "DELETE FROM accounting.account_events WHERE org_id = $1::uuid",
+			args: []any{result.OrganizationID},
+		},
+		{
+			sql: "ALTER TABLE accounting.account_events " +
+				"ENABLE TRIGGER accounting_account_events_immutable",
+		},
+		{
 			sql:  "DELETE FROM accounting.accounts WHERE org_id = $1::uuid",
 			args: []any{result.OrganizationID},
 		},
@@ -339,9 +357,13 @@ func cleanupWorkerFixture(t *testing.T, database *postgres.DB, result provisioni
 		},
 	}
 	for _, query := range queries {
-		if _, err := database.Exec(ctx, query.sql, query.args...); err != nil {
+		if _, err := tx.Exec(ctx, query.sql, query.args...); err != nil {
 			t.Errorf("cleanup query %q: %v", query.sql, err)
+			return
 		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Errorf("commit cleanup transaction: %v", err)
 	}
 }
 

@@ -55,7 +55,7 @@ smoke:
 	docker compose exec -T postgres sh -ec \
 		'test "$$(psql -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''idempotency/core'\''")" = 1'
 	docker compose exec -T postgres sh -ec \
-		'test "$$(psql -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 20'
+		'test "$$(psql -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 23'
 
 clerk-check:
 	./scripts/check-clerk-config.sh

@@ -1236,11 +1236,24 @@ func accountingReportTable(
 		}
 		return accounting.JournalReportTable(entries), nil
 	case "trial-balance":
-		trial, err := service.TrialBalance(ctx, scope, from, to)
+		trial, err := collectTrialBalance(
+			ctx,
+			service,
+			scope,
+			accounting.TrialBalanceFilter{
+				From:  from,
+				To:    to,
+				Limit: 200,
+			},
+		)
 		if err != nil {
 			return accounting.ReportTable{}, err
 		}
-		return accounting.TrialBalanceReportTable(trial), nil
+		currency, err := loadFunctionalCurrency(ctx, tx)
+		if err != nil {
+			return accounting.ReportTable{}, err
+		}
+		return trialBalanceExportTable(trial, currency), nil
 	case "general-ledger":
 		if accountID == nil {
 			return accounting.ReportTable{}, fmt.Errorf("%w: account_id is required", accounting.ErrInvalidArgument)

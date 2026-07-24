@@ -310,6 +310,22 @@ func assertSchemaState(t *testing.T, ctx context.Context, database *postgres.DB)
 	if !lifecycleAuditTableExists {
 		t.Fatal("lifecycle audit table does not exist")
 	}
+	for _, index := range []string{
+		"accounting.accounting_journal_lines_general_ledger_idx",
+		"accounting.accounting_journal_entries_general_ledger_idx",
+	} {
+		var exists bool
+		if err := database.QueryRow(
+			ctx,
+			"SELECT to_regclass($1) IS NOT NULL",
+			index,
+		).Scan(&exists); err != nil {
+			t.Fatalf("query index %s: %v", index, err)
+		}
+		if !exists {
+			t.Fatalf("index %s does not exist", index)
+		}
+	}
 	for _, relation := range []string{
 		"accounting.accounts",
 		"accounting.journal_entries",
@@ -359,8 +375,8 @@ func assertSchemaState(t *testing.T, ctx context.Context, database *postgres.DB)
 	).Scan(&productMigrationCount); err != nil {
 		t.Fatalf("query product migrations: %v", err)
 	}
-	if productMigrationCount != 20 {
-		t.Fatalf("product migration count = %d, want 20", productMigrationCount)
+	if productMigrationCount != 23 {
+		t.Fatalf("product migration count = %d, want 23", productMigrationCount)
 	}
 
 	var iamMigrationCount int

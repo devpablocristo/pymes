@@ -62,6 +62,25 @@ func (c MonetaryClassification) Valid() bool {
 	return c == Monetary || c == NonMonetary || c == NotApplicable
 }
 
+type AccountNodeType string
+
+const (
+	AccountGroup   AccountNodeType = "group"
+	AccountPosting AccountNodeType = "posting"
+)
+
+func (n AccountNodeType) Valid() bool {
+	return n == AccountGroup || n == AccountPosting
+}
+
+type AccountLifecycleState string
+
+const (
+	AccountActive   AccountLifecycleState = "active"
+	AccountArchived AccountLifecycleState = "archived"
+	AccountTrashed  AccountLifecycleState = "trashed"
+)
+
 type Currency struct {
 	code       string
 	minorUnits int
@@ -156,12 +175,33 @@ type Account struct {
 	Monetary              MonetaryClassification `json:"monetary_classification"`
 	ParentID              *uuid.UUID             `json:"parent_id,omitempty"`
 	Postable              bool                   `json:"postable"`
+	NodeType              AccountNodeType        `json:"node_type"`
+	SystemKey             string                 `json:"-"`
+	SystemManaged         bool                   `json:"system_managed"`
 	ArchivedAt            *time.Time             `json:"archived_at,omitempty"`
+	TrashedAt             *time.Time             `json:"trashed_at,omitempty"`
 	Version               int64                  `json:"version"`
 	CreatedAt             time.Time              `json:"created_at"`
 	UpdatedAt             time.Time              `json:"updated_at"`
 	OpeningBalanceDate    *time.Time             `json:"opening_balance_date,omitempty"`
 	InflationOriginPolicy string                 `json:"inflation_origin_policy,omitempty"`
+}
+
+func (a Account) LifecycleState() AccountLifecycleState {
+	if a.TrashedAt != nil {
+		return AccountTrashed
+	}
+	if a.ArchivedAt != nil {
+		return AccountArchived
+	}
+	return AccountActive
+}
+
+func (a Account) EffectiveNodeType() AccountNodeType {
+	if a.Postable {
+		return AccountPosting
+	}
+	return AccountGroup
 }
 
 func (a Account) Validate() error {
@@ -180,10 +220,157 @@ func (a Account) Validate() error {
 	if !a.Monetary.Valid() {
 		return fmt.Errorf("%w: invalid monetary classification", ErrInvalidArgument)
 	}
+	if a.NodeType != "" && a.NodeType != a.EffectiveNodeType() {
+		return fmt.Errorf("%w: node type and postable must agree", ErrInvalidArgument)
+	}
+	if a.Postable && a.ParentID == nil {
+		return fmt.Errorf("%w: posting accounts require a parent group", ErrInvalidAccountParent)
+	}
+	if a.Postable && a.Monetary == NotApplicable {
+		return fmt.Errorf("%w: posting accounts require a monetary classification", ErrInvalidArgument)
+	}
+	if !a.Postable && a.Monetary != NotApplicable {
+		return fmt.Errorf("%w: groups use not_applicable classification", ErrInvalidArgument)
+	}
 	if a.ParentID != nil && *a.ParentID == a.ID && a.ID != uuid.Nil {
 		return fmt.Errorf("%w: account cannot be its own parent", ErrInvalidArgument)
 	}
 	return nil
+}
+
+type AccountUsage struct {
+	JournalLines            int64 `json:"journal_lines"`
+	DraftLines              int64 `json:"draft_lines"`
+	Mappings                int64 `json:"mappings"`
+	Children                int64 `json:"children"`
+	ActiveChildren          int64 `json:"active_children"`
+	FinancialAccounts       int64 `json:"financial_accounts"`
+	ActiveFinancialAccounts int64 `json:"active_financial_accounts"`
+	OpenItems               int64 `json:"open_items"`
+	InflationLines          int64 `json:"inflation_lines"`
+	RevaluationLines        int64 `json:"revaluation_lines"`
+	InactiveAncestors       int64 `json:"inactive_ancestors"`
+}
+
+func (u AccountUsage) HasDependencies() bool {
+	return u.JournalLines+u.DraftLines+u.Mappings+u.Children+
+		u.FinancialAccounts+u.OpenItems+u.InflationLines+
+		u.RevaluationLines > 0
+}
+
+func (u AccountUsage) StructureLocked() bool {
+	return u.HasDependencies()
+}
+
+type AccountCapabilities struct {
+	CanEditName      bool     `json:"can_edit_name"`
+	CanEditStructure bool     `json:"can_edit_structure"`
+	CanArchive       bool     `json:"can_archive"`
+	CanTrash         bool     `json:"can_trash"`
+	CanRestore       bool     `json:"can_restore"`
+	CanDuplicate     bool     `json:"can_duplicate"`
+	EditBlockers     []string `json:"edit_blockers"`
+	ArchiveBlockers  []string `json:"archive_blockers"`
+	TrashBlockers    []string `json:"trash_blockers"`
+	RestoreBlockers  []string `json:"restore_blockers"`
+}
+
+const (
+	BlockerAccountStructureLocked     = "ACCOUNTING_ACCOUNT_STRUCTURE_LOCKED"
+	BlockerAccountParentInvalid       = "ACCOUNTING_ACCOUNT_PARENT_INVALID"
+	BlockerAccountHierarchyCycle      = "ACCOUNTING_ACCOUNT_HIERARCHY_CYCLE"
+	BlockerMappingIncompatible        = "ACCOUNTING_MAPPING_INCOMPATIBLE"
+	BlockerAccountMapped              = "ACCOUNTING_ACCOUNT_MAPPED"
+	BlockerAccountFinancialDependency = "ACCOUNTING_ACCOUNT_FINANCIAL_DEPENDENCY"
+	BlockerAccountHasActiveChildren   = "ACCOUNTING_ACCOUNT_HAS_ACTIVE_CHILDREN"
+	BlockerAccountParentInactive      = "ACCOUNTING_ACCOUNT_PARENT_INACTIVE"
+	BlockerAccountProtected           = "ACCOUNTING_ACCOUNT_PROTECTED"
+)
+
+func BuildAccountCapabilities(
+	account Account,
+	usage AccountUsage,
+) AccountCapabilities {
+	capabilities := AccountCapabilities{
+		CanEditName: account.LifecycleState() == AccountActive,
+		CanEditStructure: account.LifecycleState() == AccountActive &&
+			!usage.StructureLocked(),
+		CanArchive:      account.LifecycleState() == AccountActive,
+		CanTrash:        account.LifecycleState() == AccountActive,
+		CanRestore:      account.LifecycleState() != AccountActive,
+		CanDuplicate:    !account.SystemManaged,
+		EditBlockers:    make([]string, 0),
+		ArchiveBlockers: make([]string, 0),
+		TrashBlockers:   make([]string, 0),
+		RestoreBlockers: make([]string, 0),
+	}
+	if account.SystemManaged {
+		capabilities.CanEditName = false
+		capabilities.CanEditStructure = false
+		capabilities.CanArchive = false
+		capabilities.CanTrash = false
+		capabilities.EditBlockers = append(
+			capabilities.EditBlockers,
+			BlockerAccountProtected,
+		)
+		capabilities.ArchiveBlockers = append(
+			capabilities.ArchiveBlockers,
+			BlockerAccountProtected,
+		)
+		capabilities.TrashBlockers = append(
+			capabilities.TrashBlockers,
+			BlockerAccountProtected,
+		)
+	}
+	if usage.StructureLocked() {
+		capabilities.EditBlockers = append(
+			capabilities.EditBlockers,
+			BlockerAccountStructureLocked,
+		)
+	}
+	if usage.Mappings > 0 {
+		capabilities.CanArchive = false
+		capabilities.ArchiveBlockers = append(
+			capabilities.ArchiveBlockers,
+			BlockerAccountMapped,
+		)
+	}
+	if usage.ActiveFinancialAccounts > 0 {
+		capabilities.CanArchive = false
+		capabilities.ArchiveBlockers = append(
+			capabilities.ArchiveBlockers,
+			BlockerAccountFinancialDependency,
+		)
+	}
+	if usage.ActiveChildren > 0 {
+		capabilities.CanArchive = false
+		capabilities.ArchiveBlockers = append(
+			capabilities.ArchiveBlockers,
+			BlockerAccountHasActiveChildren,
+		)
+	}
+	if usage.HasDependencies() {
+		capabilities.CanTrash = false
+		capabilities.TrashBlockers = append(
+			capabilities.TrashBlockers,
+			BlockerAccountStructureLocked,
+		)
+	}
+	if usage.InactiveAncestors > 0 {
+		capabilities.CanRestore = false
+		capabilities.RestoreBlockers = append(
+			capabilities.RestoreBlockers,
+			BlockerAccountParentInactive,
+		)
+	}
+	return capabilities
+}
+
+type AccountDetail struct {
+	Account      Account             `json:"account"`
+	Usage        AccountUsage        `json:"usage"`
+	Capabilities AccountCapabilities `json:"capabilities"`
+	MappingRoles []string            `json:"mapping_roles"`
 }
 
 type AccountMapping struct {
@@ -194,6 +381,22 @@ type AccountMapping struct {
 	Version     int64     `json:"version"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	UpdatedBy   string    `json:"updated_by"`
+	Reason      string    `json:"-"`
+}
+
+type AccountMappingDefinition struct {
+	Role                      string                   `json:"role"`
+	LabelES                   string                   `json:"label_es"`
+	LabelEN                   string                   `json:"label_en"`
+	DescriptionES             string                   `json:"description_es"`
+	DescriptionEN             string                   `json:"description_en"`
+	Required                  bool                     `json:"required"`
+	CompatibleAccountClasses  []AccountClass           `json:"compatible_account_classes"`
+	CompatibleNormalBalances  []NormalBalance          `json:"compatible_normal_balances"`
+	CompatibleMonetaryClasses []MonetaryClassification `json:"compatible_monetary_classes"`
+	CanonicalRole             string                   `json:"canonical_role,omitempty"`
+	Alias                     bool                     `json:"is_alias"`
+	DisplayOrder              int                      `json:"display_order"`
 }
 
 func (m AccountMapping) Validate() error {
@@ -767,7 +970,7 @@ func EvaluateDraftPostingStatus(draft Draft, context DraftPostingContext) DraftP
 			blocked = true
 			continue
 		}
-		if account.ArchivedAt != nil {
+		if account.ArchivedAt != nil || account.TrashedAt != nil {
 			issues = appendDraftPostingIssue(issues, PostingAccountArchived)
 			blocked = true
 		}

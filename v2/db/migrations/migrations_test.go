@@ -10,7 +10,7 @@ func TestProductMigrationsAreEmbedded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadDir() error = %v", err)
 	}
-	if len(entries) != 20 ||
+	if len(entries) != 23 ||
 		entries[0].Name() != "000001_app_schema.sql" ||
 		entries[1].Name() != "000002_iam_security.sql" ||
 		entries[2].Name() != "000003_outbox_access.sql" ||
@@ -30,7 +30,10 @@ func TestProductMigrationsAreEmbedded(t *testing.T) {
 		entries[16].Name() != "000017_fiscal_worker_durability.sql" ||
 		entries[17].Name() != "000018_accounting_bootstrap.sql" ||
 		entries[18].Name() != "000019_journal_workflow.sql" ||
-		entries[19].Name() != "000020_journal_workflow_upgrade.sql" {
+		entries[19].Name() != "000020_journal_workflow_upgrade.sql" ||
+		entries[20].Name() != "000021_accounting_accounts_workflow.sql" ||
+		entries[21].Name() != "000022_general_ledger.sql" ||
+		entries[22].Name() != "000023_trial_balance.sql" {
 		t.Fatalf("migration entries = %v", entries)
 	}
 }

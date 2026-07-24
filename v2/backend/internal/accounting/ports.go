@@ -46,14 +46,18 @@ type Repositories interface {
 
 type AccountRepository interface {
 	ListAccounts(context.Context, bool) ([]Account, error)
+	ListAccountDetails(context.Context, bool) ([]AccountDetail, error)
 	GetAccount(context.Context, uuid.UUID) (Account, error)
+	GetAccountDetail(context.Context, uuid.UUID) (AccountDetail, error)
 	CreateAccount(context.Context, Account) (Account, error)
 	UpdateAccount(context.Context, Account, int64) (Account, error)
-	AccountUsage(context.Context, uuid.UUID) (postings int64, mappings int64, children int64, err error)
+	AccountUsage(context.Context, uuid.UUID) (AccountUsage, error)
 	ArchiveAccount(context.Context, uuid.UUID, int64, time.Time, string) (Account, error)
 	RestoreAccount(context.Context, uuid.UUID, int64, string) (Account, error)
-	DeleteUnusedAccount(context.Context, uuid.UUID, int64) error
+	TrashUnusedAccount(context.Context, uuid.UUID, int64, string) error
 	ListMappings(context.Context) ([]AccountMapping, error)
+	ListMappingDefinitions(context.Context) ([]AccountMappingDefinition, error)
+	GetMappingDefinition(context.Context, string) (AccountMappingDefinition, error)
 	GetMappings(context.Context, []string) (map[string]AccountMapping, error)
 	SetMapping(context.Context, AccountMapping, int64) (AccountMapping, error)
 }
@@ -93,6 +97,8 @@ type JournalRepository interface {
 		[]uuid.UUID,
 	) (bool, error)
 	ListJournal(context.Context, JournalFilter) (PageResult[JournalEntry], error)
+	ListGeneralLedger(context.Context, GeneralLedgerFilter) (GeneralLedgerPage, error)
+	ListTrialBalance(context.Context, TrialBalanceFilter) (TrialBalancePage, error)
 	ReportLines(context.Context, time.Time, time.Time) ([]ReportLine, error)
 	AccountOpeningBalance(context.Context, uuid.UUID, time.Time) (Decimal, error)
 	ListOpenItems(context.Context, OpenItemFilter) ([]OpenItem, error)

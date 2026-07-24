@@ -481,6 +481,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounting/accounts/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAccountingAccountsTree"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/accounts/{account_id}": {
         parameters: {
             query?: never;
@@ -522,6 +538,22 @@ export interface paths {
         };
         get: operations["listAccountingMappings"];
         put: operations["updateAccountingMappings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/account-mapping-definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAccountingMappingDefinitions"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -635,6 +667,70 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["reverseJournalEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/general-ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getGeneralLedger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/general-ledger/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["exportGeneralLedger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/trial-balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getTrialBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/trial-balance/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["exportTrialBalance"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1491,6 +1587,8 @@ export interface components {
         /** @enum {string} */
         AccountingAccountType: "asset" | "liability" | "equity" | "income" | "cost" | "expense";
         /** @enum {string} */
+        AccountingAccountNodeType: "group" | "posting";
+        /** @enum {string} */
         AccountingNormalBalance: "debit" | "credit";
         /** @enum {string} */
         MonetaryClassification: "monetary" | "non_monetary" | "not_applicable";
@@ -1504,11 +1602,16 @@ export interface components {
             id: string;
             code: string;
             name: string;
+            node_type: components["schemas"]["AccountingAccountNodeType"];
             account_type: components["schemas"]["AccountingAccountType"];
             normal_balance: components["schemas"]["AccountingNormalBalance"];
             monetary_classification: components["schemas"]["MonetaryClassification"];
             /** Format: uuid */
             parent_id?: string | null;
+            /**
+             * @deprecated
+             * @description Compatibilidad; equivale a node_type=posting.
+             */
             postable: boolean;
             lifecycle_state: components["schemas"]["LifecycleState"];
             /** Format: int64 */
@@ -1517,20 +1620,94 @@ export interface components {
         AccountingAccountInput: {
             code: string;
             name: string;
+            node_type: components["schemas"]["AccountingAccountNodeType"];
             account_type: components["schemas"]["AccountingAccountType"];
             normal_balance: components["schemas"]["AccountingNormalBalance"];
             monetary_classification: components["schemas"]["MonetaryClassification"];
             /** Format: uuid */
             parent_id?: string | null;
-            postable: boolean;
+            /**
+             * @deprecated
+             * @description Compatibilidad temporal. Si se envía junto con node_type, ambos deben coincidir.
+             */
+            postable?: boolean;
         };
         UpdateAccountingAccountInput: components["schemas"]["AccountingAccountInput"] & {
             /** Format: int64 */
             version: number;
         };
         AccountingAccountList: {
-            items: components["schemas"]["AccountingAccount"][];
+            items: components["schemas"]["AccountingAccountSummary"][];
             page: components["schemas"]["PageInfo"];
+        };
+        AccountingAccountUsage: {
+            used: boolean;
+            journal_lines: number;
+            draft_lines: number;
+            mappings: number;
+            financial_accounts: number;
+            active_financial_accounts: number;
+            open_items: number;
+            inflation_lines: number;
+            revaluation_lines: number;
+            children: number;
+            active_children: number;
+            total_dependencies: number;
+        };
+        AccountingAccountCapabilities: {
+            can_edit_name: boolean;
+            can_edit_structure: boolean;
+            can_duplicate: boolean;
+            can_archive: boolean;
+            can_trash: boolean;
+            can_restore: boolean;
+            /** @description Códigos estables y localizables; nunca mensajes del backend. */
+            edit_blockers: string[];
+            /** @description Códigos estables y localizables; nunca mensajes del backend. */
+            archive_blockers: string[];
+            /** @description Códigos estables y localizables; nunca mensajes del backend. */
+            trash_blockers: string[];
+            /** @description Códigos estables y localizables; nunca mensajes del backend. */
+            restore_blockers: string[];
+        };
+        AccountingAccountSummary: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            node_type: components["schemas"]["AccountingAccountNodeType"];
+            account_type: components["schemas"]["AccountingAccountType"];
+            normal_balance: components["schemas"]["AccountingNormalBalance"];
+            monetary_classification: components["schemas"]["MonetaryClassification"];
+            /** Format: uuid */
+            parent_id?: string | null;
+            /** @deprecated */
+            postable: boolean;
+            lifecycle_state: components["schemas"]["LifecycleState"];
+            /** Format: int64 */
+            version: number;
+            depth: number;
+            path: string[];
+            has_children: boolean;
+            used: boolean;
+            mapped: boolean;
+            system_managed: boolean;
+            context_only: boolean;
+            capabilities: components["schemas"]["AccountingAccountCapabilities"];
+        };
+        AccountingAccountDetail: components["schemas"]["AccountingAccountSummary"] & {
+            usage: components["schemas"]["AccountingAccountUsage"];
+            mapped_roles: string[];
+        };
+        AccountingAccountLifecycleTotals: {
+            active: number;
+            archived: number;
+            trashed: number;
+        };
+        AccountingAccountTree: {
+            /** @description Recorrido preordenado; cada relación jerárquica se determina por parent_id. */
+            items: components["schemas"]["AccountingAccountSummary"][];
+            totals: components["schemas"]["AccountingAccountLifecycleTotals"];
         };
         AccountingMapping: {
             role: string;
@@ -1547,6 +1724,20 @@ export interface components {
             account_id: string;
             /** Format: int64 */
             version?: number;
+        };
+        AccountingMappingDefinition: {
+            role: string;
+            canonical_role?: string | null;
+            is_alias: boolean;
+            label_es: string;
+            label_en: string;
+            description_es: string;
+            description_en: string;
+            required: boolean;
+            display_order: number;
+            compatible_account_types: components["schemas"]["AccountingAccountType"][];
+            compatible_normal_balances: components["schemas"]["AccountingNormalBalance"][];
+            compatible_monetary_classifications: components["schemas"]["MonetaryClassification"][];
         };
         JournalLineInput: {
             /** Format: uuid */
@@ -1956,6 +2147,89 @@ export interface components {
             rows: components["schemas"]["AccountingReportRow"][];
             total_debit: components["schemas"]["DecimalAmount"];
             total_credit: components["schemas"]["DecimalAmount"];
+        };
+        /** @enum {string} */
+        GeneralLedgerBalanceSide: "debit" | "credit" | "zero";
+        GeneralLedgerBalance: {
+            amount: components["schemas"]["DecimalAmount"];
+            side: components["schemas"]["GeneralLedgerBalanceSide"];
+        };
+        GeneralLedgerLine: {
+            /** Format: uuid */
+            entry_id: string;
+            /** Format: uuid */
+            line_id: string;
+            /** Format: int64 */
+            entry_number: number;
+            line_number: number;
+            /** Format: date */
+            accounting_date: string;
+            reference: string;
+            origin: string;
+            description: string;
+            memo: string;
+            debit: components["schemas"]["DecimalAmount"];
+            credit: components["schemas"]["DecimalAmount"];
+            balance: components["schemas"]["GeneralLedgerBalance"];
+        };
+        GeneralLedger: {
+            account: components["schemas"]["AccountingAccount"];
+            currency: components["schemas"]["CurrencyCode"];
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            opening_balance: components["schemas"]["GeneralLedgerBalance"];
+            closing_balance: components["schemas"]["GeneralLedgerBalance"];
+            total_debit: components["schemas"]["DecimalAmount"];
+            total_credit: components["schemas"]["DecimalAmount"];
+            items: components["schemas"]["GeneralLedgerLine"][];
+            page: components["schemas"]["PageInfo"];
+        };
+        /** @enum {string} */
+        TrialBalanceSide: "debit" | "credit" | "zero";
+        TrialBalanceBalance: {
+            amount: components["schemas"]["DecimalAmount"];
+            side: components["schemas"]["TrialBalanceSide"];
+        };
+        TrialBalanceItem: {
+            /** Format: uuid */
+            account_id: string;
+            code: string;
+            name: string;
+            account_class: components["schemas"]["AccountingAccountType"];
+            normal_balance: components["schemas"]["AccountingNormalBalance"];
+            lifecycle_state: components["schemas"]["LifecycleState"];
+            /** @description Nombres de los ancestros y de la cuenta, en orden jerárquico. */
+            path: string[];
+            opening_balance: components["schemas"]["TrialBalanceBalance"];
+            debit: components["schemas"]["DecimalAmount"];
+            credit: components["schemas"]["DecimalAmount"];
+            closing_balance: components["schemas"]["TrialBalanceBalance"];
+        };
+        TrialBalanceTotals: {
+            opening_debit: components["schemas"]["DecimalAmount"];
+            opening_credit: components["schemas"]["DecimalAmount"];
+            movement_debit: components["schemas"]["DecimalAmount"];
+            movement_credit: components["schemas"]["DecimalAmount"];
+            closing_debit: components["schemas"]["DecimalAmount"];
+            closing_credit: components["schemas"]["DecimalAmount"];
+        };
+        TrialBalanceControls: {
+            opening_difference: components["schemas"]["DecimalAmount"];
+            movement_difference: components["schemas"]["DecimalAmount"];
+            closing_difference: components["schemas"]["DecimalAmount"];
+        };
+        TrialBalance: {
+            currency: components["schemas"]["CurrencyCode"];
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            items: components["schemas"]["TrialBalanceItem"][];
+            totals: components["schemas"]["TrialBalanceTotals"];
+            controls: components["schemas"]["TrialBalanceControls"];
+            page: components["schemas"]["PageInfo"];
         };
         InflationAdjustmentInput: {
             /** Format: uuid */
@@ -3570,8 +3844,15 @@ export interface operations {
                 limit?: components["parameters"]["Limit"];
                 lifecycle_state?: components["schemas"]["LifecycleState"];
                 query?: string;
-                /** @description Filtra cuentas que admiten o no imputaciones. */
+                /**
+                 * @deprecated
+                 * @description Compatibilidad; usar node_type.
+                 */
                 postable?: boolean;
+                node_type?: components["schemas"]["AccountingAccountNodeType"];
+                account_type?: components["schemas"]["AccountingAccountType"];
+                parent_id?: string;
+                used?: boolean;
             };
             header?: never;
             path?: never;
@@ -3622,6 +3903,38 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getAccountingAccountsTree: {
+        parameters: {
+            query?: {
+                lifecycle_state?: components["schemas"]["LifecycleState"];
+                query?: string;
+                node_type?: components["schemas"]["AccountingAccountNodeType"];
+                account_type?: components["schemas"]["AccountingAccountType"];
+                parent_id?: string;
+                used?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Árbol contable completo, ordenado naturalmente y con ancestros de las coincidencias. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingAccountTree"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             503: components["responses"]["Unavailable"];
         };
     };
@@ -3642,7 +3955,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AccountingAccount"];
+                    "application/json": components["schemas"]["AccountingAccountDetail"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -3682,6 +3995,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
             503: components["responses"]["Unavailable"];
         };
     };
@@ -3771,6 +4085,30 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listAccountingMappingDefinitions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Catálogo canónico de roles funcionales y compatibilidades. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingMappingDefinition"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             503: components["responses"]["Unavailable"];
         };
     };
@@ -4052,6 +4390,145 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getGeneralLedger: {
+        parameters: {
+            query: {
+                account_id: string;
+                from: string;
+                to: string;
+                /** @description Busca número de asiento, referencia, origen, detalle o memo de línea. */
+                query?: string;
+                /** @description Origen efectivo del asiento; para asientos manuales coincide con su clase. */
+                origin?: string;
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Movimientos y saldos exactos de una cuenta imputable. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeneralLedger"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    exportGeneralLedger: {
+        parameters: {
+            query: {
+                account_id: string;
+                format: "csv" | "xlsx" | "pdf";
+                from: string;
+                to: string;
+                query?: string;
+                origin?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Libro Mayor exportado con los mismos filtros de consulta. */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/pdf": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getTrialBalance: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                /** @description Busca por código, nombre o ruta de la cuenta. */
+                query?: string;
+                account_class?: components["schemas"]["AccountingAccountType"];
+                /** @description Incluye además cuentas imputables activas sin saldo ni movimientos; las archivadas sólo aparecen con historia y las cuentas en papelera nunca se incluyen. */
+                include_zero?: boolean;
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Balance de sumas y saldos exacto, filtrable y paginado. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialBalance"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    exportTrialBalance: {
+        parameters: {
+            query: {
+                format: "csv" | "xlsx" | "pdf";
+                from: string;
+                to: string;
+                query?: string;
+                account_class?: components["schemas"]["AccountingAccountType"];
+                /** @description Incluye además cuentas imputables activas sin saldo ni movimientos; las archivadas sólo aparecen con historia y las cuentas en papelera nunca se incluyen. */
+                include_zero?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Balance de sumas y saldos completo con los mismos filtros. */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/pdf": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             503: components["responses"]["Unavailable"];
         };
     };

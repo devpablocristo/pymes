@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func TestJournalRoutesAllowViewAndRequireManageForMutations(t *testing.T) {
@@ -123,6 +124,60 @@ func TestJournalWorkflowErrorsHaveStableCodes(t *testing.T) {
 			status: http.StatusConflict,
 			code:   "ACCOUNTING_RECONCILIATION_CLOSED",
 		},
+		{
+			name:   "account structure locked",
+			err:    errAccountingAccountStructureLocked,
+			status: http.StatusConflict,
+			code:   "ACCOUNTING_ACCOUNT_STRUCTURE_LOCKED",
+		},
+		{
+			name:   "invalid account parent",
+			err:    errAccountingAccountParentInvalid,
+			status: http.StatusUnprocessableEntity,
+			code:   "ACCOUNTING_ACCOUNT_PARENT_INVALID",
+		},
+		{
+			name:   "account hierarchy cycle",
+			err:    errAccountingAccountHierarchyCycle,
+			status: http.StatusConflict,
+			code:   "ACCOUNTING_ACCOUNT_HIERARCHY_CYCLE",
+		},
+		{
+			name:   "mapping incompatible",
+			err:    errAccountingMappingIncompatible,
+			status: http.StatusUnprocessableEntity,
+			code:   "ACCOUNTING_MAPPING_INCOMPATIBLE",
+		},
+		{
+			name:   "account mapped",
+			err:    errAccountingAccountMapped,
+			status: http.StatusConflict,
+			code:   "ACCOUNTING_ACCOUNT_MAPPED",
+		},
+		{
+			name:   "financial dependency",
+			err:    errAccountingFinancialDependency,
+			status: http.StatusConflict,
+			code:   "ACCOUNTING_ACCOUNT_FINANCIAL_DEPENDENCY",
+		},
+		{
+			name:   "active children",
+			err:    errAccountingAccountHasChildren,
+			status: http.StatusConflict,
+			code:   "ACCOUNTING_ACCOUNT_HAS_ACTIVE_CHILDREN",
+		},
+		{
+			name:   "inactive parent",
+			err:    errAccountingAccountParentInactive,
+			status: http.StatusConflict,
+			code:   "ACCOUNTING_ACCOUNT_PARENT_INACTIVE",
+		},
+		{
+			name:   "protected account",
+			err:    errAccountingAccountProtected,
+			status: http.StatusConflict,
+			code:   "ACCOUNTING_ACCOUNT_PROTECTED",
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			response := httptest.NewRecorder()
@@ -132,6 +187,55 @@ func TestJournalWorkflowErrorsHaveStableCodes(t *testing.T) {
 					"status = %d, want %d; body = %s",
 					response.Code,
 					test.status,
+					response.Body,
+				)
+			}
+			var body struct {
+				Error struct {
+					Code string `json:"code"`
+				} `json:"error"`
+			}
+			if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+				t.Fatalf("decode error response: %v", err)
+			}
+			if body.Error.Code != test.code {
+				t.Fatalf("error code = %q, want %q", body.Error.Code, test.code)
+			}
+		})
+	}
+}
+
+func TestAccountingAccountConstraintErrorsHaveStableCodes(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		constraint string
+		code       string
+	}{
+		{"accounting_accounts_structure_locked", "ACCOUNTING_ACCOUNT_STRUCTURE_LOCKED"},
+		{"accounting_accounts_postable_leaf", "ACCOUNTING_ACCOUNT_STRUCTURE_LOCKED"},
+		{"accounting_accounts_invalid_parent", "ACCOUNTING_ACCOUNT_PARENT_INVALID"},
+		{"accounting_accounts_parent_not_postable", "ACCOUNTING_ACCOUNT_PARENT_INVALID"},
+		{"accounting_accounts_parent_class", "ACCOUNTING_ACCOUNT_PARENT_INVALID"},
+		{"accounting_accounts_hierarchy_cycle", "ACCOUNTING_ACCOUNT_HIERARCHY_CYCLE"},
+		{"accounting_accounts_hierarchy_acyclic", "ACCOUNTING_ACCOUNT_HIERARCHY_CYCLE"},
+		{"accounting_account_mappings_incompatible", "ACCOUNTING_MAPPING_INCOMPATIBLE"},
+		{"accounting_accounts_mapping_blocks_archive", "ACCOUNTING_ACCOUNT_MAPPED"},
+		{"accounting_accounts_financial_blocks_archive", "ACCOUNTING_ACCOUNT_FINANCIAL_DEPENDENCY"},
+		{"accounting_accounts_active_children", "ACCOUNTING_ACCOUNT_HAS_ACTIVE_CHILDREN"},
+		{"accounting_accounts_parent_inactive", "ACCOUNTING_ACCOUNT_PARENT_INACTIVE"},
+		{"accounting_accounts_system_protected", "ACCOUNTING_ACCOUNT_PROTECTED"},
+	} {
+		t.Run(test.constraint, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			writeBusinessError(response, &pgconn.PgError{
+				Code:           "23514",
+				ConstraintName: test.constraint,
+			})
+			if response.Code < http.StatusBadRequest {
+				t.Fatalf(
+					"status = %d, body = %s",
+					response.Code,
 					response.Body,
 				)
 			}

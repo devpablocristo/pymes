@@ -12,11 +12,18 @@ import {
   useState,
 } from "react";
 import { normalizeHttpError } from "@devpablocristo/platform-http";
-import { NavLink, Navigate, useParams } from "react-router-dom";
+import {
+  NavLink,
+  Navigate,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import type { components } from "../../api/schema.generated";
 import { useProductApi } from "../../api/ProductApiContext";
 import { createIdempotencyKey } from "../../api/idempotency";
 import { calendarDate } from "../calendarDate";
+import { ChevronRightIcon } from "../icons";
 import {
   EntityLifecycleTabs,
   EntitySelectionToolbar,
@@ -29,6 +36,72 @@ import { SectionHeader, SectionSearch } from "../shell/SectionChrome";
 type Account = components["schemas"]["AccountingAccount"];
 type AccountList = components["schemas"]["AccountingAccountList"];
 type AccountMapping = components["schemas"]["AccountingMapping"];
+type AccountNodeType = "group" | "posting";
+type AccountTypeFilter = "all" | AccountNodeType;
+type AccountCapabilities = {
+  can_edit_name: boolean;
+  can_edit_structure: boolean;
+  can_archive: boolean;
+  can_trash: boolean;
+  can_restore: boolean;
+  can_duplicate: boolean;
+  edit_blockers: string[];
+  archive_blockers: string[];
+  trash_blockers: string[];
+  restore_blockers: string[];
+};
+type AccountUsage = {
+  used: boolean;
+  journal_lines: number;
+  draft_lines: number;
+  mappings: number;
+  children: number;
+  financial_accounts: number;
+  open_items: number;
+  inflation_lines: number;
+  revaluation_lines: number;
+  total_dependencies: number;
+  active_children: number;
+  active_financial_accounts: number;
+};
+type AccountingAccountView = Account & {
+  node_type: AccountNodeType;
+  depth: number;
+  path: string[];
+  has_children: boolean;
+  used: boolean;
+  mapped: boolean;
+  system_managed: boolean;
+  context_only: boolean;
+  capabilities: AccountCapabilities;
+  usage?: AccountUsage;
+  mapped_roles?: string[];
+};
+type AccountingAccountTree = {
+  items: AccountingAccountView[];
+  totals: {
+    active: number;
+    archived: number;
+    trashed: number;
+  };
+};
+type AccountingMappingDefinition = {
+  role: string;
+  label_es: string;
+  label_en: string;
+  description_es: string;
+  description_en: string;
+  required: boolean;
+  compatible_account_types: Account["account_type"][];
+  compatible_normal_balances: Account["normal_balance"][];
+  compatible_monetary_classifications: Account["monetary_classification"][];
+  canonical_role?: string | null;
+  is_alias: boolean;
+  display_order?: number;
+};
+type AccountingMappingDefinitions =
+  | AccountingMappingDefinition[]
+  | { items: AccountingMappingDefinition[] };
 type CurrentSession = components["schemas"]["CurrentSession"];
 type Draft = components["schemas"]["JournalDraft"];
 type DraftList = components["schemas"]["JournalDraftList"];
@@ -138,6 +211,14 @@ type JournalEntryPage = {
   page: PageInfo;
 };
 
+type GeneralLedgerBalanceView =
+  components["schemas"]["GeneralLedgerBalance"];
+type GeneralLedgerView = components["schemas"]["GeneralLedger"];
+
+type TrialBalanceBalance = components["schemas"]["TrialBalanceBalance"];
+type TrialBalanceItem = components["schemas"]["TrialBalanceItem"];
+type TrialBalanceView = components["schemas"]["TrialBalance"];
+
 type AccountingSettingsView = {
   country_code: string;
   functional_currency: string;
@@ -152,6 +233,8 @@ type LogicalOperationKey = {
 const sections = [
   ["accounts", "Plan de cuentas"],
   ["journal", "Diario"],
+  ["ledger", "Mayor"],
+  ["trial-balance", "Sumas y saldos"],
   ["open-items", "Cobros y pagos"],
   ["reports", "Informes"],
   ["reconciliation", "Conciliación"],
@@ -228,6 +311,8 @@ function AccountingSectionView({
 }) {
   if (section === "accounts") return <AccountsPanel canManage={canManage} />;
   if (section === "journal") return <JournalPanel canManage={canManage} />;
+  if (section === "ledger") return <LedgerPanel />;
+  if (section === "trial-balance") return <TrialBalancePanel />;
   if (section === "open-items") return <OpenItemsPanel canManage={canManage} />;
   if (section === "reports") return <ReportsPanel />;
   if (section === "reconciliation") {
@@ -237,22 +322,30 @@ function AccountingSectionView({
   return <InflationPanel canManage={canManage} />;
 }
 
+type AccountEditorMode = "create-group" | "create-posting" | "edit" | "duplicate";
+type AccountLifecycleAction = "archive" | "unarchive" | "trash" | "restore";
+
 function AccountsPanel({ canManage }: { canManage: boolean }) {
   const api = useProductApi();
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [mappingAccounts, setMappingAccounts] = useState<Account[]>([]);
+  const [accounts, setAccounts] = useState<AccountingAccountView[]>([]);
+  const [supportAccounts, setSupportAccounts] = useState<AccountingAccountView[]>([]);
   const [mappings, setMappings] = useState<AccountMapping[]>([]);
+  const [mappingDefinitions, setMappingDefinitions] = useState<
+    AccountingMappingDefinition[]
+  >([]);
   const [query, setQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<AccountTypeFilter>("all");
   const [lifecycle, setLifecycle] = useState<EntityLifecycleState>("active");
+  const [totals, setTotals] = useState({ active: 0, archived: 0, trashed: 0 });
   const [selectedIDs, setSelectedIDs] = useState<string[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkNotice, setBulkNotice] = useState<string>();
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<Account>();
-  const [cursor, setCursor] = useState<string>();
-  const [cursorTrail, setCursorTrail] = useState<string[]>([]);
-  const [page, setPage] = useState<PageInfo>({ total: 0 });
+  const [editorMode, setEditorMode] = useState<AccountEditorMode>();
+  const [editorAccount, setEditorAccount] = useState<AccountingAccountView>();
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
 
   const load = useCallback(async () => {
@@ -261,196 +354,408 @@ function AccountsPanel({ canManage }: { canManage: boolean }) {
     try {
       const search = new URLSearchParams({
         lifecycle_state: toApiLifecycleState(lifecycle),
-        limit: "100",
       });
       if (query.trim()) search.set("query", query.trim());
-      if (cursor) search.set("cursor", cursor);
-      const response = await api.request<AccountList>(`/api/v1/accounting/accounts?${search}`);
-      setAccounts(response.items);
-      setCollapsed(collapsibleAccountIDs(response.items));
-      setPage(response.page);
+      if (typeFilter !== "all") search.set("node_type", typeFilter);
+      const response = await api.request<AccountingAccountTree>(
+        `/api/v1/accounting/accounts/tree?${search}`,
+        { skipJSONContentType: true },
+      );
+      const items = (response.items ?? []).map(normalizeAccountView);
+      setAccounts(items);
+      setTotals(response.totals ?? countAccountLifecycles(items));
+      setCollapsed(
+        query.trim() || typeFilter !== "all"
+          ? new Set()
+          : new Set(
+              items
+                .filter((account) => account.node_type === "group" && account.has_children)
+                .map((account) => account.id),
+            ),
+      );
     } catch (cause) {
-      setError(message(cause, "No pudimos cargar el plan de cuentas."));
+      setError(
+        accountErrorMessage(cause, "No pudimos cargar el plan de cuentas."),
+      );
     } finally {
       setLoading(false);
     }
-  }, [api, cursor, lifecycle, query]);
+  }, [api, lifecycle, query, typeFilter]);
 
-  const loadMappings = useCallback(async () => {
+  const loadSupportData = useCallback(async () => {
     try {
-      const [currentMappings, candidates] = await Promise.all([
+      const [currentMappings, definitions, activeTree] = await Promise.all([
         api.request<AccountMapping[]>("/api/v1/accounting/account-mappings", {
           skipJSONContentType: true,
         }),
-        api.request<AccountList>(
-          "/api/v1/accounting/accounts?lifecycle_state=active&limit=100",
+        api.request<AccountingMappingDefinitions>(
+          "/api/v1/accounting/account-mapping-definitions",
+          { skipJSONContentType: true },
+        ),
+        api.request<AccountingAccountTree>(
+          "/api/v1/accounting/accounts/tree?lifecycle_state=active",
+          { skipJSONContentType: true },
         ),
       ]);
       setMappings(currentMappings);
-      setMappingAccounts(candidates.items);
+      setMappingDefinitions(
+        Array.isArray(definitions) ? definitions : definitions.items ?? [],
+      );
+      setSupportAccounts((activeTree.items ?? []).map(normalizeAccountView));
     } catch (cause) {
-      setError(message(cause, "No pudimos cargar los mappings contables."));
+      setError(
+        accountErrorMessage(
+          cause,
+          "No pudimos cargar la configuración de posteo automático.",
+        ),
+      );
     }
   }, [api]);
 
   useEffect(() => void load(), [load]);
-  useEffect(() => void loadMappings(), [loadMappings]);
+  useEffect(() => void loadSupportData(), [loadSupportData]);
   useEffect(() => {
-    setSelectedIDs((current) => current.filter((id) => accounts.some((account) => account.id === id)));
+    setSelectedIDs((current) =>
+      current.filter((id) => accounts.some((account) => account.id === id)),
+    );
   }, [accounts]);
-  useEffect(() => {
-    if (!canManage) {
-      setShowCreate(false);
-      setEditingAccount(undefined);
-    }
-  }, [canManage]);
 
-  function resetPage() {
-    setCursor(undefined);
-    setCursorTrail([]);
+  function confirmEditorChange() {
+    return (
+      !editorDirty ||
+      window.confirm(
+        "Hay cambios sin guardar. Si continuás, se perderán.",
+      )
+    );
+  }
+
+  function closeEditor() {
+    if (!confirmEditorChange()) return;
+    setEditorMode(undefined);
+    setEditorAccount(undefined);
+    setEditorDirty(false);
+  }
+
+  function startCreate(mode: "create-group" | "create-posting") {
+    if (!confirmEditorChange()) return;
+    setEditorAccount(undefined);
+    setEditorMode(mode);
+    setEditorDirty(false);
+  }
+
+  async function openAccount(account: AccountingAccountView) {
+    if (!confirmEditorChange()) return;
+    setDetailLoading(true);
+    setError(undefined);
+    try {
+      const detail = await api.request<AccountingAccountView>(
+        `/api/v1/accounting/accounts/${account.id}`,
+        { skipJSONContentType: true },
+      );
+      setEditorAccount(normalizeAccountView(detail));
+      setEditorMode("edit");
+      setEditorDirty(false);
+    } catch (cause) {
+      setError(
+        accountErrorMessage(cause, "No pudimos abrir la ficha de la cuenta."),
+      );
+    } finally {
+      setDetailLoading(false);
+    }
   }
 
   function changeLifecycle(value: EntityLifecycleState) {
+    if (!confirmEditorChange()) return;
     setLifecycle(value);
     setSelectedIDs([]);
-    resetPage();
-    setEditingAccount(undefined);
-  }
-
-  function changeQuery(value: string) {
-    setQuery(value);
-    resetPage();
+    setEditorMode(undefined);
+    setEditorAccount(undefined);
+    setEditorDirty(false);
   }
 
   async function transition(
-    accountsToTransition: Account[],
-    action: "archive" | "unarchive" | "trash" | "restore",
+    selected: AccountingAccountView[],
+    action: AccountLifecycleAction,
   ) {
-    if (accountsToTransition.length === 0) return;
+    if (selected.length === 0) return;
     setBulkBusy(true);
     setError(undefined);
-    try {
-      await Promise.all(accountsToTransition.map((account) =>
-        api.request<Account>(`/api/v1/accounting/accounts/${account.id}/${action}`, {
-          method: "POST",
-          headers: { "Idempotency-Key": createIdempotencyKey(`account-${action}`) },
-          body: JSON.stringify({ version: account.version, reason: "Cambio desde plan de cuentas" }),
-        }),
-      ));
-      setSelectedIDs([]);
-      await Promise.all([load(), loadMappings()]);
-    } catch (cause) {
-      setError(message(cause, "No pudimos cambiar el estado de la cuenta."));
-    } finally {
-      setBulkBusy(false);
+    setBulkNotice(undefined);
+    const orderedDepths = [...new Set(selected.map((account) => account.depth))].sort(
+      (left, right) =>
+        action === "archive" || action === "trash"
+          ? right - left
+          : left - right,
+    );
+    const failedIDs: string[] = [];
+    let succeeded = 0;
+    for (const depth of orderedDepths) {
+      const level = selected.filter((account) => account.depth === depth);
+      const results = await Promise.allSettled(
+        level.map((account) =>
+          api.request<Account>(
+            `/api/v1/accounting/accounts/${account.id}/${action}`,
+            {
+              method: "POST",
+              headers: {
+                "Idempotency-Key": createIdempotencyKey(
+                  `account-${action}-${account.id}`,
+                ),
+              },
+              body: JSON.stringify({
+                version: account.version,
+                reason: "Cambio desde plan de cuentas",
+              }),
+            },
+          ),
+        ),
+      );
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") succeeded += 1;
+        else if (level[index]) failedIDs.push(level[index].id);
+      });
     }
+    setSelectedIDs(failedIDs);
+    setBulkNotice(
+      failedIDs.length === 0
+        ? `${succeeded} ${
+            succeeded === 1 ? "cuenta actualizada" : "cuentas actualizadas"
+          }.`
+        : `${succeeded} actualizadas y ${failedIDs.length} con conflictos. Las cuentas pendientes siguen seleccionadas.`,
+    );
+    if (failedIDs.length > 0) {
+      setError(
+        "Algunas cuentas no pudieron cambiar de estado. Abrí su ficha para revisar los bloqueos.",
+      );
+    }
+    await Promise.all([load(), loadSupportData()]);
+    setBulkBusy(false);
   }
 
   const treeRows = accountTreeRows(accounts, collapsed);
-  const selectedAccounts = accounts.filter((account) => selectedIDs.includes(account.id));
-  const selectedAccount = selectedAccounts.length === 1 ? selectedAccounts[0] : undefined;
-  const selectionActions: EntitySelectionAction[] = lifecycle === "active"
-    ? [
-        {
-          id: "edit",
-          label: "Editar",
-          disabled: !selectedAccount,
-          onClick: () => {
-            if (!selectedAccount) return;
-            setShowCreate(false);
-            setEditingAccount(selectedAccount);
-          },
-        },
-        {
-          id: "archive",
-          label: "Archivar",
-          onClick: () => void transition(selectedAccounts, "archive"),
-        },
-        {
-          id: "trash",
-          label: "Papelera",
-          danger: true,
-          onClick: () => void transition(selectedAccounts, "trash"),
-        },
-      ]
-    : lifecycle === "archived"
-      ? [{
-          id: "unarchive",
-          label: "Desarchivar",
-          onClick: () => void transition(selectedAccounts, "unarchive"),
-        }]
-      : [{
-          id: "restore",
-          label: "Restaurar",
-          onClick: () => void transition(selectedAccounts, "restore"),
-        }];
+  const selectableRows = accounts.filter((account) => !account.context_only);
+  const selectedAccounts = accounts.filter((account) =>
+    selectedIDs.includes(account.id),
+  );
+  const allVisibleSelected =
+    selectableRows.length > 0 &&
+    selectableRows.every((account) => selectedIDs.includes(account.id));
+  const someVisibleSelected = selectableRows.some((account) =>
+    selectedIDs.includes(account.id),
+  );
+  const action =
+    lifecycle === "active"
+      ? undefined
+      : lifecycle === "archived"
+        ? "unarchive"
+        : "restore";
 
   return (
-    <section className="directory-section">
-      <div className="directory-section__heading">
-        <div className="directory-section__controls">
-          {canManage ? (
-            <EntitySelectionToolbar
-              actions={selectionActions}
-              busy={bulkBusy}
-              createLabel="Nueva cuenta"
-              onClear={() => setSelectedIDs([])}
-              onCreate={lifecycle === "active" ? () => {
-                setEditingAccount(undefined);
-                setShowCreate((value) => !value);
-              } : undefined}
-              selectedCount={selectedIDs.length}
-            />
-          ) : null}
-          <div className="directory-section__filter-group">
-            <SectionSearch label="Buscar cuentas" placeholder="Buscar por código o nombre…" value={query} onChange={changeQuery} />
-            <EntityLifecycleTabs label="Estado de cuentas" onChange={changeLifecycle} state={lifecycle} />
+    <section className="directory-section accounts-directory">
+      <div className="accounts-toolbar">
+        {canManage ? (
+          <div className="accounts-toolbar__actions">
+            <div className="accounts-toolbar__buttons">
+              {lifecycle === "active" ? (
+                <>
+                  <button
+                    className="directory-create-button"
+                    onClick={() => startCreate("create-group")}
+                    type="button"
+                  >
+                    <span aria-hidden="true">＋</span>
+                    Nuevo rubro
+                  </button>
+                  <button
+                    className="directory-create-button"
+                    onClick={() => startCreate("create-posting")}
+                    type="button"
+                  >
+                    <span aria-hidden="true">＋</span>
+                    Nueva cuenta
+                  </button>
+                </>
+              ) : null}
+              <span className="accounts-toolbar__separator" aria-hidden="true" />
+              <button
+                disabled={bulkBusy || selectedIDs.length === 0}
+                onClick={() => setSelectedIDs([])}
+                type="button"
+              >
+                Limpiar
+              </button>
+              {lifecycle === "active" ? (
+                <>
+                  <button
+                    disabled={
+                      bulkBusy ||
+                      selectedAccounts.length === 0 ||
+                      selectedAccounts.every(
+                        (account) => !account.capabilities.can_archive,
+                      )
+                    }
+                    onClick={() =>
+                      void transition(selectedAccounts, "archive")
+                    }
+                    type="button"
+                  >
+                    Archivar
+                  </button>
+                  <button
+                    className="is-danger"
+                    disabled={
+                      bulkBusy ||
+                      selectedAccounts.length === 0 ||
+                      selectedAccounts.every(
+                        (account) => !account.capabilities.can_trash,
+                      )
+                    }
+                    onClick={() => void transition(selectedAccounts, "trash")}
+                    type="button"
+                  >
+                    Papelera
+                  </button>
+                </>
+              ) : (
+                <button
+                  disabled={
+                    bulkBusy ||
+                    selectedAccounts.length === 0 ||
+                    selectedAccounts.every(
+                      (account) => !account.capabilities.can_restore,
+                    )
+                  }
+                  onClick={() =>
+                    void transition(selectedAccounts, action ?? "restore")
+                  }
+                  type="button"
+                >
+                  {lifecycle === "archived" ? "Desarchivar" : "Restaurar"}
+                </button>
+              )}
+            </div>
+            <span className="accounts-toolbar__count">
+              {selectedIDs.length}{" "}
+              {selectedIDs.length === 1 ? "seleccionado" : "seleccionados"}
+            </span>
           </div>
+        ) : (
+          <span />
+        )}
+        <div className="accounts-toolbar__filters">
+          <SectionSearch
+            label="Buscar cuentas"
+            placeholder="Buscar por código o nombre…"
+            value={query}
+            onChange={setQuery}
+          />
+          <AccountNodeTypeTabs onChange={setTypeFilter} value={typeFilter} />
+          <AccountLifecycleTabs
+            onChange={changeLifecycle}
+            state={lifecycle}
+            totals={totals}
+          />
         </div>
       </div>
       {!canManage ? <ReadOnlyNote /> : null}
-      {canManage && (showCreate || editingAccount) ? (
+      {editorMode ? (
         <AccountForm
-          account={editingAccount}
-          accounts={mappingAccounts}
-          key={editingAccount?.id ?? "new"}
-          onCancel={() => {
-            setShowCreate(false);
-            setEditingAccount(undefined);
+          account={editorAccount}
+          accounts={supportAccounts}
+          canManage={canManage}
+          key={`${editorMode}-${editorAccount?.id ?? "new"}`}
+          mode={editorMode}
+          onCancel={closeEditor}
+          onDirtyChange={setEditorDirty}
+          onDuplicate={(account) => {
+            setEditorAccount(account);
+            setEditorMode("duplicate");
+            setEditorDirty(false);
+          }}
+          onReload={(account) => {
+            setEditorAccount(account);
+            setEditorMode("edit");
+            setEditorDirty(false);
           }}
           onSaved={() => {
-            setShowCreate(false);
-            setEditingAccount(undefined);
-            void Promise.all([load(), loadMappings()]);
+            setEditorMode(undefined);
+            setEditorAccount(undefined);
+            setEditorDirty(false);
+            void Promise.all([load(), loadSupportData()]);
           }}
         />
       ) : null}
-      <InlineFeedback error={error} loading={loading} />
-      <div className="directory-table-wrap">
-        <table className="directory-table finance-table">
-          <thead><tr>
-            {canManage ? <th className="entity-select-cell" /> : null}
-            <th>Código</th><th>Cuenta</th><th>Rubro</th><th>Naturaleza</th><th>Imputable</th>
-          </tr></thead>
+      {bulkNotice ? (
+        <div className="inline-state accounts-bulk-notice" role="status">
+          {bulkNotice}
+        </div>
+      ) : null}
+      <InlineFeedback error={error} loading={loading || detailLoading} />
+      <div className="directory-table-wrap accounts-tree-wrap">
+        <table className="directory-table finance-table accounts-tree-table">
+          <thead>
+            <tr>
+              {canManage ? (
+                <th className="entity-select-cell">
+                  <PageSelectionCheckbox
+                    checked={allVisibleSelected}
+                    indeterminate={!allVisibleSelected && someVisibleSelected}
+                    onChange={(checked) =>
+                      setSelectedIDs(
+                        checked
+                          ? selectableRows.map((account) => account.id)
+                          : [],
+                      )
+                    }
+                  />
+                </th>
+              ) : null}
+              <th>Código</th>
+              <th>Cuenta</th>
+              <th>Tipo</th>
+              <th>Rubro</th>
+              <th>Naturaleza</th>
+              <th>Clasificación</th>
+              <th>Estado de uso</th>
+            </tr>
+          </thead>
           <tbody>
             {treeRows.map(({ account, depth, hasChildren }) => (
-              <tr key={account.id}>
-                {canManage ? <td className="entity-select-cell">
-                  <input
-                    aria-label={`Seleccionar ${account.code} ${account.name}`}
-                    checked={selectedIDs.includes(account.id)}
-                    onChange={(event) => {
-                      if (event.target.checked) {
-                        setSelectedIDs([account.id]);
-                        setShowCreate(false);
-                        setEditingAccount(account);
-                        return;
+              <tr
+                aria-label={`Abrir ${account.code} ${account.name}`}
+                className={`${account.node_type === "group" ? "is-account-group" : "is-posting-account"} ${
+                  depth === 0 ? "is-account-root" : ""
+                } ${account.context_only ? "is-context-only" : ""}`}
+                key={account.id}
+                onClick={() => void openAccount(account)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void openAccount(account);
+                  }
+                }}
+                tabIndex={0}
+              >
+                {canManage ? (
+                  <td
+                    className="entity-select-cell"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <input
+                      aria-label={`Seleccionar ${account.code} ${account.name}`}
+                      checked={selectedIDs.includes(account.id)}
+                      disabled={account.context_only}
+                      onChange={(event) =>
+                        setSelectedIDs((current) =>
+                          event.target.checked
+                            ? [...new Set([...current, account.id])]
+                            : current.filter((id) => id !== account.id),
+                        )
                       }
-                      setSelectedIDs((current) => current.filter((id) => id !== account.id));
-                    }}
-                    type="checkbox"
-                  />
-                </td> : null}
+                      type="checkbox"
+                    />
+                  </td>
+                ) : null}
                 <td>{account.code}</td>
                 <td className="directory-table__primary">
                   <div
@@ -459,53 +764,83 @@ function AccountsPanel({ canManage }: { canManage: boolean }) {
                   >
                     {hasChildren ? (
                       <button
-                        aria-label={`${collapsed.has(account.id) ? "Expandir" : "Contraer"} ${account.name}`}
+                        aria-label={`${
+                          collapsed.has(account.id) ? "Expandir" : "Contraer"
+                        } ${account.name}`}
                         aria-expanded={!collapsed.has(account.id)}
                         className="account-tree-toggle"
-                        onClick={() =>
+                        onClick={(event) => {
+                          event.stopPropagation();
                           setCollapsed((previous) => {
                             const next = new Set(previous);
                             if (next.has(account.id)) next.delete(account.id);
                             else next.add(account.id);
                             return next;
-                          })
-                        }
+                          });
+                        }}
                         type="button"
                       >
-                        {collapsed.has(account.id) ? "›" : "⌄"}
+                        <ChevronRightIcon
+                          aria-hidden="true"
+                          className={collapsed.has(account.id) ? undefined : "is-expanded"}
+                        />
                       </button>
-                    ) : <span className="account-tree-leaf" aria-hidden="true" />}
+                    ) : (
+                      <span className="account-tree-leaf" aria-hidden="true" />
+                    )}
                     <span>{account.name}</span>
                   </div>
                 </td>
+                <td>
+                  {account.node_type === "group" ? "Rubro" : "Imputable"}
+                </td>
                 <td>{accountTypeLabel(account.account_type)}</td>
-                <td>{account.normal_balance === "debit" ? "Deudora" : "Acreedora"}</td>
-                <td>{account.postable ? "Sí" : "Rubro"}</td>
+                <td>
+                  {account.normal_balance === "debit"
+                    ? "Deudora"
+                    : "Acreedora"}
+                </td>
+                <td>
+                  {monetaryClassificationLabel(
+                    account.monetary_classification,
+                  )}
+                </td>
+                <td>
+                  <div className="account-usage-cell">
+                    <span>{accountUsageLabel(account)}</span>
+                    {account.node_type === "posting" ? (
+                      <NavLink
+                        onClick={(event) => event.stopPropagation()}
+                        to={`/accounting/ledger?account_id=${account.id}`}
+                      >
+                        Ver mayor
+                      </NavLink>
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             ))}
-            {!loading && accounts.length === 0 ? <EmptyRow columns={canManage ? 6 : 5} text="No hay cuentas en este estado." /> : null}
+            {!loading && accounts.length === 0 ? (
+              <EmptyRow
+                columns={canManage ? 8 : 7}
+                text="No hay cuentas que coincidan."
+              />
+            ) : null}
           </tbody>
         </table>
       </div>
-      <CursorPagination
-        currentPage={cursorTrail.length + 1}
-        hasNext={Boolean(page.next_cursor)}
-        hasPrevious={cursorTrail.length > 0}
-        onNext={() => {
-          if (!page.next_cursor) return;
-          setCursorTrail((previous) => [...previous, cursor ?? ""]);
-          setCursor(page.next_cursor ?? undefined);
-        }}
-        onPrevious={() => {
-          const previous = cursorTrail.at(-1) ?? "";
-          setCursorTrail((items) => items.slice(0, -1));
-          setCursor(previous || undefined);
-        }}
-        total={page.total}
-      />
+      <div className="accounts-tree-summary">
+        <span>{accounts.length} elementos en el resultado</span>
+        <span>El árbol se construye por rubro superior.</span>
+      </div>
       <AccountMappingsPanel
-        accounts={mappingAccounts.filter((account) => account.postable)}
+        accounts={supportAccounts.filter(
+          (account) =>
+            account.node_type === "posting" &&
+            account.lifecycle_state === "active",
+        )}
         canManage={canManage}
+        definitions={mappingDefinitions}
         mappings={mappings}
         onSaved={(saved) => setMappings(saved)}
       />
@@ -513,87 +848,627 @@ function AccountsPanel({ canManage }: { canManage: boolean }) {
   );
 }
 
+function PageSelectionCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+}: {
+  checked: boolean;
+  indeterminate: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return (
+    <input
+      aria-label="Seleccionar todo el resultado"
+      checked={checked}
+      onChange={(event) => onChange(event.target.checked)}
+      ref={ref}
+      type="checkbox"
+    />
+  );
+}
+
+function AccountNodeTypeTabs({
+  onChange,
+  value,
+}: {
+  onChange: (value: AccountTypeFilter) => void;
+  value: AccountTypeFilter;
+}) {
+  return (
+    <div className="account-filter-tabs" role="tablist" aria-label="Tipo de cuenta">
+      {(
+        [
+          ["all", "Todos"],
+          ["group", "Rubros"],
+          ["posting", "Imputables"],
+        ] as const
+      ).map(([candidate, label]) => (
+        <button
+          aria-selected={candidate === value}
+          className={candidate === value ? "is-active" : ""}
+          key={candidate}
+          onClick={() => onChange(candidate)}
+          role="tab"
+          type="button"
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AccountLifecycleTabs({
+  onChange,
+  state,
+  totals,
+}: {
+  onChange: (state: EntityLifecycleState) => void;
+  state: EntityLifecycleState;
+  totals: { active: number; archived: number; trashed: number };
+}) {
+  const tabs: Array<[EntityLifecycleState, string, number]> = [
+    ["active", "Activos", totals.active],
+    ["archived", "Archivados", totals.archived],
+    ["trash", "Papelera", totals.trashed],
+  ];
+  return (
+    <div className="lifecycle-tabs account-lifecycle-tabs" role="tablist" aria-label="Estado de cuentas">
+      {tabs.map(([candidate, label, count]) => (
+        <button
+          aria-selected={candidate === state}
+          className={candidate === state ? "is-active" : ""}
+          key={candidate}
+          onClick={() => onChange(candidate)}
+          role="tab"
+          type="button"
+        >
+          <span>{label}</span>
+          <small>{count}</small>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+type AccountFormState = {
+  code: string;
+  name: string;
+  accountType: Account["account_type"];
+  normalBalance: Account["normal_balance"];
+  monetaryClassification: Account["monetary_classification"];
+  parentID: string;
+};
+
 function AccountForm({
   account,
   accounts,
+  canManage,
+  mode,
   onCancel,
+  onDirtyChange,
+  onDuplicate,
+  onReload,
   onSaved,
 }: {
-  account?: Account;
-  accounts: Account[];
+  account?: AccountingAccountView;
+  accounts: AccountingAccountView[];
+  canManage: boolean;
+  mode: AccountEditorMode;
   onCancel: () => void;
+  onDirtyChange: (dirty: boolean) => void;
+  onDuplicate: (account: AccountingAccountView) => void;
+  onReload: (account: AccountingAccountView) => void;
   onSaved: () => void;
 }) {
   const api = useProductApi();
+  const nodeType: AccountNodeType =
+    mode === "create-group"
+      ? "group"
+      : mode === "create-posting"
+        ? "posting"
+        : account?.node_type ?? (account?.postable ? "posting" : "group");
+  const initial = accountFormInitialState(account, mode, nodeType);
+  const [value, setValue] = useState<AccountFormState>(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [conflict, setConflict] = useState(false);
+  const dirty = JSON.stringify(value) !== JSON.stringify(initial);
+  const lifecycleReadOnly =
+    mode === "edit" && account?.lifecycle_state !== "active";
+  const systemReadOnly = mode === "edit" && Boolean(account?.system_managed);
+  const formReadOnly = !canManage || lifecycleReadOnly || systemReadOnly;
+  const structuralReadOnly =
+    formReadOnly ||
+    (mode === "edit" && !Boolean(account?.capabilities.can_edit_structure));
+  const canSubmit =
+    !formReadOnly &&
+    value.code.trim().length > 0 &&
+    value.name.trim().length > 0 &&
+    (nodeType === "group" || Boolean(value.parentID));
+  const groupAccounts = accounts.filter(
+    (candidate) =>
+      candidate.node_type === "group" &&
+      candidate.lifecycle_state === "active" &&
+      candidate.id !== account?.id &&
+      (mode === "create-posting" ||
+        candidate.account_type === value.accountType),
+  );
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
+  useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
+  useEffect(() => {
+    if (!dirty) return;
+    const preventUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", preventUnload);
+    return () => window.removeEventListener("beforeunload", preventUnload);
+  }, [dirty]);
+
+  function update(next: Partial<AccountFormState>) {
+    setConflict(false);
+    setValue((current) => ({ ...current, ...next }));
+  }
+
+  async function reloadLatest() {
+    if (!account) return;
     setBusy(true);
     setError(undefined);
     try {
-      await api.request<Account>(
-        account
-          ? `/api/v1/accounting/accounts/${account.id}`
-          : "/api/v1/accounting/accounts",
-        {
-        method: account ? "PUT" : "POST",
-        headers: { "Idempotency-Key": createIdempotencyKey(account ? "account-update" : "account") },
-        body: JSON.stringify({
-          code: String(form.get("code") ?? "").trim(),
-          name: String(form.get("name") ?? "").trim(),
-          account_type: form.get("account_type"),
-          normal_balance: form.get("normal_balance"),
-          monetary_classification: form.get("monetary_classification"),
-          parent_id: form.get("parent_id") || null,
-          postable: form.get("postable") === "on",
-          ...(account ? { version: account.version } : {}),
-        }),
-      });
-      onSaved();
+      const detail = await api.request<AccountingAccountView>(
+        `/api/v1/accounting/accounts/${account.id}`,
+        { skipJSONContentType: true },
+      );
+      onReload(normalizeAccountView(detail));
     } catch (cause) {
-      setError(message(cause, "No pudimos guardar la cuenta."));
+      setError(
+        accountErrorMessage(cause, "No pudimos recargar la última versión."),
+      );
     } finally {
       setBusy(false);
     }
   }
 
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSubmit) return;
+    setBusy(true);
+    setError(undefined);
+    setConflict(false);
+    const editing = mode === "edit" && account;
+    try {
+      await api.request<AccountingAccountView>(
+        editing
+          ? `/api/v1/accounting/accounts/${account.id}`
+          : "/api/v1/accounting/accounts",
+        {
+          method: editing ? "PUT" : "POST",
+          headers: {
+            "Idempotency-Key": createIdempotencyKey(
+              editing ? "account-update" : `account-${nodeType}`,
+            ),
+          },
+          body: JSON.stringify({
+            code: value.code.trim(),
+            name: value.name.trim(),
+            node_type: nodeType,
+            postable: nodeType === "posting",
+            account_type: value.accountType,
+            normal_balance:
+              nodeType === "group"
+                ? normalBalanceForType(value.accountType)
+                : value.normalBalance,
+            monetary_classification:
+              nodeType === "group"
+                ? "not_applicable"
+                : value.monetaryClassification,
+            parent_id: value.parentID || null,
+            ...(editing ? { version: account.version } : {}),
+          }),
+        },
+      );
+      onSaved();
+    } catch (cause) {
+      const normalized = normalizeHttpError(cause, {
+        fallbackMessage: "No pudimos guardar la cuenta.",
+      });
+      setConflict(normalized.code === "VERSION_CONFLICT");
+      setError(accountErrorMessage(cause, "No pudimos guardar la cuenta."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const title =
+    mode === "create-group"
+      ? "Nuevo rubro"
+      : mode === "create-posting"
+        ? "Nueva cuenta imputable"
+        : mode === "duplicate"
+          ? `Duplicar ${account?.name ?? "cuenta"}`
+          : `${nodeType === "group" ? "Rubro" : "Cuenta"} ${account?.code ?? ""}`;
+
   return (
-    <form className="finance-form finance-form--account" onSubmit={(event) => void submit(event)}>
-      <h2>{account ? `Editar ${account.code}` : "Nueva cuenta"}</h2>
-      <label>Código<input defaultValue={account?.code} name="code" required maxLength={32} /></label>
-      <label>Nombre<input defaultValue={account?.name} name="name" required maxLength={160} /></label>
-      <label>Rubro<select defaultValue={account?.account_type ?? "asset"} name="account_type"><option value="asset">Activo</option><option value="liability">Pasivo</option><option value="equity">Patrimonio</option><option value="income">Ingresos</option><option value="cost">Costos</option><option value="expense">Gastos</option></select></label>
-      <label>Naturaleza<select defaultValue={account?.normal_balance ?? "debit"} name="normal_balance"><option value="debit">Deudora</option><option value="credit">Acreedora</option></select></label>
-      <label>Clasificación<select defaultValue={account?.monetary_classification ?? "monetary"} name="monetary_classification"><option value="monetary">Monetaria</option><option value="non_monetary">No monetaria</option></select></label>
-      <label>Cuenta superior<select defaultValue={account?.parent_id ?? ""} name="parent_id"><option value="">Sin superior</option>{accounts.filter((item) => !item.postable && item.id !== account?.id).map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></label>
-      <label className="finance-check"><input defaultChecked={account?.postable ?? true} name="postable" type="checkbox" /> Permite imputaciones</label>
-      <div className="finance-form__actions">
-        <button onClick={onCancel} type="button">Cancelar</button>
-        <button className="directory-create-button" disabled={busy} type="submit">{busy ? "Guardando…" : "Guardar cuenta"}</button>
+    <form
+      className={`finance-form finance-form--account account-editor ${
+        formReadOnly ? "is-readonly" : ""
+      }`}
+      onSubmit={(event) => void submit(event)}
+    >
+      <header className="account-editor__header">
+        <div>
+          <small>{nodeType === "group" ? "Rubro estructural" : "Cuenta imputable"}</small>
+          <h2>{title}</h2>
+          {account?.parent_id ? <span>Depende de un rubro superior.</span> : null}
+        </div>
+        <div>
+          {mode === "edit" &&
+          account?.capabilities.can_duplicate &&
+          canManage ? (
+            <button onClick={() => onDuplicate(account)} type="button">
+              Duplicar como nueva
+            </button>
+          ) : null}
+          <button aria-label="Cerrar ficha" onClick={onCancel} type="button">
+            ×
+          </button>
+        </div>
+      </header>
+      <label>
+        Código
+        <input
+          disabled={structuralReadOnly}
+          maxLength={32}
+          onChange={(event) => update({ code: event.target.value })}
+          required
+          value={value.code}
+        />
+      </label>
+      <label>
+        Nombre
+        <input
+          disabled={
+            formReadOnly ||
+            (mode === "edit" && !account?.capabilities.can_edit_name)
+          }
+          maxLength={160}
+          onChange={(event) => update({ name: event.target.value })}
+          required
+          value={value.name}
+        />
+      </label>
+      <label>
+        Clase
+        <select
+          disabled={structuralReadOnly || nodeType === "posting"}
+          onChange={(event) => {
+            const accountType = event.target.value as Account["account_type"];
+            update({
+              accountType,
+              normalBalance: normalBalanceForType(accountType),
+              parentID: "",
+            });
+          }}
+          value={value.accountType}
+        >
+          <option value="asset">Activo</option>
+          <option value="liability">Pasivo</option>
+          <option value="equity">Patrimonio</option>
+          <option value="income">Ingresos</option>
+          <option value="cost">Costos</option>
+          <option value="expense">Gastos</option>
+        </select>
+      </label>
+      <label>
+        Naturaleza
+        <select
+          disabled={structuralReadOnly || nodeType === "group"}
+          onChange={(event) =>
+            update({
+              normalBalance: event.target.value as Account["normal_balance"],
+            })
+          }
+          value={
+            nodeType === "group"
+              ? normalBalanceForType(value.accountType)
+              : value.normalBalance
+          }
+        >
+          <option value="debit">Deudora</option>
+          <option value="credit">Acreedora</option>
+        </select>
+      </label>
+      <label>
+        Clasificación
+        <select
+          disabled={structuralReadOnly || nodeType === "group"}
+          onChange={(event) =>
+            update({
+              monetaryClassification: event.target
+                .value as Account["monetary_classification"],
+            })
+          }
+          value={
+            nodeType === "group"
+              ? "not_applicable"
+              : value.monetaryClassification
+          }
+        >
+          {nodeType === "group" ? (
+            <option value="not_applicable">No aplicable</option>
+          ) : (
+            <>
+              <option value="monetary">Monetaria</option>
+              <option value="non_monetary">No monetaria</option>
+            </>
+          )}
+        </select>
+      </label>
+      <label className="account-editor__parent">
+        Rubro superior {nodeType === "posting" ? "(obligatorio)" : "(opcional)"}
+        <AccountLookupCombobox
+          accounts={groupAccounts}
+          allowEmpty={nodeType === "group"}
+          disabled={structuralReadOnly}
+          emptyText="Sin rubro superior"
+          label="Rubro superior"
+          onSelect={(selected) => {
+            if (!selected) {
+              update({ parentID: "" });
+              return;
+            }
+            update({
+              parentID: selected.id,
+              accountType: selected.account_type,
+              normalBalance: normalBalanceForType(selected.account_type),
+            });
+          }}
+          selectedID={value.parentID}
+        />
+      </label>
+      <div className="account-editor__status">
+        <span className={`account-node-badge is-${nodeType}`}>
+          {nodeType === "group" ? "Rubro · no imputable" : "Cuenta imputable"}
+        </span>
+        {account?.used ? <span>En uso</span> : <span>Sin uso</span>}
+        {account?.mapped ? <span>Usada en posteo automático</span> : null}
+        {account?.system_managed ? <span>Protegida por el sistema</span> : null}
       </div>
-      {error ? <span className="form-error" role="alert">{error}</span> : null}
+      {account?.usage ? <AccountUsageSummary usage={account.usage} /> : null}
+      {account && accountCapabilityBlockers(account).length ? (
+        <div className="account-editor__blockers">
+          <strong>Bloqueos actuales</strong>
+          <ul>
+            {accountCapabilityBlockers(account).map((blocker) => (
+              <li key={blocker}>{accountBlockerLabel(blocker)}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <div className="finance-form__actions account-editor__actions">
+        <button onClick={onCancel} type="button">
+          {formReadOnly ? "Cerrar" : "Cancelar"}
+        </button>
+        {!formReadOnly ? (
+          <button
+            className="directory-create-button"
+            disabled={busy || !canSubmit}
+            type="submit"
+          >
+            {busy
+              ? "Guardando…"
+              : nodeType === "group"
+                ? "Guardar rubro"
+                : "Guardar cuenta"}
+          </button>
+        ) : null}
+      </div>
+      {error ? (
+        <div className="form-error account-editor__error" role="alert">
+          <span>{error}</span>
+          {conflict ? (
+            <div>
+              <button disabled={busy} onClick={() => void reloadLatest()} type="button">
+                Recargar última versión
+              </button>
+              {account ? (
+                <button
+                  onClick={() =>
+                    onDuplicate(
+                      accountFromFormState(account, value, nodeType),
+                    )
+                  }
+                  type="button"
+                >
+                  Guardar como nueva
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </form>
   );
 }
 
+function AccountUsageSummary({ usage }: { usage: AccountUsage }) {
+  const items: Array<[string, number]> = [
+    ["Asientos", usage.journal_lines],
+    ["Borradores", usage.draft_lines],
+    ["Mappings", usage.mappings],
+    ["Hijas", usage.children],
+    ["Cuentas financieras", usage.financial_accounts],
+    ["Partidas abiertas", usage.open_items],
+    ["Ajustes por inflación", usage.inflation_lines],
+    ["Revaluaciones", usage.revaluation_lines],
+  ];
+  return (
+    <dl className="account-usage-summary">
+      {items.map(([label, count]) => (
+        <div key={label}>
+          <dt>{label}</dt>
+          <dd>{count}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function AccountLookupCombobox({
+  accounts,
+  allowEmpty = true,
+  disabled = false,
+  emptyText = "Sin cuenta",
+  label,
+  onSelect,
+  selectedID,
+}: {
+  accounts: AccountingAccountView[];
+  allowEmpty?: boolean;
+  disabled?: boolean;
+  emptyText?: string;
+  label: string;
+  onSelect: (account?: AccountingAccountView) => void;
+  selectedID: string;
+}) {
+  const listID = useId();
+  const selected = accounts.find((account) => account.id === selectedID);
+  const selectedLabel = selected ? `${selected.code} · ${selected.name}` : "";
+  const [query, setQuery] = useState(selectedLabel);
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+
+  useEffect(() => {
+    if (!open) setQuery(selectedLabel);
+  }, [open, selectedLabel]);
+
+  const normalized = query.trim().toLocaleLowerCase("es");
+  const options = accounts
+    .filter(
+      (account) =>
+        !normalized ||
+        query === selectedLabel ||
+        `${account.code} ${account.name}`
+          .toLocaleLowerCase("es")
+          .includes(normalized),
+    )
+    .sort(compareAccountsByCode)
+    .slice(0, 40);
+
+  function choose(account?: AccountingAccountView) {
+    onSelect(account);
+    setQuery(account ? `${account.code} · ${account.name}` : "");
+    setOpen(false);
+    setActiveIndex(-1);
+  }
+
+  return (
+    <div className="journal-account-combobox account-lookup-combobox">
+      <input
+        aria-activedescendant={
+          open && activeIndex >= 0 && options[activeIndex]
+            ? `${listID}-${options[activeIndex].id}`
+            : undefined
+        }
+        aria-autocomplete="list"
+        aria-controls={listID}
+        aria-expanded={open}
+        aria-label={label}
+        autoComplete="off"
+        disabled={disabled}
+        onBlur={() => window.setTimeout(() => setOpen(false), 0)}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          if (selectedID) onSelect(undefined);
+          setActiveIndex(-1);
+          setOpen(true);
+        }}
+        onFocus={() => {
+          setOpen(true);
+          setActiveIndex(-1);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setOpen(true);
+            setActiveIndex((current) =>
+              Math.min(current + 1, options.length - 1),
+            );
+          } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setActiveIndex((current) => Math.max(current - 1, 0));
+          } else if (event.key === "Enter" && open) {
+            event.preventDefault();
+            const option = options[activeIndex];
+            if (option) choose(option);
+          } else if (event.key === "Escape") {
+            setOpen(false);
+          }
+        }}
+        placeholder="Buscar por código o nombre…"
+        role="combobox"
+        value={query}
+      />
+      {open ? (
+        <div className="journal-account-combobox__options" id={listID} role="listbox">
+          {allowEmpty ? (
+            <button
+              aria-selected={!selectedID}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => choose(undefined)}
+              role="option"
+              type="button"
+            >
+              <strong>—</strong>
+              <span>{emptyText}</span>
+            </button>
+          ) : null}
+          {options.map((account, index) => (
+            <button
+              aria-selected={selectedID === account.id}
+              className={index === activeIndex ? "is-active" : ""}
+              id={`${listID}-${account.id}`}
+              key={account.id}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => choose(account)}
+              role="option"
+              type="button"
+            >
+              <strong>{account.code}</strong>
+              <span>{account.name}</span>
+            </button>
+          ))}
+          {options.length === 0 ? (
+            <span>No hay cuentas que coincidan.</span>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 type EditableMapping = {
-  role: string;
+  definition: AccountingMappingDefinition;
   accountID: string;
   version?: number;
-  persisted: boolean;
 };
 
 function AccountMappingsPanel({
   accounts,
   canManage,
+  definitions,
   mappings,
   onSaved,
 }: {
-  accounts: Account[];
+  accounts: AccountingAccountView[];
   canManage: boolean;
+  definitions: AccountingMappingDefinition[];
   mappings: AccountMapping[];
   onSaved: (mappings: AccountMapping[]) => void;
 }) {
@@ -603,36 +1478,79 @@ function AccountMappingsPanel({
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const canonicalDefinitions = definitions
+    .filter((definition) => !definition.is_alias)
+    .sort(
+      (left, right) =>
+        (left.display_order ?? 0) - (right.display_order ?? 0) ||
+        left.label_es.localeCompare(right.label_es, "es"),
+    );
+  const aliasDefinitions = definitions
+    .filter((definition) => definition.is_alias)
+    .sort(
+      (left, right) =>
+        (left.display_order ?? 0) - (right.display_order ?? 0) ||
+        left.role.localeCompare(right.role, "es"),
+    );
+  const required = canonicalDefinitions.filter((definition) => definition.required);
+  const configuredRequired = required.filter((definition) =>
+    mappings.some((mapping) => mapping.role === definition.role),
+  ).length;
+  const canonicalRoles = new Set(
+    canonicalDefinitions.map((definition) => definition.role),
+  );
+
+  function rowsFromMappings() {
+    return canonicalDefinitions.map((definition) => {
+      const mapping = mappings.find(
+        (candidate) => candidate.role === definition.role,
+      );
+      return {
+        definition,
+        accountID: mapping?.account_id ?? "",
+        version: mapping?.version,
+      };
+    });
+  }
 
   useEffect(() => {
-    setRows(
-      [...mappings]
-        .sort((left, right) => left.account_code.localeCompare(right.account_code, "es", { numeric: true }))
-        .map((mapping) => ({
-        role: mapping.role,
-        accountID: mapping.account_id,
-        version: mapping.version,
-        persisted: true,
-        })),
-    );
-  }, [mappings]);
+    setRows(rowsFromMappings());
+    // The definitions endpoint is authoritative; mapping changes reset the
+    // working copy so cancel never leaks edits into the next session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [definitions, mappings]);
 
   const mappingGroups = ["1", "2", "3", "4", "5", "6"].map((code) => ({
     code,
     label: accountGroupLabel(code),
     mappings: mappings
-      .filter((mapping) => mapping.account_code.split(".")[0] === code)
-      .sort((left, right) => left.account_code.localeCompare(right.account_code, "es", { numeric: true })),
+      .filter(
+        (mapping) =>
+          canonicalRoles.has(mapping.role) &&
+          mapping.account_code.split(".")[0] === code,
+      )
+      .sort((left, right) =>
+        left.account_code.localeCompare(right.account_code, "es", {
+          numeric: true,
+        }),
+      ),
   }));
 
   async function save() {
-    const commands = rows
-      .map((row) => ({ ...row, role: row.role.trim() }))
-      .filter((row) => row.role && row.accountID);
-    if (commands.length === 0) {
-      setError("Agregá al menos un mapping con una cuenta.");
+    const missingRequired = rows.filter(
+      (row) => row.definition.required && !row.accountID,
+    );
+    if (missingRequired.length > 0) {
+      setError(
+        `Completá ${
+          missingRequired.length === 1
+            ? "el mapping requerido"
+            : "los mappings requeridos"
+        } antes de guardar.`,
+      );
       return;
     }
+    const commands = rows.filter((row) => row.accountID);
     setBusy(true);
     setError(undefined);
     try {
@@ -645,7 +1563,7 @@ function AccountMappingsPanel({
           },
           body: JSON.stringify(
             commands.map((row) => ({
-              role: row.role,
+              role: row.definition.role,
               account_id: row.accountID,
               ...(row.version ? { version: row.version } : {}),
             })),
@@ -655,7 +1573,9 @@ function AccountMappingsPanel({
       onSaved(saved);
       setEditing(false);
     } catch (cause) {
-      setError(message(cause, "No pudimos guardar los mappings."));
+      setError(
+        accountErrorMessage(cause, "No pudimos guardar los mappings."),
+      );
     } finally {
       setBusy(false);
     }
@@ -666,8 +1586,13 @@ function AccountMappingsPanel({
       <header>
         <div>
           <small>Posteo automático</small>
-          <strong>Mappings funcionales</strong>
-          <span>Las reglas comerciales apuntan a roles; las cuentas se pueden cambiar sin reescribir el ledger.</span>
+          <strong>
+            Mappings funcionales · {configuredRequired}/{required.length} requeridos
+          </strong>
+          <span>
+            Definen qué cuenta usa cada operación automática. Si cambiás un mapping,
+            los próximos posteos usarán la nueva cuenta.
+          </span>
         </div>
         <div className="account-mappings-card__actions">
           <button
@@ -679,10 +1604,18 @@ function AccountMappingsPanel({
             {expanded || editing ? "Ocultar información" : "Desplegar información"}
           </button>
           {canManage ? (
-            <button onClick={() => {
-              setExpanded(true);
-              setEditing((value) => !value);
-            }} className="account-mappings-card__edit" type="button">
+            <button
+              className="account-mappings-card__edit"
+              onClick={() => {
+                setExpanded(true);
+                setEditing((value) => {
+                  if (value) setRows(rowsFromMappings());
+                  return !value;
+                });
+                setError(undefined);
+              }}
+              type="button"
+            >
               {editing ? "Cancelar edición" : "Editar mappings"}
             </button>
           ) : null}
@@ -690,85 +1623,114 @@ function AccountMappingsPanel({
       </header>
       {editing ? (
         <div className="account-mapping-editor">
-          {rows.map((row, index) => (
-            <div key={`${row.role}-${index}`}>
-              <label>
-                Rol funcional
-                <input
-                  aria-label={`Rol funcional ${index + 1}`}
-                  disabled={row.persisted}
-                  pattern="[a-z][a-z0-9_]{1,63}"
-                  value={row.role}
-                  onChange={(event) =>
-                    setRows((previous) =>
-                      previous.map((item, itemIndex) =>
-                        itemIndex === index
-                          ? { ...item, role: event.target.value }
-                          : item,
-                      ),
-                    )
-                  }
-                />
-              </label>
-              <label>
-                Cuenta
-                <select
-                  aria-label={`Cuenta del mapping ${row.role || index + 1}`}
-                  value={row.accountID}
-                  onChange={(event) =>
-                    setRows((previous) =>
-                      previous.map((item, itemIndex) =>
-                        itemIndex === index
-                          ? { ...item, accountID: event.target.value }
-                          : item,
-                      ),
-                    )
-                  }
-                >
-                  <option value="">Seleccionar</option>
-                  {accounts.map(accountOption)}
-                </select>
-              </label>
-            </div>
-          ))}
+          {rows.map((row, index) => {
+            const compatibleAccounts = accounts.filter((account) =>
+              accountMatchesDefinition(account, row.definition),
+            );
+            return (
+              <div key={row.definition.role}>
+                <div className="account-mapping-editor__definition">
+                  <strong>
+                    {row.definition.label_es}
+                    {row.definition.required ? " · Requerido" : ""}
+                  </strong>
+                  <span>{row.definition.description_es}</span>
+                  <code>{row.definition.role}</code>
+                </div>
+                <label>
+                  Cuenta para {row.definition.label_es}
+                  <AccountLookupCombobox
+                    accounts={compatibleAccounts}
+                    allowEmpty={!row.definition.required}
+                    emptyText="Sin configurar"
+                    label={`Cuenta para ${row.definition.label_es}`}
+                    onSelect={(selected) =>
+                      setRows((previous) =>
+                        previous.map((candidate, candidateIndex) =>
+                          candidateIndex === index
+                            ? {
+                                ...candidate,
+                                accountID: selected?.id ?? "",
+                              }
+                            : candidate,
+                        ),
+                      )
+                    }
+                    selectedID={row.accountID}
+                  />
+                </label>
+              </div>
+            );
+          })}
           <footer>
+            <span>
+              Los roles canónicos están definidos por el sistema y no se pueden crear
+              manualmente.
+            </span>
             <button
-              onClick={() =>
-                setRows((previous) => [
-                  ...previous,
-                  { role: "", accountID: "", persisted: false },
-                ])
-              }
+              className="directory-create-button"
+              disabled={busy}
+              onClick={() => void save()}
               type="button"
             >
-              ＋ Nuevo mapping
-            </button>
-            <button className="directory-create-button" disabled={busy} onClick={() => void save()} type="button">
               {busy ? "Guardando…" : "Guardar mappings"}
             </button>
           </footer>
-          {error ? <span className="form-error" role="alert">{error}</span> : null}
-        </div>
-      ) : expanded ? (
-        <div className="account-mapping-grid">
-          {mappingGroups.map((group) => (
-            <section key={group.code}>
-              <header><strong>{group.code}</strong><span>{group.label}</span></header>
-              <div>
-                {group.mappings.map((mapping) => (
-                  <article key={mapping.role}>
-                    <span>{mappingRoleLabel(mapping.role)}</span>
-                    <strong>{mapping.account_code} · {mapping.account_name}</strong>
-                  </article>
-                ))}
-                {group.mappings.length === 0 ? <p>Sin mappings.</p> : null}
-              </div>
-            </section>
-          ))}
-          {mappings.length === 0 ? (
-            <p>No hay mappings configurados. El cierre señalará las reglas pendientes.</p>
+          {error ? (
+            <span className="form-error" role="alert">
+              {error}
+            </span>
           ) : null}
         </div>
+      ) : expanded ? (
+        <>
+          <div className="account-mapping-grid">
+            {mappingGroups.map((group) => (
+              <section key={group.code}>
+                <header>
+                  <strong>{group.code}</strong>
+                  <span>{group.label}</span>
+                </header>
+                <div>
+                  {group.mappings.map((mapping) => {
+                    const definition = definitions.find(
+                      (candidate) => candidate.role === mapping.role,
+                    );
+                    return (
+                      <article key={mapping.role}>
+                        <span>
+                          {definition?.label_es ?? mappingRoleLabel(mapping.role)}
+                        </span>
+                        <strong>
+                          {mapping.account_code} · {mapping.account_name}
+                        </strong>
+                      </article>
+                    );
+                  })}
+                  {group.mappings.length === 0 ? <p>Sin mappings.</p> : null}
+                </div>
+              </section>
+            ))}
+          </div>
+          {aliasDefinitions.length ? (
+            <div className="account-mapping-aliases">
+              <strong>Aliases heredados</strong>
+              {aliasDefinitions.map((alias) => (
+                <span key={alias.role}>
+                  <code>{alias.role}</code>
+                  {alias.canonical_role ? (
+                    <>
+                      {" → "}
+                      <code>{alias.canonical_role}</code>
+                    </>
+                  ) : (
+                    " · sin reemplazo canónico"
+                  )}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </>
       ) : null}
     </article>
   );
@@ -3804,16 +4766,1080 @@ function SettlementDrawer({
   );
 }
 
+function LedgerPanel() {
+  const api = useProductApi();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryFrom = searchParams.get("from");
+  const queryTo = searchParams.get("to");
+  const [accountID, setAccountID] = useState(
+    searchParams.get("account_id") ?? "",
+  );
+  const [accounts, setAccounts] = useState<AccountingAccountView[]>([]);
+  const [from, setFrom] = useState(
+    () =>
+      (queryFrom && isAccountingDate(queryFrom)
+        ? queryFrom
+        : `${new Date().getFullYear()}-01-01`),
+  );
+  const [to, setTo] = useState(
+    () => (queryTo && isAccountingDate(queryTo) ? queryTo : calendarDate()),
+  );
+  const [query, setQuery] = useState("");
+  const [origin, setOrigin] = useState("");
+  const [cursor, setCursor] = useState<string>();
+  const [cursorTrail, setCursorTrail] = useState<Array<string | undefined>>([]);
+  const [ledger, setLedger] = useState<GeneralLedgerView>();
+  const [accountsLoading, setAccountsLoading] = useState(true);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [error, setError] = useState<string>();
+  const [detailError, setDetailError] = useState<string>();
+  const [entryLoadingID, setEntryLoadingID] = useState<string>();
+  const [selectedEntry, setSelectedEntry] = useState<JournalEntryView>();
+  const [exporting, setExporting] = useState<"csv" | "xlsx" | "pdf">();
+
+  useEffect(() => {
+    if (queryFrom && isAccountingDate(queryFrom)) {
+      setFrom((current) => (current === queryFrom ? current : queryFrom));
+    }
+  }, [queryFrom]);
+
+  useEffect(() => {
+    if (queryTo && isAccountingDate(queryTo)) {
+      setTo((current) => (current === queryTo ? current : queryTo));
+    }
+  }, [queryTo]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setAccountsLoading(true);
+    api
+      .request<AccountingAccountTree>(
+        "/api/v1/accounting/accounts/tree?lifecycle_state=active&node_type=posting",
+        {
+          signal: controller.signal,
+          skipJSONContentType: true,
+        },
+      )
+      .then((tree) => {
+        setAccounts(
+          tree.items
+            .filter(
+              (account) =>
+                account.node_type === "posting" &&
+                account.lifecycle_state === "active" &&
+                !account.context_only,
+            )
+            .sort(compareAccountsByCode),
+        );
+        setError(undefined);
+      })
+      .catch((cause) => {
+        if (!controller.signal.aborted) {
+          setError(
+            ledgerErrorMessage(
+              cause,
+              "No pudimos cargar las cuentas imputables.",
+            ),
+          );
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setAccountsLoading(false);
+      });
+    return () => controller.abort();
+  }, [api]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    if (!accountID) {
+      setLedger(undefined);
+      setLedgerLoading(false);
+      return () => controller.abort();
+    }
+
+    const requestSearch = ledgerSearch({
+      accountID,
+      cursor,
+      from,
+      origin,
+      query,
+      to,
+    });
+    setLedgerLoading(true);
+    api
+      .request<GeneralLedgerView>(
+        `/api/v1/accounting/general-ledger?${requestSearch}`,
+        {
+          signal: controller.signal,
+          skipJSONContentType: true,
+        },
+      )
+      .then((value) => {
+        setLedger(value);
+        setError(undefined);
+      })
+      .catch((cause) => {
+        if (!controller.signal.aborted) {
+          setLedger(undefined);
+          setError(
+            ledgerErrorMessage(cause, "No pudimos preparar el Libro Mayor."),
+          );
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLedgerLoading(false);
+      });
+    return () => controller.abort();
+  }, [accountID, api, cursor, from, origin, query, to]);
+
+  function resetCursor() {
+    setCursor(undefined);
+    setCursorTrail([]);
+  }
+
+  function selectAccount(account?: AccountingAccountView) {
+    const nextID = account?.id ?? "";
+    setAccountID(nextID);
+    setLedger(undefined);
+    resetCursor();
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (nextID) nextSearchParams.set("account_id", nextID);
+    else nextSearchParams.delete("account_id");
+    setSearchParams(nextSearchParams, { replace: true });
+  }
+
+  function updatePeriod(nextFrom: string, nextTo: string) {
+    setFrom(nextFrom);
+    setTo(nextTo);
+    resetCursor();
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.set("from", nextFrom);
+    nextSearchParams.set("to", nextTo);
+    setSearchParams(nextSearchParams, { replace: true });
+  }
+
+  async function openEntry(entryID: string) {
+    setEntryLoadingID(entryID);
+    setDetailError(undefined);
+    try {
+      const entry = await api.request<JournalEntryView>(
+        `/api/v1/accounting/journal-entries/${entryID}`,
+        { skipJSONContentType: true },
+      );
+      setSelectedEntry(entry);
+    } catch (cause) {
+      setDetailError(
+        ledgerErrorMessage(
+          cause,
+          "No pudimos abrir el detalle del asiento.",
+        ),
+      );
+    } finally {
+      setEntryLoadingID(undefined);
+    }
+  }
+
+  async function exportLedger(format: "csv" | "xlsx" | "pdf") {
+    if (!accountID) return;
+    setExporting(format);
+    setError(undefined);
+    try {
+      const requestSearch = ledgerSearch({
+        accountID,
+        from,
+        origin,
+        query,
+        to,
+      });
+      requestSearch.set("format", format);
+      const response = await api.requestResponse(
+        `/api/v1/accounting/general-ledger/export?${requestSearch}`,
+        { skipJSONContentType: true },
+      );
+      const blob = await response.blob();
+      downloadBlob(
+        blob,
+        response.headers.get("content-disposition"),
+        `mayor-${ledger?.account.code ?? "cuenta"}-${from}-${to}.${format}`,
+      );
+    } catch (cause) {
+      setError(
+        ledgerErrorMessage(cause, "No pudimos exportar el Libro Mayor."),
+      );
+    } finally {
+      setExporting(undefined);
+    }
+  }
+
+  const nextCursor = ledger?.page.next_cursor;
+  const account = ledger?.account ?? accounts.find((item) => item.id === accountID);
+  const loading = accountsLoading || ledgerLoading;
+
+  return (
+    <section className="directory-section ledger-panel">
+      <div className="ledger-toolbar">
+        <div className="ledger-account-picker">
+          <span className="ledger-account-picker__label">Cuenta del Mayor</span>
+          <AccountLookupCombobox
+            accounts={accounts}
+            emptyText="Elegí una cuenta imputable"
+            label="Cuenta del Mayor"
+            onSelect={selectAccount}
+            selectedID={accountID}
+          />
+          {account ? (
+            <span className="ledger-account-picker__selection">
+              <strong>
+                {account.code} · {account.name}
+              </strong>
+              <small>
+                {accountTypeLabel(account.account_type)} · Naturaleza{" "}
+                {account.normal_balance === "debit" ? "deudora" : "acreedora"}
+              </small>
+            </span>
+          ) : null}
+        </div>
+        <div className="ledger-filters">
+          <label>
+            Desde
+            <input
+              aria-label="Mayor desde"
+              max={to}
+              onChange={(event) => {
+                updatePeriod(event.target.value, to);
+              }}
+              type="date"
+              value={from}
+            />
+          </label>
+          <label>
+            Hasta
+            <input
+              aria-label="Mayor hasta"
+              min={from}
+              onChange={(event) => {
+                updatePeriod(from, event.target.value);
+              }}
+              type="date"
+              value={to}
+            />
+          </label>
+          <label>
+            Origen
+            <select
+              aria-label="Origen del Mayor"
+              onChange={(event) => {
+                setOrigin(event.target.value);
+                resetCursor();
+              }}
+              value={origin}
+            >
+              <option value="">Todos</option>
+              <option value="manual">Manual</option>
+              <option value="sale">Ventas</option>
+              <option value="purchase">Compras</option>
+              <option value="receipt">Cobros</option>
+              <option value="payment">Pagos</option>
+              <option value="inventory">Inventario</option>
+              <option value="fiscal">Fiscal</option>
+              <option value="adjustment">Ajustes</option>
+              <option value="reversal">Reversas</option>
+            </select>
+          </label>
+          <label className="ledger-query">
+            Buscar movimientos
+            <span>
+              <span aria-hidden="true">⌕</span>
+              <input
+                aria-label="Buscar movimientos del Mayor"
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  resetCursor();
+                }}
+                placeholder="Número, referencia, detalle…"
+                type="search"
+                value={query}
+              />
+            </span>
+          </label>
+        </div>
+        <div className="ledger-export-actions" aria-label="Exportar Libro Mayor">
+          {(["csv", "xlsx", "pdf"] as const).map((format) => (
+            <button
+              disabled={!accountID || Boolean(exporting) || ledgerLoading}
+              key={format}
+              onClick={() => void exportLedger(format)}
+              type="button"
+            >
+              {exporting === format ? "Preparando…" : format.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <InlineFeedback error={error ?? detailError} loading={loading} />
+
+      {!accountID && !accountsLoading ? (
+        <div className="ledger-empty">
+          <span aria-hidden="true">≡</span>
+          <strong>Elegí una cuenta imputable</strong>
+          <p>
+            El Mayor sigue una cuenta por vez para mostrar su saldo inicial,
+            movimientos y saldo final sin mezclar naturalezas contables.
+          </p>
+        </div>
+      ) : null}
+
+      {ledger ? (
+        <>
+          <div className="ledger-balance-rail" aria-label="Resumen del Mayor">
+            <LedgerBalanceCard
+              currency={ledger.currency}
+              kind="opening"
+              label="Saldo inicial"
+              side={ledgerBalanceSideLabel(ledger.opening_balance.side)}
+              value={ledger.opening_balance.amount}
+            />
+            <LedgerBalanceCard
+              currency={ledger.currency}
+              kind="debit"
+              label="Debe del período"
+              side="D"
+              value={ledger.total_debit}
+            />
+            <LedgerBalanceCard
+              currency={ledger.currency}
+              kind="credit"
+              label="Haber del período"
+              side="H"
+              value={ledger.total_credit}
+            />
+            <LedgerBalanceCard
+              currency={ledger.currency}
+              kind="closing"
+              label="Saldo final"
+              side={ledgerBalanceSideLabel(ledger.closing_balance.side)}
+              value={ledger.closing_balance.amount}
+            />
+          </div>
+
+          <div className="directory-table-wrap ledger-table-wrap">
+            <table className="directory-table finance-table ledger-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>N°</th>
+                  <th>Referencia / detalle</th>
+                  <th>Origen</th>
+                  <th>Debe</th>
+                  <th>Haber</th>
+                  <th>Saldo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ledger.items.map((item) => (
+                  <tr
+                    aria-label={`Abrir asiento número ${item.entry_number}`}
+                    className="ledger-entry-row"
+                    key={item.line_id}
+                    onClick={() => void openEntry(item.entry_id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        void openEntry(item.entry_id);
+                      }
+                    }}
+                    tabIndex={0}
+                  >
+                    <td>{formatDate(item.accounting_date)}</td>
+                    <td>
+                      <span className="ledger-entry-number">
+                        {entryLoadingID === item.entry_id
+                          ? "Abriendo…"
+                          : `#${item.entry_number}`}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="ledger-entry-cell">
+                        <strong>{item.reference || item.description}</strong>
+                        {item.reference && item.description ? (
+                          <span>{item.description}</span>
+                        ) : null}
+                        {item.memo ? <small>{item.memo}</small> : null}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="ledger-origin">
+                        {journalSourceLabel(item.origin)}
+                      </span>
+                    </td>
+                    <td className="ledger-amount">
+                      {decimalValueIsPositive(item.debit)
+                        ? formatMoney(item.debit, ledger.currency)
+                        : "—"}
+                    </td>
+                    <td className="ledger-amount">
+                      {decimalValueIsPositive(item.credit)
+                        ? formatMoney(item.credit, ledger.currency)
+                        : "—"}
+                    </td>
+                    <td className="ledger-amount ledger-running-balance">
+                      <LedgerSignedAmount
+                        currency={ledger.currency}
+                        side={ledgerBalanceSideLabel(item.balance.side)}
+                        value={item.balance.amount}
+                      />
+                    </td>
+                  </tr>
+                ))}
+                {!ledgerLoading && ledger.items.length === 0 ? (
+                  <EmptyRow
+                    columns={7}
+                    text="No hay movimientos para estos filtros."
+                  />
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="ledger-pagination">
+            <span>
+              {ledger.page.total}{" "}
+              {ledger.page.total === 1 ? "movimiento" : "movimientos"} ·
+              página {cursorTrail.length + 1}
+            </span>
+            <div>
+              <button
+                disabled={cursorTrail.length === 0 || ledgerLoading}
+                onClick={() => {
+                  const previous = cursorTrail.at(-1);
+                  setCursor(previous);
+                  setCursorTrail((trail) => trail.slice(0, -1));
+                }}
+                type="button"
+              >
+                Anterior
+              </button>
+              <button
+                disabled={!nextCursor || ledgerLoading}
+                onClick={() => {
+                  if (!nextCursor) return;
+                  setCursorTrail((trail) => [...trail, cursor]);
+                  setCursor(nextCursor);
+                }}
+                type="button"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      {selectedEntry ? (
+        <EntryDrawer
+          accounts={accounts}
+          canManage={false}
+          entry={selectedEntry}
+          onClose={() => setSelectedEntry(undefined)}
+          onCopy={() => undefined}
+          onOpenRelated={(entryID) => void openEntry(entryID)}
+          onReverse={() => undefined}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function LedgerBalanceCard({
+  currency,
+  kind,
+  label,
+  side,
+  value,
+}: {
+  currency: string;
+  kind: "opening" | "debit" | "credit" | "closing";
+  label: string;
+  side?: "D" | "H" | "—";
+  value: string;
+}) {
+  return (
+    <div className={`ledger-balance-card ledger-balance-card--${kind}`}>
+      <span>{label}</span>
+      {side ? (
+        <strong>
+          {formatMoney(value, currency)}
+          <small>{side}</small>
+        </strong>
+      ) : (
+        <LedgerSignedAmount currency={currency} value={value} />
+      )}
+    </div>
+  );
+}
+
+function LedgerSignedAmount({
+  currency,
+  side: explicitSide,
+  value,
+}: {
+  currency: string;
+  side?: "D" | "H" | "—";
+  value: string;
+}) {
+  const side =
+    explicitSide ??
+    (decimalValueIsNegative(value)
+      ? "H"
+      : decimalValuesEqual(value, "0")
+        ? "—"
+        : "D");
+  const absolute = value.trim().replace(/^-/, "");
+  return (
+    <strong>
+      {formatMoney(absolute, currency)}
+      <small>{side}</small>
+    </strong>
+  );
+}
+
+type TrialBalanceAccountClass = "" | Account["account_type"];
+type TrialBalanceScope = "nonzero" | "all";
+
+function TrialBalancePanel() {
+  const api = useProductApi();
+  const navigate = useNavigate();
+  const [from, setFrom] = useState(`${new Date().getFullYear()}-01-01`);
+  const [to, setTo] = useState(calendarDate());
+  const [query, setQuery] = useState("");
+  const [accountClass, setAccountClass] = useState<TrialBalanceAccountClass>("");
+  const [scope, setScope] = useState<TrialBalanceScope>("nonzero");
+  const [cursor, setCursor] = useState<string>();
+  const [cursorTrail, setCursorTrail] = useState<Array<string | undefined>>(
+    [],
+  );
+  const [balance, setBalance] = useState<TrialBalanceView>();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>();
+  const [exporting, setExporting] = useState<"csv" | "xlsx" | "pdf">();
+
+  const resetCursor = useCallback(() => {
+    setCursor(undefined);
+    setCursorTrail([]);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const requestSearch = trialBalanceSearch({
+      accountClass,
+      cursor,
+      from,
+      includeZero: scope === "all",
+      query,
+      to,
+    });
+    setLoading(true);
+    api
+      .request<TrialBalanceView>(
+        `/api/v1/accounting/trial-balance?${requestSearch}`,
+        {
+          signal: controller.signal,
+          skipJSONContentType: true,
+        },
+      )
+      .then((value) => {
+        setBalance(value);
+        setError(undefined);
+      })
+      .catch((cause) => {
+        if (!controller.signal.aborted) {
+          setBalance(undefined);
+          setError(
+            trialBalanceErrorMessage(
+              cause,
+              "No pudimos preparar las Sumas y saldos.",
+            ),
+          );
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [accountClass, api, cursor, from, query, scope, to]);
+
+  function updatePeriod(nextFrom: string, nextTo: string) {
+    setFrom(nextFrom);
+    setTo(nextTo);
+    resetCursor();
+  }
+
+  function updateQuery(value: string) {
+    setQuery(value);
+    resetCursor();
+  }
+
+  function updateAccountClass(value: TrialBalanceAccountClass) {
+    setAccountClass(value);
+    resetCursor();
+  }
+
+  function updateScope(value: TrialBalanceScope) {
+    setScope(value);
+    resetCursor();
+  }
+
+  function openLedger(item: TrialBalanceItem) {
+    const nextSearch = new URLSearchParams({
+      account_id: item.account_id,
+      from,
+      to,
+    });
+    navigate(`/accounting/ledger?${nextSearch}`);
+  }
+
+  async function exportTrialBalance(format: "csv" | "xlsx" | "pdf") {
+    setExporting(format);
+    setError(undefined);
+    try {
+      const requestSearch = trialBalanceSearch({
+        accountClass,
+        from,
+        includeZero: scope === "all",
+        query,
+        to,
+      });
+      requestSearch.set("format", format);
+      const response = await api.requestResponse(
+        `/api/v1/accounting/trial-balance/export?${requestSearch}`,
+        { skipJSONContentType: true },
+      );
+      const blob = await response.blob();
+      downloadBlob(
+        blob,
+        response.headers.get("content-disposition"),
+        `sumas-y-saldos-${from}-${to}.${format}`,
+      );
+    } catch (cause) {
+      setError(
+        trialBalanceErrorMessage(
+          cause,
+          "No pudimos exportar las Sumas y saldos.",
+        ),
+      );
+    } finally {
+      setExporting(undefined);
+    }
+  }
+
+  const nextCursor = balance?.page.next_cursor;
+  const totals = balance?.totals;
+  const controls = balance?.controls;
+
+  return (
+    <section className="directory-section trial-balance-panel">
+      <header className="trial-balance-heading">
+        <div>
+          <span>INFORME CONTABLE</span>
+          <h2>Balance de sumas y saldos</h2>
+          <p>Controlá apertura, movimientos y cierre de cada cuenta.</p>
+        </div>
+        {balance ? (
+          <small>
+            {balance.page.total} {balance.page.total === 1 ? "cuenta" : "cuentas"}
+          </small>
+        ) : null}
+      </header>
+
+      <div className="trial-balance-toolbar">
+        <div className="trial-balance-toolbar__filters">
+          <label>
+            Desde
+            <input
+              aria-label="Sumas y saldos desde"
+              max={to}
+              onChange={(event) => updatePeriod(event.target.value, to)}
+              type="date"
+              value={from}
+            />
+          </label>
+          <label>
+            Hasta
+            <input
+              aria-label="Sumas y saldos hasta"
+              min={from}
+              onChange={(event) => updatePeriod(from, event.target.value)}
+              type="date"
+              value={to}
+            />
+          </label>
+          <SectionSearch
+            label="Buscar cuentas en Sumas y saldos"
+            onChange={updateQuery}
+            placeholder="Código, cuenta o rubro…"
+            value={query}
+          />
+          <label>
+            Clase
+            <select
+              aria-label="Clase de cuenta"
+              onChange={(event) =>
+                updateAccountClass(
+                  event.target.value as TrialBalanceAccountClass,
+                )
+              }
+              value={accountClass}
+            >
+              <option value="">Todas las clases</option>
+              <option value="asset">Activo</option>
+              <option value="liability">Pasivo</option>
+              <option value="equity">Patrimonio</option>
+              <option value="income">Ingresos</option>
+              <option value="cost">Costos</option>
+              <option value="expense">Gastos</option>
+            </select>
+          </label>
+          <div
+            aria-label="Cuentas incluidas"
+            className="trial-balance-scope"
+            role="group"
+          >
+            <button
+              aria-pressed={scope === "nonzero"}
+              className={scope === "nonzero" ? "is-active" : ""}
+              onClick={() => updateScope("nonzero")}
+              type="button"
+            >
+              Con saldo o movimientos
+            </button>
+            <button
+              aria-pressed={scope === "all"}
+              className={scope === "all" ? "is-active" : ""}
+              onClick={() => updateScope("all")}
+              type="button"
+            >
+              Todas
+            </button>
+          </div>
+        </div>
+        <div
+          aria-label="Exportar Sumas y saldos"
+          className="ledger-export-actions trial-balance-export-actions"
+        >
+          {(["csv", "xlsx", "pdf"] as const).map((format) => (
+            <button
+              disabled={Boolean(exporting) || loading}
+              key={format}
+              onClick={() => void exportTrialBalance(format)}
+              type="button"
+            >
+              {exporting === format ? "Preparando…" : format.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <InlineFeedback error={error} loading={loading} />
+
+      {balance && totals && controls ? (
+        <>
+          <div
+            aria-label="Control de sumas y saldos"
+            className="trial-balance-control-rail"
+          >
+            <TrialBalanceControlCard
+              currency={balance.currency}
+              debit={totals.opening_debit}
+              difference={controls.opening_difference}
+              filtered={Boolean(query.trim() || accountClass)}
+              label="Apertura"
+              leftLabel="Deudor"
+              credit={totals.opening_credit}
+              rightLabel="Acreedor"
+            />
+            <TrialBalanceControlCard
+              currency={balance.currency}
+              debit={totals.movement_debit}
+              difference={controls.movement_difference}
+              filtered={Boolean(query.trim() || accountClass)}
+              label="Movimientos"
+              leftLabel="Debe"
+              credit={totals.movement_credit}
+              rightLabel="Haber"
+            />
+            <TrialBalanceControlCard
+              currency={balance.currency}
+              debit={totals.closing_debit}
+              difference={controls.closing_difference}
+              filtered={Boolean(query.trim() || accountClass)}
+              label="Cierre"
+              leftLabel="Deudor"
+              credit={totals.closing_credit}
+              rightLabel="Acreedor"
+            />
+          </div>
+
+          <div className="directory-table-wrap trial-balance-table-wrap">
+            <table className="directory-table finance-table trial-balance-table">
+              <thead>
+                <tr>
+                  <th rowSpan={2}>Código</th>
+                  <th rowSpan={2}>Cuenta</th>
+                  <th colSpan={2} scope="colgroup">
+                    Saldo inicial
+                  </th>
+                  <th colSpan={2} scope="colgroup">
+                    Movimientos
+                  </th>
+                  <th colSpan={2} scope="colgroup">
+                    Saldo final
+                  </th>
+                </tr>
+                <tr>
+                  <th scope="col">Deudor</th>
+                  <th scope="col">Acreedor</th>
+                  <th scope="col">Debe</th>
+                  <th scope="col">Haber</th>
+                  <th scope="col">Deudor</th>
+                  <th scope="col">Acreedor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {balance.items.map((item) => (
+                  <tr
+                    aria-label={`Abrir Mayor de ${item.code} ${item.name}`}
+                    className="trial-balance-account-row"
+                    key={item.account_id}
+                    onClick={() => openLedger(item)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openLedger(item);
+                      }
+                    }}
+                    tabIndex={0}
+                  >
+                    <td className="trial-balance-code-cell">{item.code}</td>
+                    <td className="trial-balance-account-cell">
+                      <div>
+                        <strong>{item.name}</strong>
+                        {trialBalancePath(item.path, item.name) ? (
+                          <small>{trialBalancePath(item.path, item.name)}</small>
+                        ) : null}
+                        <span>
+                          <em>{trialBalanceClassLabel(item.account_class)}</em>
+                          <em>{trialBalanceNormalBalanceLabel(item.normal_balance)}</em>
+                          {item.lifecycle_state !== "active" ? (
+                            <em className="is-archived">
+                              {trialBalanceLifecycleLabel(item.lifecycle_state)}
+                            </em>
+                          ) : null}
+                        </span>
+                      </div>
+                    </td>
+                    <TrialBalanceBalanceCell
+                      balance={item.opening_balance}
+                      currency={balance.currency}
+                      side="debit"
+                    />
+                    <TrialBalanceBalanceCell
+                      balance={item.opening_balance}
+                      currency={balance.currency}
+                      side="credit"
+                    />
+                    <TrialBalanceAmountCell
+                      currency={balance.currency}
+                      value={item.debit}
+                    />
+                    <TrialBalanceAmountCell
+                      currency={balance.currency}
+                      value={item.credit}
+                    />
+                    <TrialBalanceBalanceCell
+                      balance={item.closing_balance}
+                      currency={balance.currency}
+                      side="debit"
+                    />
+                    <TrialBalanceBalanceCell
+                      balance={item.closing_balance}
+                      currency={balance.currency}
+                      side="credit"
+                    />
+                  </tr>
+                ))}
+                {!loading && balance.items.length === 0 ? (
+                  <EmptyRow
+                    columns={8}
+                    text={
+                      query.trim() || accountClass
+                        ? "No hay cuentas que coincidan con los filtros."
+                        : scope === "all"
+                          ? "No hay cuentas imputables disponibles."
+                          : "No hay saldos ni movimientos contabilizados en el período."
+                    }
+                  />
+                ) : null}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <th colSpan={2} scope="row">Totales</th>
+                  <TrialBalanceAmountCell
+                    currency={balance.currency}
+                    value={totals.opening_debit}
+                  />
+                  <TrialBalanceAmountCell
+                    currency={balance.currency}
+                    value={totals.opening_credit}
+                  />
+                  <TrialBalanceAmountCell
+                    currency={balance.currency}
+                    value={totals.movement_debit}
+                  />
+                  <TrialBalanceAmountCell
+                    currency={balance.currency}
+                    value={totals.movement_credit}
+                  />
+                  <TrialBalanceAmountCell
+                    currency={balance.currency}
+                    value={totals.closing_debit}
+                  />
+                  <TrialBalanceAmountCell
+                    currency={balance.currency}
+                    value={totals.closing_credit}
+                  />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div className="ledger-pagination trial-balance-pagination">
+            <span>
+              {balance.page.total} {balance.page.total === 1 ? "cuenta" : "cuentas"}
+              {" · página "}
+              {cursorTrail.length + 1}
+            </span>
+            <div>
+              <button
+                disabled={cursorTrail.length === 0 || loading}
+                onClick={() => {
+                  const previous = cursorTrail.at(-1);
+                  setCursor(previous);
+                  setCursorTrail((trail) => trail.slice(0, -1));
+                }}
+                type="button"
+              >
+                Anterior
+              </button>
+              <button
+                disabled={!nextCursor || loading}
+                onClick={() => {
+                  if (!nextCursor) return;
+                  setCursorTrail((trail) => [...trail, cursor]);
+                  setCursor(nextCursor);
+                }}
+                type="button"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+function TrialBalanceControlCard({
+  credit,
+  currency,
+  debit,
+  difference,
+  filtered,
+  label,
+  leftLabel,
+  rightLabel,
+}: {
+  credit: string;
+  currency: string;
+  debit: string;
+  difference: string;
+  filtered: boolean;
+  label: string;
+  leftLabel: string;
+  rightLabel: string;
+}) {
+  const balanced = decimalValuesEqual(difference, "0");
+  return (
+    <section className="trial-balance-control-card">
+      <header>
+        <strong>{label}</strong>
+        <span
+          className={
+            filtered ? "is-filtered" : balanced ? "is-balanced" : "is-unbalanced"
+          }
+        >
+          {filtered ? "Vista filtrada" : balanced ? "Equilibrado" : "Diferencia"}
+        </span>
+      </header>
+      <dl>
+        <div>
+          <dt>{leftLabel}</dt>
+          <dd>{formatMoney(debit, currency)}</dd>
+        </div>
+        <div>
+          <dt>{rightLabel}</dt>
+          <dd>{formatMoney(credit, currency)}</dd>
+        </div>
+      </dl>
+      <footer>
+        <span>Control</span>
+        <strong>{formatMoney(difference, currency)}</strong>
+      </footer>
+    </section>
+  );
+}
+
+function TrialBalanceBalanceCell({
+  balance,
+  currency,
+  side,
+}: {
+  balance: TrialBalanceBalance;
+  currency: string;
+  side: "debit" | "credit";
+}) {
+  return (
+    <td className="trial-balance-amount">
+      {balance.side === side && decimalValueIsPositive(balance.amount)
+        ? formatMoney(balance.amount, currency)
+        : "—"}
+    </td>
+  );
+}
+
+function TrialBalanceAmountCell({
+  currency,
+  value,
+}: {
+  currency: string;
+  value: string;
+}) {
+  return (
+    <td className="trial-balance-amount">
+      {decimalValueIsPositive(value) ? formatMoney(value, currency) : "—"}
+    </td>
+  );
+}
+
 function ReportsPanel() {
   const api = useProductApi();
   const [kind, setKind] = useState<
-    "journal" | "general-ledger" | "trial-balance" | "balance-sheet" | "income-statement" | "aging" | "vat-position" | "financial-activity"
-  >("trial-balance");
+    "journal" | "balance-sheet" | "income-statement" | "aging" | "vat-position" | "financial-activity"
+  >("journal");
   const [from, setFrom] = useState(`${new Date().getFullYear()}-01-01`);
   const [to, setTo] = useState(calendarDate());
-  const [accountID, setAccountID] = useState("");
   const [financialAccountID, setFinancialAccountID] = useState("");
-  const [accounts, setAccounts] = useState<Account[]>([]);
   const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]);
   const [report, setReport] = useState<Report>();
   const [error, setError] = useState<string>();
@@ -3823,17 +5849,12 @@ function ReportsPanel() {
     kind === "financial-activity" ? financialAccountID : "";
 
   useEffect(() => {
-    Promise.all([
-      api.request<AccountList>(
-        "/api/v1/accounting/accounts?lifecycle_state=active&limit=100",
-      ),
-      api.request<FinancialAccount[]>(
+    api
+      .request<FinancialAccount[]>(
         "/api/v1/accounting/financial-accounts?lifecycle_state=active",
         { skipJSONContentType: true },
-      ),
-    ])
-      .then(([chart, currentFinancialAccounts]) => {
-        setAccounts(chart.items.filter((item) => item.postable));
+      )
+      .then((currentFinancialAccounts) => {
         setFinancialAccounts(currentFinancialAccounts);
         setFinancialAccountID((current) =>
           current || currentFinancialAccounts[0]?.id || "",
@@ -3853,7 +5874,7 @@ function ReportsPanel() {
     const search = reportSearch(
       from,
       to,
-      kind === "general-ledger" ? accountID : "",
+      "",
       reportFinancialAccountID,
     );
     api.request<Report>(`/api/v1/accounting/reports/${kind}?${search}`, {
@@ -3868,7 +5889,7 @@ function ReportsPanel() {
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [accountID, api, from, kind, reportFinancialAccountID, to]);
+  }, [api, from, kind, reportFinancialAccountID, to]);
 
   async function exportReport(format: "csv" | "xlsx" | "pdf") {
     setExporting(format);
@@ -3877,7 +5898,7 @@ function ReportsPanel() {
       const search = reportSearch(
         from,
         to,
-        kind === "general-ledger" ? accountID : "",
+        "",
         reportFinancialAccountID,
       );
       search.set("format", format);
@@ -3901,18 +5922,9 @@ function ReportsPanel() {
   return (
     <section className="directory-section">
       <div className="finance-toolbar finance-toolbar--reports">
-        <label className="finance-select">Informe<select value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}><option value="journal">Libro Diario</option><option value="trial-balance">Balance de comprobación</option><option value="general-ledger">Libro Mayor</option><option value="balance-sheet">Estado patrimonial</option><option value="income-statement">Estado de resultados</option><option value="aging">Cuentas corrientes</option><option value="vat-position">Posición IVA</option><option value="financial-activity">Movimiento de cajas y bancos</option></select></label>
+        <label className="finance-select">Informe<select value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}><option value="journal">Libro Diario</option><option value="balance-sheet">Estado patrimonial</option><option value="income-statement">Estado de resultados</option><option value="aging">Cuentas corrientes</option><option value="vat-position">Posición IVA</option><option value="financial-activity">Movimiento de cajas y bancos</option></select></label>
         <label className="finance-select">Desde<input aria-label="Desde" max={to} type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
         <label className="finance-select">Hasta<input aria-label="Hasta" min={from} type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label>
-        {kind === "general-ledger" ? (
-          <label className="finance-select finance-select--account">
-            Cuenta
-            <select aria-label="Cuenta del Mayor" value={accountID} onChange={(event) => setAccountID(event.target.value)}>
-              <option value="">Todas las cuentas</option>
-              {accounts.map(accountOption)}
-            </select>
-          </label>
-        ) : null}
         {kind === "financial-activity" ? (
           <label className="finance-select finance-select--account">
             Cuenta financiera
@@ -5107,19 +7119,17 @@ function CursorPagination({
   );
 }
 
-function accountTreeRows(accounts: Account[], collapsed: Set<string>) {
+function accountTreeRows(
+  accounts: AccountingAccountView[],
+  collapsed: Set<string>,
+) {
   const accountByID = new Map(accounts.map((account) => [account.id, account]));
-  const accountByCode = new Map(accounts.map((account) => [account.code, account]));
-  const children = new Map<string, Account[]>();
-  const roots: Account[] = [];
+  const children = new Map<string, AccountingAccountView[]>();
+  const roots: AccountingAccountView[] = [];
   for (const account of accounts) {
-    const explicitParent = account.parent_id ? accountByID.get(account.parent_id) : undefined;
-    const parentCode = account.code.split(".").slice(0, -1).join(".");
-    const codeParent = parentCode ? accountByCode.get(parentCode) : undefined;
-    // The standard chart's codes are hierarchical. Prefer that canonical
-    // relationship so a legacy or malformed parent_id cannot leave a detail
-    // account visible after its code parent has been collapsed.
-    const parent = codeParent ?? explicitParent;
+    const parent = account.parent_id
+      ? accountByID.get(account.parent_id)
+      : undefined;
     if (parent) {
       const siblings = children.get(parent.id) ?? [];
       siblings.push(account);
@@ -5128,14 +7138,16 @@ function accountTreeRows(accounts: Account[], collapsed: Set<string>) {
       roots.push(account);
     }
   }
-  const byCode = (left: Account, right: Account) =>
-    left.code.localeCompare(right.code, "es", { numeric: true });
-  roots.sort(byCode);
-  children.forEach((siblings) => siblings.sort(byCode));
+  roots.sort(compareAccountsByCode);
+  children.forEach((siblings) => siblings.sort(compareAccountsByCode));
 
-  const result: Array<{ account: Account; depth: number; hasChildren: boolean }> = [];
+  const result: Array<{
+    account: AccountingAccountView;
+    depth: number;
+    hasChildren: boolean;
+  }> = [];
   const visited = new Set<string>();
-  function visit(account: Account, depth: number) {
+  function visit(account: AccountingAccountView, depth: number) {
     if (visited.has(account.id)) return;
     visited.add(account.id);
     const descendants = children.get(account.id) ?? [];
@@ -5148,17 +7160,232 @@ function accountTreeRows(accounts: Account[], collapsed: Set<string>) {
   return result;
 }
 
-function collapsibleAccountIDs(accounts: Account[]) {
-  const accountByID = new Map(accounts.map((account) => [account.id, account]));
-  const accountByCode = new Map(accounts.map((account) => [account.code, account]));
-  const parentIDs = new Set<string>();
-  for (const account of accounts) {
-    const explicitParent = account.parent_id ? accountByID.get(account.parent_id) : undefined;
-    const parentCode = account.code.split(".").slice(0, -1).join(".");
-    const parent = (parentCode ? accountByCode.get(parentCode) : undefined) ?? explicitParent;
-    if (parent) parentIDs.add(parent.id);
+function compareAccountsByCode(
+  left: Pick<Account, "code">,
+  right: Pick<Account, "code">,
+) {
+  return left.code.localeCompare(right.code, "es", {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
+function normalizeAccountView(
+  value: Account | AccountingAccountView,
+): AccountingAccountView {
+  const account = value as Partial<AccountingAccountView> & Account;
+  const nodeType = account.node_type ?? (account.postable ? "posting" : "group");
+  const protectedAccount = account.system_managed ?? false;
+  const active = account.lifecycle_state === "active";
+  const defaultCanEdit = active && !protectedAccount;
+  const capabilities = account.capabilities;
+  return {
+    ...account,
+    node_type: nodeType,
+    depth: account.depth ?? 0,
+    path: Array.isArray(account.path) ? account.path : [],
+    has_children: account.has_children ?? false,
+    used: account.used ?? false,
+    mapped: account.mapped ?? false,
+    system_managed: protectedAccount,
+    context_only: account.context_only ?? false,
+    capabilities: {
+      can_edit_name: capabilities?.can_edit_name ?? defaultCanEdit,
+      can_edit_structure:
+        capabilities?.can_edit_structure ??
+        (defaultCanEdit && !Boolean(account.used)),
+      can_archive: capabilities?.can_archive ?? active,
+      can_trash:
+        capabilities?.can_trash ??
+        (active && !Boolean(account.used) && !Boolean(account.mapped)),
+      can_restore:
+        capabilities?.can_restore ?? account.lifecycle_state !== "active",
+      can_duplicate:
+        capabilities?.can_duplicate ?? nodeType === "posting",
+      edit_blockers: capabilities?.edit_blockers ?? [],
+      archive_blockers: capabilities?.archive_blockers ?? [],
+      trash_blockers: capabilities?.trash_blockers ?? [],
+      restore_blockers: capabilities?.restore_blockers ?? [],
+    },
+  };
+}
+
+function countAccountLifecycles(accounts: AccountingAccountView[]) {
+  return accounts.reduce(
+    (totals, account) => {
+      if (account.lifecycle_state === "active") totals.active += 1;
+      else if (account.lifecycle_state === "archived") totals.archived += 1;
+      else totals.trashed += 1;
+      return totals;
+    },
+    { active: 0, archived: 0, trashed: 0 },
+  );
+}
+
+function normalBalanceForType(
+  accountType: Account["account_type"],
+): Account["normal_balance"] {
+  return accountType === "asset" ||
+    accountType === "cost" ||
+    accountType === "expense"
+    ? "debit"
+    : "credit";
+}
+
+function accountFormInitialState(
+  account: AccountingAccountView | undefined,
+  mode: AccountEditorMode,
+  nodeType: AccountNodeType,
+): AccountFormState {
+  const accountType = account?.account_type ?? "asset";
+  return {
+    code: mode === "duplicate" ? "" : account?.code ?? "",
+    name: account?.name ?? "",
+    accountType,
+    normalBalance:
+      account?.normal_balance ?? normalBalanceForType(accountType),
+    monetaryClassification:
+      nodeType === "group"
+        ? "not_applicable"
+        : account?.monetary_classification === "not_applicable"
+          ? "monetary"
+          : account?.monetary_classification ?? "monetary",
+    parentID: account?.parent_id ?? "",
+  };
+}
+
+function accountFromFormState(
+  account: AccountingAccountView,
+  value: AccountFormState,
+  nodeType: AccountNodeType,
+): AccountingAccountView {
+  return {
+    ...account,
+    code: value.code,
+    name: value.name,
+    node_type: nodeType,
+    postable: nodeType === "posting",
+    account_type: value.accountType,
+    normal_balance:
+      nodeType === "group"
+        ? normalBalanceForType(value.accountType)
+        : value.normalBalance,
+    monetary_classification:
+      nodeType === "group"
+        ? "not_applicable"
+        : value.monetaryClassification,
+    parent_id: value.parentID || null,
+  };
+}
+
+function monetaryClassificationLabel(
+  value: Account["monetary_classification"],
+) {
+  return {
+    monetary: "Monetaria",
+    non_monetary: "No monetaria",
+    not_applicable: "No aplicable",
+  }[value];
+}
+
+function accountUsageLabel(account: AccountingAccountView) {
+  if (account.used) return "En uso";
+  if (account.mapped) return "Vinculada";
+  if (account.has_children) return "Con cuentas hijas";
+  return "Sin uso";
+}
+
+function accountMatchesDefinition(
+  account: AccountingAccountView,
+  definition: AccountingMappingDefinition,
+) {
+  return (
+    account.node_type === "posting" &&
+    account.lifecycle_state === "active" &&
+    (definition.compatible_account_types.length === 0 ||
+      definition.compatible_account_types.includes(account.account_type)) &&
+    (definition.compatible_normal_balances.length === 0 ||
+      definition.compatible_normal_balances.includes(account.normal_balance)) &&
+    (definition.compatible_monetary_classifications.length === 0 ||
+      definition.compatible_monetary_classifications.includes(
+        account.monetary_classification,
+      ))
+  );
+}
+
+function accountCapabilityBlockers(account: AccountingAccountView) {
+  return [
+    ...account.capabilities.edit_blockers,
+    ...account.capabilities.archive_blockers,
+    ...account.capabilities.trash_blockers,
+    ...account.capabilities.restore_blockers,
+  ].filter((blocker, index, blockers) => blockers.indexOf(blocker) === index);
+}
+
+function accountBlockerLabel(code: string) {
+  return (
+    {
+      ACCOUNTING_ACCOUNT_STRUCTURE_LOCKED:
+        "La estructura quedó bloqueada porque la cuenta ya tiene uso.",
+      ACCOUNTING_ACCOUNT_PARENT_INVALID:
+        "El rubro superior no pertenece a la misma clase contable.",
+      ACCOUNTING_ACCOUNT_HIERARCHY_CYCLE:
+        "La relación generaría un ciclo en el plan de cuentas.",
+      ACCOUNTING_MAPPING_INCOMPATIBLE:
+        "La cuenta no es compatible con uno de sus mappings.",
+      ACCOUNTING_ACCOUNT_MAPPED:
+        "Remapeá el posteo automático antes de cambiar su estado.",
+      ACCOUNTING_ACCOUNT_FINANCIAL_DEPENDENCY:
+        "La cuenta está vinculada a una cuenta financiera activa.",
+      ACCOUNTING_ACCOUNT_HAS_ACTIVE_CHILDREN:
+        "Primero cambiá el estado de sus cuentas hijas activas.",
+      ACCOUNTING_ACCOUNT_PARENT_INACTIVE:
+        "Primero restaurá todos sus rubros superiores.",
+      ACCOUNTING_ACCOUNT_PROTECTED:
+        "Esta cuenta está protegida por la plantilla del sistema.",
+    }[code] ?? code
+  );
+}
+
+function accountErrorMessage(cause: unknown, fallback: string) {
+  const normalized = normalizeHttpError(cause, { fallbackMessage: fallback });
+  const messages: Record<string, string> = {
+    ACCOUNTING_ACCOUNT_STRUCTURE_LOCKED:
+      "La cuenta ya tiene uso. Sólo podés cambiar su nombre.",
+    ACCOUNTING_ACCOUNT_PARENT_INVALID:
+      "Elegí un rubro superior activo de la misma clase contable.",
+    ACCOUNTING_ACCOUNT_HIERARCHY_CYCLE:
+      "Ese rubro superior generaría un ciclo en el plan de cuentas.",
+    ACCOUNTING_MAPPING_INCOMPATIBLE:
+      "La cuenta elegida no es compatible con ese rol de posteo automático.",
+    ACCOUNTING_ACCOUNT_MAPPED:
+      "Remapeá el posteo automático antes de archivar esta cuenta.",
+    ACCOUNTING_ACCOUNT_FINANCIAL_DEPENDENCY:
+      "La cuenta está vinculada a una caja, banco o medio de cobro activo.",
+    ACCOUNTING_ACCOUNT_HAS_ACTIVE_CHILDREN:
+      "Primero archivá o enviá a papelera sus cuentas hijas activas.",
+    ACCOUNTING_ACCOUNT_PARENT_INACTIVE:
+      "Primero restaurá los rubros superiores de esta cuenta.",
+    ACCOUNTING_ACCOUNT_PROTECTED:
+      "Esta cuenta pertenece a la plantilla del sistema y es de sólo lectura.",
+    VERSION_CONFLICT:
+      "La cuenta cambió en otra sesión. Recargá la última versión o guardala como nueva.",
+    RESOURCE_NOT_FOUND: "La cuenta ya no está disponible.",
+  };
+  if (normalized.code && messages[normalized.code]) {
+    return messages[normalized.code];
   }
-  return parentIDs;
+  if (normalized.kind === "network") {
+    return "No pudimos conectarnos con Pymes. Revisá la conexión y reintentá.";
+  }
+  if (normalized.kind === "authorization") {
+    return "No tenés permiso para realizar esta operación.";
+  }
+  if (normalized.kind === "not_found") return messages.RESOURCE_NOT_FOUND;
+  if (normalized.kind === "server") {
+    return "Pymes no pudo completar la operación. Reintentá en unos instantes.";
+  }
+  return fallback;
 }
 
 function journalLinesForReconciliation(
@@ -5467,6 +7694,12 @@ function journalSourceLabel(source?: string) {
   return source ? labels[source] ?? source : "Manual";
 }
 
+function ledgerBalanceSideLabel(
+  side: GeneralLedgerBalanceView["side"],
+): "D" | "H" | "—" {
+  return side === "debit" ? "D" : side === "credit" ? "H" : "—";
+}
+
 function journalPostingKindLabel(kind: string) {
   const labels: Record<string, string> = {
     standard: "Asiento general",
@@ -5574,6 +7807,38 @@ function journalErrorMessage(cause: unknown, fallback: string) {
   }
   if (normalized.kind === "server") {
     return "Pymes no pudo completar la operación. Reintentá en unos instantes.";
+  }
+  return fallback;
+}
+
+function ledgerErrorMessage(cause: unknown, fallback: string) {
+  const normalized = normalizeHttpError(cause, { fallbackMessage: fallback });
+  const messages: Record<string, string> = {
+    ACCOUNT_NOT_POSTABLE:
+      "Elegí una cuenta imputable. Los rubros no tienen movimientos propios.",
+    ACCOUNTING_ACCOUNT_NOT_POSTABLE:
+      "Elegí una cuenta imputable. Los rubros no tienen movimientos propios.",
+    ACCOUNTING_ACCOUNT_ARCHIVED:
+      "La cuenta está archivada. Podés consultar su historia desde el Plan de cuentas.",
+    ACCOUNTING_PERIOD_INVALID:
+      "El rango de fechas no es válido. Revisá las fechas desde y hasta.",
+    RESOURCE_NOT_FOUND:
+      "La cuenta o el asiento ya no está disponible en esta organización.",
+  };
+  if (normalized.code && messages[normalized.code]) {
+    return messages[normalized.code];
+  }
+  if (normalized.kind === "network") {
+    return "No pudimos conectarnos con Pymes. Revisá la conexión y reintentá.";
+  }
+  if (normalized.kind === "authorization") {
+    return "No tenés permiso para consultar este Libro Mayor.";
+  }
+  if (normalized.kind === "not_found") {
+    return "La cuenta o el asiento ya no está disponible en esta organización.";
+  }
+  if (normalized.kind === "server") {
+    return "Pymes no pudo preparar el Libro Mayor. Reintentá en unos instantes.";
   }
   return fallback;
 }
@@ -5835,6 +8100,122 @@ function reportSearch(
     search.set("financial_account_id", financialAccountID);
   }
   return search;
+}
+
+function ledgerSearch({
+  accountID,
+  cursor,
+  from,
+  origin,
+  query,
+  to,
+}: {
+  accountID: string;
+  cursor?: string;
+  from: string;
+  origin: string;
+  query: string;
+  to: string;
+}) {
+  const search = new URLSearchParams({
+    account_id: accountID,
+    from,
+    limit: "50",
+    to,
+  });
+  if (cursor) search.set("cursor", cursor);
+  if (origin) search.set("origin", origin);
+  if (query.trim()) search.set("query", query.trim());
+  return search;
+}
+
+function trialBalanceSearch({
+  accountClass,
+  cursor,
+  from,
+  includeZero,
+  query,
+  to,
+}: {
+  accountClass: TrialBalanceAccountClass;
+  cursor?: string;
+  from: string;
+  includeZero: boolean;
+  query: string;
+  to: string;
+}) {
+  const search = new URLSearchParams({
+    from,
+    include_zero: String(includeZero),
+    limit: "50",
+    to,
+  });
+  if (accountClass) search.set("account_class", accountClass);
+  if (cursor) search.set("cursor", cursor);
+  if (query.trim()) search.set("query", query.trim());
+  return search;
+}
+
+function isAccountingDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+function trialBalancePath(path: string[], name: string) {
+  const hierarchy = path.filter(
+    (segment, index) =>
+      !(index === path.length - 1 && segment.trim() === name.trim()),
+  );
+  return hierarchy.join(" / ");
+}
+
+function trialBalanceClassLabel(value: TrialBalanceItem["account_class"]) {
+  return accountTypeLabel(value);
+}
+
+function trialBalanceNormalBalanceLabel(
+  value: TrialBalanceItem["normal_balance"],
+) {
+  return value === "debit" ? "Naturaleza deudora" : "Naturaleza acreedora";
+}
+
+function trialBalanceLifecycleLabel(
+  value: TrialBalanceItem["lifecycle_state"],
+) {
+  return value === "archived"
+    ? "Archivada"
+    : value === "trashed"
+      ? "En papelera"
+      : "Activa";
+}
+
+function trialBalanceErrorMessage(cause: unknown, fallback: string) {
+  const normalized = normalizeHttpError(cause, { fallbackMessage: fallback });
+  const messages: Record<string, string> = {
+    ACCOUNTING_INVALID_PERIOD:
+      "El rango de fechas no es válido. Revisá Desde y Hasta.",
+    RESOURCE_NOT_FOUND:
+      "La información contable ya no está disponible en esta organización.",
+  };
+  if (normalized.code && messages[normalized.code]) {
+    return messages[normalized.code];
+  }
+  if (normalized.kind === "network") {
+    return "No pudimos conectarnos con Pymes. Revisá la conexión y reintentá.";
+  }
+  if (normalized.kind === "authorization") {
+    return "No tenés permiso para consultar las Sumas y saldos.";
+  }
+  if (normalized.kind === "server") {
+    return "Pymes no pudo preparar las Sumas y saldos. Reintentá en unos instantes.";
+  }
+  return fallback;
 }
 
 function downloadBlob(

@@ -54,6 +54,47 @@ func (h *IAMAPI) listAccountingMappings(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, response)
 }
 
+func (h *IAMAPI) listAccountingMappingDefinitions(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	response := make([]api.AccountingMappingDefinition, 0)
+	if !h.withAccountingService(
+		w,
+		r,
+		productiam.PermissionAccountingView,
+		func(
+			ctx context.Context,
+			service *accounting.Service,
+			scope accounting.Scope,
+			_ pgx.Tx,
+		) error {
+			definitions, err := service.ListAccountMappingDefinitions(
+				ctx,
+				scope,
+			)
+			if err != nil {
+				return err
+			}
+			response = make(
+				[]api.AccountingMappingDefinition,
+				0,
+				len(definitions),
+			)
+			for _, definition := range definitions {
+				response = append(
+					response,
+					apiAccountMappingDefinition(definition),
+				)
+			}
+			return nil
+		},
+	) {
+		return
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
 func (h *IAMAPI) updateAccountingMappings(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -64,8 +105,36 @@ func (h *IAMAPI) updateAccountingMappings(
 		return
 	}
 	if len(input) == 0 || len(input) > 100 {
-		writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", "At least one mapping is required")
+		writeAPIError(
+			w,
+			http.StatusBadRequest,
+			"REQUEST_INVALID",
+			"Indicá entre 1 y 100 mappings funcionales",
+		)
 		return
+	}
+	seen := make(map[string]struct{}, len(input))
+	for _, command := range input {
+		role := strings.TrimSpace(command.Role)
+		if role == "" {
+			writeAPIError(
+				w,
+				http.StatusBadRequest,
+				"REQUEST_INVALID",
+				"Cada mapping debe indicar un rol funcional",
+			)
+			return
+		}
+		if _, duplicate := seen[role]; duplicate {
+			writeAPIError(
+				w,
+				http.StatusBadRequest,
+				"REQUEST_INVALID",
+				"No se puede repetir un rol funcional",
+			)
+			return
+		}
+		seen[role] = struct{}{}
 	}
 	response := make([]api.AccountingMapping, 0, len(input))
 	if !h.withAccountingService(
@@ -78,13 +147,8 @@ func (h *IAMAPI) updateAccountingMappings(
 			scope accounting.Scope,
 			_ pgx.Tx,
 		) error {
-			seen := make(map[string]struct{}, len(input))
 			for _, command := range input {
 				role := strings.TrimSpace(command.Role)
-				if _, duplicate := seen[role]; duplicate {
-					return fmt.Errorf("%w: duplicate mapping role", accounting.ErrInvalidArgument)
-				}
-				seen[role] = struct{}{}
 				expectedVersion := int64(0)
 				if command.Version != nil {
 					expectedVersion = *command.Version
@@ -120,111 +184,215 @@ func (h *IAMAPI) listAccountingAccounts(
 	r *http.Request,
 	params api.ListAccountingAccountsParams,
 ) {
-	if params.LifecycleState != nil && !params.LifecycleState.Valid() {
-		writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", "Invalid lifecycle state")
-		return
-	}
 	cursor, err := decodeKeysetCursor((*string)(params.Cursor))
 	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", err.Error())
+		writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", "El cursor no es válido")
+		return
+	}
+	filter, err := validateAccountDirectoryFilter(
+		params.LifecycleState,
+		params.Query,
+		params.NodeType,
+		params.AccountType,
+		params.ParentId,
+		params.Used,
+		params.Postable,
+	)
+	if err != nil {
+		writeAPIError(
+			w,
+			http.StatusBadRequest,
+			"REQUEST_INVALID",
+			"Los filtros del plan de cuentas no son válidos",
+		)
 		return
 	}
 	limit := accountingAPILimit(params.Limit)
-	query := ""
-	if params.Query != nil {
-		query = strings.TrimSpace(*params.Query)
-	}
-	lifecycle := api.LifecycleStateActive
-	if params.LifecycleState != nil {
-		lifecycle = *params.LifecycleState
-	}
 
 	var (
-		items []api.AccountingAccount
+		items []api.AccountingAccountSummary
 		total int
+		next  *string
 	)
-	if !h.withinBusinessTx(
+	if !h.withAccountingService(
 		w,
 		r,
 		productiam.PermissionAccountingView,
 		func(
 			ctx context.Context,
-			tx pgx.Tx,
-			_ platformiam.ActiveMembership,
-			_ clerkadapter.SessionClaims,
+			service *accounting.Service,
+			scope accounting.Scope,
+			_ pgx.Tx,
 		) error {
-			lifecyclePredicate := "account.archived_at IS NULL AND account.trashed_at IS NULL"
-			switch lifecycle {
-			case api.LifecycleStateArchived:
-				lifecyclePredicate = "account.archived_at IS NOT NULL AND account.trashed_at IS NULL"
-			case api.LifecycleStateTrashed:
-				lifecyclePredicate = "account.trashed_at IS NOT NULL"
-			}
-			if err := tx.QueryRow(ctx, `
-				SELECT count(*)
-				  FROM accounting.accounts AS account
-				 WHERE (`+lifecyclePredicate+`)
-				   AND (
-				       $1 = ''
-				       OR account.code ILIKE '%' || $1 || '%'
-				       OR account.name ILIKE '%' || $1 || '%'
-				   )
-				   AND ($2::boolean IS NULL OR account.posting_allowed = $2)
-			`, query, params.Postable).Scan(&total); err != nil {
-				return fmt.Errorf("count accounting accounts: %w", err)
-			}
-			rows, err := tx.Query(ctx, `
-				SELECT
-					account.id,
-					account.code,
-					account.name,
-					account.account_class,
-					account.normal_balance,
-					account.monetary_class,
-					account.parent_id,
-					account.posting_allowed,
-					account.version
-				  FROM accounting.accounts AS account
-				 WHERE (`+lifecyclePredicate+`)
-				   AND (
-				       $1 = ''
-				       OR account.code ILIKE '%' || $1 || '%'
-				       OR account.name ILIKE '%' || $1 || '%'
-				   )
-				   AND ($2::boolean IS NULL OR account.posting_allowed = $2)
-				   AND (
-				       $3 = ''
-				       OR (lower(account.code), account.id) > ($3, $4::uuid)
-				   )
-				 ORDER BY lower(account.code), account.id
-				 LIMIT $5
-			`, query, params.Postable, cursor.Sort, nullableCursorID(cursor.ID), limit+1)
+			details, err := service.ListAccountDetails(
+				ctx,
+				scope,
+				true,
+			)
 			if err != nil {
-				return fmt.Errorf("list accounting accounts: %w", err)
+				return err
 			}
-			defer rows.Close()
-			for rows.Next() {
-				item, err := scanAccountingAccount(rows, lifecycle)
-				if err != nil {
-					return err
+			directory, err := accountingAccountDirectoryRows(details)
+			if err != nil {
+				return err
+			}
+
+			filtered := make([]accountingAccountDirectoryRow, 0, len(directory))
+			for _, item := range directory {
+				if filter.matches(item, true) {
+					filtered = append(filtered, item)
 				}
-				items = append(items, item)
 			}
-			return rows.Err()
+			sortAccountingDirectoryRows(filtered)
+			total = len(filtered)
+
+			start := 0
+			if cursor.Sort != "" || cursor.ID != "" {
+				found := false
+				for index, item := range filtered {
+					if item.sortKey == cursor.Sort &&
+						item.detail.Account.ID.String() == cursor.ID {
+						start = index + 1
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf(
+						"%w: account cursor does not belong to this result",
+						errBusinessInvalidRequest,
+					)
+				}
+			}
+
+			end := start + limit
+			if end > len(filtered) {
+				end = len(filtered)
+			}
+			items = make([]api.AccountingAccountSummary, 0, end-start)
+			for _, item := range filtered[start:end] {
+				items = append(items, accountDirectorySummary(
+					item,
+					false,
+				))
+			}
+			if end < len(filtered) && end > start {
+				last := filtered[end-1]
+				next = encodeKeysetCursor(
+					last.sortKey,
+					last.detail.Account.ID.String(),
+				)
+			}
+			return nil
 		},
 	) {
 		return
-	}
-	var next *string
-	if len(items) > limit {
-		last := items[limit-1]
-		next = encodeKeysetCursor(strings.ToLower(last.Code), last.Id.String())
-		items = items[:limit]
 	}
 	writeJSON(w, http.StatusOK, api.AccountingAccountList{
 		Items: items,
 		Page:  api.PageInfo{NextCursor: next, Total: total},
 	})
+}
+
+func (h *IAMAPI) getAccountingAccountsTree(
+	w http.ResponseWriter,
+	r *http.Request,
+	params api.GetAccountingAccountsTreeParams,
+) {
+	filter, err := validateAccountDirectoryFilter(
+		params.LifecycleState,
+		params.Query,
+		params.NodeType,
+		params.AccountType,
+		params.ParentId,
+		params.Used,
+		nil,
+	)
+	if err != nil {
+		writeAPIError(
+			w,
+			http.StatusBadRequest,
+			"REQUEST_INVALID",
+			"Los filtros del plan de cuentas no son válidos",
+		)
+		return
+	}
+
+	response := api.AccountingAccountTree{
+		Items: make([]api.AccountingAccountSummary, 0),
+	}
+	if !h.withAccountingService(
+		w,
+		r,
+		productiam.PermissionAccountingView,
+		func(
+			ctx context.Context,
+			service *accounting.Service,
+			scope accounting.Scope,
+			_ pgx.Tx,
+		) error {
+			details, err := service.ListAccountDetails(
+				ctx,
+				scope,
+				true,
+			)
+			if err != nil {
+				return err
+			}
+			directory, err := accountingAccountDirectoryRows(details)
+			if err != nil {
+				return err
+			}
+
+			direct := make(map[uuid.UUID]struct{}, len(directory))
+			included := make(map[uuid.UUID]struct{}, len(directory))
+			for _, item := range directory {
+				if !filter.matches(item, false) {
+					continue
+				}
+				switch item.detail.Account.LifecycleState() {
+				case accounting.AccountActive:
+					response.Totals.Active++
+				case accounting.AccountArchived:
+					response.Totals.Archived++
+				case accounting.AccountTrashed:
+					response.Totals.Trashed++
+				}
+				if api.LifecycleState(item.detail.Account.LifecycleState()) !=
+					filter.lifecycle {
+					continue
+				}
+				direct[item.detail.Account.ID] = struct{}{}
+				for _, ancestorID := range item.path {
+					included[ancestorID] = struct{}{}
+				}
+			}
+
+			ordered, err := preorderAccountingDirectory(
+				directory,
+				included,
+			)
+			if err != nil {
+				return err
+			}
+			response.Items = make(
+				[]api.AccountingAccountSummary,
+				0,
+				len(ordered),
+			)
+			for _, item := range ordered {
+				_, isDirect := direct[item.detail.Account.ID]
+				response.Items = append(response.Items, accountDirectorySummary(
+					item,
+					!isDirect,
+				))
+			}
+			return nil
+		},
+	) {
+		return
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (h *IAMAPI) getAccountingSettings(w http.ResponseWriter, r *http.Request) {
@@ -274,7 +442,12 @@ func (h *IAMAPI) createAccountingAccount(
 	}
 	command, err := accountCommand(input)
 	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", err.Error())
+		writeAPIError(
+			w,
+			http.StatusBadRequest,
+			"REQUEST_INVALID",
+			"Los datos de la cuenta contable no son válidos",
+		)
 		return
 	}
 	var response api.AccountingAccount
@@ -302,57 +475,36 @@ func (h *IAMAPI) createAccountingAccount(
 }
 
 func (h *IAMAPI) getAccountingAccount(w http.ResponseWriter, r *http.Request, accountID api.AccountID) {
-	var response api.AccountingAccount
-	if !h.withinBusinessTx(
+	var response api.AccountingAccountDetail
+	if !h.withAccountingService(
 		w,
 		r,
 		productiam.PermissionAccountingView,
 		func(
 			ctx context.Context,
-			tx pgx.Tx,
-			_ platformiam.ActiveMembership,
-			_ clerkadapter.SessionClaims,
+			service *accounting.Service,
+			scope accounting.Scope,
+			_ pgx.Tx,
 		) error {
-			var lifecycle string
-			err := tx.QueryRow(ctx, `
-				SELECT
-					id,
-					code,
-					name,
-					account_class,
-					normal_balance,
-					monetary_class,
-					parent_id,
-					posting_allowed,
-					version,
-					CASE
-						WHEN trashed_at IS NOT NULL THEN 'trashed'
-						WHEN archived_at IS NOT NULL THEN 'archived'
-						ELSE 'active'
-					END
-				  FROM accounting.accounts
-				 WHERE id = $1
-			`, accountID).Scan(
-				&response.Id,
-				&response.Code,
-				&response.Name,
-				&response.AccountType,
-				&response.NormalBalance,
-				&response.MonetaryClassification,
-				&response.ParentId,
-				&response.Postable,
-				&response.Version,
-				&lifecycle,
+			details, err := service.ListAccountDetails(
+				ctx,
+				scope,
+				true,
 			)
-			if errors.Is(err, pgx.ErrNoRows) {
-				return errBusinessNotFound
-			}
 			if err != nil {
-				return fmt.Errorf("get accounting account: %w", err)
+				return err
 			}
-			response.AccountType = apiAccountTypeFromDB(string(response.AccountType))
-			response.LifecycleState = api.LifecycleState(lifecycle)
-			return nil
+			directory, err := accountingAccountDirectoryRows(details)
+			if err != nil {
+				return err
+			}
+			for _, item := range directory {
+				if item.detail.Account.ID == accountID {
+					response = accountDirectoryDetail(item)
+					return nil
+				}
+			}
+			return accounting.ErrNotFound
 		},
 	) {
 		return
@@ -375,13 +527,19 @@ func (h *IAMAPI) updateAccountingAccount(
 		Code:                   input.Code,
 		MonetaryClassification: input.MonetaryClassification,
 		Name:                   input.Name,
+		NodeType:               input.NodeType,
 		NormalBalance:          input.NormalBalance,
 		ParentId:               input.ParentId,
 		Postable:               input.Postable,
 	}
 	createCommand, err := accountCommand(base)
 	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", err.Error())
+		writeAPIError(
+			w,
+			http.StatusBadRequest,
+			"REQUEST_INVALID",
+			"Los datos de la cuenta contable no son válidos",
+		)
 		return
 	}
 	var response api.AccountingAccount
@@ -405,6 +563,7 @@ func (h *IAMAPI) updateAccountingAccount(
 				Monetary:        createCommand.Monetary,
 				ParentID:        createCommand.ParentID,
 				Postable:        createCommand.Postable,
+				NodeType:        createCommand.NodeType,
 			})
 			if err != nil {
 				return err
@@ -429,6 +588,10 @@ func (h *IAMAPI) transitionAccountingAccount(
 	if !decodeBusinessBody(w, r, &input) {
 		return
 	}
+	reason := ""
+	if input.Reason != nil {
+		reason = strings.TrimSpace(*input.Reason)
+	}
 	var response api.AccountingAccount
 	if !h.withAccountingService(
 		w,
@@ -442,19 +605,37 @@ func (h *IAMAPI) transitionAccountingAccount(
 		) error {
 			switch string(action) {
 			case "archive":
-				account, err := service.ArchiveAccount(ctx, scope, accountID, input.Version)
+				account, err := service.ArchiveAccount(
+					ctx,
+					scope,
+					accountID,
+					input.Version,
+					reason,
+				)
 				if err != nil {
 					return err
 				}
 				response = apiAccount(account, api.LifecycleStateArchived)
-			case "unarchive":
-				account, err := service.RestoreAccount(ctx, scope, accountID, input.Version)
+			case "unarchive", "restore":
+				account, err := service.RestoreAccount(
+					ctx,
+					scope,
+					accountID,
+					input.Version,
+					reason,
+				)
 				if err != nil {
 					return err
 				}
 				response = apiAccount(account, api.LifecycleStateActive)
 			case "trash":
-				if err := service.TrashUnusedAccount(ctx, scope, accountID, input.Version); err != nil {
+				if err := service.TrashUnusedAccount(
+					ctx,
+					scope,
+					accountID,
+					input.Version,
+					reason,
+				); err != nil {
 					return err
 				}
 				return loadAccountingAccountAfterTransition(
@@ -462,37 +643,6 @@ func (h *IAMAPI) transitionAccountingAccount(
 					tx,
 					accountID,
 					api.LifecycleStateTrashed,
-					&response,
-				)
-			case "restore":
-				tag, err := tx.Exec(ctx, `
-					UPDATE accounting.accounts
-					   SET trashed_at = NULL,
-					       version = version + 1,
-					       updated_at = now()
-					 WHERE id = $1
-					   AND version = $2
-					   AND trashed_at IS NOT NULL
-					   AND NOT EXISTS (
-					       SELECT 1
-					         FROM accounting.accounts AS active_account
-					        WHERE active_account.org_id = accounting.accounts.org_id
-					          AND active_account.code = accounting.accounts.code
-					          AND active_account.id <> accounting.accounts.id
-					          AND active_account.trashed_at IS NULL
-					   )
-				`, accountID, input.Version)
-				if err != nil {
-					return fmt.Errorf("restore trashed accounting account: %w", err)
-				}
-				if tag.RowsAffected() != 1 {
-					return errBusinessVersionConflict
-				}
-				return loadAccountingAccountAfterTransition(
-					ctx,
-					tx,
-					accountID,
-					api.LifecycleStateActive,
 					&response,
 				)
 			default:
@@ -1611,21 +1761,30 @@ func (h *IAMAPI) getAccountingReport(
 				response.TotalDebit = totalDebit.String()
 				response.TotalCredit = totalCredit.String()
 			case "trial-balance":
-				trial, err := service.TrialBalance(ctx, scope, params.From.Time, params.To.Time)
+				trial, err := collectTrialBalance(
+					ctx,
+					service,
+					scope,
+					accounting.TrialBalanceFilter{
+						From:  params.From.Time,
+						To:    params.To.Time,
+						Limit: 200,
+					},
+				)
 				if err != nil {
 					return err
 				}
-				for _, row := range trial.Rows {
+				for _, row := range trial.Items {
 					response.Rows = append(response.Rows, api.AccountingReportRow{
-						Balance: row.NetBalance.String(),
+						Balance: row.ClosingBalance.String(),
 						Credit:  row.Credit.String(),
 						Debit:   row.Debit.String(),
 						Key:     row.AccountID.String(),
 						Label:   row.Code + " · " + row.Name,
 					})
 				}
-				response.TotalDebit = trial.TotalDebit.String()
-				response.TotalCredit = trial.TotalCredit.String()
+				response.TotalDebit = trial.Totals.Debit.String()
+				response.TotalCredit = trial.Totals.Credit.String()
 			case "general-ledger":
 				if params.AccountId == nil {
 					return fmt.Errorf("%w: account_id is required for general ledger", accounting.ErrInvalidArgument)
@@ -1847,8 +2006,27 @@ func mapAccountingError(err error) error {
 		return fmt.Errorf("%w: %v", errAccountingNotPostable, err)
 	case errors.Is(err, accounting.ErrReconciliationClosed):
 		return fmt.Errorf("%w: %v", errAccountingReconciliationClosed, err)
-	case errors.Is(err, accounting.ErrAccountInUse),
-		errors.Is(err, accounting.ErrConflict):
+	case errors.Is(err, accounting.ErrAccountStructureLocked):
+		return fmt.Errorf("%w: account", errAccountingAccountStructureLocked)
+	case errors.Is(err, accounting.ErrInvalidAccountParent):
+		return fmt.Errorf("%w: account", errAccountingAccountParentInvalid)
+	case errors.Is(err, accounting.ErrAccountHierarchyCycle):
+		return fmt.Errorf("%w: account", errAccountingAccountHierarchyCycle)
+	case errors.Is(err, accounting.ErrMappingIncompatible):
+		return fmt.Errorf("%w: mapping", errAccountingMappingIncompatible)
+	case errors.Is(err, accounting.ErrAccountMapped):
+		return fmt.Errorf("%w: account", errAccountingAccountMapped)
+	case errors.Is(err, accounting.ErrFinancialAccountLinked):
+		return fmt.Errorf("%w: account", errAccountingFinancialDependency)
+	case errors.Is(err, accounting.ErrAccountHasActiveChildren):
+		return fmt.Errorf("%w: account", errAccountingAccountHasChildren)
+	case errors.Is(err, accounting.ErrAccountParentInactive):
+		return fmt.Errorf("%w: account", errAccountingAccountParentInactive)
+	case errors.Is(err, accounting.ErrAccountProtected):
+		return fmt.Errorf("%w: account", errAccountingAccountProtected)
+	case errors.Is(err, accounting.ErrAccountInUse):
+		return fmt.Errorf("%w: account", errAccountingAccountStructureLocked)
+	case errors.Is(err, accounting.ErrConflict):
 		return fmt.Errorf("%w: %v", errBusinessInvalidTransition, err)
 	case errors.Is(err, accounting.ErrInvalidArgument),
 		errors.Is(err, accounting.ErrInvalidDecimal),
@@ -1903,6 +2081,10 @@ func scanAccountingAccount(
 	item.AccountType = apiAccountTypeFromDB(accountClass)
 	item.NormalBalance = api.AccountingNormalBalance(normal)
 	item.MonetaryClassification = api.MonetaryClassification(monetary)
+	item.NodeType = api.Group
+	if item.Postable {
+		item.NodeType = api.Posting
+	}
 	item.LifecycleState = lifecycle
 	return item, nil
 }
@@ -1935,14 +2117,49 @@ func accountCommand(input api.AccountingAccountInput) (accounting.CreateAccountC
 			accounting.ErrInvalidArgument,
 		)
 	}
+	if !input.NodeType.Valid() {
+		return accounting.CreateAccountCommand{}, fmt.Errorf(
+			"%w: invalid account node type",
+			accounting.ErrInvalidArgument,
+		)
+	}
+	postable := input.NodeType == api.Posting
+	if input.Postable != nil && *input.Postable != postable {
+		return accounting.CreateAccountCommand{}, fmt.Errorf(
+			"%w: node_type and postable must agree",
+			accounting.ErrInvalidArgument,
+		)
+	}
+	normalBalance := accounting.NormalBalance(input.NormalBalance)
+	monetaryClass := accounting.MonetaryClassification(
+		input.MonetaryClassification,
+	)
+	if input.NodeType == api.Group {
+		expectedNormal := accounting.DefaultNormalBalance(class)
+		if normalBalance != expectedNormal ||
+			monetaryClass != accounting.NotApplicable {
+			return accounting.CreateAccountCommand{}, fmt.Errorf(
+				"%w: groups derive their balance from class and use not_applicable",
+				accounting.ErrInvalidArgument,
+			)
+		}
+		normalBalance = expectedNormal
+		monetaryClass = accounting.NotApplicable
+	} else if input.ParentId == nil {
+		return accounting.CreateAccountCommand{}, fmt.Errorf(
+			"%w: posting accounts require a parent group",
+			accounting.ErrInvalidAccountParent,
+		)
+	}
 	command := accounting.CreateAccountCommand{
 		Code:          strings.TrimSpace(input.Code),
 		Name:          strings.TrimSpace(input.Name),
 		Class:         class,
-		NormalBalance: accounting.NormalBalance(input.NormalBalance),
-		Monetary:      accounting.MonetaryClassification(input.MonetaryClassification),
+		NormalBalance: normalBalance,
+		Monetary:      monetaryClass,
 		ParentID:      input.ParentId,
-		Postable:      input.Postable,
+		Postable:      postable,
+		NodeType:      accounting.AccountNodeType(input.NodeType),
 	}
 	if !command.Postable && command.Monetary != accounting.NotApplicable {
 		return accounting.CreateAccountCommand{}, fmt.Errorf(
@@ -1967,6 +2184,7 @@ func apiAccount(account accounting.Account, lifecycle api.LifecycleState) api.Ac
 		LifecycleState:         lifecycle,
 		MonetaryClassification: api.MonetaryClassification(account.Monetary),
 		Name:                   account.Name,
+		NodeType:               api.AccountingAccountNodeType(account.EffectiveNodeType()),
 		NormalBalance:          api.AccountingNormalBalance(account.NormalBalance),
 		ParentId:               account.ParentID,
 		Postable:               account.Postable,

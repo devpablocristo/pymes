@@ -154,6 +154,32 @@ func mapError(err error) error {
 			return accounting.ErrAlreadyReversed
 		case strings.Contains(constraint, "trash_unused"):
 			return accounting.ErrAccountInUse
+		case strings.Contains(constraint, "structure_locked"),
+			strings.Contains(constraint, "node_type_immutable"),
+			strings.Contains(constraint, "postable_leaf"):
+			return accounting.ErrAccountStructureLocked
+		case strings.Contains(constraint, "invalid_parent"),
+			strings.Contains(constraint, "parent_not_postable"),
+			strings.Contains(constraint, "parent_class"):
+			return accounting.ErrInvalidAccountParent
+		case strings.Contains(constraint, "hierarchy_acyclic"),
+			strings.Contains(constraint, "hierarchy_cycle"):
+			return accounting.ErrAccountHierarchyCycle
+		case strings.Contains(constraint, "mappings_incompatible"),
+			strings.Contains(constraint, "unknown_role"),
+			strings.Contains(constraint, "alias_read_only"):
+			return accounting.ErrMappingIncompatible
+		case strings.Contains(constraint, "mapping_blocks_archive"):
+			return accounting.ErrAccountMapped
+		case strings.Contains(constraint, "financial_blocks_archive"):
+			return accounting.ErrFinancialAccountLinked
+		case strings.Contains(constraint, "active_children"):
+			return accounting.ErrAccountHasActiveChildren
+		case strings.Contains(constraint, "parent_inactive"):
+			return accounting.ErrAccountParentInactive
+		case strings.Contains(constraint, "system_protected"),
+			strings.Contains(constraint, "system_key_immutable"):
+			return accounting.ErrAccountProtected
 		default:
 			return fmt.Errorf("%w: %s", accounting.ErrConflict, postgresError.Message)
 		}

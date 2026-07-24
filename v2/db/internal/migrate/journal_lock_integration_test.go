@@ -54,6 +54,8 @@ func TestJournalPostingDependencyLocks(t *testing.T) {
 		archiveRetry    = "00000000-0000-0000-0000-00000000c913"
 		reconcileRace   = "00000000-0000-0000-0000-00000000c914"
 		reconcileRetry  = "00000000-0000-0000-0000-00000000c915"
+		assetGroup      = "00000000-0000-0000-0000-00000000c916"
+		revenueGroup    = "00000000-0000-0000-0000-00000000c917"
 	)
 	if _, err := database.Exec(ctx, `
 		INSERT INTO iam.organizations (
@@ -80,14 +82,17 @@ func TestJournalPostingDependencyLocks(t *testing.T) {
 	if _, err := seedTx.Exec(ctx, `
 		INSERT INTO accounting.accounts (
 			org_id, id, code, name, account_class, normal_balance,
-			monetary_class, posting_allowed
+			monetary_class, posting_allowed, parent_id
 		)
 		VALUES
-			($1, $2, '1.1.90', 'Archive race', 'asset', 'debit', 'monetary', true),
-			($1, $3, '1.1.91', 'Cash race', 'asset', 'debit', 'monetary', true),
-			($1, $4, '1.1.92', 'Other cash', 'asset', 'debit', 'monetary', true),
-			($1, $5, '4.9.90', 'Lock revenue', 'revenue', 'credit', 'monetary', true)
-	`, orgID, archiveAccount, cashAccount, otherCash, revenueAccount); err != nil {
+			($1, $6, '1.1', 'Asset group', 'asset', 'debit', 'not_applicable', false, NULL),
+			($1, $7, '4.9', 'Revenue group', 'revenue', 'credit', 'not_applicable', false, NULL),
+			($1, $2, '1.1.90', 'Archive race', 'asset', 'debit', 'monetary', true, $6),
+			($1, $3, '1.1.91', 'Cash race', 'asset', 'debit', 'monetary', true, $6),
+			($1, $4, '1.1.92', 'Other cash', 'asset', 'debit', 'monetary', true, $6),
+			($1, $5, '4.9.90', 'Lock revenue', 'revenue', 'credit', 'monetary', true, $7)
+	`, orgID, archiveAccount, cashAccount, otherCash, revenueAccount,
+		assetGroup, revenueGroup); err != nil {
 		t.Fatalf("seed posting dependency accounts: %v", err)
 	}
 	if _, err := seedTx.Exec(ctx, `

@@ -146,6 +146,31 @@ func TestPostgresWorkerPostsOnceAndRetriesMissingMapping(t *testing.T) {
 	}
 	assertFailedFixture(t, ctx, backend, organizationID, second.intentID, 1)
 
+	if _, err := admin.Exec(ctx, `
+		INSERT INTO accounting.account_mapping_definitions (
+			role, label_es, label_en, description_es, description_en,
+			required, compatible_account_classes,
+			compatible_normal_balances, compatible_monetary_classes,
+			canonical_role, is_alias, display_order
+		)
+		VALUES (
+			'vat_payable_15',
+			'IVA débito fiscal 15%',
+			'VAT payable 15%',
+			'Cuenta de integración para IVA débito fiscal 15%',
+			'Integration account for 15% VAT payable',
+			true,
+			ARRAY['liability'],
+			ARRAY['credit'],
+			ARRAY['monetary'],
+			NULL,
+			false,
+			9999
+		)
+		ON CONFLICT (role) DO NOTHING
+	`); err != nil {
+		t.Fatalf("install retry mapping definition: %v", err)
+	}
 	withTenantTx(t, ctx, backend, organizationID, func(tx pgx.Tx) {
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO accounting.account_mappings (

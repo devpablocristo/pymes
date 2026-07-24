@@ -69,6 +69,84 @@ function session(permissions: string[]) {
   };
 }
 
+const editableAccountCapabilities = {
+  can_edit_name: true,
+  can_edit_structure: true,
+  can_archive: true,
+  can_trash: true,
+  can_restore: false,
+  can_duplicate: true,
+  edit_blockers: [],
+  archive_blockers: [],
+  trash_blockers: [],
+  restore_blockers: [],
+};
+
+function accountSummaryFixture(
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    code: "1.1.01",
+    name: "Caja",
+    node_type: "posting",
+    account_type: "asset",
+    normal_balance: "debit",
+    monetary_classification: "monetary",
+    parent_id: null,
+    postable: true,
+    lifecycle_state: "active",
+    version: 1,
+    depth: 0,
+    path: [],
+    has_children: false,
+    used: false,
+    mapped: false,
+    system_managed: false,
+    context_only: false,
+    capabilities: editableAccountCapabilities,
+    ...overrides,
+  };
+}
+
+function trialBalanceFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    currency: "ARS",
+    from: "2026-01-01",
+    to: "2026-07-24",
+    items: [
+      {
+        account_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        code: "1.1.01",
+        name: "Caja",
+        account_class: "asset",
+        normal_balance: "debit",
+        lifecycle_state: "active",
+        path: ["Activo", "Disponibilidades", "Caja"],
+        opening_balance: { amount: "1250.00", side: "debit" },
+        debit: "500.50",
+        credit: "250.00",
+        closing_balance: { amount: "1500.50", side: "debit" },
+      },
+    ],
+    totals: {
+      opening_debit: "1250.00",
+      opening_credit: "0.00",
+      movement_debit: "500.50",
+      movement_credit: "250.00",
+      closing_debit: "1500.50",
+      closing_credit: "0.00",
+    },
+    controls: {
+      opening_difference: "0.00",
+      movement_difference: "0.00",
+      closing_difference: "0.00",
+    },
+    page: { total: 1, next_cursor: null },
+    ...overrides,
+  };
+}
+
 function renderAccounting(
   path: string,
   request: (path: string, options?: Record<string, unknown>) => Promise<unknown>,
@@ -105,7 +183,8 @@ test("accounting view-only can inspect accounts but has no mutation controls", a
   renderAccounting("/accounting/accounts", async (path) => {
     if (path === "/api/v1/session") return session(["accounting:view"]);
     if (path === "/api/v1/accounting/account-mappings") return [];
-    if (path.startsWith("/api/v1/accounting/accounts?")) {
+    if (path === "/api/v1/accounting/account-mapping-definitions") return [];
+    if (path.startsWith("/api/v1/accounting/accounts/tree?")) {
       return {
         items: [
           {
@@ -115,12 +194,32 @@ test("accounting view-only can inspect accounts but has no mutation controls", a
             account_type: "asset",
             normal_balance: "debit",
             monetary_classification: "monetary",
+            node_type: "posting",
+            depth: 0,
+            path: [],
+            has_children: false,
+            used: false,
+            mapped: false,
+            system_managed: false,
+            context_only: false,
+            capabilities: {
+              can_edit_name: true,
+              can_edit_structure: true,
+              can_archive: true,
+              can_trash: true,
+              can_restore: false,
+              can_duplicate: true,
+              edit_blockers: [],
+              archive_blockers: [],
+              trash_blockers: [],
+              restore_blockers: [],
+            },
             postable: true,
             lifecycle_state: "active",
             version: 1,
           },
         ],
-        page: { total: 1 },
+        totals: { active: 1, archived: 0, trashed: 0 },
       };
     }
     throw new Error(`unexpected request ${path}`);
@@ -149,19 +248,32 @@ test("collapsing an account group hides every descendant and expands it again", 
   const disponibilidadesID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
   const cajaID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
   const bancosID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const capabilities = {
+    can_edit_name: true,
+    can_edit_structure: true,
+    can_archive: true,
+    can_trash: true,
+    can_restore: false,
+    can_duplicate: true,
+    edit_blockers: [],
+    archive_blockers: [],
+    trash_blockers: [],
+    restore_blockers: [],
+  };
 
   renderAccounting("/accounting/accounts", async (path) => {
     if (path === "/api/v1/session") return session(["accounting:view"]);
     if (path === "/api/v1/accounting/account-mappings") return [];
-    if (path.startsWith("/api/v1/accounting/accounts?")) {
+    if (path === "/api/v1/accounting/account-mapping-definitions") return [];
+    if (path.startsWith("/api/v1/accounting/accounts/tree?")) {
       return {
         items: [
-          { id: activoID, code: "1", name: "Activo", account_type: "asset", normal_balance: "debit", monetary_classification: "not_applicable", postable: false, lifecycle_state: "active", version: 1 },
-          { id: disponibilidadesID, code: "1.1", name: "Disponibilidades", parent_id: activoID, account_type: "asset", normal_balance: "debit", monetary_classification: "not_applicable", postable: false, lifecycle_state: "active", version: 1 },
-          { id: cajaID, code: "1.1.01", name: "Caja", parent_id: disponibilidadesID, account_type: "asset", normal_balance: "debit", monetary_classification: "monetary", postable: true, lifecycle_state: "active", version: 1 },
-          { id: bancosID, code: "1.1.02", name: "Bancos", parent_id: disponibilidadesID, account_type: "asset", normal_balance: "debit", monetary_classification: "monetary", postable: true, lifecycle_state: "active", version: 1 },
+          { id: activoID, code: "1", name: "Activo", node_type: "group", depth: 0, path: [], has_children: true, used: false, mapped: false, system_managed: true, context_only: false, capabilities, account_type: "asset", normal_balance: "debit", monetary_classification: "not_applicable", postable: false, lifecycle_state: "active", version: 1 },
+          { id: disponibilidadesID, code: "1.1", name: "Disponibilidades", node_type: "group", depth: 1, path: [activoID], has_children: true, used: false, mapped: false, system_managed: false, context_only: false, capabilities, parent_id: activoID, account_type: "asset", normal_balance: "debit", monetary_classification: "not_applicable", postable: false, lifecycle_state: "active", version: 1 },
+          { id: cajaID, code: "1.1.01", name: "Caja", node_type: "posting", depth: 2, path: [activoID, disponibilidadesID], has_children: false, used: false, mapped: false, system_managed: false, context_only: false, capabilities, parent_id: disponibilidadesID, account_type: "asset", normal_balance: "debit", monetary_classification: "monetary", postable: true, lifecycle_state: "active", version: 1 },
+          { id: bancosID, code: "1.1.02", name: "Bancos", node_type: "posting", depth: 2, path: [activoID, disponibilidadesID], has_children: false, used: false, mapped: false, system_managed: false, context_only: false, capabilities, parent_id: disponibilidadesID, account_type: "asset", normal_balance: "debit", monetary_classification: "monetary", postable: true, lifecycle_state: "active", version: 1 },
         ],
-        page: { total: 4 },
+        totals: { active: 4, archived: 0, trashed: 0 },
       };
     }
     throw new Error(`unexpected request ${path}`);
@@ -183,6 +295,252 @@ test("collapsing an account group hides every descendant and expands it again", 
   await user.click(screen.getByRole("button", { name: "Expandir Disponibilidades" }));
   expect(await screen.findByText("Caja")).toBeInTheDocument();
   expect(screen.getByText("Bancos")).toBeInTheDocument();
+});
+
+test("checkboxes only build a multi-selection and never open the account form", async () => {
+  const user = userEvent.setup();
+  const asset = accountSummaryFixture({
+    id: "10000000-0000-4000-8000-000000000000",
+    code: "1",
+    name: "Activo",
+    node_type: "group",
+    postable: false,
+    monetary_classification: "not_applicable",
+    has_children: false,
+  });
+  const liability = accountSummaryFixture({
+    id: "20000000-0000-4000-8000-000000000000",
+    code: "2",
+    name: "Pasivo",
+    node_type: "group",
+    postable: false,
+    account_type: "liability",
+    normal_balance: "credit",
+    monetary_classification: "not_applicable",
+    has_children: false,
+  });
+
+  renderAccounting("/accounting/accounts", async (path) => {
+    if (path === "/api/v1/session") {
+      return session(["accounting:view", "accounting:manage"]);
+    }
+    if (path === "/api/v1/accounting/account-mappings") return [];
+    if (path === "/api/v1/accounting/account-mapping-definitions") return [];
+    if (path.startsWith("/api/v1/accounting/accounts/tree?")) {
+      return {
+        items: [asset, liability],
+        totals: { active: 2, archived: 0, trashed: 0 },
+      };
+    }
+    throw new Error(`unexpected request ${path}`);
+  });
+
+  await user.click(
+    await screen.findByRole("checkbox", { name: "Seleccionar 1 Activo" }),
+  );
+  await user.click(
+    screen.getByRole("checkbox", { name: "Seleccionar 2 Pasivo" }),
+  );
+
+  expect(screen.getByText("2 seleccionados")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Nombre")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("checkbox", { name: "Seleccionar 1 Activo" }),
+  ).toBeChecked();
+  expect(
+    screen.getByRole("checkbox", { name: "Seleccionar 2 Pasivo" }),
+  ).toBeChecked();
+});
+
+test("keeps only lifecycle conflicts selected after a partial bulk result", async () => {
+  const user = userEvent.setup();
+  const cash = accountSummaryFixture();
+  const bank = accountSummaryFixture({
+    id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    code: "1.1.02",
+    name: "Banco",
+  });
+  const { request } = renderAccounting(
+    "/accounting/accounts",
+    async (path, options) => {
+      if (path === "/api/v1/session") {
+        return session(["accounting:view", "accounting:manage"]);
+      }
+      if (path === "/api/v1/accounting/account-mappings") return [];
+      if (path === "/api/v1/accounting/account-mapping-definitions") return [];
+      if (path.startsWith("/api/v1/accounting/accounts/tree?")) {
+        return {
+          items: [cash, bank],
+          totals: { active: 2, archived: 0, trashed: 0 },
+        };
+      }
+      if (
+        path === `/api/v1/accounting/accounts/${cash.id}/archive` &&
+        options?.method === "POST"
+      ) {
+        return { ...cash, lifecycle_state: "archived", version: 2 };
+      }
+      if (
+        path === `/api/v1/accounting/accounts/${bank.id}/archive` &&
+        options?.method === "POST"
+      ) {
+        throw new Error("version conflict");
+      }
+      throw new Error(`unexpected request ${path}`);
+    },
+  );
+
+  await user.click(
+    await screen.findByRole("checkbox", {
+      name: "Seleccionar todo el resultado",
+    }),
+  );
+  await user.click(screen.getByRole("button", { name: "Archivar" }));
+
+  expect(
+    await screen.findByText(/1 actualizadas y 1 con conflictos/),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("checkbox", { name: "Seleccionar 1.1.01 Caja" }),
+  ).not.toBeChecked();
+  expect(
+    screen.getByRole("checkbox", { name: "Seleccionar 1.1.02 Banco" }),
+  ).toBeChecked();
+  expect(
+    request.mock.calls.filter(
+      ([path]) => String(path).endsWith("/archive"),
+    ),
+  ).toHaveLength(2);
+});
+
+test("separates new groups from posting accounts and derives class from any parent group", async () => {
+  const user = userEvent.setup();
+  const asset = accountSummaryFixture({
+    id: "10000000-0000-4000-8000-000000000000",
+    code: "1",
+    name: "Activo",
+    node_type: "group",
+    postable: false,
+    monetary_classification: "not_applicable",
+  });
+  const liability = accountSummaryFixture({
+    id: "20000000-0000-4000-8000-000000000000",
+    code: "2",
+    name: "Pasivo",
+    node_type: "group",
+    postable: false,
+    account_type: "liability",
+    normal_balance: "credit",
+    monetary_classification: "not_applicable",
+  });
+  const { request } = renderAccounting(
+    "/accounting/accounts",
+    async (path, options) => {
+      if (path === "/api/v1/session") {
+        return session(["accounting:view", "accounting:manage"]);
+      }
+      if (path === "/api/v1/accounting/account-mappings") return [];
+      if (path === "/api/v1/accounting/account-mapping-definitions") return [];
+      if (path.startsWith("/api/v1/accounting/accounts/tree?")) {
+        return {
+          items: [asset, liability],
+          totals: { active: 2, archived: 0, trashed: 0 },
+        };
+      }
+      if (
+        path === "/api/v1/accounting/accounts" &&
+        options?.method === "POST"
+      ) {
+        return {
+          ...accountSummaryFixture(),
+          ...JSON.parse(String(options.body)),
+        };
+      }
+      throw new Error(`unexpected request ${path}`);
+    },
+  );
+
+  await user.click(await screen.findByRole("button", { name: "Nuevo rubro" }));
+  expect(screen.getByRole("heading", { name: "Nuevo rubro" })).toBeInTheDocument();
+  expect(screen.getByLabelText("Clasificación")).toHaveValue("not_applicable");
+  await user.click(screen.getByRole("button", { name: "Cancelar" }));
+
+  await user.click(screen.getByRole("button", { name: "Nueva cuenta" }));
+  const parent = screen.getByRole("combobox", { name: "Rubro superior" });
+  await user.click(parent);
+  await user.click(screen.getByRole("option", { name: "2Pasivo" }));
+  expect(screen.getByLabelText("Clase")).toHaveValue("liability");
+  expect(screen.getByLabelText("Clase")).toBeDisabled();
+  await user.type(screen.getByLabelText("Código"), "2.1.99");
+  await user.type(screen.getByLabelText("Nombre"), "Proveedor exterior");
+  await user.click(screen.getByRole("button", { name: "Guardar cuenta" }));
+
+  await waitFor(() => {
+    const create = request.mock.calls.find(
+      ([path, options]) =>
+        path === "/api/v1/accounting/accounts" && options?.method === "POST",
+    );
+    expect(JSON.parse(String(create?.[1]?.body))).toEqual(
+      expect.objectContaining({
+        node_type: "posting",
+        postable: true,
+        account_type: "liability",
+        normal_balance: "credit",
+        parent_id: liability.id,
+      }),
+    );
+  });
+});
+
+test("starts with roots collapsed and expands the returned ancestor path when searching", async () => {
+  const user = userEvent.setup();
+  const root = accountSummaryFixture({
+    id: "10000000-0000-4000-8000-000000000000",
+    code: "1",
+    name: "Activo",
+    node_type: "group",
+    postable: false,
+    monetary_classification: "not_applicable",
+    has_children: true,
+  });
+  const cash = accountSummaryFixture({
+    id: "11000000-0000-4000-8000-000000000000",
+    parent_id: root.id,
+    depth: 1,
+    path: [root.id],
+  });
+  const { request } = renderAccounting("/accounting/accounts", async (path) => {
+    if (path === "/api/v1/session") {
+      return session(["accounting:view", "accounting:manage"]);
+    }
+    if (path === "/api/v1/accounting/account-mappings") return [];
+    if (path === "/api/v1/accounting/account-mapping-definitions") return [];
+    if (path.startsWith("/api/v1/accounting/accounts/tree?")) {
+      const searching = path.includes("query=Caja");
+      return {
+        items: searching
+          ? [{ ...root, context_only: true }, cash]
+          : [root, cash],
+        totals: { active: 2, archived: 0, trashed: 0 },
+      };
+    }
+    throw new Error(`unexpected request ${path}`);
+  });
+
+  expect(
+    await screen.findByRole("button", { name: "Expandir Activo" }),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("Caja")).not.toBeInTheDocument();
+  await user.type(screen.getByRole("searchbox", { name: "Buscar cuentas" }), "Caja");
+
+  expect(await screen.findByText("Caja")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Contraer Activo" })).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+  expect(
+    request.mock.calls.some(([path]) => String(path).includes("query=Caja")),
+  ).toBe(true);
 });
 
 test("imports an extract, loads suggestions and saves the selected match", async () => {
@@ -378,19 +736,40 @@ test("imports an extract, loads suggestions and saves the selected match", async
   ]);
 });
 
-test("edits the account tree, updates mappings and follows the account cursor", async () => {
+test("opens an exact account row, edits its name and updates a canonical mapping", async () => {
   const user = userEvent.setup();
+  const capabilities = {
+    can_edit_name: true,
+    can_edit_structure: true,
+    can_archive: true,
+    can_trash: true,
+    can_restore: false,
+    can_duplicate: true,
+    edit_blockers: [],
+    archive_blockers: [],
+    trash_blockers: [],
+    restore_blockers: [],
+  };
   const rootAccount = {
     id: "10000000-0000-4000-8000-000000000000",
     code: "1",
     name: "Activo",
+    node_type: "group",
     account_type: "asset",
     normal_balance: "debit",
-    monetary_classification: "monetary",
+    monetary_classification: "not_applicable",
     parent_id: null,
     postable: false,
     lifecycle_state: "active",
     version: 1,
+    depth: 0,
+    path: [],
+    has_children: true,
+    used: false,
+    mapped: false,
+    system_managed: true,
+    context_only: false,
+    capabilities: { ...capabilities, can_edit_name: false, can_edit_structure: false },
   };
   const cashAccount = {
     ...rootAccount,
@@ -398,8 +777,16 @@ test("edits the account tree, updates mappings and follows the account cursor", 
     code: "1.1.01",
     name: "Caja",
     parent_id: rootAccount.id,
+    node_type: "posting",
+    monetary_classification: "monetary",
     postable: true,
     version: 3,
+    depth: 1,
+    path: [rootAccount.id],
+    has_children: false,
+    mapped: true,
+    system_managed: false,
+    capabilities,
   };
   const bankAccount = {
     ...cashAccount,
@@ -427,6 +814,37 @@ test("edits the account tree, updates mappings and follows the account cursor", 
           },
         ];
       }
+      if (path === "/api/v1/accounting/account-mapping-definitions") {
+        return [
+          {
+            role: "cash",
+            label_es: "Caja",
+            label_en: "Cash",
+            description_es: "Cuenta usada para cobros en efectivo.",
+            description_en: "Cash postings.",
+            required: true,
+            compatible_account_types: ["asset"],
+            compatible_normal_balances: ["debit"],
+            compatible_monetary_classifications: ["monetary"],
+            is_alias: false,
+            display_order: 1,
+          },
+          {
+            role: "cash_account",
+            canonical_role: "cash",
+            label_es: "Caja heredada",
+            label_en: "Legacy cash",
+            description_es: "Alias heredado.",
+            description_en: "Legacy alias.",
+            required: false,
+            compatible_account_types: ["asset"],
+            compatible_normal_balances: ["debit"],
+            compatible_monetary_classifications: ["monetary"],
+            is_alias: true,
+            display_order: 2,
+          },
+        ];
+      }
       if (
         path === "/api/v1/accounting/account-mappings" &&
         options?.method === "PUT"
@@ -443,18 +861,38 @@ test("edits the account tree, updates mappings and follows the account cursor", 
       }
       if (
         path === `/api/v1/accounting/accounts/${cashAccount.id}` &&
+        !options?.method
+      ) {
+        return {
+          ...cashAccount,
+          usage: {
+            used: false,
+            journal_lines: 0,
+            draft_lines: 0,
+            mappings: 1,
+            children: 0,
+            financial_accounts: 0,
+            open_items: 0,
+            inflation_lines: 0,
+            revaluation_lines: 0,
+            total_dependencies: 1,
+            active_children: 0,
+            active_financial_accounts: 0,
+          },
+          mapped_roles: ["cash"],
+        };
+      }
+      if (
+        path === `/api/v1/accounting/accounts/${cashAccount.id}` &&
         options?.method === "PUT"
       ) {
         const body = JSON.parse(String(options.body));
         return { ...cashAccount, ...body, version: 4 };
       }
-      if (path.startsWith("/api/v1/accounting/accounts?")) {
-        if (path.includes("cursor=")) {
-          return { items: [], page: { total: allAccounts.length } };
-        }
+      if (path.startsWith("/api/v1/accounting/accounts/tree?")) {
         return {
           items: allAccounts,
-          page: { total: allAccounts.length, next_cursor: "cursor-two" },
+          totals: { active: allAccounts.length, archived: 0, trashed: 0 },
         };
       }
       throw new Error(`unexpected request ${path}`);
@@ -473,7 +911,8 @@ test("edits the account tree, updates mappings and follows the account cursor", 
       name: "Seleccionar 1.1.01 Caja",
     }),
   );
-  await user.click(screen.getByRole("button", { name: "Editar" }));
+  expect(screen.queryByLabelText("Nombre")).not.toBeInTheDocument();
+  await user.click(cashRow as HTMLTableRowElement);
   const nameInput = screen.getByLabelText("Nombre");
   await user.clear(nameInput);
   await user.type(nameInput, "Caja central");
@@ -491,9 +930,13 @@ test("edits the account tree, updates mappings and follows the account cursor", 
   });
 
   await user.click(screen.getByRole("button", { name: "Editar mappings" }));
-  await user.selectOptions(
-    screen.getByLabelText("Cuenta del mapping cash"),
-    bankAccount.id,
+  const mappingAccount = screen.getByRole("combobox", {
+    name: "Cuenta para Caja",
+  });
+  await user.clear(mappingAccount);
+  await user.type(mappingAccount, "Banco");
+  await user.click(
+    screen.getByRole("option", { name: /1\.1\.02Banco Nación/ }),
   );
   await user.click(screen.getByRole("button", { name: "Guardar mappings" }));
   await waitFor(() => {
@@ -506,13 +949,7 @@ test("edits the account tree, updates mappings and follows the account cursor", 
       { role: "cash", account_id: bankAccount.id, version: 2 },
     ]);
   });
-
-  await user.click(screen.getByRole("button", { name: "Siguiente" }));
-  await waitFor(() =>
-    expect(
-      request.mock.calls.some(([path]) => String(path).includes("cursor=cursor-two")),
-    ).toBe(true),
-  );
+  expect(screen.getByText(/cash_account/)).toBeInTheDocument();
 });
 
 test("saves a versioned multiline draft before posting it", async () => {
@@ -2438,7 +2875,494 @@ test("keeps the ledger account immutable when editing a financial account", asyn
   ).not.toBeInTheDocument();
 });
 
-test("exports the selected report as PDF with the active date filters", async () => {
+test("shows a focused Libro Mayor and opens the exact journal entry", async () => {
+  const user = userEvent.setup();
+  const cash = accountSummaryFixture({
+    parent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  });
+  const entryID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const lineID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const { request } = renderAccounting(
+    `/accounting/ledger?account_id=${cash.id}&from=2026-03-01&to=2026-04-30`,
+    async (path) => {
+      if (path === "/api/v1/session") {
+        return session(["accounting:view"]);
+      }
+      if (path.startsWith("/api/v1/accounting/accounts/tree?")) {
+        return {
+          items: [cash],
+          totals: { active: 1, archived: 0, trashed: 0 },
+        };
+      }
+      if (path.startsWith("/api/v1/accounting/general-ledger?")) {
+        return {
+          account: cash,
+          currency: "ARS",
+          from: "2026-01-01",
+          to: "2026-07-24",
+          opening_balance: { amount: "1250.00", side: "debit" },
+          closing_balance: { amount: "1500.50", side: "debit" },
+          total_debit: "500.50",
+          total_credit: "250.00",
+          items: [
+            {
+              entry_id: entryID,
+              line_id: lineID,
+              entry_number: 42,
+              line_number: 1,
+              accounting_date: "2026-07-20",
+              reference: "FAC-A-0001-00000042",
+              origin: "sale",
+              description: "Venta mostrador",
+              memo: "Cobro por transferencia",
+              debit: "500.50",
+              credit: "0",
+              balance: { amount: "1750.50", side: "debit" },
+            },
+          ],
+          page: { total: 1, next_cursor: null },
+        };
+      }
+      if (path === `/api/v1/accounting/journal-entries/${entryID}`) {
+        return {
+          id: entryID,
+          entry_number: 42,
+          accounting_date: "2026-07-20",
+          description: "Venta mostrador",
+          reference: "FAC-A-0001-00000042",
+          currency: "ARS",
+          functional_currency: "ARS",
+          source_type: "sale",
+          posting_kind: "primary",
+          lines: [
+            {
+              id: lineID,
+              account_id: cash.id,
+              account_code: cash.code,
+              account_name: cash.name,
+              debit: "500.50",
+              credit: "0",
+              memo: "Cobro por transferencia",
+            },
+          ],
+          total_debit: "500.50",
+          total_credit: "500.50",
+          created_at: "2026-07-20T14:30:00Z",
+        };
+      }
+      throw new Error(`unexpected request ${path}`);
+    },
+  );
+
+  expect(await screen.findByText("FAC-A-0001-00000042")).toBeInTheDocument();
+  expect(screen.getByText("Activo · Naturaleza deudora")).toBeInTheDocument();
+  const summary = screen.getByLabelText("Resumen del Mayor");
+  expect(within(summary).getByText("Saldo inicial")).toBeInTheDocument();
+  expect(within(summary).getByText("ARS 1.250,00")).toBeInTheDocument();
+  expect(within(summary).getByText("Saldo final")).toBeInTheDocument();
+  expect(within(summary).getByText("ARS 1.500,50")).toBeInTheDocument();
+  expect(
+    request.mock.calls.some(
+      ([path]) =>
+        String(path).startsWith("/api/v1/accounting/general-ledger?") &&
+        String(path).includes(`account_id=${cash.id}`) &&
+        String(path).includes("from=2026-03-01") &&
+        String(path).includes("to=2026-04-30"),
+    ),
+  ).toBe(true);
+
+  await user.click(
+    screen.getByRole("row", { name: "Abrir asiento número 42" }),
+  );
+  expect(
+    await screen.findByRole("dialog", { name: "Venta mostrador" }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("Asiento Nº 42")).toBeInTheDocument();
+});
+
+test("keeps Mayor and Sumas y saldos out of Informes and places them after Diario", async () => {
+  renderAccounting("/accounting/reports", async (path) => {
+    if (path === "/api/v1/session") return session(["accounting:view"]);
+    if (path.startsWith("/api/v1/accounting/financial-accounts?")) return [];
+    if (path.startsWith("/api/v1/accounting/reports/journal?")) {
+      return {
+        report: "journal",
+        from: "2026-01-01",
+        to: "2026-07-24",
+        currency: "ARS",
+        rows: [],
+        total_debit: "0",
+        total_credit: "0",
+      };
+    }
+    throw new Error(`unexpected request ${path}`);
+  });
+
+  const navigation = screen.getByRole("navigation", {
+    name: "Secciones contables",
+  });
+  expect(
+    within(navigation)
+      .getAllByRole("link")
+      .map((link) => link.textContent),
+  ).toEqual([
+    "Plan de cuentas",
+    "Diario",
+    "Mayor",
+    "Sumas y saldos",
+    "Cobros y pagos",
+    "Informes",
+    "Conciliación",
+    "Cierre",
+    "Inflación",
+  ]);
+  expect(await screen.findByLabelText("Informe")).toBeInTheDocument();
+  expect(
+    screen.queryByRole("option", { name: "Libro Mayor" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("option", { name: "Balance de comprobación" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Informe")).toHaveValue("journal");
+});
+
+test("filters, paginates and exports the selected Libro Mayor", async () => {
+  const user = userEvent.setup();
+  const cash = accountSummaryFixture();
+  const createObjectURL = vi
+    .spyOn(URL, "createObjectURL")
+    .mockReturnValue("blob:ledger");
+  const revokeObjectURL = vi
+    .spyOn(URL, "revokeObjectURL")
+    .mockImplementation(() => undefined);
+  const click = vi
+    .spyOn(HTMLAnchorElement.prototype, "click")
+    .mockImplementation(() => undefined);
+  const { request, requestResponse } = renderAccounting(
+    `/accounting/ledger?account_id=${cash.id}`,
+    async (path) => {
+      if (path === "/api/v1/session") return session(["accounting:view"]);
+      if (path.startsWith("/api/v1/accounting/accounts/tree?")) {
+        return {
+          items: [cash],
+          totals: { active: 1, archived: 0, trashed: 0 },
+        };
+      }
+      if (path.startsWith("/api/v1/accounting/general-ledger?")) {
+        const nextPage = path.includes("cursor=next-page");
+        return {
+          account: cash,
+          currency: "ARS",
+          from: "2026-01-01",
+          to: "2026-07-24",
+          opening_balance: { amount: "0", side: "zero" },
+          closing_balance: { amount: "0", side: "zero" },
+          total_debit: "0",
+          total_credit: "0",
+          items: [],
+          page: {
+            total: 51,
+            next_cursor: nextPage ? null : "next-page",
+          },
+        };
+      }
+      throw new Error(`unexpected request ${path}`);
+    },
+    async () =>
+      new Response("ledger", {
+        status: 200,
+        headers: {
+          "content-type": "text/csv",
+          "content-disposition": 'attachment; filename="mayor-caja.csv"',
+        },
+      }),
+  );
+
+  await screen.findByText("51 movimientos · página 1");
+  await user.selectOptions(screen.getByLabelText("Origen del Mayor"), "sale");
+  await user.type(
+    screen.getByLabelText("Buscar movimientos del Mayor"),
+    "factura 42",
+  );
+  await user.click(screen.getByRole("button", { name: "Siguiente" }));
+
+  await waitFor(() => {
+    expect(
+      request.mock.calls.some(
+        ([path]) =>
+          String(path).startsWith("/api/v1/accounting/general-ledger?") &&
+          String(path).includes("origin=sale") &&
+          String(path).includes("query=factura+42") &&
+          String(path).includes("cursor=next-page"),
+      ),
+    ).toBe(true);
+  });
+  expect(await screen.findByText("51 movimientos · página 2")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "CSV" }));
+  await waitFor(() => expect(requestResponse).toHaveBeenCalledTimes(1));
+  const exportPath = String(requestResponse.mock.calls[0]?.[0]);
+  expect(exportPath).toContain("/api/v1/accounting/general-ledger/export?");
+  expect(exportPath).toContain(`account_id=${cash.id}`);
+  expect(exportPath).toContain("origin=sale");
+  expect(exportPath).toContain("query=factura+42");
+  expect(exportPath).toContain("format=csv");
+  expect(exportPath).not.toContain("cursor=");
+  expect(click).toHaveBeenCalled();
+  createObjectURL.mockRestore();
+  revokeObjectURL.mockRestore();
+  click.mockRestore();
+});
+
+test("shows Balance de sumas y saldos with its six debit and credit columns", async () => {
+  const user = userEvent.setup();
+  const archivedIncome = {
+    account_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    code: "4.1",
+    name: "Ventas de mercaderías",
+    account_class: "income",
+    normal_balance: "credit",
+    lifecycle_state: "archived",
+    path: ["Ingresos", "Ventas de mercaderías"],
+    opening_balance: { amount: "0.00", side: "zero" },
+    debit: "0.00",
+    credit: "950.00",
+    closing_balance: { amount: "950.00", side: "credit" },
+  };
+  const { request } = renderAccounting("/accounting/trial-balance", async (path) => {
+    if (path === "/api/v1/session") return session(["accounting:view"]);
+    if (path.startsWith("/api/v1/accounting/trial-balance?")) {
+      return trialBalanceFixture({
+        items: [trialBalanceFixture().items[0], archivedIncome],
+        page: { total: 2, next_cursor: null },
+      });
+    }
+    throw new Error(`unexpected request ${path}`);
+  });
+
+  expect(
+    await screen.findByRole("heading", { name: "Balance de sumas y saldos" }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Código" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Cuenta" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Saldo inicial" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Movimientos" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Saldo final" })).toBeInTheDocument();
+  expect(screen.getAllByRole("columnheader", { name: "Deudor" })).toHaveLength(2);
+  expect(screen.getAllByRole("columnheader", { name: "Acreedor" })).toHaveLength(2);
+  expect(screen.getByRole("columnheader", { name: "Debe" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Haber" })).toBeInTheDocument();
+  expect(screen.getByText("Activo / Disponibilidades")).toBeInTheDocument();
+  expect(screen.getByText("Archivada")).toBeInTheDocument();
+  expect(screen.getAllByText("Equilibrado")).toHaveLength(3);
+  expect(
+    request.mock.calls.some(
+      ([path]) =>
+        String(path).startsWith("/api/v1/accounting/trial-balance?") &&
+        String(path).includes("include_zero=false"),
+    ),
+  ).toBe(true);
+
+  await user.type(
+    screen.getByRole("searchbox", { name: "Buscar cuentas en Sumas y saldos" }),
+    "Caja",
+  );
+  expect(await screen.findAllByText("Vista filtrada")).toHaveLength(3);
+  await user.selectOptions(screen.getByLabelText("Clase de cuenta"), "income");
+  await user.click(screen.getByRole("button", { name: "Todas" }));
+
+  await waitFor(() => {
+    expect(
+      request.mock.calls.some(
+        ([path]) =>
+          String(path).startsWith("/api/v1/accounting/trial-balance?") &&
+          String(path).includes("query=Caja") &&
+          String(path).includes("account_class=income") &&
+          String(path).includes("include_zero=true"),
+      ),
+    ).toBe(true);
+  });
+});
+
+test("marks the inconsistent control in Sumas y saldos without hiding its difference", async () => {
+  renderAccounting("/accounting/trial-balance", async (path) => {
+    if (path === "/api/v1/session") return session(["accounting:view"]);
+    if (path.startsWith("/api/v1/accounting/trial-balance?")) {
+      return trialBalanceFixture({
+        controls: {
+          opening_difference: "0.00",
+          movement_difference: "1.25",
+          closing_difference: "0.00",
+        },
+      });
+    }
+    throw new Error(`unexpected request ${path}`);
+  });
+
+  const control = await screen.findByLabelText("Control de sumas y saldos");
+  const movements = within(control)
+    .getByText("Movimientos")
+    .closest("section");
+  expect(movements).not.toBeNull();
+  expect(within(movements as HTMLElement).getByText("Diferencia")).toBeInTheDocument();
+  expect(within(movements as HTMLElement).getByText("ARS 1,25")).toBeInTheDocument();
+  expect(within(control).getAllByText("Equilibrado")).toHaveLength(2);
+});
+
+test("localizes an error from Sumas y saldos instead of exposing the backend message", async () => {
+  renderAccounting("/accounting/trial-balance", async (path) => {
+    if (path === "/api/v1/session") return session(["accounting:view"]);
+    if (path.startsWith("/api/v1/accounting/trial-balance?")) {
+      throw new HttpError(
+        "invalid period",
+        400,
+        JSON.stringify({
+          error: {
+            code: "ACCOUNTING_INVALID_PERIOD",
+            message: "invalid period",
+          },
+        }),
+      );
+    }
+    throw new Error(`unexpected request ${path}`);
+  });
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "El rango de fechas no es válido. Revisá Desde y Hasta.",
+  );
+  expect(screen.queryByText("invalid period")).not.toBeInTheDocument();
+});
+
+test("distinguishes a period without entries from filters without matches", async () => {
+  const user = userEvent.setup();
+  renderAccounting("/accounting/trial-balance", async (path) => {
+    if (path === "/api/v1/session") return session(["accounting:view"]);
+    if (path.startsWith("/api/v1/accounting/trial-balance?")) {
+      return trialBalanceFixture({
+        items: [],
+        page: { total: 0, next_cursor: null },
+      });
+    }
+    throw new Error(`unexpected request ${path}`);
+  });
+
+  expect(
+    await screen.findByText(
+      "No hay saldos ni movimientos contabilizados en el período.",
+    ),
+  ).toBeInTheDocument();
+
+  await user.type(
+    screen.getByRole("searchbox", { name: "Buscar cuentas en Sumas y saldos" }),
+    "inexistente",
+  );
+  expect(
+    await screen.findByText("No hay cuentas que coincidan con los filtros."),
+  ).toBeInTheDocument();
+});
+
+test("paginates, exports and opens the selected account in Mayor with its period", async () => {
+  const user = userEvent.setup();
+  const cash = accountSummaryFixture();
+  const createObjectURL = vi
+    .spyOn(URL, "createObjectURL")
+    .mockReturnValue("blob:trial-balance");
+  const revokeObjectURL = vi
+    .spyOn(URL, "revokeObjectURL")
+    .mockImplementation(() => undefined);
+  const click = vi
+    .spyOn(HTMLAnchorElement.prototype, "click")
+    .mockImplementation(() => undefined);
+  const { request, requestResponse } = renderAccounting(
+    "/accounting/trial-balance",
+    async (path) => {
+      if (path === "/api/v1/session") return session(["accounting:view"]);
+      if (path.startsWith("/api/v1/accounting/trial-balance?")) {
+        const nextPage = path.includes("cursor=next-page");
+        return trialBalanceFixture({
+          page: { total: 51, next_cursor: nextPage ? null : "next-page" },
+        });
+      }
+      if (path.startsWith("/api/v1/accounting/accounts/tree?")) {
+        return {
+          items: [cash],
+          totals: { active: 1, archived: 0, trashed: 0 },
+        };
+      }
+      if (path.startsWith("/api/v1/accounting/general-ledger?")) {
+        return {
+          account: cash,
+          currency: "ARS",
+          from: "2026-02-01",
+          to: "2026-05-31",
+          opening_balance: { amount: "0", side: "zero" },
+          closing_balance: { amount: "0", side: "zero" },
+          total_debit: "0",
+          total_credit: "0",
+          items: [],
+          page: { total: 0, next_cursor: null },
+        };
+      }
+      throw new Error(`unexpected request ${path}`);
+    },
+    async () =>
+      new Response("trial-balance", {
+        status: 200,
+        headers: {
+          "content-type": "text/csv",
+          "content-disposition": 'attachment; filename="sumas-y-saldos.csv"',
+        },
+      }),
+  );
+
+  await screen.findByText("51 cuentas · página 1");
+  fireEvent.change(screen.getByLabelText("Sumas y saldos desde"), {
+    target: { value: "2026-02-01" },
+  });
+  fireEvent.change(screen.getByLabelText("Sumas y saldos hasta"), {
+    target: { value: "2026-05-31" },
+  });
+  await user.click(screen.getByRole("button", { name: "Siguiente" }));
+
+  await waitFor(() => {
+    expect(
+      request.mock.calls.some(
+        ([path]) =>
+          String(path).startsWith("/api/v1/accounting/trial-balance?") &&
+          String(path).includes("from=2026-02-01") &&
+          String(path).includes("to=2026-05-31") &&
+          String(path).includes("cursor=next-page"),
+      ),
+    ).toBe(true);
+  });
+  expect(await screen.findByText("51 cuentas · página 2")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "CSV" }));
+  await waitFor(() => expect(requestResponse).toHaveBeenCalledTimes(1));
+  const exportPath = String(requestResponse.mock.calls[0]?.[0]);
+  expect(exportPath).toContain("/api/v1/accounting/trial-balance/export?");
+  expect(exportPath).toContain("from=2026-02-01");
+  expect(exportPath).toContain("to=2026-05-31");
+  expect(exportPath).toContain("include_zero=false");
+  expect(exportPath).not.toContain("cursor=");
+  expect(click).toHaveBeenCalled();
+
+  fireEvent.keyDown(
+    screen.getByRole("row", { name: "Abrir Mayor de 1.1.01 Caja" }),
+    { key: "Enter" },
+  );
+  await waitFor(() => {
+    expect(window.location.pathname).toBe("/accounting/ledger");
+    expect(window.location.search).toContain(`account_id=${cash.id}`);
+    expect(window.location.search).toContain("from=2026-02-01");
+    expect(window.location.search).toContain("to=2026-05-31");
+  });
+  createObjectURL.mockRestore();
+  revokeObjectURL.mockRestore();
+  click.mockRestore();
+});
+
+test("exports Libro Diario by default with the active date filters", async () => {
   const user = userEvent.setup();
   const createObjectURL = vi
     .spyOn(URL, "createObjectURL")
@@ -2461,9 +3385,9 @@ test("exports the selected report as PDF with the active date filters", async ()
       if (path.startsWith("/api/v1/accounting/financial-accounts?")) {
         return [];
       }
-      if (path.startsWith("/api/v1/accounting/reports/trial-balance?")) {
+      if (path.startsWith("/api/v1/accounting/reports/journal?")) {
         return {
-          report: "trial-balance",
+          report: "journal",
           from: "2026-01-01",
           to: "2026-07-24",
           currency: "ARS",
@@ -2499,7 +3423,7 @@ test("exports the selected report as PDF with the active date filters", async ()
 
   await waitFor(() => expect(requestResponse).toHaveBeenCalledTimes(1));
   expect(String(requestResponse.mock.calls[0]?.[0])).toMatch(
-    /^\/api\/v1\/accounting\/reports\/trial-balance\/export\?/,
+    /^\/api\/v1\/accounting\/reports\/journal\/export\?/,
   );
   expect(String(requestResponse.mock.calls[0]?.[0])).toContain("format=pdf");
   expect(String(requestResponse.mock.calls[0]?.[0])).toContain("from=");
@@ -2536,9 +3460,9 @@ test("filters the financial activity report by the selected cash or bank account
       if (path.startsWith("/api/v1/accounting/financial-accounts?")) {
         return [financialAccount];
       }
-      if (path.startsWith("/api/v1/accounting/reports/trial-balance?")) {
+      if (path.startsWith("/api/v1/accounting/reports/journal?")) {
         return {
-          report: "trial-balance",
+          report: "journal",
           from: "2026-01-01",
           to: "2026-07-24",
           currency: "ARS",

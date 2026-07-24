@@ -213,7 +213,7 @@ jobs:
       - name: Re-run migrations through the normal startup contract
         run: |
           docker compose exec -T postgres sh -ec \
-            'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 7'
+            'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 9'
           docker compose exec -T postgres sh -ec \
             'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''iam/core'\''")" = 1'
           docker compose exec -T postgres sh -ec \
@@ -222,7 +222,7 @@ jobs:
             'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''idempotency/core'\''")" = 1'
           make up
           docker compose exec -T postgres sh -ec \
-            'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 7'
+            'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 9'
       - name: Verify readiness failure and recovery
         run: |
           docker compose stop postgres

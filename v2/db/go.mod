@@ -2,7 +2,13 @@ module github.com/devpablocristo/pymes/v2/db
 
 go 1.26.5
 
-require github.com/devpablocristo/platform/databases/postgres/go v0.4.0
+require (
+	github.com/devpablocristo/platform/databases/postgres/go v0.5.0
+	github.com/devpablocristo/platform/iam/go v0.1.0
+	github.com/devpablocristo/platform/idempotency/go v0.1.0
+	github.com/devpablocristo/platform/outbox/go v0.2.0
+	github.com/jackc/pgx/v5 v5.8.0
+)
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
@@ -10,7 +16,6 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.19.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/pgx/v5 v5.8.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect

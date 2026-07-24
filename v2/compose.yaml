@@ -11,30 +11,102 @@ services:
       - "127.0.0.1:55433:5432"
     volumes:
       - pymes_v2_postgres_data:/var/lib/postgresql/data
+      - ./db/dev/bootstrap-roles.sql:/docker-entrypoint-initdb.d/05-bootstrap-roles.sql:ro
       - ./db/dev/init-test-database.sql:/docker-entrypoint-initdb.d/10-test-database.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pymes -d pymes_v2"]
+      test:
+        - CMD-SHELL
+        - >-
+          pg_isready -U pymes -d pymes_v2
+          && psql -U pymes -d pymes_v2 -tAc
+          "SELECT 1 FROM pg_database WHERE datname = 'pymes_v2_test'"
+          | grep -qx 1
       interval: 2s
       timeout: 3s
       retries: 15
     restart: unless-stopped
 
-  migrate:
-    build:
-      context: ./db
+  db-bootstrap:
+    image: postgres:16-alpine
     environment:
-      PYMES_DATABASE_URL: postgres://pymes:pymes@postgres:5432/pymes_v2?sslmode=disable
+      PGPASSWORD: pymes
+    volumes:
+      - ./db/dev/bootstrap-roles.sql:/bootstrap-roles.sql:ro
+      - ./db/dev/ensure-test-role-grants.sql:/ensure-test-role-grants.sql:ro
+    command:
+      - /bin/sh
+      - -ec
+      - >-
+        psql -h postgres -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -f /bootstrap-roles.sql
+        && psql -h postgres -U pymes -d pymes_v2_test -v ON_ERROR_STOP=1 -f /ensure-test-role-grants.sql
     depends_on:
       postgres:
         condition: service_healthy
     restart: "no"
 
+  migrate:
+    build:
+      context: ./db
+    environment:
+      PYMES_DATABASE_URL: postgres://pymes_migrator:pymes_migrator@postgres:5432/pymes_v2?sslmode=disable
+    depends_on:
+      db-bootstrap:
+        condition: service_completed_successfully
+    restart: "no"
+
+  provision-org:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.provision
+    environment:
+      PYMES_DATABASE_URL: postgres://pymes_migrator:pymes_migrator@postgres:5432/pymes_v2?sslmode=disable
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    profiles: ["ops"]
+    restart: "no"
+
+  iam-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    command: ["-c", ".air.iam-worker.toml"]
+    environment:
+      PYMES_DATABASE_URL: postgres://pymes_iam_worker:pymes_iam_worker@postgres:5432/pymes_v2?sslmode=disable
+      PYMES_CLERK_SECRET_KEY: ${PYMES_CLERK_SECRET_KEY:-}
+      PYMES_CLERK_API_URL: ${PYMES_CLERK_API_URL:-}
+      PYMES_IAM_WORKER_BATCH_SIZE: ${PYMES_IAM_WORKER_BATCH_SIZE:-1}
+      PYMES_IAM_WORKER_POLL_INTERVAL: ${PYMES_IAM_WORKER_POLL_INTERVAL:-1s}
+      PYMES_IAM_WORKER_LEASE_DURATION: ${PYMES_IAM_WORKER_LEASE_DURATION:-2m}
+      PYMES_IAM_WORKER_PUBLISH_TIMEOUT: ${PYMES_IAM_WORKER_PUBLISH_TIMEOUT:-90s}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - ./backend:/src
+    tmpfs:
+      - /src/tmp:exec,mode=1777
+    profiles: ["iam"]
+    init: true
+    stop_grace_period: 15s
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
+      dockerfile: Dockerfile.dev
+    command: ["-c", ".air.api.toml"]
     environment:
       PYMES_HTTP_ADDR: :8080
-      PYMES_DATABASE_URL: postgres://pymes:pymes@postgres:5432/pymes_v2?sslmode=disable
+      PYMES_DATABASE_URL: postgres://pymes_backend:pymes_backend@postgres:5432/pymes_v2?sslmode=disable
+      PYMES_ENVIRONMENT: ${PYMES_ENVIRONMENT:-development}
+      PYMES_CLERK_PUBLISHABLE_KEY: ${PYMES_CLERK_PUBLISHABLE_KEY:-}
+      PYMES_CLERK_SECRET_KEY: ${PYMES_CLERK_SECRET_KEY:-}
+      PYMES_CLERK_ISSUER: ${PYMES_CLERK_ISSUER:-}
+      PYMES_CLERK_AUDIENCE: ${PYMES_CLERK_AUDIENCE:-pymes-v2-api}
+      PYMES_CLERK_AUTHORIZED_PARTIES: ${PYMES_CLERK_AUTHORIZED_PARTIES:-http://127.0.0.1:15173,http://localhost:15173}
+      PYMES_CLERK_WEBHOOK_SECRET: ${PYMES_CLERK_WEBHOOK_SECRET:-}
+      PYMES_CLERK_JWT_KEY: ${PYMES_CLERK_JWT_KEY:-}
       PYMES_SHUTDOWN_TIMEOUT: 10s
       PYMES_READINESS_TIMEOUT: 2s
     ports:
@@ -44,12 +116,16 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    volumes:
+      - ./backend:/src
+    tmpfs:
+      - /src/tmp:exec,mode=1777
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/readyz"]
       interval: 2s
       timeout: 3s
       retries: 30
-      start_period: 2s
+      start_period: 30s
     init: true
     stop_grace_period: 15s
     restart: unless-stopped
@@ -57,11 +133,19 @@ services:
   web:
     build:
       context: ./web
+      dockerfile: Dockerfile.dev
+    environment:
+      VITE_PROXY_TARGET: http://backend:8080
     ports:
       - "127.0.0.1:${PYMES_WEB_PORT:-15173}:8080"
     depends_on:
       backend:
         condition: service_healthy
+    volumes:
+      - ./web:/src
+      - pymes_v2_web_node_modules:/src/node_modules
+    tmpfs:
+      - /src/node_modules/.vite-temp:mode=1777
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/healthz"]
       interval: 2s
@@ -72,3 +156,4 @@ services:
 
 volumes:
   pymes_v2_postgres_data:
+  pymes_v2_web_node_modules:

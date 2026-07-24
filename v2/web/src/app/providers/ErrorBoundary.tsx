@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type PropsWithChildren, type ReactNode } from "react";
+import { FatalErrorState } from "../states/ContentStates";
 
 type State = { failed: boolean };
 
@@ -16,10 +17,11 @@ export class ErrorBoundary extends Component<PropsWithChildren, State> {
   render(): ReactNode {
     if (this.state.failed) {
       return (
-        <main className="fatal-error" role="alert">
-          <h1>No pudimos cargar la aplicación.</h1>
-          <p>Actualizá la página para volver a intentarlo.</p>
-        </main>
+        <FatalErrorState
+          title="Pymes no pudo iniciar"
+          body="Recargá la página. Si el problema continúa, contactá a soporte."
+          reloadLabel="Recargar"
+        />
       );
     }
     return this.props.children;

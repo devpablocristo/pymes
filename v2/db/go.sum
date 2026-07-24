@@ -11,8 +11,14 @@ github.com/containerd/errdefs/pkg v0.3.0/go.mod h1:NJw6s9HwNuRhnjJhM7pylWwMyAkmC
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/devpablocristo/platform/databases/postgres/go v0.4.0 h1:l0J2SoE0ciaEBc0hYFfgdS7k5YQCpX1SaklxcBjajfA=
-github.com/devpablocristo/platform/databases/postgres/go v0.4.0/go.mod h1:nu3BGv8CbneLW/80NVJIc1fPiHe4IBpSN2CgOsYZ59g=
+github.com/devpablocristo/platform/databases/postgres/go v0.5.0 h1:yLg42w0O8bA48my2S7iL3yJGUcwdxXifhGKO1lW84n8=
+github.com/devpablocristo/platform/databases/postgres/go v0.5.0/go.mod h1:nu3BGv8CbneLW/80NVJIc1fPiHe4IBpSN2CgOsYZ59g=
+github.com/devpablocristo/platform/iam/go v0.1.0 h1:8duzdXm1U4huQgzemMquZ8h5rVZmSvUiQyZarvnSVCs=
+github.com/devpablocristo/platform/iam/go v0.1.0/go.mod h1:+/SEmr+DmgkE8dq5qeUfYxEVI/Ey6WbT5axHkgTWUfY=
+github.com/devpablocristo/platform/idempotency/go v0.1.0 h1:VddpcGebuHdHnEFgr9LdCc2yDa/vCeXwO4WptgwWI7Y=
+github.com/devpablocristo/platform/idempotency/go v0.1.0/go.mod h1:ohlYMKDOA2MsbTcsMEykRUHHcDOovteZia0l3isZzg8=
+github.com/devpablocristo/platform/outbox/go v0.2.0 h1:hoQIlZbJLdzMLvUTWYXAlpkdAic4S+EGQ/1Cswb22zs=
+github.com/devpablocristo/platform/outbox/go v0.2.0/go.mod h1:Joxe4Qc786UYfu0y9CkVwnLvMp6gzujC5L2ls4iVSSw=
 github.com/dhui/dktest v0.4.6 h1:+DPKyScKSEp3VLtbMDHcUq6V5Lm5zfZZVb0Sk7Ahom4=
 github.com/dhui/dktest v0.4.6/go.mod h1:JHTSYDtKkvFNFHJKqCzVzqXecyv+tKt8EzceOmQOgbU=
 github.com/distribution/reference v0.6.0 h1:0IXCQ5g4/QMHHkarYzh5l+u8T3t73zM5QvfrDyIgxBk=

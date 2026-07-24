@@ -865,6 +865,23 @@ paths:
           $ref: "#/components/responses/Conflict"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/settings:
+    get:
+      operationId: getAccountingSettings
+      tags: [Accounting]
+      responses:
+        "200":
+          description: Configuración contable efectiva de la organización activa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /api/v1/accounting/accounts:
     get:
       operationId: listAccountingAccounts
@@ -881,6 +898,11 @@ paths:
           schema:
             type: string
             maxLength: 120
+        - name: postable
+          in: query
+          description: Filtra cuentas que admiten o no imputaciones.
+          schema:
+            type: boolean
       responses:
         "200":
           description: Plan de cuentas de la organización activa.
@@ -1073,6 +1095,21 @@ paths:
       parameters:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
+        - name: query
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: Borradores manuales.
@@ -1115,6 +1152,26 @@ paths:
         "503":
           $ref: "#/components/responses/Unavailable"
   /api/v1/accounting/drafts/{draft_id}:
+    get:
+      operationId: getJournalDraft
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/DraftID"
+      responses:
+        "200":
+          description: Borrador contable completo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalDraft"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
     put:
       operationId: updateJournalDraft
       tags: [Accounting]
@@ -1134,6 +1191,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/JournalDraft"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/drafts/{draft_id}/discard:
+    post:
+      operationId: discardJournalDraft
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/DraftID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionedCommandInput"
+      responses:
+        "204":
+          description: Borrador descartado de forma lógica.
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1202,6 +1287,21 @@ paths:
           schema:
             type: string
             maxLength: 120
+        - name: source_type
+          in: query
+          schema:
+            type: string
+            maxLength: 80
+        - name: reversal_state
+          in: query
+          schema:
+            $ref: "#/components/schemas/JournalReversalState"
+        - name: include_lines
+          in: query
+          description: Incluye líneas completas; se reserva para consumidores que necesitan conciliación o drill-down.
+          schema:
+            type: boolean
+            default: false
       responses:
         "200":
           description: Libro Diario paginado.
@@ -3459,6 +3559,18 @@ components:
     MonetaryClassification:
       type: string
       enum: [monetary, non_monetary, not_applicable]
+    AccountingSettings:
+      type: object
+      additionalProperties: false
+      required: [country_code, functional_currency, timezone]
+      properties:
+        country_code:
+          type: string
+          pattern: "^[A-Z]{2}$"
+        functional_currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        timezone:
+          type: string
     AccountingAccount:
       type: object
       additionalProperties: false
@@ -3598,7 +3710,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/JournalLineInput"
         - type: object
-          required: [id, line_number]
+          required: [id, line_number, account_code, account_name]
           properties:
             id:
               type: string
@@ -3606,6 +3718,38 @@ components:
             line_number:
               type: integer
               minimum: 1
+            account_code:
+              type: string
+            account_name:
+              type: string
+    AccountingEntryKind:
+      type: string
+      enum:
+        [manual, sale, purchase, collection, payment, refund, inventory, cogs, tax, adjustment, closing, inflation, revaluation, reversal]
+    JournalPostingState:
+      type: string
+      enum: [incomplete, unbalanced, blocked, ready]
+    JournalPostingIssue:
+      type: string
+      enum:
+        [description_required, minimum_lines, line_account_required, line_side_invalid, unbalanced, zero_total, period_closed, account_archived, account_not_postable]
+    JournalPostingStatus:
+      type: object
+      additionalProperties: false
+      required: [state, difference, issues]
+      properties:
+        state:
+          $ref: "#/components/schemas/JournalPostingState"
+        difference:
+          $ref: "#/components/schemas/DecimalAmount"
+        issues:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/JournalPostingIssue"
+    JournalReversalState:
+      type: string
+      enum: [regular, reversal, reversed]
     JournalDraftInput:
       type: object
       additionalProperties: false
@@ -3614,15 +3758,24 @@ components:
         accounting_date:
           type: string
           format: date
+        reference:
+          type: string
+          maxLength: 160
         description:
           type: string
-          minLength: 1
           maxLength: 500
         currency:
           $ref: "#/components/schemas/CurrencyCode"
+        exchange_rate:
+          $ref: "#/components/schemas/DecimalAmount"
+        exchange_rate_date:
+          type: string
+          format: date
+        exchange_rate_source:
+          type: string
+          maxLength: 160
         lines:
           type: array
-          minItems: 2
           maxItems: 500
           items:
             $ref: "#/components/schemas/JournalLineInput"
@@ -3639,7 +3792,8 @@ components:
     JournalDraft:
       type: object
       additionalProperties: false
-      required: [id, accounting_date, description, currency, lines, total_debit, total_credit, version]
+      required:
+        [id, accounting_date, description, functional_currency, currency, exchange_rate, lines, total_debit, total_credit, posting_status, kind, created_by, updated_by, created_at, updated_at, version]
       properties:
         id:
           type: string
@@ -3647,10 +3801,23 @@ components:
         accounting_date:
           type: string
           format: date
+        reference:
+          type: string
         description:
           type: string
+        functional_currency:
+          $ref: "#/components/schemas/CurrencyCode"
         currency:
           $ref: "#/components/schemas/CurrencyCode"
+        exchange_rate:
+          $ref: "#/components/schemas/DecimalAmount"
+        exchange_rate_date:
+          type: string
+          format: date
+        exchange_rate_source:
+          type: string
+        kind:
+          $ref: "#/components/schemas/AccountingEntryKind"
         lines:
           type: array
           items:
@@ -3659,6 +3826,64 @@ components:
           $ref: "#/components/schemas/DecimalAmount"
         total_credit:
           $ref: "#/components/schemas/DecimalAmount"
+        posting_status:
+          $ref: "#/components/schemas/JournalPostingStatus"
+        created_by:
+          type: string
+        updated_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+    JournalDraftSummary:
+      type: object
+      additionalProperties: false
+      required:
+        [id, accounting_date, description, functional_currency, currency, exchange_rate, line_count, total_debit, total_credit, posting_status, kind, updated_by, updated_at, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        accounting_date:
+          type: string
+          format: date
+        reference:
+          type: string
+        description:
+          type: string
+        functional_currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        exchange_rate:
+          $ref: "#/components/schemas/DecimalAmount"
+        exchange_rate_date:
+          type: string
+          format: date
+        exchange_rate_source:
+          type: string
+        kind:
+          $ref: "#/components/schemas/AccountingEntryKind"
+        line_count:
+          type: integer
+          minimum: 0
+        total_debit:
+          $ref: "#/components/schemas/DecimalAmount"
+        total_credit:
+          $ref: "#/components/schemas/DecimalAmount"
+        posting_status:
+          $ref: "#/components/schemas/JournalPostingStatus"
+        updated_by:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
         version:
           type: integer
           format: int64
@@ -3669,14 +3894,14 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/JournalDraft"
+            $ref: "#/components/schemas/JournalDraftSummary"
         page:
           $ref: "#/components/schemas/PageInfo"
     JournalEntry:
       type: object
       additionalProperties: false
       required:
-        [id, entry_number, accounting_date, description, currency, lines, total_debit, total_credit, created_at]
+        [id, entry_number, accounting_date, description, functional_currency, currency, exchange_rate, kind, posting_kind, created_by, lines, total_debit, total_credit, created_at]
       properties:
         id:
           type: string
@@ -3688,10 +3913,27 @@ components:
         accounting_date:
           type: string
           format: date
+        reference:
+          type: string
         description:
           type: string
+        functional_currency:
+          $ref: "#/components/schemas/CurrencyCode"
         currency:
           $ref: "#/components/schemas/CurrencyCode"
+        exchange_rate:
+          $ref: "#/components/schemas/DecimalAmount"
+        exchange_rate_date:
+          type: string
+          format: date
+        exchange_rate_source:
+          type: string
+        kind:
+          $ref: "#/components/schemas/AccountingEntryKind"
+        posting_kind:
+          type: string
+        created_by:
+          type: string
         source_type:
           type: string
         source_id:
@@ -3702,11 +3944,91 @@ components:
           type: string
           format: uuid
           nullable: true
+        reverses_entry_number:
+          type: integer
+          format: int64
+          minimum: 1
+          nullable: true
+        reversed_by_entry_id:
+          type: string
+          format: uuid
+          nullable: true
+        reversed_by_entry_number:
+          type: integer
+          format: int64
+          minimum: 1
+          nullable: true
         reversal_reason:
           type: string
           nullable: true
         lines:
           type: array
+          items:
+            $ref: "#/components/schemas/JournalLine"
+        total_debit:
+          $ref: "#/components/schemas/DecimalAmount"
+        total_credit:
+          $ref: "#/components/schemas/DecimalAmount"
+        created_at:
+          type: string
+          format: date-time
+    JournalEntrySummary:
+      type: object
+      additionalProperties: false
+      required:
+        [id, entry_number, accounting_date, description, functional_currency, currency, kind, posting_kind, created_by, total_debit, total_credit, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        entry_number:
+          type: integer
+          format: int64
+          minimum: 1
+        accounting_date:
+          type: string
+          format: date
+        reference:
+          type: string
+        description:
+          type: string
+        functional_currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        kind:
+          $ref: "#/components/schemas/AccountingEntryKind"
+        posting_kind:
+          type: string
+        created_by:
+          type: string
+        source_type:
+          type: string
+        source_id:
+          type: string
+          format: uuid
+          nullable: true
+        reverses_entry_id:
+          type: string
+          format: uuid
+          nullable: true
+        reverses_entry_number:
+          type: integer
+          format: int64
+          minimum: 1
+          nullable: true
+        reversed_by_entry_id:
+          type: string
+          format: uuid
+          nullable: true
+        reversed_by_entry_number:
+          type: integer
+          format: int64
+          minimum: 1
+          nullable: true
+        lines:
+          type: array
+          description: Presente únicamente cuando include_lines=true.
           items:
             $ref: "#/components/schemas/JournalLine"
         total_debit:
@@ -3723,7 +4045,7 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/JournalEntry"
+            $ref: "#/components/schemas/JournalEntrySummary"
         page:
           $ref: "#/components/schemas/PageInfo"
     AccountingOpenItemType:

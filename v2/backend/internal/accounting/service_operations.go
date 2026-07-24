@@ -130,7 +130,7 @@ func (s *Service) SaveReconciliation(
 	normalizeReconciliationMatches(&reconciliation, scope.ActorID, s.clock.Now(), s.ids)
 	var saved Reconciliation
 	err := s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
-		current, err := repos.GetReconciliation(ctx, reconciliation.ID, true)
+		current, err := repos.GetReconciliation(ctx, reconciliation.ID, false)
 		if err != nil {
 			return err
 		}
@@ -154,7 +154,7 @@ func (s *Service) CloseReconciliation(
 ) (Reconciliation, error) {
 	var closed Reconciliation
 	err := s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
-		reconciliation, err := repos.GetReconciliation(ctx, id, true)
+		reconciliation, err := repos.GetReconciliation(ctx, id, false)
 		if err != nil {
 			return err
 		}
@@ -190,7 +190,7 @@ func (s *Service) ReopenReconciliation(
 	}
 	var reopened Reconciliation
 	err := s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
-		reconciliation, err := repos.GetReconciliation(ctx, id, true)
+		reconciliation, err := repos.GetReconciliation(ctx, id, false)
 		if err != nil {
 			return err
 		}

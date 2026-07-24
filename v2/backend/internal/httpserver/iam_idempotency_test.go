@@ -157,6 +157,102 @@ func TestIAMIdempotencyAuthorizesLocalMembershipBeforeReplay(t *testing.T) {
 	}
 }
 
+func TestJournalMutationsReplayThroughDurableIdempotencyMiddleware(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{
+			name:   "create draft",
+			method: http.MethodPost,
+			path:   "/api/v1/accounting/drafts",
+			body:   `{"accounting_date":"2026-07-24","description":"","currency":"ARS","lines":[]}`,
+		},
+		{
+			name:   "update draft",
+			method: http.MethodPut,
+			path:   "/api/v1/accounting/drafts/00000000-0000-0000-0000-000000000001",
+			body:   `{"version":1,"accounting_date":"2026-07-24","description":"","currency":"ARS","lines":[]}`,
+		},
+		{
+			name:   "discard draft",
+			method: http.MethodPost,
+			path:   "/api/v1/accounting/drafts/00000000-0000-0000-0000-000000000001/discard",
+			body:   `{"version":1,"reason":"Descartado desde el Diario"}`,
+		},
+		{
+			name:   "post draft",
+			method: http.MethodPost,
+			path:   "/api/v1/accounting/drafts/00000000-0000-0000-0000-000000000001/post",
+			body:   `{"version":1}`,
+		},
+		{
+			name:   "reverse journal entry",
+			method: http.MethodPost,
+			path:   "/api/v1/accounting/journal-entries/00000000-0000-0000-0000-000000000001/reverse",
+			body:   `{"date":"2026-07-24","reason":"Corrección contable"}`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store := &iamIdempotencyStore{}
+			verifier := &iamIdempotencyVerifier{claims: iamIdempotencyClaims()}
+			transactor := &iamIdempotencyTransactor{
+				active: platformiam.ActiveMembership{
+					OrganizationID: "local-org",
+					UserID:         "local-user",
+				},
+			}
+			middleware, err := NewIAMIdempotency(
+				store,
+				verifier,
+				verifier,
+				transactor,
+			)
+			if err != nil {
+				t.Fatalf("NewIAMIdempotency: %v", err)
+			}
+			var executions atomic.Int32
+			handler := middleware.Wrap(http.HandlerFunc(
+				func(w http.ResponseWriter, _ *http.Request) {
+					executions.Add(1)
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					_, _ = w.Write([]byte(`{"ok":true}`))
+				},
+			))
+
+			first := performIdempotentIAMRequest(
+				handler,
+				test.method,
+				test.path,
+				"journal-replay-key",
+				test.body,
+			)
+			second := performIdempotentIAMRequest(
+				handler,
+				test.method,
+				test.path,
+				"journal-replay-key",
+				test.body,
+			)
+			if first.Code != http.StatusOK ||
+				second.Code != http.StatusOK ||
+				executions.Load() != 1 ||
+				store.claims != 2 {
+				t.Fatalf(
+					"replay statuses/executions/claims = %d/%d/%d/%d",
+					first.Code,
+					second.Code,
+					executions.Load(),
+					store.claims,
+				)
+			}
+		})
+	}
+}
+
 func TestIAMIdempotencyRejectsRemovedMembershipBeforeStore(t *testing.T) {
 	store := &iamIdempotencyStore{}
 	verifier := &iamIdempotencyVerifier{claims: iamIdempotencyClaims()}

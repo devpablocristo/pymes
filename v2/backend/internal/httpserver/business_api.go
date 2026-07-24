@@ -24,6 +24,10 @@ func (h *IAMAPI) ListAccountingMappings(w http.ResponseWriter, r *http.Request) 
 	h.listAccountingMappings(w, r)
 }
 
+func (h *IAMAPI) GetAccountingSettings(w http.ResponseWriter, r *http.Request) {
+	h.getAccountingSettings(w, r)
+}
+
 func (h *IAMAPI) UpdateAccountingMappings(w http.ResponseWriter, r *http.Request, params api.UpdateAccountingMappingsParams) {
 	h.updateAccountingMappings(w, r, params)
 }
@@ -66,12 +70,20 @@ func (h *IAMAPI) CreateJournalDraft(w http.ResponseWriter, r *http.Request, para
 	h.createJournalDraft(w, r, params)
 }
 
+func (h *IAMAPI) GetJournalDraft(w http.ResponseWriter, r *http.Request, draftID api.DraftID) {
+	h.getJournalDraft(w, r, draftID)
+}
+
 func (h *IAMAPI) UpdateJournalDraft(w http.ResponseWriter, r *http.Request, draftID api.DraftID, params api.UpdateJournalDraftParams) {
 	h.updateJournalDraft(w, r, draftID, params)
 }
 
 func (h *IAMAPI) PostJournalDraft(w http.ResponseWriter, r *http.Request, draftID api.DraftID, params api.PostJournalDraftParams) {
 	h.postJournalDraft(w, r, draftID, params)
+}
+
+func (h *IAMAPI) DiscardJournalDraft(w http.ResponseWriter, r *http.Request, draftID api.DraftID, params api.DiscardJournalDraftParams) {
+	h.discardJournalDraft(w, r, draftID, params)
 }
 
 func (h *IAMAPI) ListJournalEntries(w http.ResponseWriter, r *http.Request, params api.ListJournalEntriesParams) {

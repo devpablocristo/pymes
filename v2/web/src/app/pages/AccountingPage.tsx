@@ -2,11 +2,16 @@ import {
   type CSSProperties,
   type ChangeEvent,
   type FormEvent,
+  type ReactNode,
+  type RefObject,
+  Fragment,
+  useId,
   useCallback,
   useEffect,
   useRef,
   useState,
 } from "react";
+import { normalizeHttpError } from "@devpablocristo/platform-http";
 import { NavLink, Navigate, useParams } from "react-router-dom";
 import type { components } from "../../api/schema.generated";
 import { useProductApi } from "../../api/ProductApiContext";
@@ -27,8 +32,10 @@ type AccountMapping = components["schemas"]["AccountingMapping"];
 type CurrentSession = components["schemas"]["CurrentSession"];
 type Draft = components["schemas"]["JournalDraft"];
 type DraftList = components["schemas"]["JournalDraftList"];
+type DraftSummary = components["schemas"]["JournalDraftSummary"];
 type Entry = components["schemas"]["JournalEntry"];
 type EntryList = components["schemas"]["JournalEntryList"];
+type EntrySummary = components["schemas"]["JournalEntrySummary"];
 type JournalLine = components["schemas"]["JournalLine"];
 type OpenItem = components["schemas"]["AccountingOpenItem"];
 type OpenItemList = components["schemas"]["AccountingOpenItemList"];
@@ -47,6 +54,100 @@ type Report = components["schemas"]["AccountingReport"];
 type InflationAdjustment = components["schemas"]["InflationAdjustment"];
 type CurrencyRevaluation = components["schemas"]["CurrencyRevaluation"];
 type ClosingExchangeRateInput = components["schemas"]["ClosingExchangeRateInput"];
+
+type JournalPostingState = "incomplete" | "unbalanced" | "blocked" | "ready";
+type JournalPostingIssue =
+  | "description_required"
+  | "minimum_lines"
+  | "line_account_required"
+  | "line_side_invalid"
+  | "unbalanced"
+  | "zero_total"
+  | "period_closed"
+  | "account_archived"
+  | "account_not_postable";
+
+type JournalPostingStatusView = {
+  state: JournalPostingState;
+  difference: string;
+  issues: JournalPostingIssue[];
+};
+
+type JournalLineView = JournalLine & {
+  account_code?: string;
+  account_name?: string;
+};
+
+type JournalDraftView = Partial<Draft & DraftSummary> &
+  Pick<
+    Draft,
+    | "id"
+    | "accounting_date"
+    | "description"
+    | "currency"
+    | "total_debit"
+    | "total_credit"
+    | "version"
+  > & {
+  reference?: string | null;
+  functional_currency?: string;
+  exchange_rate?: string;
+  exchange_rate_date?: string | null;
+  exchange_rate_source?: string | null;
+  lines?: JournalLineView[];
+  line_count?: number;
+  posting_status?: JournalPostingStatusView;
+  updated_at?: string;
+  updated_by?: string;
+  };
+
+type JournalEntryView = Partial<Entry & EntrySummary> &
+  Pick<
+    Entry,
+    | "id"
+    | "entry_number"
+    | "accounting_date"
+    | "description"
+    | "currency"
+    | "total_debit"
+    | "total_credit"
+    | "created_at"
+  > & {
+  reference?: string | null;
+  functional_currency?: string;
+  exchange_rate?: string;
+  exchange_rate_date?: string | null;
+  exchange_rate_source?: string | null;
+  lines?: JournalLineView[];
+  line_count?: number;
+  reverses_entry_number?: number | null;
+  reversed_by_entry_number?: number | null;
+  kind?: string;
+  posting_kind?: string;
+  created_by?: string;
+  reversed_by_entry_id?: string | null;
+  };
+
+type JournalDraftPage = {
+  items: JournalDraftView[];
+  page: PageInfo;
+};
+
+type JournalEntryPage = {
+  items: JournalEntryView[];
+  page: PageInfo;
+};
+
+type AccountingSettingsView = {
+  country_code: string;
+  functional_currency: string;
+  timezone: string;
+};
+
+type LogicalOperationKey = {
+  signature: string;
+  value: string;
+};
 
 const sections = [
   ["accounts", "Plan de cuentas"],
@@ -166,6 +267,7 @@ function AccountsPanel({ canManage }: { canManage: boolean }) {
       if (cursor) search.set("cursor", cursor);
       const response = await api.request<AccountList>(`/api/v1/accounting/accounts?${search}`);
       setAccounts(response.items);
+      setCollapsed(collapsibleAccountIDs(response.items));
       setPage(response.page);
     } catch (cause) {
       setError(message(cause, "No pudimos cargar el plan de cuentas."));
@@ -338,9 +440,13 @@ function AccountsPanel({ canManage }: { canManage: boolean }) {
                     aria-label={`Seleccionar ${account.code} ${account.name}`}
                     checked={selectedIDs.includes(account.id)}
                     onChange={(event) => {
-                      setSelectedIDs((current) => event.target.checked
-                        ? [...current, account.id]
-                        : current.filter((id) => id !== account.id));
+                      if (event.target.checked) {
+                        setSelectedIDs([account.id]);
+                        setShowCreate(false);
+                        setEditingAccount(account);
+                        return;
+                      }
+                      setSelectedIDs((current) => current.filter((id) => id !== account.id));
                     }}
                     type="checkbox"
                   />
@@ -493,18 +599,21 @@ function AccountMappingsPanel({
 }) {
   const api = useProductApi();
   const [rows, setRows] = useState<EditableMapping[]>([]);
+  const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
   useEffect(() => {
     setRows(
-      mappings.map((mapping) => ({
+      [...mappings]
+        .sort((left, right) => left.account_code.localeCompare(right.account_code, "es", { numeric: true }))
+        .map((mapping) => ({
         role: mapping.role,
         accountID: mapping.account_id,
         version: mapping.version,
         persisted: true,
-      })),
+        })),
     );
   }, [mappings]);
 
@@ -560,11 +669,24 @@ function AccountMappingsPanel({
           <strong>Mappings funcionales</strong>
           <span>Las reglas comerciales apuntan a roles; las cuentas se pueden cambiar sin reescribir el ledger.</span>
         </div>
-        {canManage ? (
-          <button onClick={() => setEditing((value) => !value)} type="button">
-            {editing ? "Cancelar edición" : "Editar mappings"}
+        <div className="account-mappings-card__actions">
+          <button
+            aria-expanded={expanded || editing}
+            className="account-mappings-card__toggle"
+            onClick={() => setExpanded((value) => !value)}
+            type="button"
+          >
+            {expanded || editing ? "Ocultar información" : "Desplegar información"}
           </button>
-        ) : null}
+          {canManage ? (
+            <button onClick={() => {
+              setExpanded(true);
+              setEditing((value) => !value);
+            }} className="account-mappings-card__edit" type="button">
+              {editing ? "Cancelar edición" : "Editar mappings"}
+            </button>
+          ) : null}
+        </div>
       </header>
       {editing ? (
         <div className="account-mapping-editor">
@@ -627,7 +749,7 @@ function AccountMappingsPanel({
           </footer>
           {error ? <span className="form-error" role="alert">{error}</span> : null}
         </div>
-      ) : (
+      ) : expanded ? (
         <div className="account-mapping-grid">
           {mappingGroups.map((group) => (
             <section key={group.code}>
@@ -647,22 +769,33 @@ function AccountMappingsPanel({
             <p>No hay mappings configurados. El cierre señalará las reglas pendientes.</p>
           ) : null}
         </div>
-      )}
+      ) : null}
     </article>
   );
 }
 
 function JournalPanel({ canManage }: { canManage: boolean }) {
   const api = useProductApi();
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [entries, setEntries] = useState<JournalEntryView[]>([]);
+  const [drafts, setDrafts] = useState<JournalDraftView[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [query, setQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sourceType, setSourceType] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [editingDraft, setEditingDraft] = useState<Draft>();
-  const [selectedEntry, setSelectedEntry] = useState<Entry>();
+  const [editingDraft, setEditingDraft] = useState<JournalDraftView>();
+  const [copySeed, setCopySeed] = useState<JournalDraftView>();
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [selectedDraftIDs, setSelectedDraftIDs] = useState<string[]>([]);
+  const [discardRequested, setDiscardRequested] = useState(false);
+  const [discardBusy, setDiscardBusy] = useState(false);
+  const [draftDetailBusy, setDraftDetailBusy] = useState<string>();
+  const [selectedEntry, setSelectedEntry] = useState<JournalEntryView>();
+  const [reverseEntry, setReverseEntry] = useState<JournalEntryView>();
   const [entryDetailBusy, setEntryDetailBusy] = useState(false);
   const [mode, setMode] = useState<"posted" | "drafts">("posted");
   const [entryCursor, setEntryCursor] = useState<string>();
@@ -671,123 +804,452 @@ function JournalPanel({ canManage }: { canManage: boolean }) {
   const [draftCursorTrail, setDraftCursorTrail] = useState<string[]>([]);
   const [entryPage, setEntryPage] = useState<PageInfo>({ total: 0 });
   const [draftPage, setDraftPage] = useState<PageInfo>({ total: 0 });
+  const [functionalCurrency, setFunctionalCurrency] = useState("");
+  const discardIdempotencyKeys = useRef(
+    new Map<string, LogicalOperationKey>(),
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(undefined);
     try {
-      const entrySearch = new URLSearchParams({ limit: "30" });
+      const entrySearch = new URLSearchParams({
+        include_lines: "false",
+        limit: "30",
+      });
       if (query.trim()) entrySearch.set("query", query.trim());
+      if (dateFrom) entrySearch.set("from", dateFrom);
+      if (dateTo) entrySearch.set("to", dateTo);
+      if (sourceType) entrySearch.set("source_type", sourceType);
       if (entryCursor) entrySearch.set("cursor", entryCursor);
       const draftSearch = new URLSearchParams({ limit: "30" });
+      if (query.trim()) draftSearch.set("query", query.trim());
+      if (dateFrom) draftSearch.set("from", dateFrom);
+      if (dateTo) draftSearch.set("to", dateTo);
       if (draftCursor) draftSearch.set("cursor", draftCursor);
-      const [journal, pendingDrafts, chart] = await Promise.all([
-        api.request<EntryList>(`/api/v1/accounting/journal-entries?${entrySearch}`),
-        api.request<DraftList>(`/api/v1/accounting/drafts?${draftSearch}`),
-        api.request<AccountList>("/api/v1/accounting/accounts?lifecycle_state=active&limit=100"),
+      const [journal, pendingDrafts, chart, settings] = await Promise.all([
+        api.request<JournalEntryPage>(
+          `/api/v1/accounting/journal-entries?${entrySearch}`,
+        ),
+        api.request<JournalDraftPage>(`/api/v1/accounting/drafts?${draftSearch}`),
+        api.request<AccountList>(
+          "/api/v1/accounting/accounts?lifecycle_state=active&postable=true&limit=100",
+        ),
+        api.request<AccountingSettingsView>("/api/v1/accounting/settings", {
+          skipJSONContentType: true,
+        }),
       ]);
-      setEntries(journal.items);
-      setEntryPage(journal.page);
-      setDrafts(pendingDrafts.items);
-      setDraftPage(pendingDrafts.page);
-      setAccounts(chart.items.filter((item) => item.postable));
-      setError(undefined);
+      const entryItems = Array.isArray(journal?.items) ? journal.items : [];
+      const draftItems = Array.isArray(pendingDrafts?.items)
+        ? pendingDrafts.items
+        : [];
+      setEntries(entryItems);
+      setEntryPage(journal?.page ?? { total: 0 });
+      setDrafts(draftItems);
+      setDraftPage(pendingDrafts?.page ?? { total: 0 });
+      setSelectedDraftIDs((current) =>
+        current.filter((id) => draftItems.some((draft) => draft.id === id)),
+      );
+      setAccounts(
+        (Array.isArray(chart?.items) ? chart.items : []).filter(
+          (item) => item.postable && item.lifecycle_state === "active",
+        ),
+      );
+      setFunctionalCurrency(settings.functional_currency);
     } catch (cause) {
-      setError(message(cause, "No pudimos cargar el Diario."));
+      setError(journalErrorMessage(cause, "No pudimos cargar el Diario."));
     } finally {
       setLoading(false);
     }
-  }, [api, draftCursor, entryCursor, query]);
+  }, [
+    api,
+    dateFrom,
+    dateTo,
+    draftCursor,
+    entryCursor,
+    query,
+    sourceType,
+  ]);
   useEffect(() => void load(), [load]);
   useEffect(() => {
     if (!canManage) {
       setShowCreate(false);
       setEditingDraft(undefined);
+      setCopySeed(undefined);
+      setSelectedDraftIDs([]);
     }
   }, [canManage]);
 
-  function changeQuery(value: string) {
-    setQuery(value);
+  function resetPagination() {
     setEntryCursor(undefined);
     setEntryCursorTrail([]);
+    setDraftCursor(undefined);
+    setDraftCursorTrail([]);
   }
 
-  async function openEntry(entry: Entry) {
+  function changeQuery(value: string) {
+    setQuery(value);
+    resetPagination();
+  }
+
+  function changeMode(next: "posted" | "drafts") {
+    setMode(next);
+    if (next === "drafts") setSourceType("");
+    setSelectedDraftIDs([]);
+    resetPagination();
+  }
+
+  async function openEntry(entry: JournalEntryView | string) {
     setEntryDetailBusy(true);
     setError(undefined);
     try {
+      const id = typeof entry === "string" ? entry : entry.id;
       setSelectedEntry(
-        await api.request<Entry>(
-          `/api/v1/accounting/journal-entries/${entry.id}`,
+        await api.request<JournalEntryView>(
+          `/api/v1/accounting/journal-entries/${id}`,
           { skipJSONContentType: true },
         ),
       );
     } catch (cause) {
-      setError(message(cause, "No pudimos abrir el asiento."));
+      setError(journalErrorMessage(cause, "No pudimos abrir el asiento."));
     } finally {
       setEntryDetailBusy(false);
     }
   }
 
-  async function reverse(entry: Entry) {
-    const reason = window.prompt("Motivo de la reversa");
-    if (!reason) return;
+  async function openDraft(draft: JournalDraftView) {
+    if (
+      editorDirty &&
+      !window.confirm(
+        "Hay cambios sin guardar. ¿Querés descartarlos y abrir otro borrador?",
+      )
+    ) {
+      return;
+    }
+    setDraftDetailBusy(draft.id);
+    setError(undefined);
     try {
-      await api.request<Entry>(`/api/v1/accounting/journal-entries/${entry.id}/reverse`, {
-        method: "POST",
-        headers: { "Idempotency-Key": createIdempotencyKey("journal-reverse") },
-        body: JSON.stringify({ accounting_date: calendarDate(), reason }),
-      });
-      setSelectedEntry(undefined);
-      await load();
+      let detail = draft;
+      try {
+        detail = await api.request<JournalDraftView>(
+          `/api/v1/accounting/drafts/${draft.id}`,
+          { skipJSONContentType: true },
+        );
+      } catch (cause) {
+        const normalized = normalizeHttpError(cause);
+        if (normalized.status !== 404 || !draft.lines) throw cause;
+      }
+      setShowCreate(false);
+      setCopySeed(undefined);
+      setEditingDraft(detail);
     } catch (cause) {
-      setError(message(cause, "No pudimos crear la reversa."));
+      setError(journalErrorMessage(cause, "No pudimos abrir el borrador."));
+    } finally {
+      setDraftDetailBusy(undefined);
     }
   }
 
+  async function discardSelectedDrafts() {
+    const selected = drafts.filter((draft) =>
+      selectedDraftIDs.includes(draft.id),
+    );
+    if (selected.length === 0) return;
+    setDiscardBusy(true);
+    setError(undefined);
+    const results = await Promise.allSettled(
+      selected.map((draft) => {
+        const signature = `${draft.id}:${draft.version}`;
+        const operationKey = logicalOperationKey(
+          discardIdempotencyKeys.current.get(draft.id),
+          "journal-draft-discard",
+          signature,
+        );
+        discardIdempotencyKeys.current.set(draft.id, operationKey);
+        return api.request<void>(
+          `/api/v1/accounting/drafts/${draft.id}/discard`,
+          {
+            method: "POST",
+            headers: {
+              "Idempotency-Key": operationKey.value,
+            },
+            body: JSON.stringify({
+              version: draft.version,
+              reason: "Descartado desde el Diario",
+            }),
+          },
+        );
+      }),
+    );
+    const failedIDs = selected
+      .filter((_, index) => results[index]?.status === "rejected")
+      .map((draft) => draft.id);
+    const discardedCount = selected.length - failedIDs.length;
+    selected.forEach((draft, index) => {
+      if (results[index]?.status === "fulfilled") {
+        discardIdempotencyKeys.current.delete(draft.id);
+      }
+    });
+    setSelectedDraftIDs(failedIDs);
+    setDiscardRequested(false);
+    setDiscardBusy(false);
+    if (failedIDs.length > 0) {
+      const firstFailure = results.find(
+        (result): result is PromiseRejectedResult =>
+          result.status === "rejected",
+      );
+      setError(
+        `${discardedCount} ${
+          discardedCount === 1 ? "borrador descartado" : "borradores descartados"
+        }. ${journalErrorMessage(
+          firstFailure?.reason,
+          `No pudimos descartar ${failedIDs.length} ${
+            failedIDs.length === 1 ? "borrador" : "borradores"
+          }.`,
+        )}`,
+      );
+    }
+    if (editingDraft && selectedDraftIDs.includes(editingDraft.id) && !failedIDs.includes(editingDraft.id)) {
+      setEditingDraft(undefined);
+    }
+    await load();
+  }
+
+  function copyEntry(entry: JournalEntryView) {
+    if (
+      editorDirty &&
+      !window.confirm(
+        "Hay cambios sin guardar. ¿Querés descartarlos y preparar esta copia?",
+      )
+    ) {
+      return;
+    }
+    const lines = entry.lines ?? [];
+    setSelectedEntry(undefined);
+    setEditingDraft(undefined);
+    setShowCreate(false);
+    setCopySeed({
+      id: "",
+      accounting_date: calendarDate(),
+      description: entry.description,
+      currency: entry.currency,
+      functional_currency: entry.functional_currency ?? functionalCurrency,
+      exchange_rate: entry.exchange_rate ?? "1",
+      exchange_rate_date: entry.exchange_rate_date,
+      exchange_rate_source: entry.exchange_rate_source,
+      reference: "",
+      lines,
+      total_debit: entry.total_debit,
+      total_credit: entry.total_credit,
+      version: 0,
+    });
+  }
+
+  function startNew() {
+    setEditingDraft(undefined);
+    setCopySeed(undefined);
+    setShowCreate(true);
+  }
+
+  function clearFilters() {
+    setDateFrom("");
+    setDateTo("");
+    setSourceType("");
+    resetPagination();
+  }
+
+  const filterCount =
+    Number(Boolean(dateFrom)) + Number(Boolean(dateTo)) + Number(Boolean(sourceType));
+  const pageDraftIDs = drafts.map((draft) => draft.id);
+  const allPageDraftsSelected =
+    pageDraftIDs.length > 0 &&
+    pageDraftIDs.every((id) => selectedDraftIDs.includes(id));
+  const somePageDraftsSelected =
+    !allPageDraftsSelected &&
+    pageDraftIDs.some((id) => selectedDraftIDs.includes(id));
+  const draftSelectionActions: EntitySelectionAction[] = [
+    {
+      id: "discard",
+      label: "Descartar",
+      danger: true,
+      onClick: () => setDiscardRequested(true),
+    },
+  ];
+
   return (
-    <section className="directory-section">
-      <div className="finance-toolbar">
-        {canManage ? <button className="directory-create-button finance-toolbar__create" onClick={() => {
-          setEditingDraft(undefined);
-          setShowCreate((value) => !value);
-        }} type="button"><span>＋</span> Nuevo asiento</button> : null}
-        <div className="finance-toolbar__start">
-          <SectionSearch label="Buscar asientos" placeholder="Buscar número, descripción o fuente…" value={query} onChange={changeQuery} />
-          <div className="lifecycle-tabs" role="group" aria-label="Vista del Diario">
-            <button className={mode === "posted" ? "is-active" : ""} onClick={() => setMode("posted")} type="button">Contabilizados</button>
-            <button className={mode === "drafts" ? "is-active" : ""} onClick={() => setMode("drafts")} type="button">Borradores</button>
+    <section className="directory-section journal-section">
+      <div className="finance-toolbar journal-toolbar">
+        {canManage ? (
+          <button
+            className="directory-create-button finance-toolbar__create"
+            disabled={
+              !functionalCurrency ||
+              showCreate ||
+              Boolean(editingDraft) ||
+              Boolean(copySeed)
+            }
+            onClick={startNew}
+            type="button"
+          >
+            <span>＋</span> Nuevo asiento
+          </button>
+        ) : null}
+        <div className="finance-toolbar__start journal-toolbar__controls">
+          <SectionSearch
+            label="Buscar asientos"
+            placeholder="Número, referencia, detalle o cuenta…"
+            value={query}
+            onChange={changeQuery}
+          />
+          <button
+            aria-expanded={filtersOpen}
+            className={`journal-filter-button ${filterCount ? "has-filters" : ""}`}
+            onClick={() => setFiltersOpen((value) => !value)}
+            type="button"
+          >
+            Filtros{filterCount ? ` · ${filterCount}` : ""}
+          </button>
+          <div className="lifecycle-tabs journal-mode-tabs" role="tablist" aria-label="Vista del Diario">
+            <button
+              aria-selected={mode === "posted"}
+              className={mode === "posted" ? "is-active" : ""}
+              onClick={() => changeMode("posted")}
+              role="tab"
+              type="button"
+            >
+              Contabilizados <span>{entryPage.total}</span>
+            </button>
+            <button
+              aria-selected={mode === "drafts"}
+              className={mode === "drafts" ? "is-active" : ""}
+              onClick={() => changeMode("drafts")}
+              role="tab"
+              type="button"
+            >
+              Borradores <span>{draftPage.total}</span>
+            </button>
           </div>
         </div>
       </div>
+      {filtersOpen ? (
+        <div className="journal-filters" aria-label="Filtros del Diario">
+          <label>
+            Desde
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(event) => {
+                setDateFrom(event.target.value);
+                resetPagination();
+              }}
+            />
+          </label>
+          <label>
+            Hasta
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(event) => {
+                setDateTo(event.target.value);
+                resetPagination();
+              }}
+            />
+          </label>
+          {mode === "posted" ? (
+            <label>
+              Origen
+              <select
+                value={sourceType}
+                onChange={(event) => {
+                  setSourceType(event.target.value);
+                  resetPagination();
+                }}
+              >
+                <option value="">Todos</option>
+                <option value="manual_draft">Manual</option>
+                <option value="sale">Ventas</option>
+                <option value="purchase">Compras</option>
+                <option value="receipt">Cobros</option>
+                <option value="supplier_payment">Pagos</option>
+                <option value="customer_credit_note">Devoluciones</option>
+                <option value="journal_entry">Otro asiento</option>
+              </select>
+            </label>
+          ) : null}
+          <button
+            disabled={filterCount === 0}
+            onClick={clearFilters}
+            type="button"
+          >
+            Limpiar filtros
+          </button>
+        </div>
+      ) : null}
       {!canManage ? <ReadOnlyNote /> : null}
-      {canManage && (showCreate || editingDraft) ? (
+      {mode === "drafts" && canManage ? (
+        <div className="journal-draft-selection">
+          <EntitySelectionToolbar
+            actions={draftSelectionActions}
+            busy={discardBusy}
+            onClear={() => setSelectedDraftIDs([])}
+            selectedCount={selectedDraftIDs.length}
+          />
+        </div>
+      ) : null}
+      {canManage && (showCreate || editingDraft || copySeed) ? (
         <JournalForm
           accounts={accounts}
-          draft={editingDraft}
-          key={editingDraft?.id ?? "new"}
+          draft={editingDraft ?? copySeed}
+          functionalCurrency={functionalCurrency}
+          isCopy={Boolean(copySeed)}
+          key={
+            editingDraft?.id ??
+            (copySeed ? `copy-${copySeed.accounting_date}` : "new")
+          }
           onCancel={() => {
+            setEditorDirty(false);
             setEditingDraft(undefined);
+            setCopySeed(undefined);
             setShowCreate(false);
           }}
-          onPosted={() => {
+          onPosted={(entry) => {
+            setEditorDirty(false);
             setEditingDraft(undefined);
+            setCopySeed(undefined);
             setShowCreate(false);
             setMode("posted");
+            void openEntry(entry.id);
             void load();
           }}
           onSaved={(saved) => {
             setEditingDraft(saved);
+            setCopySeed(undefined);
             setMode("drafts");
             void load();
           }}
+          onDirtyChange={setEditorDirty}
+        />
+      ) : null}
+      {!canManage && editingDraft ? (
+        <JournalDraftDrawer
+          draft={editingDraft}
+          onClose={() => setEditingDraft(undefined)}
         />
       ) : null}
       <InlineFeedback error={error} loading={loading} />
       {mode === "posted" ? (
         <>
           <div className="directory-table-wrap">
-            <table className="directory-table finance-table finance-table--interactive">
-              <thead><tr><th>Nº</th><th>Fecha</th><th>Detalle</th><th>Debe</th><th>Haber</th></tr></thead>
+            <table className="directory-table finance-table finance-table--interactive journal-table">
+              <thead>
+                <tr>
+                  <th>Nº</th>
+                  <th>Fecha</th>
+                  <th>Referencia / detalle</th>
+                  <th>Origen</th>
+                  <th>Debe</th>
+                  <th>Haber</th>
+                </tr>
+              </thead>
               <tbody>
                 {entries.map((entry) => (
                   <tr
@@ -802,13 +1264,40 @@ function JournalPanel({ canManage }: { canManage: boolean }) {
                     }}
                     tabIndex={0}
                   >
-                    <td>{entry.entry_number}</td><td>{formatDate(entry.accounting_date)}</td>
-                    <td><strong>{entry.description}</strong>{entry.reverses_entry_id ? <small className="finance-row-note">Reversa</small> : null}</td>
-                    <td className="money-cell">{formatMoney(entry.total_debit, entry.currency)}</td>
-                    <td className="money-cell">{formatMoney(entry.total_credit, entry.currency)}</td>
+                    <td className="mono-cell">{entry.entry_number}</td>
+                    <td>{formatDate(entry.accounting_date)}</td>
+                    <td className="directory-table__primary">
+                      {entry.reference ? <small>{entry.reference}</small> : null}
+                      <strong>{entry.description}</strong>
+                      {entry.reverses_entry_id ? (
+                        <small className="finance-row-note">Reversa</small>
+                      ) : null}
+                    </td>
+                    <td>{journalSourceLabel(entry.source_type)}</td>
+                    <td className="money-cell">
+                      {formatMoney(
+                        entry.total_debit,
+                        entry.functional_currency ?? entry.currency,
+                      )}
+                    </td>
+                    <td className="money-cell">
+                      {formatMoney(
+                        entry.total_credit,
+                        entry.functional_currency ?? entry.currency,
+                      )}
+                    </td>
                   </tr>
                 ))}
-                {!loading && entries.length === 0 ? <EmptyRow columns={5} text="Todavía no hay asientos contabilizados." /> : null}
+                {!loading && entries.length === 0 ? (
+                  <EmptyRow
+                    columns={6}
+                    text={
+                      query || filterCount
+                        ? "No encontramos asientos con esos filtros."
+                        : "Todavía no hay asientos contabilizados."
+                    }
+                  />
+                ) : null}
               </tbody>
             </table>
           </div>
@@ -832,28 +1321,112 @@ function JournalPanel({ canManage }: { canManage: boolean }) {
       ) : (
         <>
           <div className="directory-table-wrap">
-            <table className="directory-table finance-table">
-              <thead><tr><th>Fecha</th><th>Detalle</th><th>Versión</th><th>Debe</th><th>Haber</th><th>Gestión</th></tr></thead>
+            <table className="directory-table finance-table finance-table--interactive journal-table journal-table--drafts">
+              <thead>
+                <tr>
+                  {canManage ? (
+                    <th className="directory-table__select">
+                      <JournalPageSelectionCheckbox
+                        checked={allPageDraftsSelected}
+                        indeterminate={somePageDraftsSelected}
+                        onChange={(checked) =>
+                          setSelectedDraftIDs((current) =>
+                            checked
+                              ? [...new Set([...current, ...pageDraftIDs])]
+                              : current.filter(
+                                  (id) => !pageDraftIDs.includes(id),
+                                ),
+                          )
+                        }
+                      />
+                    </th>
+                  ) : null}
+                  <th>Fecha</th>
+                  <th>Referencia / detalle</th>
+                  <th>Líneas</th>
+                  <th>Debe</th>
+                  <th>Haber</th>
+                  <th>Preparación</th>
+                  <th>Actualizado</th>
+                </tr>
+              </thead>
               <tbody>
-                {drafts
-                  .filter((draft) =>
-                    !query.trim() ||
-                    draft.description.toLocaleLowerCase("es").includes(query.trim().toLocaleLowerCase("es")),
-                  )
-                  .map((draft) => (
-                    <tr key={draft.id}>
+                {drafts.map((draft) => {
+                  const status = draftPostingStatus(draft);
+                  return (
+                    <tr
+                      aria-label={`Abrir borrador ${draft.description || "sin detalle"}`}
+                      aria-busy={draftDetailBusy === draft.id}
+                      key={draft.id}
+                      onClick={() => void openDraft(draft)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void openDraft(draft);
+                        }
+                      }}
+                      tabIndex={0}
+                    >
+                      {canManage ? (
+                        <td
+                          className="directory-table__select"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <input
+                            aria-label={`Seleccionar borrador ${draft.description || "sin detalle"}`}
+                            checked={selectedDraftIDs.includes(draft.id)}
+                            onChange={(event) =>
+                              setSelectedDraftIDs((current) =>
+                                event.target.checked
+                                  ? [...new Set([...current, draft.id])]
+                                  : current.filter((id) => id !== draft.id),
+                              )
+                            }
+                            type="checkbox"
+                          />
+                        </td>
+                      ) : null}
                       <td>{formatDate(draft.accounting_date)}</td>
-                      <td className="directory-table__primary">{draft.description}</td>
-                      <td className="mono-cell">v{draft.version}</td>
-                      <td className="money-cell">{formatMoney(draft.total_debit, draft.currency)}</td>
-                      <td className="money-cell">{formatMoney(draft.total_credit, draft.currency)}</td>
-                      <td>{canManage ? <div className="directory-row-actions"><button onClick={() => {
-                        setShowCreate(false);
-                        setEditingDraft(draft);
-                      }} type="button">Abrir borrador</button></div> : null}</td>
+                      <td className="directory-table__primary">
+                        {draft.reference ? <small>{draft.reference}</small> : null}
+                        <strong>{draft.description || "Sin detalle"}</strong>
+                      </td>
+                      <td className="mono-cell">
+                        {draft.line_count ?? draft.lines?.length ?? 0}
+                      </td>
+                      <td className="money-cell">
+                        {formatMoney(
+                          draft.total_debit,
+                          draft.functional_currency ?? draft.currency,
+                        )}
+                      </td>
+                      <td className="money-cell">
+                        {formatMoney(
+                          draft.total_credit,
+                          draft.functional_currency ?? draft.currency,
+                        )}
+                      </td>
+                      <td>
+                        <JournalStatusBadge status={status.state} />
+                      </td>
+                      <td>
+                        {draft.updated_at
+                          ? formatDateTime(draft.updated_at)
+                          : `v${draft.version}`}
+                      </td>
                     </tr>
-                  ))}
-                {!loading && drafts.length === 0 ? <EmptyRow columns={6} text="No hay borradores pendientes." /> : null}
+                  );
+                })}
+                {!loading && drafts.length === 0 ? (
+                  <EmptyRow
+                    columns={canManage ? 8 : 7}
+                    text={
+                      query || filterCount
+                        ? "No encontramos borradores con esos filtros."
+                        : "No hay borradores pendientes."
+                    }
+                  />
+                ) : null}
               </tbody>
             </table>
           </div>
@@ -882,8 +1455,56 @@ function JournalPanel({ canManage }: { canManage: boolean }) {
           canManage={canManage}
           entry={selectedEntry}
           onClose={() => setSelectedEntry(undefined)}
-          onReverse={() => void reverse(selectedEntry)}
+          onCopy={() => copyEntry(selectedEntry)}
+          onOpenRelated={(id) => void openEntry(id)}
+          onReverse={() => setReverseEntry(selectedEntry)}
         />
+      ) : null}
+      {reverseEntry ? (
+        <JournalReversalDialog
+          entry={reverseEntry}
+          onClose={() => setReverseEntry(undefined)}
+          onCompleted={(created) => {
+            setReverseEntry(undefined);
+            void openEntry(created.id);
+            void load();
+          }}
+        />
+      ) : null}
+      {discardRequested ? (
+        <JournalModal
+          eyebrow="Borradores"
+          onClose={() => {
+            if (!discardBusy) setDiscardRequested(false);
+          }}
+          title={`Descartar ${
+            selectedDraftIDs.length === 1
+              ? "el borrador seleccionado"
+              : `${selectedDraftIDs.length} borradores`
+          }`}
+        >
+          <p>
+            Los borradores descartados dejan de estar disponibles para
+            contabilizar. Esta acción no modifica ningún asiento confirmado.
+          </p>
+          <div className="journal-modal__actions">
+            <button
+              disabled={discardBusy}
+              onClick={() => setDiscardRequested(false)}
+              type="button"
+            >
+              Cancelar
+            </button>
+            <button
+              className="journal-danger-button"
+              disabled={discardBusy}
+              onClick={() => void discardSelectedDrafts()}
+              type="button"
+            >
+              {discardBusy ? "Descartando…" : "Descartar borradores"}
+            </button>
+          </div>
+        </JournalModal>
       ) : null}
     </section>
   );
@@ -892,6 +1513,8 @@ function JournalPanel({ canManage }: { canManage: boolean }) {
 type EditableJournalLine = {
   localID: string;
   accountID: string;
+  accountCode?: string;
+  accountName?: string;
   debit: string;
   credit: string;
   memo: string;
@@ -900,192 +1523,1228 @@ type EditableJournalLine = {
 function JournalForm({
   accounts,
   draft,
+  functionalCurrency,
+  isCopy = false,
   onCancel,
+  onDirtyChange,
   onPosted,
   onSaved,
 }: {
   accounts: Account[];
-  draft?: Draft;
+  draft?: JournalDraftView;
+  functionalCurrency: string;
+  isCopy?: boolean;
   onCancel: () => void;
-  onPosted: () => void;
-  onSaved: (draft: Draft) => void;
+  onDirtyChange: (dirty: boolean) => void;
+  onPosted: (entry: JournalEntryView) => void;
+  onSaved: (draft: JournalDraftView) => void;
 }) {
   const api = useProductApi();
-  const [busy, setBusy] = useState<"save" | "post">();
+  const [busy, setBusy] = useState<"save" | "post" | "reload">();
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
-  const [persisted, setPersisted] = useState<Draft | undefined>(draft);
+  const [persisted, setPersisted] = useState<JournalDraftView | undefined>(
+    isCopy ? undefined : draft,
+  );
   const [dirty, setDirty] = useState(false);
   const [date, setDate] = useState(draft?.accounting_date ?? calendarDate());
+  const [reference, setReference] = useState(
+    isCopy ? "" : draft?.reference ?? "",
+  );
   const [description, setDescription] = useState(draft?.description ?? "");
-  const [currency, setCurrency] = useState(draft?.currency ?? "ARS");
-  const [lines, setLines] = useState<EditableJournalLine[]>(() =>
-    draft?.lines.map(editableJournalLine) ?? [blankJournalLine(), blankJournalLine()],
+  const [currency, setCurrency] = useState(
+    draft?.currency ?? functionalCurrency,
+  );
+  const [exchangeRate, setExchangeRate] = useState(
+    draft?.exchange_rate ?? "1",
+  );
+  const [exchangeRateDate, setExchangeRateDate] = useState(
+    draft?.exchange_rate_date ?? draft?.accounting_date ?? calendarDate(),
+  );
+  const [exchangeRateSource, setExchangeRateSource] = useState(
+    draft?.exchange_rate_source ?? "",
+  );
+  const [lines, setLines] = useState<EditableJournalLine[]>(() => {
+    const existing = draft?.lines?.map(editableJournalLine) ?? [];
+    return existing.length >= 2
+      ? existing
+      : [...existing, ...Array.from({ length: 2 - existing.length }, blankJournalLine)];
+  });
+  const [resolvedAccounts, setResolvedAccounts] = useState<Account[]>([]);
+  const requestedAccountIDs = useRef(new Set<string>());
+  const [postConfirmationOpen, setPostConfirmationOpen] = useState(false);
+  const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false);
+  const [conflictOpen, setConflictOpen] = useState(false);
+  const saveIdempotencyKey = useRef<LogicalOperationKey | undefined>(
+    undefined,
+  );
+  const postIdempotencyKey = useRef<LogicalOperationKey | undefined>(
+    undefined,
   );
 
   const totalDebit = sumDecimalStrings(lines.map((line) => line.debit || "0"));
   const totalCredit = sumDecimalStrings(lines.map((line) => line.credit || "0"));
-  const linesValid = lines.every((line) => {
-    const hasDebit = decimalValueIsPositive(line.debit || "0");
-    const hasCredit = decimalValueIsPositive(line.credit || "0");
-    return Boolean(line.accountID) && hasDebit !== hasCredit;
+  const difference = subtractDecimalStrings(totalDebit, totalCredit);
+  const structureIssue = journalDraftStructureIssue(lines);
+  const availableAccounts = [
+    ...accounts,
+    ...resolvedAccounts.filter(
+      (resolved) => !accounts.some((account) => account.id === resolved.id),
+    ),
+  ];
+  const localStatus = journalFormPostingStatus({
+    accounts: availableAccounts,
+    description,
+    difference,
+    lines,
+    totalCredit,
+    totalDebit,
   });
-  const balanced =
-    linesValid &&
-    decimalValuesEqual(totalDebit, totalCredit) &&
-    decimalValueIsPositive(totalDebit);
+  const postingStatus =
+    !dirty && persisted?.posting_status
+      ? persisted.posting_status
+      : localStatus;
+  const readyToPost =
+    Boolean(persisted) &&
+    !dirty &&
+    postingStatus.state === "ready" &&
+    busy === undefined;
+  const foreignCurrency = currency !== functionalCurrency;
+  const lineAccountSignature = [
+    ...new Set(lines.map((line) => line.accountID).filter(Boolean)),
+  ]
+    .sort()
+    .join(",");
 
-  function mutateLine(index: number, field: keyof EditableJournalLine, value: string) {
+  function markDirty() {
+    setDirty(true);
+    setNotice(undefined);
+    setError(undefined);
+  }
+
+  function mutateLine(
+    index: number,
+    field: keyof EditableJournalLine,
+    value: string,
+  ) {
     setLines((previous) =>
       previous.map((line, itemIndex) =>
         itemIndex === index ? { ...line, [field]: value } : line,
       ),
     );
-    setDirty(true);
-    setNotice(undefined);
+    markDirty();
   }
+
+  function selectAccount(index: number, account?: Account) {
+    if (account) {
+      setResolvedAccounts((current) => [
+        ...current.filter((item) => item.id !== account.id),
+        account,
+      ]);
+    }
+    setLines((previous) =>
+      previous.map((line, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...line,
+              accountID: account?.id ?? "",
+              accountCode: account?.code,
+              accountName: account?.name,
+            }
+          : line,
+      ),
+    );
+    markDirty();
+  }
+
+  useEffect(() => {
+    const knownAccountIDs = new Set(
+      [...accounts, ...resolvedAccounts].map((account) => account.id),
+    );
+    const missingAccountIDs = lineAccountSignature
+      .split(",")
+      .filter(
+        (id) =>
+          id &&
+          !knownAccountIDs.has(id) &&
+          !requestedAccountIDs.current.has(id),
+      );
+    if (missingAccountIDs.length === 0) return;
+
+    const controller = new AbortController();
+    let active = true;
+    missingAccountIDs.forEach((id) => requestedAccountIDs.current.add(id));
+    void Promise.allSettled(
+      missingAccountIDs.map((id) =>
+        api.request<Account>(`/api/v1/accounting/accounts/${id}`, {
+          signal: controller.signal,
+          skipJSONContentType: true,
+        }),
+      ),
+    ).then((results) => {
+      if (!active) return;
+      const found = results.flatMap((result) =>
+        result.status === "fulfilled" ? [result.value] : [],
+      );
+      if (found.length === 0) return;
+      setResolvedAccounts((current) => {
+        const byID = new Map(
+          current.map((account) => [account.id, account]),
+        );
+        found.forEach((account) => byID.set(account.id, account));
+        return [...byID.values()];
+      });
+    });
+
+    return () => {
+      active = false;
+      controller.abort();
+      missingAccountIDs.forEach((id) =>
+        requestedAccountIDs.current.delete(id),
+      );
+    };
+  }, [
+    accounts,
+    api,
+    lineAccountSignature,
+    resolvedAccounts,
+  ]);
 
   function payload() {
     return {
       accounting_date: date,
+      ...(reference.trim() ? { reference: reference.trim() } : {}),
       description: description.trim(),
       currency: currency.trim().toUpperCase(),
-      lines: lines.map((line) => ({
-        account_id: line.accountID,
-        debit: line.debit || "0",
-        credit: line.credit || "0",
-        ...(line.memo.trim() ? { memo: line.memo.trim() } : {}),
-      })),
+      ...(foreignCurrency
+        ? {
+            exchange_rate: exchangeRate,
+            exchange_rate_date: exchangeRateDate,
+            exchange_rate_source: exchangeRateSource.trim(),
+          }
+        : {}),
+      lines: lines
+        .filter((line) => !journalLineIsBlank(line))
+        .map((line) => ({
+          account_id: line.accountID,
+          debit: line.debit || "0",
+          credit: line.credit || "0",
+          ...(line.memo.trim() ? { memo: line.memo.trim() } : {}),
+        })),
     };
   }
 
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!balanced) {
-      setError("El borrador debe tener Debe y Haber iguales y mayores que cero.");
+  async function saveDraft(options: { asNew?: boolean } = {}) {
+    if (!date || !currency.trim()) {
+      setError("Indicá la fecha contable y la moneda.");
       return;
     }
+    if (structureIssue) {
+      setError(structureIssue);
+      return;
+    }
+    if (
+      foreignCurrency &&
+      (!decimalValueIsPositive(exchangeRate) ||
+        !exchangeRateDate ||
+        !exchangeRateSource.trim())
+    ) {
+      setError(
+        "Para una moneda extranjera indicá cotización, fecha y fuente.",
+      );
+      return;
+    }
+    const updating = Boolean(persisted) && !options.asNew;
+    const requestBody = {
+      ...payload(),
+      ...(updating ? { version: persisted?.version } : {}),
+    };
+    const requestPath = updating
+      ? `/api/v1/accounting/drafts/${persisted?.id}`
+      : "/api/v1/accounting/drafts";
+    const saveSignature = `${updating ? "update" : "create"}:${requestPath}:${JSON.stringify(
+      requestBody,
+    )}`;
+    saveIdempotencyKey.current = logicalOperationKey(
+      saveIdempotencyKey.current,
+      updating ? "journal-draft-update" : "journal-draft",
+      saveSignature,
+    );
     setBusy("save");
     setError(undefined);
     setNotice(undefined);
     try {
-      const saved = await api.request<Draft>(
-        persisted
-          ? `/api/v1/accounting/drafts/${persisted.id}`
-          : "/api/v1/accounting/drafts",
+      const saved = await api.request<JournalDraftView>(
+        requestPath,
         {
-          method: persisted ? "PUT" : "POST",
+          method: updating ? "PUT" : "POST",
           headers: {
-            "Idempotency-Key": createIdempotencyKey(
-              persisted ? "journal-draft-update" : "journal-draft",
-            ),
+            "Idempotency-Key": saveIdempotencyKey.current.value,
           },
-          body: JSON.stringify({
-            ...payload(),
-            ...(persisted ? { version: persisted.version } : {}),
-          }),
+          body: JSON.stringify(requestBody),
         },
       );
+      saveIdempotencyKey.current = undefined;
+      postIdempotencyKey.current = undefined;
       setPersisted(saved);
       setDirty(false);
+      setConflictOpen(false);
       setNotice(`Borrador guardado · versión ${saved.version}`);
       onSaved(saved);
     } catch (cause) {
-      setError(message(cause, "No pudimos guardar el borrador."));
+      const normalized = normalizeHttpError(cause);
+      if (
+        normalized.code === "VERSION_CONFLICT" ||
+        (normalized.status === 409 && !normalized.code)
+      ) {
+        setConflictOpen(true);
+      } else {
+        setError(
+          journalErrorMessage(cause, "No pudimos guardar el borrador."),
+        );
+      }
+    } finally {
+      setBusy(undefined);
+    }
+  }
+
+  async function reloadLatest() {
+    if (!persisted) return;
+    setBusy("reload");
+    setError(undefined);
+    try {
+      const latest = await api.request<JournalDraftView>(
+        `/api/v1/accounting/drafts/${persisted.id}`,
+        { skipJSONContentType: true },
+      );
+      requestedAccountIDs.current.clear();
+      setResolvedAccounts([]);
+      hydrateJournalDraft(latest, {
+        setCurrency,
+        setDate,
+        setDescription,
+        setExchangeRate,
+        setExchangeRateDate,
+        setExchangeRateSource,
+        setLines,
+        setReference,
+      });
+      setPersisted(latest);
+      saveIdempotencyKey.current = undefined;
+      postIdempotencyKey.current = undefined;
+      setDirty(false);
+      setConflictOpen(false);
+      setNotice(`Borrador actualizado · versión ${latest.version}`);
+      onSaved(latest);
+    } catch (cause) {
+      setError(
+        journalErrorMessage(cause, "No pudimos recargar el borrador."),
+      );
     } finally {
       setBusy(undefined);
     }
   }
 
   async function post() {
-    if (!persisted || dirty) return;
+    if (!persisted || !readyToPost) return;
+    const requestBody = {
+      version: persisted.version,
+      reason: "Asiento manual",
+    };
+    postIdempotencyKey.current = logicalOperationKey(
+      postIdempotencyKey.current,
+      "journal-post",
+      `${persisted.id}:${JSON.stringify(requestBody)}`,
+    );
     setBusy("post");
     setError(undefined);
     try {
-      await api.request<Entry>(`/api/v1/accounting/drafts/${persisted.id}/post`, {
-        method: "POST",
-        headers: { "Idempotency-Key": createIdempotencyKey("journal-post") },
-        body: JSON.stringify({ version: persisted.version, reason: "Asiento manual" }),
-      });
-      onPosted();
+      const entry = await api.request<JournalEntryView>(
+        `/api/v1/accounting/drafts/${persisted.id}/post`,
+        {
+          method: "POST",
+          headers: {
+            "Idempotency-Key": postIdempotencyKey.current.value,
+          },
+          body: JSON.stringify(requestBody),
+        },
+      );
+      postIdempotencyKey.current = undefined;
+      setPostConfirmationOpen(false);
+      onPosted(entry);
     } catch (cause) {
-      setError(message(cause, "No pudimos contabilizar el asiento."));
+      const normalized = normalizeHttpError(cause);
+      if (
+        normalized.code === "VERSION_CONFLICT" ||
+        (normalized.status === 409 && !normalized.code)
+      ) {
+        setPostConfirmationOpen(false);
+        setConflictOpen(true);
+      } else {
+        setError(
+          journalErrorMessage(cause, "No pudimos contabilizar el asiento."),
+        );
+      }
     } finally {
       setBusy(undefined);
     }
   }
 
+  function requestClose() {
+    if (dirty) {
+      setCloseConfirmationOpen(true);
+      return;
+    }
+    onCancel();
+  }
+
+  useEffect(() => {
+    onDirtyChange(dirty);
+  }, [dirty, onDirtyChange]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [dirty]);
+
+  useEffect(() => {
+    function handleSaveShortcut(event: KeyboardEvent) {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLocaleLowerCase("es") === "s"
+      ) {
+        event.preventDefault();
+        if (!busy) void saveDraft();
+      }
+    }
+    window.addEventListener("keydown", handleSaveShortcut);
+    return () => window.removeEventListener("keydown", handleSaveShortcut);
+  });
+
+  const blockerCopy = postingIssueCopy(postingStatus.issues[0]);
+
   return (
-    <form className="journal-editor" onSubmit={(event) => void save(event)}>
-      <header>
-        <div>
-          <small>{persisted ? `Borrador · v${persisted.version}` : "Asiento manual"}</small>
-          <strong>{persisted ? "Editar borrador" : "Preparar borrador"}</strong>
-        </div>
-        <button aria-label="Cerrar editor de asiento" onClick={onCancel} type="button">×</button>
-      </header>
-      <div className="journal-editor__meta">
-        <label>Fecha<input required type="date" value={date} onChange={(event) => { setDate(event.target.value); setDirty(true); }} /></label>
-        <label className="finance-form__wide">Detalle<input maxLength={500} required value={description} onChange={(event) => { setDescription(event.target.value); setDirty(true); }} /></label>
-        <label>Moneda<input maxLength={3} required value={currency} onChange={(event) => { setCurrency(event.target.value); setDirty(true); }} /></label>
-      </div>
-      <div className="journal-line-editor">
-        <div className="journal-line-editor__head"><span>Cuenta</span><span>Debe</span><span>Haber</span><span>Detalle de línea</span><span /></div>
-        {lines.map((line, index) => (
-          <div className="journal-line-editor__row" key={line.localID}>
-            <label>
-              <span className="visually-hidden">Cuenta línea {index + 1}</span>
-              <select aria-label={`Cuenta línea ${index + 1}`} required value={line.accountID} onChange={(event) => mutateLine(index, "accountID", event.target.value)}>
-                <option value="">Seleccionar cuenta</option>
-                {accounts.map(accountOption)}
-              </select>
-            </label>
-            <label>
-              <span className="visually-hidden">Debe línea {index + 1}</span>
-              <input aria-label={`Debe línea ${index + 1}`} inputMode="decimal" placeholder="0.00" value={line.debit} onChange={(event) => mutateLine(index, "debit", event.target.value)} />
-            </label>
-            <label>
-              <span className="visually-hidden">Haber línea {index + 1}</span>
-              <input aria-label={`Haber línea ${index + 1}`} inputMode="decimal" placeholder="0.00" value={line.credit} onChange={(event) => mutateLine(index, "credit", event.target.value)} />
-            </label>
-            <label>
-              <span className="visually-hidden">Detalle línea {index + 1}</span>
-              <input aria-label={`Detalle línea ${index + 1}`} maxLength={500} placeholder="Opcional" value={line.memo} onChange={(event) => mutateLine(index, "memo", event.target.value)} />
-            </label>
-            <button
-              aria-label={`Quitar línea ${index + 1}`}
-              disabled={lines.length <= 2}
-              onClick={() => {
-                setLines((previous) => previous.filter((_, itemIndex) => itemIndex !== index));
-                setDirty(true);
+    <>
+      <form
+        className="journal-editor"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void saveDraft();
+        }}
+      >
+        <header>
+          <div>
+            <small>
+              {persisted
+                ? `Borrador · v${persisted.version}`
+                : isCopy
+                  ? "Copia de asiento"
+                  : "Asiento manual"}
+            </small>
+            <strong>
+              {persisted
+                ? "Editar borrador"
+                : isCopy
+                  ? "Preparar una copia"
+                  : "Preparar borrador"}
+            </strong>
+          </div>
+          <button
+            aria-label="Cerrar editor de asiento"
+            onClick={requestClose}
+            type="button"
+          >
+            ×
+          </button>
+        </header>
+        <div className="journal-editor__meta">
+          <label>
+            Fecha
+            <input
+              required
+              type="date"
+              value={date}
+              onChange={(event) => {
+                setDate(event.target.value);
+                markDirty();
               }}
+            />
+          </label>
+          <label>
+            Referencia
+            <input
+              maxLength={160}
+              placeholder="Comprobante u origen"
+              value={reference}
+              onChange={(event) => {
+                setReference(event.target.value);
+                markDirty();
+              }}
+            />
+          </label>
+          <label className="finance-form__wide journal-editor__description">
+            Detalle
+            <input
+              maxLength={500}
+              placeholder="Descripción del asiento"
+              value={description}
+              onChange={(event) => {
+                setDescription(event.target.value);
+                markDirty();
+              }}
+            />
+          </label>
+          <label>
+            Moneda
+            <select
+              value={currency}
+              onChange={(event) => {
+                const nextCurrency = event.target.value;
+                setCurrency(nextCurrency);
+                if (nextCurrency === functionalCurrency) {
+                  setExchangeRate("1");
+                }
+                markDirty();
+              }}
+            >
+              {[functionalCurrency, "USD", "EUR", "BRL", "UYU"]
+                .filter((value, index, values) => values.indexOf(value) === index)
+                .map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {foreignCurrency ? (
+            <div className="journal-editor__fx">
+              <label>
+                Cotización
+                <input
+                  inputMode="decimal"
+                  placeholder="0.000000"
+                  value={exchangeRate}
+                  onChange={(event) => {
+                    setExchangeRate(event.target.value);
+                    markDirty();
+                  }}
+                />
+              </label>
+              <label>
+                Fecha de cotización
+                <input
+                  type="date"
+                  value={exchangeRateDate}
+                  onChange={(event) => {
+                    setExchangeRateDate(event.target.value);
+                    markDirty();
+                  }}
+                />
+              </label>
+              <label>
+                Fuente
+                <input
+                  placeholder="BNA, comprobante…"
+                  value={exchangeRateSource}
+                  onChange={(event) => {
+                    setExchangeRateSource(event.target.value);
+                    markDirty();
+                  }}
+                />
+              </label>
+            </div>
+          ) : null}
+        </div>
+        <div className="journal-line-editor">
+          <div className="journal-line-editor__head">
+            <span>Cuenta</span>
+            <span>Debe</span>
+            <span>Haber</span>
+            <span>Detalle de línea</span>
+            <span />
+          </div>
+          {lines.map((line, index) => (
+            <div className="journal-line-editor__row" key={line.localID}>
+              <JournalAccountCombobox
+                accounts={availableAccounts}
+                fallbackCode={line.accountCode}
+                fallbackName={line.accountName}
+                index={index}
+                onSelect={(account) => selectAccount(index, account)}
+                selectedID={line.accountID}
+              />
+              <label>
+                <span className="visually-hidden">Debe línea {index + 1}</span>
+                <input
+                  aria-label={`Debe línea ${index + 1}`}
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={line.debit}
+                  onChange={(event) =>
+                    mutateLine(index, "debit", event.target.value)
+                  }
+                />
+              </label>
+              <label>
+                <span className="visually-hidden">Haber línea {index + 1}</span>
+                <input
+                  aria-label={`Haber línea ${index + 1}`}
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={line.credit}
+                  onChange={(event) =>
+                    mutateLine(index, "credit", event.target.value)
+                  }
+                />
+              </label>
+              <label>
+                <span className="visually-hidden">Detalle línea {index + 1}</span>
+                <input
+                  aria-label={`Detalle línea ${index + 1}`}
+                  maxLength={500}
+                  placeholder="Opcional"
+                  value={line.memo}
+                  onChange={(event) =>
+                    mutateLine(index, "memo", event.target.value)
+                  }
+                />
+              </label>
+              <button
+                aria-label={`Quitar línea ${index + 1}`}
+                disabled={lines.length <= 2}
+                onClick={() => {
+                  setLines((previous) =>
+                    previous.filter((_, itemIndex) => itemIndex !== index),
+                  );
+                  markDirty();
+                }}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+        <footer>
+          <button
+            onClick={() => {
+              setLines((previous) => [...previous, blankJournalLine()]);
+              markDirty();
+            }}
+            type="button"
+          >
+            ＋ Agregar línea
+          </button>
+          <div
+            aria-live="polite"
+            className={`journal-balance-rail is-${postingStatus.state}`}
+          >
+            <span>
+              Debe <strong>{formatMoney(totalDebit, currency)}</strong>
+            </span>
+            <span>
+              Haber <strong>{formatMoney(totalCredit, currency)}</strong>
+            </span>
+            <span>
+              Diferencia <strong>{formatMoney(difference, currency)}</strong>
+            </span>
+            <JournalStatusBadge status={postingStatus.state} />
+            {foreignCurrency && decimalValueIsPositive(exchangeRate) ? (
+              <small className="journal-balance-rail__functional">
+                Equivalente funcional · Debe{" "}
+                {formatMoney(
+                  multiplyDecimalStrings(totalDebit, exchangeRate),
+                  functionalCurrency,
+                )}{" "}
+                · Haber{" "}
+                {formatMoney(
+                  multiplyDecimalStrings(totalCredit, exchangeRate),
+                  functionalCurrency,
+                )}
+              </small>
+            ) : null}
+          </div>
+          <div className="journal-editor__actions">
+            <button
+              disabled={busy !== undefined}
+              onClick={requestClose}
               type="button"
             >
-              ×
+              Cancelar
+            </button>
+            <button
+              disabled={Boolean(structureIssue) || busy !== undefined}
+              type="submit"
+            >
+              {busy === "save" ? "Guardando…" : "Guardar borrador"}
+            </button>
+            <button
+              className="directory-create-button"
+              disabled={!readyToPost}
+              onClick={() => setPostConfirmationOpen(true)}
+              type="button"
+            >
+              {busy === "post" ? "Contabilizando…" : "Contabilizar"}
             </button>
           </div>
-        ))}
-      </div>
-      <footer>
-        <button onClick={() => {
-          setLines((previous) => [...previous, blankJournalLine()]);
-          setDirty(true);
-        }} type="button">＋ Agregar línea</button>
-        <div className={`journal-editor__balance ${balanced ? "is-balanced" : ""}`}>
-          <span>Debe <strong>{formatMoney(totalDebit, currency || "ARS")}</strong></span>
-          <span>Haber <strong>{formatMoney(totalCredit, currency || "ARS")}</strong></span>
-          <small>{balanced ? "Balanceado" : "Debe y Haber deben coincidir"}</small>
+        </footer>
+        {dirty && persisted ? (
+          <span className="journal-editor__hint">
+            Guardá los cambios antes de contabilizar.
+          </span>
+        ) : null}
+        {postingStatus.state !== "ready" ? (
+          <span className="journal-editor__posting-hint">
+            {blockerCopy ??
+              "Para contabilizar, Debe y Haber deben coincidir."}
+          </span>
+        ) : null}
+        {notice ? (
+          <span className="form-success" role="status">
+            {notice}
+          </span>
+        ) : null}
+        {error ? (
+          <span className="form-error" role="alert">
+            {error}
+          </span>
+        ) : null}
+      </form>
+      {postConfirmationOpen ? (
+        <JournalModal
+          eyebrow="Confirmación"
+          onClose={() => {
+            if (!busy) setPostConfirmationOpen(false);
+          }}
+          title="Contabilizar asiento"
+        >
+          <div className="journal-confirmation-summary">
+            <span>
+              Fecha<strong>{formatDate(date)}</strong>
+            </span>
+            <span>
+              Período<strong>{date.slice(0, 7)}</strong>
+            </span>
+            <span>
+              Referencia<strong>{reference.trim() || "Sin referencia"}</strong>
+            </span>
+            <span>
+              Detalle<strong>{description.trim() || "Sin detalle"}</strong>
+            </span>
+            <span>
+              Líneas
+              <strong>
+                {lines.filter((line) => !journalLineIsBlank(line)).length}
+              </strong>
+            </span>
+            <span>
+              Debe<strong>{formatMoney(totalDebit, currency)}</strong>
+            </span>
+            <span>
+              Haber<strong>{formatMoney(totalCredit, currency)}</strong>
+            </span>
+            <span>
+              Diferencia<strong>{formatMoney(difference, currency)}</strong>
+            </span>
+          </div>
+          <p className="journal-modal__warning">
+            Al contabilizar se asignará el número definitivo. El asiento no
+            podrá editarse ni eliminarse; cualquier corrección se hará mediante
+            una reversa.
+          </p>
+          <div className="journal-modal__actions">
+            <button
+              disabled={busy !== undefined}
+              onClick={() => setPostConfirmationOpen(false)}
+              type="button"
+            >
+              Volver
+            </button>
+            <button
+              className="directory-create-button"
+              disabled={busy !== undefined}
+              onClick={() => void post()}
+              type="button"
+            >
+              {busy === "post" ? "Contabilizando…" : "Contabilizar asiento"}
+            </button>
+          </div>
+        </JournalModal>
+      ) : null}
+      {closeConfirmationOpen ? (
+        <JournalModal
+          eyebrow="Cambios sin guardar"
+          onClose={() => setCloseConfirmationOpen(false)}
+          title="¿Cerrar el borrador?"
+        >
+          <p>Los cambios realizados desde el último guardado se perderán.</p>
+          <div className="journal-modal__actions">
+            <button
+              onClick={() => setCloseConfirmationOpen(false)}
+              type="button"
+            >
+              Seguir editando
+            </button>
+            <button
+              className="journal-danger-button"
+              onClick={onCancel}
+              type="button"
+            >
+              Cerrar sin guardar
+            </button>
+          </div>
+        </JournalModal>
+      ) : null}
+      {conflictOpen ? (
+        <JournalModal
+          eyebrow="Conflicto de versión"
+          onClose={() => setConflictOpen(false)}
+          title="Este borrador cambió en otra sesión"
+        >
+          <p>
+            No sobrescribimos la versión más reciente. Podés recargarla o
+            guardar tu contenido actual como un borrador nuevo.
+          </p>
+          <div className="journal-modal__actions">
+            <button
+              disabled={busy !== undefined}
+              onClick={() => void reloadLatest()}
+              type="button"
+            >
+              {busy === "reload" ? "Recargando…" : "Recargar última versión"}
+            </button>
+            <button
+              className="directory-create-button"
+              disabled={busy !== undefined}
+              onClick={() => void saveDraft({ asNew: true })}
+              type="button"
+            >
+              Guardar como nuevo
+            </button>
+          </div>
+        </JournalModal>
+      ) : null}
+    </>
+  );
+}
+
+function JournalAccountCombobox({
+  accounts,
+  fallbackCode,
+  fallbackName,
+  index,
+  onSelect,
+  selectedID,
+}: {
+  accounts: Account[];
+  fallbackCode?: string;
+  fallbackName?: string;
+  index: number;
+  onSelect: (account?: Account) => void;
+  selectedID: string;
+}) {
+  const api = useProductApi();
+  const listID = useId();
+  const selected = accounts.find((account) => account.id === selectedID);
+  const selectedLabel = selected
+    ? `${selected.code} · ${selected.name}`
+    : selectedID && (fallbackCode || fallbackName)
+      ? `${fallbackCode ?? ""}${fallbackCode && fallbackName ? " · " : ""}${
+          fallbackName ?? ""
+        }`
+      : "";
+  const [query, setQuery] = useState(selectedLabel);
+  const [open, setOpen] = useState(false);
+  const [remoteOptions, setRemoteOptions] = useState<Account[]>();
+  const [activeIndex, setActiveIndex] = useState(-1);
+
+  useEffect(() => {
+    if (!open || !query.trim() || query === selectedLabel) {
+      setRemoteOptions(undefined);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      const search = new URLSearchParams({
+        lifecycle_state: "active",
+        postable: "true",
+        limit: "20",
+        query: query.trim(),
+      });
+      api
+        .request<AccountList>(`/api/v1/accounting/accounts?${search}`, {
+          signal: controller.signal,
+          skipJSONContentType: true,
+        })
+        .then((response) =>
+          setRemoteOptions(
+            (Array.isArray(response?.items) ? response.items : []).filter(
+              (account) =>
+                account.postable && account.lifecycle_state === "active",
+            ),
+          ),
+        )
+        .catch(() => {
+          if (!controller.signal.aborted) setRemoteOptions(undefined);
+        });
+    }, 180);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [api, open, query, selectedLabel]);
+
+  useEffect(() => {
+    if (!open) setQuery(selectedLabel);
+  }, [open, selectedLabel]);
+
+  const normalized = query.trim().toLocaleLowerCase("es");
+  const visibleOptions = (remoteOptions ?? accounts)
+    .filter((account) => {
+      if (!account.postable || account.lifecycle_state !== "active") {
+        return false;
+      }
+      if (!normalized || query === selectedLabel) return true;
+      return `${account.code} ${account.name}`
+        .toLocaleLowerCase("es")
+        .includes(normalized);
+    })
+    .slice(0, 20);
+
+  function choose(account?: Account) {
+    onSelect(account);
+    setQuery(account ? `${account.code} · ${account.name}` : "");
+    setOpen(false);
+  }
+
+  return (
+    <div className="journal-account-combobox">
+      <label>
+        <span className="visually-hidden">Cuenta línea {index + 1}</span>
+        <input
+          aria-activedescendant={
+            open && activeIndex >= 0 && visibleOptions[activeIndex]
+              ? `${listID}-${visibleOptions[activeIndex]?.id}`
+              : undefined
+          }
+          aria-autocomplete="list"
+          aria-controls={listID}
+          aria-expanded={open}
+          aria-label={`Cuenta línea ${index + 1}`}
+          autoComplete="off"
+          onBlur={() => window.setTimeout(() => setOpen(false), 0)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            if (selectedID) onSelect(undefined);
+            setActiveIndex(-1);
+            setOpen(true);
+          }}
+          onFocus={() => {
+            setOpen(true);
+            setActiveIndex(-1);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowDown") {
+              event.preventDefault();
+              setOpen(true);
+              setActiveIndex((current) =>
+                Math.min(current + 1, visibleOptions.length - 1),
+              );
+            } else if (event.key === "ArrowUp") {
+              event.preventDefault();
+              setActiveIndex((current) => Math.max(current - 1, 0));
+            } else if (event.key === "Enter" && open) {
+              event.preventDefault();
+              const option = visibleOptions[activeIndex];
+              if (option) choose(option);
+            } else if (event.key === "Escape") {
+              setOpen(false);
+            }
+          }}
+          placeholder="Buscar por código o nombre…"
+          role="combobox"
+          value={query}
+        />
+      </label>
+      {open ? (
+        <div className="journal-account-combobox__options" id={listID} role="listbox">
+          {visibleOptions.map((account, optionIndex) => (
+            <button
+              aria-selected={selectedID === account.id}
+              className={optionIndex === activeIndex ? "is-active" : ""}
+              id={`${listID}-${account.id}`}
+              key={account.id}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => choose(account)}
+              role="option"
+              type="button"
+            >
+              <strong>{account.code}</strong>
+              <span>{account.name}</span>
+            </button>
+          ))}
+          {visibleOptions.length === 0 ? (
+            <span>No hay cuentas imputables que coincidan.</span>
+          ) : null}
         </div>
-        <div className="journal-editor__actions">
-          <button disabled={busy !== undefined} onClick={onCancel} type="button">Cancelar</button>
-          <button disabled={!balanced || busy !== undefined} type="submit">{busy === "save" ? "Guardando…" : "Guardar borrador"}</button>
-          <button className="directory-create-button" disabled={!persisted || dirty || busy !== undefined} onClick={() => void post()} type="button">{busy === "post" ? "Contabilizando…" : "Contabilizar"}</button>
+      ) : null}
+      {selectedID &&
+      (!selected || selected.lifecycle_state !== "active") ? (
+        <small className="journal-account-combobox__warning">
+          Esta cuenta ya no está disponible para contabilizar.
+        </small>
+      ) : selectedID && selected && !selected.postable ? (
+        <small className="journal-account-combobox__warning">
+          Esta cuenta es un rubro y no admite imputaciones.
+        </small>
+      ) : null}
+    </div>
+  );
+}
+
+function JournalStatusBadge({ status }: { status: JournalPostingState }) {
+  const labels: Record<JournalPostingState, string> = {
+    incomplete: "Incompleto",
+    unbalanced: "Desbalanceado",
+    blocked: "Bloqueado",
+    ready: "Listo para contabilizar",
+  };
+  return (
+    <span className={`journal-status-badge is-${status}`}>{labels[status]}</span>
+  );
+}
+
+function JournalPageSelectionCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+}: {
+  checked: boolean;
+  indeterminate: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  const checkbox = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (checkbox.current) checkbox.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return (
+    <input
+      aria-label={
+        checked
+          ? "Deseleccionar todos los borradores de la página"
+          : "Seleccionar todos los borradores de la página"
+      }
+      checked={checked}
+      onChange={(event) => onChange(event.target.checked)}
+      ref={checkbox}
+      type="checkbox"
+    />
+  );
+}
+
+function JournalDraftDrawer({
+  draft,
+  onClose,
+}: {
+  draft: JournalDraftView;
+  onClose: () => void;
+}) {
+  const drawer = useRef<HTMLElement>(null);
+  useDialogFocus(drawer, onClose);
+  const status = draftPostingStatus(draft);
+  const originalTotals = journalOriginalTotals(draft);
+
+  return (
+    <div
+      className="finance-drawer-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <aside
+        aria-labelledby="draft-drawer-title"
+        aria-modal="true"
+        className="finance-drawer journal-entry-drawer journal-draft-drawer"
+        ref={drawer}
+        role="dialog"
+        tabIndex={-1}
+      >
+        <header>
+          <div>
+            <small>Borrador · versión {draft.version}</small>
+            <h2 id="draft-drawer-title">
+              {draft.description || "Sin detalle"}
+            </h2>
+            <span>
+              {formatDate(draft.accounting_date)} · {draft.currency}
+            </span>
+          </div>
+          <button
+            aria-label="Cerrar detalle del borrador"
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </header>
+        <div className="finance-drawer__facts">
+          <span>
+            Referencia<strong>{draft.reference || "Sin referencia"}</strong>
+          </span>
+          <span>
+            Preparación
+            <strong>
+              <JournalStatusBadge status={status.state} />
+            </strong>
+          </span>
+          {draft.updated_at ? (
+            <span>
+              Última modificación
+              <strong>{formatDateTime(draft.updated_at)}</strong>
+            </span>
+          ) : null}
+          {draft.updated_by ? (
+            <span>
+              Modificado por<strong>{draft.updated_by}</strong>
+            </span>
+          ) : null}
+          {draft.exchange_rate &&
+          draft.currency !== draft.functional_currency ? (
+            <span>
+              Cotización
+              <strong>
+                {draft.exchange_rate} ·{" "}
+                {draft.exchange_rate_source || "Sin fuente"}
+              </strong>
+            </span>
+          ) : null}
         </div>
-      </footer>
-      {dirty && persisted ? <span className="journal-editor__hint">Guardá los cambios antes de contabilizar.</span> : null}
-      {notice ? <span className="form-success" role="status">{notice}</span> : null}
-      {error ? <span className="form-error" role="alert">{error}</span> : null}
-    </form>
+        {status.issues.length > 0 ? (
+          <div className="journal-draft-drawer__issues">
+            <strong>Antes de contabilizar</strong>
+            <ul>
+              {status.issues.map((issue) => (
+                <li key={issue}>{postingIssueCopy(issue)}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        <div className="finance-drawer__lines">
+          <div>
+            <span>Cuenta</span>
+            <span>Debe</span>
+            <span>Haber</span>
+          </div>
+          {(draft.lines ?? []).map((line, index) => {
+            const accountLabel =
+              line.account_code || line.account_name
+                ? `${line.account_code ?? ""}${
+                    line.account_code && line.account_name ? " · " : ""
+                  }${line.account_name ?? ""}`
+                : "Cuenta contable";
+            return (
+              <div key={line.id ?? `${line.account_id}-${index}`}>
+                <span>
+                  <strong>{accountLabel}</strong>
+                  {line.memo ? <small>{line.memo}</small> : null}
+                </span>
+                <span>
+                  {formatMoney(
+                    line.debit,
+                    draft.functional_currency ?? draft.currency,
+                  )}
+                  {line.transaction_amount &&
+                  line.transaction_currency &&
+                  line.transaction_currency !== draft.functional_currency &&
+                  decimalValueIsPositive(line.debit) ? (
+                    <small>
+                      {formatMoney(
+                        line.transaction_amount,
+                        line.transaction_currency,
+                      )}
+                    </small>
+                  ) : null}
+                </span>
+                <span>
+                  {formatMoney(
+                    line.credit,
+                    draft.functional_currency ?? draft.currency,
+                  )}
+                  {line.transaction_amount &&
+                  line.transaction_currency &&
+                  line.transaction_currency !== draft.functional_currency &&
+                  decimalValueIsPositive(line.credit) ? (
+                    <small>
+                      {formatMoney(
+                        line.transaction_amount,
+                        line.transaction_currency,
+                      )}
+                    </small>
+                  ) : null}
+                </span>
+              </div>
+            );
+          })}
+          {(draft.lines ?? []).length === 0 ? (
+            <p className="journal-draft-drawer__empty">
+              Este borrador todavía no tiene líneas.
+            </p>
+          ) : null}
+        </div>
+        <footer>
+          <div>
+            <span>
+              Debe
+              <strong>
+                {formatMoney(
+                  draft.total_debit,
+                  draft.functional_currency ?? draft.currency,
+                )}
+              </strong>
+            </span>
+            <span>
+              Haber
+              <strong>
+                {formatMoney(
+                  draft.total_credit,
+                  draft.functional_currency ?? draft.currency,
+                )}
+              </strong>
+            </span>
+            <span>
+              Diferencia
+              <strong>
+                {formatMoney(
+                  status.difference,
+                  draft.functional_currency ?? draft.currency,
+                )}
+              </strong>
+            </span>
+            {originalTotals.map((totals) => (
+              <Fragment key={totals.currency}>
+                <span>
+                  Debe original ({totals.currency})
+                  <strong>
+                    {formatMoney(totals.debit, totals.currency)}
+                  </strong>
+                </span>
+                <span>
+                  Haber original ({totals.currency})
+                  <strong>
+                    {formatMoney(totals.credit, totals.currency)}
+                  </strong>
+                </span>
+              </Fragment>
+            ))}
+          </div>
+        </footer>
+      </aside>
+    </div>
   );
 }
 
@@ -1094,68 +2753,533 @@ function EntryDrawer({
   canManage,
   entry,
   onClose,
+  onCopy,
+  onOpenRelated,
   onReverse,
 }: {
   accounts: Account[];
   canManage: boolean;
-  entry: Entry;
+  entry: JournalEntryView;
   onClose: () => void;
+  onCopy: () => void;
+  onOpenRelated: (id: string) => void;
   onReverse: () => void;
 }) {
   const drawer = useRef<HTMLElement>(null);
-  useEffect(() => {
-    drawer.current?.focus();
-  }, []);
-  useEffect(() => {
-    function handleKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
-
+  useDialogFocus(drawer, onClose);
   const accountByID = new Map(accounts.map((account) => [account.id, account]));
+  const originalTotals = journalOriginalTotals(entry);
+  const manual =
+    !entry.source_type ||
+    entry.source_type === "manual" ||
+    entry.source_type === "manual_draft" ||
+    entry.kind === "manual";
+  const adjustment =
+    entry.posting_kind === "adjustment" || entry.kind === "adjustment";
+  const reversal =
+    entry.posting_kind === "reversal" || entry.kind === "reversal";
+  const documentarySource = [
+    "sale",
+    "purchase",
+    "receipt",
+    "collection",
+    "payment",
+    "supplier_payment",
+    "customer_credit_note",
+    "customer_debit_note",
+    "open_item",
+    "open-item",
+    "inventory",
+    "fiscal",
+    "fiscal_voucher",
+    "fiscal_purchase",
+  ].includes(entry.source_type ?? "");
+  const canReverse =
+    canManage &&
+    !entry.reversed_by_entry_id &&
+    !documentarySource &&
+    (manual || adjustment || reversal);
+
   return (
-    <div className="finance-drawer-backdrop" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) onClose();
-    }}>
-      <aside aria-labelledby="entry-drawer-title" aria-modal="true" className="finance-drawer" ref={drawer} role="dialog" tabIndex={-1}>
+    <div
+      className="finance-drawer-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <aside
+        aria-labelledby="entry-drawer-title"
+        aria-modal="true"
+        className="finance-drawer journal-entry-drawer"
+        ref={drawer}
+        role="dialog"
+        tabIndex={-1}
+      >
         <header>
           <div>
             <small>Asiento Nº {entry.entry_number}</small>
             <h2 id="entry-drawer-title">{entry.description}</h2>
-            <span>{formatDate(entry.accounting_date)} · {entry.currency}</span>
+            <span>
+              {formatDate(entry.accounting_date)} · {entry.currency}
+            </span>
           </div>
-          <button aria-label="Cerrar detalle del asiento" onClick={onClose} type="button">×</button>
+          <button
+            aria-label="Cerrar detalle del asiento"
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
         </header>
         <div className="finance-drawer__facts">
-          <span>Origen<strong>{entry.source_type || "Manual"}</strong></span>
-          <span>Creado<strong>{formatDateTime(entry.created_at)}</strong></span>
-          {entry.reversal_reason ? <span>Motivo de reversa<strong>{entry.reversal_reason}</strong></span> : null}
+          <span>
+            Referencia<strong>{entry.reference || "Sin referencia"}</strong>
+          </span>
+          <span>
+            Origen<strong>{journalSourceLabel(entry.source_type)}</strong>
+          </span>
+          <span>
+            Tipo
+            <strong>
+              {entry.posting_kind
+                ? journalPostingKindLabel(entry.posting_kind)
+                : "Asiento general"}
+            </strong>
+          </span>
+          <span>
+            Creado<strong>{formatDateTime(entry.created_at)}</strong>
+          </span>
+          {entry.created_by ? (
+            <span>
+              Actor<strong>{entry.created_by}</strong>
+            </span>
+          ) : null}
+          {entry.exchange_rate && entry.currency !== entry.functional_currency ? (
+            <span>
+              Cotización
+              <strong>
+                {entry.exchange_rate} · {entry.exchange_rate_source || "Sin fuente"}
+              </strong>
+            </span>
+          ) : null}
+          {entry.reversal_reason ? (
+            <span>
+              Motivo de reversa<strong>{entry.reversal_reason}</strong>
+            </span>
+          ) : null}
         </div>
+        {entry.reverses_entry_id || entry.reversed_by_entry_id ? (
+          <div className="journal-reversal-chain">
+            {entry.reverses_entry_id ? (
+              <button
+                onClick={() => onOpenRelated(entry.reverses_entry_id as string)}
+                type="button"
+              >
+                {entry.reverses_entry_number
+                  ? `Reversa de #${entry.reverses_entry_number}`
+                  : "Reversa de otro asiento"}{" "}
+                · abrir original
+              </button>
+            ) : null}
+            {entry.reversed_by_entry_id ? (
+              <button
+                onClick={() => onOpenRelated(entry.reversed_by_entry_id as string)}
+                type="button"
+              >
+                {entry.reversed_by_entry_number
+                  ? `Revertido por #${entry.reversed_by_entry_number}`
+                  : "Este asiento fue revertido"}{" "}
+                · abrir reversa
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         <div className="finance-drawer__lines">
-          <div><span>Cuenta</span><span>Debe</span><span>Haber</span></div>
-          {entry.lines.map((line) => {
+          <div>
+            <span>Cuenta</span>
+            <span>Debe</span>
+            <span>Haber</span>
+          </div>
+          {(entry.lines ?? []).map((line) => {
             const account = accountByID.get(line.account_id);
+            const accountLabel =
+              line.account_code || line.account_name
+                ? `${line.account_code ?? ""}${
+                    line.account_code && line.account_name ? " · " : ""
+                  }${line.account_name ?? ""}`
+                : account
+                  ? `${account.code} · ${account.name}`
+                  : "Cuenta contable";
             return (
               <div key={line.id}>
-                <span><strong>{account ? `${account.code} · ${account.name}` : "Cuenta contable"}</strong>{line.memo ? <small>{line.memo}</small> : null}</span>
-                <span>{formatMoney(line.debit, entry.currency)}</span>
-                <span>{formatMoney(line.credit, entry.currency)}</span>
+                <span>
+                  <strong>{accountLabel}</strong>
+                  {line.memo ? <small>{line.memo}</small> : null}
+                </span>
+                <span>
+                  {formatMoney(
+                    line.debit,
+                    entry.functional_currency ?? entry.currency,
+                  )}
+                  {line.transaction_amount &&
+                  line.transaction_currency &&
+                  line.transaction_currency !== entry.functional_currency &&
+                  decimalValueIsPositive(line.debit) ? (
+                    <small>
+                      {formatMoney(
+                        line.transaction_amount,
+                        line.transaction_currency,
+                      )}
+                    </small>
+                  ) : null}
+                </span>
+                <span>
+                  {formatMoney(
+                    line.credit,
+                    entry.functional_currency ?? entry.currency,
+                  )}
+                  {line.transaction_amount &&
+                  line.transaction_currency &&
+                  line.transaction_currency !== entry.functional_currency &&
+                  decimalValueIsPositive(line.credit) ? (
+                    <small>
+                      {formatMoney(
+                        line.transaction_amount,
+                        line.transaction_currency,
+                      )}
+                    </small>
+                  ) : null}
+                </span>
               </div>
             );
           })}
         </div>
         <footer>
           <div>
-            <span>Debe <strong>{formatMoney(entry.total_debit, entry.currency)}</strong></span>
-            <span>Haber <strong>{formatMoney(entry.total_credit, entry.currency)}</strong></span>
+            <span>
+              Debe
+              <strong>
+                {formatMoney(
+                  entry.total_debit,
+                  entry.functional_currency ?? entry.currency,
+                )}
+              </strong>
+            </span>
+            <span>
+              Haber
+              <strong>
+                {formatMoney(
+                  entry.total_credit,
+                  entry.functional_currency ?? entry.currency,
+                )}
+              </strong>
+            </span>
+            {originalTotals.map((totals) => (
+              <Fragment key={totals.currency}>
+                <span>
+                  Debe original ({totals.currency})
+                  <strong>
+                    {formatMoney(totals.debit, totals.currency)}
+                  </strong>
+                </span>
+                <span>
+                  Haber original ({totals.currency})
+                  <strong>
+                    {formatMoney(totals.credit, totals.currency)}
+                  </strong>
+                </span>
+              </Fragment>
+            ))}
           </div>
-          {canManage ? <button className="directory-create-button" onClick={onReverse} type="button">Crear reversa</button> : null}
+          {canManage ? (
+            <div className="journal-entry-drawer__actions">
+              {manual ? (
+                <button onClick={onCopy} type="button">
+                  Copiar como nuevo
+                </button>
+              ) : null}
+              {canReverse ? (
+                <button
+                  className="directory-create-button"
+                  onClick={onReverse}
+                  type="button"
+                >
+                  Crear reversa
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </footer>
       </aside>
     </div>
   );
+}
+
+function JournalReversalDialog({
+  entry,
+  onClose,
+  onCompleted,
+}: {
+  entry: JournalEntryView;
+  onClose: () => void;
+  onCompleted: (entry: JournalEntryView) => void;
+}) {
+  const api = useProductApi();
+  const [date, setDate] = useState(() => {
+    const today = calendarDate();
+    return entry.accounting_date > today ? entry.accounting_date : today;
+  });
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const reversalIdempotencyKey = useRef<LogicalOperationKey | undefined>(
+    undefined,
+  );
+
+  async function reverse() {
+    if (!date || !reason.trim()) {
+      setError("Indicá la fecha contable y el motivo de la reversa.");
+      return;
+    }
+    const requestBody = {
+      accounting_date: date,
+      reason: reason.trim(),
+    };
+    reversalIdempotencyKey.current = logicalOperationKey(
+      reversalIdempotencyKey.current,
+      "journal-reverse",
+      `${entry.id}:${JSON.stringify(requestBody)}`,
+    );
+    setBusy(true);
+    setError(undefined);
+    try {
+      const created = await api.request<JournalEntryView>(
+        `/api/v1/accounting/journal-entries/${entry.id}/reverse`,
+        {
+          method: "POST",
+          headers: {
+            "Idempotency-Key": reversalIdempotencyKey.current.value,
+          },
+          body: JSON.stringify(requestBody),
+        },
+      );
+      reversalIdempotencyKey.current = undefined;
+      onCompleted(created);
+    } catch (cause) {
+      setError(
+        journalErrorMessage(cause, "No pudimos crear la reversa."),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <JournalModal
+      eyebrow={`Asiento Nº ${entry.entry_number}`}
+      onClose={() => {
+        if (!busy) onClose();
+      }}
+      title="Crear reversa"
+    >
+      <div className="journal-reversal-fields">
+        <label>
+          Fecha de reversa
+          <input
+            min={entry.accounting_date}
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+          />
+        </label>
+        <label>
+          Motivo
+          <textarea
+            autoFocus
+            maxLength={500}
+            placeholder="Explicá por qué se revierte el asiento"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </label>
+      </div>
+      <div className="journal-reversal-preview">
+        <header>
+          <strong>Vista previa</strong>
+          <span>{entry.lines?.length ?? 0} líneas invertidas</span>
+        </header>
+        {(entry.lines ?? []).map((line) => (
+          <div key={line.id}>
+            <span>{line.account_code || line.account_name || "Cuenta contable"}</span>
+            <span>
+              Debe{" "}
+              {formatMoney(
+                line.credit,
+                entry.functional_currency ?? entry.currency,
+              )}
+              {line.transaction_amount &&
+              line.transaction_currency &&
+              decimalValueIsPositive(line.credit) ? (
+                <small>
+                  {" "}
+                  · original{" "}
+                  {formatMoney(
+                    line.transaction_amount,
+                    line.transaction_currency,
+                  )}
+                </small>
+              ) : null}
+            </span>
+            <span>
+              Haber{" "}
+              {formatMoney(
+                line.debit,
+                entry.functional_currency ?? entry.currency,
+              )}
+              {line.transaction_amount &&
+              line.transaction_currency &&
+              decimalValueIsPositive(line.debit) ? (
+                <small>
+                  {" "}
+                  · original{" "}
+                  {formatMoney(
+                    line.transaction_amount,
+                    line.transaction_currency,
+                  )}
+                </small>
+              ) : null}
+            </span>
+          </div>
+        ))}
+        <footer>
+          <span>
+            Debe{" "}
+            {formatMoney(
+              entry.total_credit,
+              entry.functional_currency ?? entry.currency,
+            )}
+          </span>
+          <span>
+            Haber{" "}
+            {formatMoney(
+              entry.total_debit,
+              entry.functional_currency ?? entry.currency,
+            )}
+          </span>
+        </footer>
+      </div>
+      <p className="journal-modal__warning">
+        El asiento original permanecerá intacto. Si su período está cerrado,
+        elegí una fecha perteneciente a un período abierto.
+      </p>
+      {error ? (
+        <span className="form-error" role="alert">
+          {error}
+        </span>
+      ) : null}
+      <div className="journal-modal__actions">
+        <button disabled={busy} onClick={onClose} type="button">
+          Cancelar
+        </button>
+        <button
+          className="directory-create-button"
+          disabled={busy || !date || !reason.trim()}
+          onClick={() => void reverse()}
+          type="button"
+        >
+          {busy ? "Creando reversa…" : "Confirmar reversa"}
+        </button>
+      </div>
+    </JournalModal>
+  );
+}
+
+function JournalModal({
+  children,
+  eyebrow,
+  onClose,
+  title,
+}: {
+  children: ReactNode;
+  eyebrow: string;
+  onClose: () => void;
+  title: string;
+}) {
+  const modal = useRef<HTMLElement>(null);
+  useDialogFocus(modal, onClose);
+  return (
+    <div
+      className="journal-modal-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        aria-labelledby={`journal-modal-${title.replace(/\s+/g, "-")}`}
+        aria-modal="true"
+        className="journal-modal"
+        ref={modal}
+        role="dialog"
+        tabIndex={-1}
+      >
+        <header>
+          <div>
+            <small>{eyebrow}</small>
+            <h2 id={`journal-modal-${title.replace(/\s+/g, "-")}`}>{title}</h2>
+          </div>
+          <button aria-label="Cerrar diálogo" onClick={onClose} type="button">
+            ×
+          </button>
+        </header>
+        <div className="journal-modal__body">{children}</div>
+      </section>
+    </div>
+  );
+}
+
+function useDialogFocus(
+  container: RefObject<HTMLElement | null>,
+  onClose: () => void,
+) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    const element = container.current;
+    element?.focus();
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !element) return;
+      const focusable = Array.from(
+        element.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusable.length === 0) {
+        event.preventDefault();
+        element.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      window.removeEventListener("keydown", handleKey);
+      previous?.focus();
+    };
+  }, [container]);
 }
 
 function OpenItemsPanel({ canManage }: { canManage: boolean }) {
@@ -1846,7 +3970,7 @@ function ReconciliationPanel({ canManage }: { canManage: boolean }) {
   const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]);
   const [ledgerAccounts, setLedgerAccounts] = useState<Account[]>([]);
   const [chartAccounts, setChartAccounts] = useState<Account[]>([]);
-  const [journalEntries, setJournalEntries] = useState<Entry[]>([]);
+  const [journalEntries, setJournalEntries] = useState<JournalEntryView[]>([]);
   const [items, setItems] = useState<Reconciliation[]>([]);
   const [selectedAccountID, setSelectedAccountID] = useState("");
   const [accountLifecycle, setAccountLifecycle] = useState<"active" | "archived">("active");
@@ -1914,17 +4038,22 @@ function ReconciliationPanel({ canManage }: { canManage: boolean }) {
           "/api/v1/accounting/accounts?lifecycle_state=active&limit=100",
         ),
       ]);
-      setFinancialAccounts(configuredAccounts);
-      setItems(reconciliations.items);
-      setReconciliationPage(reconciliations.page);
-      setChartAccounts(chart.items);
+      const financialAccountItems = Array.isArray(configuredAccounts) ? configuredAccounts : [];
+      const reconciliationItems = Array.isArray(reconciliations?.items)
+        ? reconciliations.items
+        : [];
+      const chartItems = Array.isArray(chart?.items) ? chart.items : [];
+      setFinancialAccounts(financialAccountItems);
+      setItems(reconciliationItems);
+      setReconciliationPage(reconciliations?.page ?? { total: 0 });
+      setChartAccounts(chartItems);
       setLedgerAccounts(
-        chart.items.filter(
+        chartItems.filter(
           (account) => account.postable && account.account_type === "asset",
         ),
       );
-      if (!configuredAccounts.some((account) => account.id === selectedAccountID)) {
-        selectFinancialAccount(configuredAccounts[0]?.id ?? "");
+      if (!financialAccountItems.some((account) => account.id === selectedAccountID)) {
+        selectFinancialAccount(financialAccountItems[0]?.id ?? "");
       }
     } catch (cause) {
       setError(message(cause, "No pudimos cargar la conciliación."));
@@ -1945,6 +4074,7 @@ function ReconciliationPanel({ canManage }: { canManage: boolean }) {
     const controller = new AbortController();
     const search = new URLSearchParams({
       from: periodStart,
+      include_lines: "true",
       to: statementDate,
       limit: "100",
     });
@@ -1953,7 +4083,9 @@ function ReconciliationPanel({ canManage }: { canManage: boolean }) {
         signal: controller.signal,
         skipJSONContentType: true,
       })
-      .then((response) => setJournalEntries(response.items))
+      .then((response) =>
+        setJournalEntries(Array.isArray(response?.items) ? response.items : []),
+      )
       .catch((cause) => {
         if (!controller.signal.aborted) {
           setError(message(cause, "No pudimos cargar las líneas del mayor."));
@@ -1991,7 +4123,9 @@ function ReconciliationPanel({ canManage }: { canManage: boolean }) {
             "Idempotency-Key": createIdempotencyKey("financial-account"),
           },
           body: JSON.stringify({
-            ledger_account_id: form.get("ledger_account_id"),
+            ledger_account_id:
+              editingAccount?.ledger_account_id ??
+              form.get("ledger_account_id"),
             account_type: form.get("account_type"),
             name: String(form.get("name") ?? "").trim(),
             currency: form.get("currency"),
@@ -2278,7 +4412,35 @@ function ReconciliationPanel({ canManage }: { canManage: boolean }) {
       {canManage && showAccountForm ? (
         <form className="finance-form" key={editingAccount?.id ?? "new"} onSubmit={(event) => void saveFinancialAccount(event)}>
           <h2>{editingAccount ? "Editar cuenta financiera" : "Nueva cuenta financiera"}</h2>
-          <label>Cuenta contable<select defaultValue={editingAccount?.ledger_account_id ?? ""} name="ledger_account_id" required><option value="">Seleccionar</option>{ledgerAccounts.map(accountOption)}</select></label>
+          <label>
+            Cuenta contable
+            <select
+              aria-label="Cuenta contable"
+              defaultValue={editingAccount?.ledger_account_id ?? ""}
+              disabled={Boolean(editingAccount)}
+              name="ledger_account_id"
+              required
+            >
+              <option value="">Seleccionar</option>
+              {editingAccount &&
+              !ledgerAccounts.some(
+                (account) =>
+                  account.id === editingAccount.ledger_account_id,
+              ) ? (
+                <option value={editingAccount.ledger_account_id}>
+                  {editingAccount.ledger_account_code} ·{" "}
+                  {editingAccount.ledger_account_name}
+                </option>
+              ) : null}
+              {ledgerAccounts.map(accountOption)}
+            </select>
+            {editingAccount ? (
+              <small className="finance-form__field-note">
+                La cuenta contable no cambia; para usar otra, archivá ésta y
+                creá una nueva.
+              </small>
+            ) : null}
+          </label>
           <label>Tipo<select defaultValue={editingAccount?.account_type ?? "bank"} name="account_type"><option value="bank">Banco</option><option value="cash">Caja</option><option value="card">Tarjeta</option><option value="wallet">Billetera</option></select></label>
           <label>Nombre<input defaultValue={editingAccount?.name} name="name" required /></label>
           <label>Moneda<input defaultValue={editingAccount?.currency ?? "ARS"} maxLength={3} name="currency" required /></label>
@@ -2986,14 +5148,27 @@ function accountTreeRows(accounts: Account[], collapsed: Set<string>) {
   return result;
 }
 
+function collapsibleAccountIDs(accounts: Account[]) {
+  const accountByID = new Map(accounts.map((account) => [account.id, account]));
+  const accountByCode = new Map(accounts.map((account) => [account.code, account]));
+  const parentIDs = new Set<string>();
+  for (const account of accounts) {
+    const explicitParent = account.parent_id ? accountByID.get(account.parent_id) : undefined;
+    const parentCode = account.code.split(".").slice(0, -1).join(".");
+    const parent = (parentCode ? accountByCode.get(parentCode) : undefined) ?? explicitParent;
+    if (parent) parentIDs.add(parent.id);
+  }
+  return parentIDs;
+}
+
 function journalLinesForReconciliation(
-  entries: Entry[],
+  entries: JournalEntryView[],
   accounts: Account[],
   ledgerAccountID?: string,
 ): JournalLineOption[] {
   const accountByID = new Map(accounts.map((account) => [account.id, account]));
   return entries.flatMap((entry) =>
-    entry.lines
+    (entry.lines ?? [])
       .filter((line) => !ledgerAccountID || line.account_id === ledgerAccountID)
       .map((line) => {
         const account = accountByID.get(line.account_id);
@@ -3039,14 +5214,368 @@ function blankJournalLine(): EditableJournalLine {
 
 let nextJournalLineID = 1;
 
-function editableJournalLine(line: JournalLine): EditableJournalLine {
+function editableJournalLine(line: JournalLineView): EditableJournalLine {
+  const transactionAmount = line.transaction_amount;
   return {
     localID: line.id,
     accountID: line.account_id,
-    debit: line.debit,
-    credit: line.credit,
+    accountCode: line.account_code,
+    accountName: line.account_name,
+    debit:
+      transactionAmount && decimalValueIsPositive(line.debit)
+        ? transactionAmount
+        : line.debit,
+    credit:
+      transactionAmount && decimalValueIsPositive(line.credit)
+        ? transactionAmount
+        : line.credit,
     memo: line.memo ?? "",
   };
+}
+
+function journalLineIsBlank(line: EditableJournalLine) {
+  return (
+    !line.accountID &&
+    !line.debit.trim() &&
+    !line.credit.trim() &&
+    !line.memo.trim()
+  );
+}
+
+function journalDraftStructureIssue(lines: EditableJournalLine[]) {
+  for (const line of lines) {
+    if (journalLineIsBlank(line)) continue;
+    const debit = parseExactDecimal(line.debit || "0");
+    const credit = parseExactDecimal(line.credit || "0");
+    if (!debit || !credit) {
+      return "Usá importes numéricos con punto decimal, por ejemplo 1250.50.";
+    }
+    if (debit.coefficient < 0n || credit.coefficient < 0n) {
+      return "Los importes de Debe y Haber no pueden ser negativos.";
+    }
+    const hasDebit = debit.coefficient > 0n;
+    const hasCredit = credit.coefficient > 0n;
+    if (!line.accountID) {
+      return "Cada línea con contenido debe tener una cuenta.";
+    }
+    if (hasDebit === hasCredit) {
+      return hasDebit
+        ? "Una línea no puede tener importes en Debe y Haber al mismo tiempo."
+        : "Cada línea guardada debe tener un importe positivo en Debe o Haber.";
+    }
+  }
+  return undefined;
+}
+
+function journalFormPostingStatus({
+  accounts,
+  description,
+  difference,
+  lines,
+  totalDebit,
+}: {
+  accounts: Account[];
+  description: string;
+  difference: string;
+  lines: EditableJournalLine[];
+  totalCredit: string;
+  totalDebit: string;
+}): JournalPostingStatusView {
+  const enteredLines = lines.filter((line) => !journalLineIsBlank(line));
+  const issues: JournalPostingIssue[] = [];
+  const structureIssue = journalDraftStructureIssue(lines);
+  if (structureIssue) {
+    issues.push(
+      enteredLines.some((line) => !line.accountID)
+        ? "line_account_required"
+        : "line_side_invalid",
+    );
+  }
+  const lineAccounts = enteredLines
+    .filter((line) => line.accountID)
+    .map((line) => accounts.find((account) => account.id === line.accountID));
+  if (
+    lineAccounts.some(
+      (account) => !account || account.lifecycle_state !== "active",
+    )
+  ) {
+    issues.push("account_archived");
+  }
+  if (
+    lineAccounts.some(
+      (account) =>
+        account?.lifecycle_state === "active" && !account.postable,
+    )
+  ) {
+    issues.push("account_not_postable");
+  }
+  if (!description.trim()) issues.push("description_required");
+  if (enteredLines.length < 2) issues.push("minimum_lines");
+  if (!decimalValueIsPositive(totalDebit)) issues.push("zero_total");
+  if (
+    parseExactDecimal(difference) &&
+    !decimalValuesEqual(difference, "0")
+  ) {
+    issues.push("unbalanced");
+  }
+
+  const blocked = issues.some((issue) =>
+    [
+      "line_account_required",
+      "line_side_invalid",
+      "account_archived",
+      "account_not_postable",
+      "period_closed",
+    ].includes(issue),
+  );
+  const incomplete = issues.some((issue) =>
+    ["description_required", "minimum_lines", "zero_total"].includes(issue),
+  );
+  const state: JournalPostingState = incomplete
+    ? "incomplete"
+    : blocked
+      ? "blocked"
+      : issues.includes("unbalanced")
+        ? "unbalanced"
+        : "ready";
+  return { state, difference, issues };
+}
+
+function draftPostingStatus(draft: JournalDraftView): JournalPostingStatusView {
+  if (draft.posting_status) return draft.posting_status;
+  const difference = subtractDecimalStrings(
+    draft.total_debit,
+    draft.total_credit,
+  );
+  const issues: JournalPostingIssue[] = [];
+  if (!draft.description.trim()) issues.push("description_required");
+  if ((draft.line_count ?? draft.lines?.length ?? 0) < 2) {
+    issues.push("minimum_lines");
+  }
+  if (!decimalValueIsPositive(draft.total_debit)) issues.push("zero_total");
+  if (!decimalValuesEqual(difference, "0")) issues.push("unbalanced");
+  return {
+    difference,
+    issues,
+    state: issues.some((issue) =>
+      ["description_required", "minimum_lines", "zero_total"].includes(issue),
+    )
+      ? "incomplete"
+      : issues.includes("unbalanced")
+        ? "unbalanced"
+        : issues.length > 0
+          ? "blocked"
+          : "ready",
+  };
+}
+
+function postingIssueCopy(issue?: JournalPostingIssue) {
+  const copy: Record<JournalPostingIssue, string> = {
+    description_required: "Agregá un detalle antes de contabilizar.",
+    minimum_lines:
+      "Para contabilizar, el asiento debe tener al menos dos líneas.",
+    line_account_required:
+      "Seleccioná una cuenta en cada línea que tenga contenido.",
+    line_side_invalid:
+      "Cada línea debe tener un importe positivo sólo en Debe o sólo en Haber.",
+    unbalanced: "Para contabilizar, Debe y Haber deben coincidir.",
+    zero_total: "Para contabilizar, el total debe ser mayor que cero.",
+    period_closed:
+      "La fecha pertenece a un período cerrado. Elegí un período abierto.",
+    account_archived:
+      "Una de las cuentas fue archivada. Reemplazala antes de contabilizar.",
+    account_not_postable:
+      "Una de las cuentas es un rubro y no admite imputaciones.",
+  };
+  return issue ? copy[issue] : undefined;
+}
+
+function subtractDecimalStrings(left: string, right: string) {
+  const parsedLeft = parseExactDecimal(left);
+  const parsedRight = parseExactDecimal(right);
+  if (!parsedLeft || !parsedRight) return "valor inválido";
+  const scale = Math.max(parsedLeft.scale, parsedRight.scale);
+  const coefficient =
+    parsedLeft.coefficient * 10n ** BigInt(scale - parsedLeft.scale) -
+    parsedRight.coefficient * 10n ** BigInt(scale - parsedRight.scale);
+  return exactDecimalString({
+    coefficient: coefficient < 0n ? -coefficient : coefficient,
+    scale,
+  });
+}
+
+function multiplyDecimalStrings(left: string, right: string) {
+  const parsedLeft = parseExactDecimal(left);
+  const parsedRight = parseExactDecimal(right);
+  if (!parsedLeft || !parsedRight) return "valor inválido";
+  return exactDecimalString({
+    coefficient: parsedLeft.coefficient * parsedRight.coefficient,
+    scale: parsedLeft.scale + parsedRight.scale,
+  });
+}
+
+function hydrateJournalDraft(
+  draft: JournalDraftView,
+  setters: {
+    setCurrency: (value: string) => void;
+    setDate: (value: string) => void;
+    setDescription: (value: string) => void;
+    setExchangeRate: (value: string) => void;
+    setExchangeRateDate: (value: string) => void;
+    setExchangeRateSource: (value: string) => void;
+    setLines: (value: EditableJournalLine[]) => void;
+    setReference: (value: string) => void;
+  },
+) {
+  setters.setDate(draft.accounting_date);
+  setters.setReference(draft.reference ?? "");
+  setters.setDescription(draft.description);
+  setters.setCurrency(draft.currency);
+  setters.setExchangeRate(draft.exchange_rate ?? "1");
+  setters.setExchangeRateDate(
+    draft.exchange_rate_date ?? draft.accounting_date,
+  );
+  setters.setExchangeRateSource(draft.exchange_rate_source ?? "");
+  const lines = draft.lines?.map(editableJournalLine) ?? [];
+  setters.setLines(
+    lines.length >= 2
+      ? lines
+      : [...lines, ...Array.from({ length: 2 - lines.length }, blankJournalLine)],
+  );
+}
+
+function journalSourceLabel(source?: string) {
+  const labels: Record<string, string> = {
+    manual: "Manual",
+    manual_draft: "Manual",
+    sale: "Venta",
+    purchase: "Compra",
+    receipt: "Cobro",
+    collection: "Cobro",
+    supplier_payment: "Pago",
+    payment: "Pago",
+    customer_credit_note: "Devolución",
+    customer_debit_note: "Nota de débito",
+    currency_revaluation: "Revaluación",
+    annual_closing: "Cierre anual",
+    journal_entry: "Asiento",
+    inventory: "Inventario",
+    fiscal: "Fiscal",
+    fiscal_voucher: "Comprobante fiscal",
+    fiscal_purchase: "Compra fiscal",
+  };
+  return source ? labels[source] ?? source : "Manual";
+}
+
+function journalPostingKindLabel(kind: string) {
+  const labels: Record<string, string> = {
+    standard: "Asiento general",
+    adjustment: "Ajuste",
+    closing: "Cierre",
+    opening: "Apertura",
+    reversal: "Reversa",
+    primary: "Asiento principal",
+  };
+  return labels[kind] ?? kind;
+}
+
+function journalOriginalTotals(
+  entry: Pick<JournalEntryView, "currency" | "functional_currency" | "lines">,
+) {
+  const valuesByCurrency = new Map<
+    string,
+    { debit: string[]; credit: string[] }
+  >();
+  for (const line of entry.lines ?? []) {
+    if (!line.transaction_amount || !line.transaction_currency) continue;
+    const currency = line.transaction_currency.toUpperCase();
+    const values = valuesByCurrency.get(currency) ?? {
+      debit: [],
+      credit: [],
+    };
+    if (decimalValueIsPositive(line.debit)) {
+      values.debit.push(line.transaction_amount);
+    } else if (decimalValueIsPositive(line.credit)) {
+      values.credit.push(line.transaction_amount);
+    }
+    valuesByCurrency.set(currency, values);
+  }
+  const functionalCurrency = entry.functional_currency?.toUpperCase();
+  if (
+    valuesByCurrency.size === 0 ||
+    (valuesByCurrency.size === 1 &&
+      functionalCurrency &&
+      valuesByCurrency.has(functionalCurrency))
+  ) {
+    return [];
+  }
+  return [...valuesByCurrency.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([currency, values]) => ({
+      currency,
+      debit: sumDecimalStrings(
+        values.debit.length > 0 ? values.debit : ["0"],
+      ),
+      credit: sumDecimalStrings(
+        values.credit.length > 0 ? values.credit : ["0"],
+      ),
+    }));
+}
+
+function logicalOperationKey(
+  current: LogicalOperationKey | undefined,
+  prefix: string,
+  signature: string,
+) {
+  return current?.signature === signature
+    ? current
+    : {
+        signature,
+        value: createIdempotencyKey(prefix),
+      };
+}
+
+function journalErrorMessage(cause: unknown, fallback: string) {
+  const normalized = normalizeHttpError(cause, { fallbackMessage: fallback });
+  const messages: Record<string, string> = {
+    ACCOUNTING_UNBALANCED:
+      "Para contabilizar, Debe y Haber deben coincidir y ser mayores que cero.",
+    ACCOUNTING_PERIOD_CLOSED:
+      "La fecha pertenece a un período cerrado. Elegí un período abierto.",
+    ACCOUNTING_ACCOUNT_ARCHIVED:
+      "Una cuenta del asiento fue archivada. Reemplazala y volvé a intentar.",
+    ACCOUNTING_ACCOUNT_NOT_POSTABLE:
+      "Una cuenta seleccionada es un rubro y no admite imputaciones.",
+    ACCOUNTING_ENTRY_ALREADY_REVERSED:
+      "Este asiento ya tiene una reversa registrada.",
+    ACCOUNTING_REVERSAL_NOT_ALLOWED:
+      "Este asiento proviene de una operación y no puede revertirse desde el Diario. Corregí la operación de origen.",
+    ACCOUNTING_RECONCILIATION_CLOSED:
+      "La conciliación está cerrada. Reabrí la conciliación antes de modificar sus vínculos.",
+    VERSION_CONFLICT:
+      "El borrador cambió en otra sesión. Recargá la última versión o guardalo como nuevo.",
+    RESOURCE_NOT_FOUND: "El asiento o borrador ya no está disponible.",
+    IDEMPOTENCY_KEY_CONFLICT:
+      "La operación ya fue enviada con otros datos. Volvé a intentarlo.",
+    IDEMPOTENCY_IN_PROGRESS:
+      "La operación todavía se está procesando. Esperá un momento y actualizá.",
+  };
+  if (normalized.code && messages[normalized.code]) {
+    return messages[normalized.code];
+  }
+  if (normalized.kind === "network") {
+    return "No pudimos conectarnos con Pymes. Revisá la conexión y reintentá.";
+  }
+  if (normalized.kind === "authorization") {
+    return "No tenés permiso para realizar esta operación.";
+  }
+  if (normalized.kind === "not_found") {
+    return "El asiento o borrador ya no está disponible.";
+  }
+  if (normalized.kind === "server") {
+    return "Pymes no pudo completar la operación. Reintentá en unos instantes.";
+  }
+  return fallback;
 }
 
 type ExactDecimal = { coefficient: bigint; scale: number };
@@ -3116,6 +5645,11 @@ function compareDecimalStrings(left: string, right: string) {
 function decimalValueIsPositive(value: string) {
   const parsed = parseExactDecimal(value);
   return Boolean(parsed && parsed.coefficient > 0n);
+}
+
+function decimalValueIsNegative(value: string) {
+  const parsed = parseExactDecimal(value);
+  return Boolean(parsed && parsed.coefficient < 0n);
 }
 
 function validateSettlement(input: SettlementInput, item: OpenItem) {

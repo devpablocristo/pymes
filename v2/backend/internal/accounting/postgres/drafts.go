@@ -22,26 +22,45 @@ func (repository *Repository) CreateDraft(
 			idempotency_key,
 			entry_date,
 			entry_kind,
+			reference,
+			currency_code,
+			exchange_rate,
+			exchange_rate_date,
+			exchange_rate_source,
 			description,
 			source_type,
 			source_id,
-			created_by
+			created_by,
+			updated_by
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, ''), NULLIF($8, ''), $9)
+		VALUES (
+			$1, $2, $3, $4, $5, NULLIF($6, ''), $7, $8::numeric,
+			$9, NULLIF($10, ''), $11, NULLIF($12, ''),
+			NULLIF($13, ''), $14, $15
+		)
 	`,
 		repository.orgID,
 		draft.ID,
 		draft.IdempotencyKey,
 		draft.Date,
 		draft.Kind,
+		draft.Reference,
+		draft.Currency.Code(),
+		draft.ExchangeRate.String(),
+		nullableDraftRateDate(draft.ExchangeRateDate),
+		strings.TrimSpace(draft.ExchangeRateSource),
 		draft.Description,
 		draft.SourceType,
 		draft.SourceID,
 		draft.CreatedBy,
+		draft.UpdatedBy,
 	); err != nil {
 		return accounting.Draft{}, mapError(err)
 	}
 	if err := repository.insertDraftLines(ctx, draft.ID, draft.Lines); err != nil {
+		return accounting.Draft{}, err
+	}
+	if err := repository.validateDraftConstraints(ctx); err != nil {
 		return accounting.Draft{}, err
 	}
 	return repository.GetDraft(ctx, draft.ID, false)
@@ -59,10 +78,16 @@ func (repository *Repository) GetDraft(
 			idempotency_key,
 			entry_date,
 			entry_kind,
+			coalesce(reference, ''),
+			currency_code,
+			exchange_rate::text,
+			exchange_rate_date,
+			coalesce(exchange_rate_source, ''),
 			description,
 			coalesce(source_type, ''),
 			coalesce(source_id, ''),
 			created_by,
+			updated_by,
 			created_at,
 			updated_at
 		  FROM accounting.drafts
@@ -73,23 +98,45 @@ func (repository *Repository) GetDraft(
 	if forUpdate {
 		query += " AND status = 'active' FOR UPDATE"
 	}
-	var draft accounting.Draft
+	var (
+		draft        accounting.Draft
+		currencyCode string
+		rateText     string
+		rateDate     *time.Time
+	)
 	if err := repository.tx.QueryRow(ctx, query, repository.orgID, id).Scan(
 		&draft.ID,
 		&draft.Version,
 		&draft.IdempotencyKey,
 		&draft.Date,
 		&draft.Kind,
+		&draft.Reference,
+		&currencyCode,
+		&rateText,
+		&rateDate,
+		&draft.ExchangeRateSource,
 		&draft.Description,
 		&draft.SourceType,
 		&draft.SourceID,
 		&draft.CreatedBy,
+		&draft.UpdatedBy,
 		&draft.CreatedAt,
 		&draft.UpdatedAt,
 	); err != nil {
 		return accounting.Draft{}, mapError(err)
 	}
-	draft.UpdatedBy = draft.CreatedBy
+	var err error
+	draft.Currency, err = accounting.NewCurrency(currencyCode)
+	if err != nil {
+		return accounting.Draft{}, err
+	}
+	draft.ExchangeRate, err = accounting.ParseExchangeRate(rateText)
+	if err != nil {
+		return accounting.Draft{}, err
+	}
+	if rateDate != nil {
+		draft.ExchangeRateDate = *rateDate
+	}
 	functionalCurrency, err := repository.functionalCurrency(ctx)
 	if err != nil {
 		return accounting.Draft{}, err
@@ -100,14 +147,6 @@ func (repository *Repository) GetDraft(
 		return accounting.Draft{}, err
 	}
 	draft.Lines = lines
-	draft.Currency = functionalCurrency
-	draft.ExchangeRate = accounting.One
-	if len(lines) > 0 {
-		draft.Currency = lines[0].Currency
-		draft.ExchangeRate = lines[0].ExchangeRate
-		draft.ExchangeRateDate = lines[0].ExchangeRateDate
-		draft.ExchangeRateSource = lines[0].ExchangeRateSource
-	}
 	draft.IsAdjustment = draft.Kind == accounting.EntryAdjustment ||
 		draft.Kind == accounting.EntryInflation ||
 		draft.Kind == accounting.EntryRevaluation ||
@@ -144,23 +183,35 @@ func (repository *Repository) UpdateDraft(
 		UPDATE accounting.drafts
 		   SET entry_date = $3,
 		       entry_kind = $4,
-		       description = $5,
-		       source_type = NULLIF($6, ''),
-		       source_id = NULLIF($7, ''),
+		       reference = NULLIF($5, ''),
+		       currency_code = $6,
+		       exchange_rate = $7::numeric,
+		       exchange_rate_date = $8,
+		       exchange_rate_source = NULLIF($9, ''),
+		       description = $10,
+		       source_type = NULLIF($11, ''),
+		       source_id = NULLIF($12, ''),
+		       updated_by = $13,
 		       version = version + 1,
 		       updated_at = now()
 		 WHERE org_id = $1
 		   AND id = $2
-		   AND version = $8
+		   AND version = $14
 		   AND status = 'active'
 	`,
 		repository.orgID,
 		draft.ID,
 		draft.Date,
 		draft.Kind,
+		draft.Reference,
+		draft.Currency.Code(),
+		draft.ExchangeRate.String(),
+		nullableDraftRateDate(draft.ExchangeRateDate),
+		strings.TrimSpace(draft.ExchangeRateSource),
 		draft.Description,
 		draft.SourceType,
 		draft.SourceID,
+		draft.UpdatedBy,
 		expectedVersion,
 	)
 	if err != nil {
@@ -179,31 +230,47 @@ func (repository *Repository) UpdateDraft(
 	if err := repository.insertDraftLines(ctx, draft.ID, draft.Lines); err != nil {
 		return accounting.Draft{}, err
 	}
+	if err := repository.validateDraftConstraints(ctx); err != nil {
+		return accounting.Draft{}, err
+	}
 	return repository.GetDraft(ctx, draft.ID, false)
 }
 
-func (repository *Repository) DeleteDraft(
+func nullableDraftRateDate(value time.Time) any {
+	if value.IsZero() {
+		return nil
+	}
+	return value
+}
+
+func (repository *Repository) DiscardDraft(
 	ctx context.Context,
 	id uuid.UUID,
 	expectedVersion int64,
+	actor string,
+	reason string,
 ) error {
 	commandTag, err := repository.tx.Exec(ctx, `
 		UPDATE accounting.drafts
 		   SET status = 'discarded',
+		       updated_by = $4,
+		       discarded_by = $4,
+		       discard_reason = NULLIF($5, ''),
+		       discarded_at = now(),
 		       version = version + 1,
 		       updated_at = now()
 		 WHERE org_id = $1
 		   AND id = $2
 		   AND version = $3
 		   AND status = 'active'
-	`, repository.orgID, id, expectedVersion)
+	`, repository.orgID, id, expectedVersion, actor, strings.TrimSpace(reason))
 	if err != nil {
 		return mapError(err)
 	}
 	if commandTag.RowsAffected() == 0 {
 		return accounting.ErrVersionConflict
 	}
-	return nil
+	return repository.validateDraftConstraints(ctx)
 }
 
 func (repository *Repository) MarkDraftPosted(
@@ -216,20 +283,21 @@ func (repository *Repository) MarkDraftPosted(
 		UPDATE accounting.drafts
 		   SET status = 'posted',
 		       posted_entry_id = $4,
+		       updated_by = $5,
 		       version = version + 1,
 		       updated_at = now()
 		 WHERE org_id = $1
 		   AND id = $2
 		   AND version = $3
 		   AND status = 'active'
-	`, repository.orgID, id, expectedVersion, entryID)
+	`, repository.orgID, id, expectedVersion, entryID, repository.actor)
 	if err != nil {
 		return mapError(err)
 	}
 	if commandTag.RowsAffected() == 0 {
 		return accounting.ErrVersionConflict
 	}
-	return nil
+	return repository.validateDraftConstraints(ctx)
 }
 
 func (repository *Repository) insertDraftLines(
@@ -300,22 +368,27 @@ func (repository *Repository) listDraftLines(
 ) ([]accounting.JournalLine, error) {
 	rows, err := repository.tx.Query(ctx, `
 		SELECT
-			id,
-			line_no,
-			account_id,
-			description,
-			debit_amount::text,
-			credit_amount::text,
-			currency_code,
-			currency_amount::text,
-			exchange_rate::text,
-			exchange_rate_date,
-			coalesce(exchange_rate_source, ''),
-			party_id
-		  FROM accounting.draft_lines
-		 WHERE org_id = $1
-		   AND draft_id = $2
-		 ORDER BY line_no
+			line.id,
+			line.line_no,
+			line.account_id,
+			account.code,
+			account.name,
+			line.description,
+			line.debit_amount::text,
+			line.credit_amount::text,
+			line.currency_code,
+			line.currency_amount::text,
+			line.exchange_rate::text,
+			line.exchange_rate_date,
+			coalesce(line.exchange_rate_source, ''),
+			line.party_id
+		  FROM accounting.draft_lines AS line
+		  JOIN accounting.accounts AS account
+		    ON account.org_id = line.org_id
+		   AND account.id = line.account_id
+		 WHERE line.org_id = $1
+		   AND line.draft_id = $2
+		 ORDER BY line.line_no
 	`, repository.orgID, draftID)
 	if err != nil {
 		return nil, mapError(err)
@@ -337,6 +410,8 @@ func (repository *Repository) listDraftLines(
 			&line.ID,
 			&line.LineNo,
 			&line.AccountID,
+			&line.AccountCode,
+			&line.AccountName,
 			&line.Memo,
 			&debitText,
 			&creditText,

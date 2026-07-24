@@ -63,20 +63,22 @@ type DraftRepository interface {
 	GetDraft(context.Context, uuid.UUID, bool) (Draft, error)
 	FindDraftByIdempotency(context.Context, string) (Draft, error)
 	UpdateDraft(context.Context, Draft, int64) (Draft, error)
-	DeleteDraft(context.Context, uuid.UUID, int64) error
+	DiscardDraft(context.Context, uuid.UUID, int64, string, string) error
 	MarkDraftPosted(context.Context, uuid.UUID, int64, uuid.UUID) error
 }
 
 type JournalFilter struct {
-	From        *time.Time
-	To          *time.Time
-	AccountID   *uuid.UUID
-	SourceType  string
-	SourceID    *uuid.UUID
-	PartyID     *uuid.UUID
-	Query       string
-	AfterNumber int64
-	Limit       int
+	From          *time.Time
+	To            *time.Time
+	AccountID     *uuid.UUID
+	SourceType    string
+	SourceID      *uuid.UUID
+	PartyID       *uuid.UUID
+	Query         string
+	ReversalState string
+	IncludeLines  bool
+	AfterNumber   int64
+	Limit         int
 }
 
 type JournalRepository interface {
@@ -84,6 +86,12 @@ type JournalRepository interface {
 	GetEntry(context.Context, uuid.UUID) (JournalEntry, error)
 	FindEntryBySource(context.Context, EntrySource) (JournalEntry, error)
 	FindDirectReversal(context.Context, uuid.UUID) (JournalEntry, error)
+	EntryHasOpenItemEffects(context.Context, uuid.UUID) (bool, error)
+	TouchesClosedReconciliation(
+		context.Context,
+		time.Time,
+		[]uuid.UUID,
+	) (bool, error)
 	ListJournal(context.Context, JournalFilter) (PageResult[JournalEntry], error)
 	ReportLines(context.Context, time.Time, time.Time) ([]ReportLine, error)
 	AccountOpeningBalance(context.Context, uuid.UUID, time.Time) (Decimal, error)

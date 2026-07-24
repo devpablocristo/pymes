@@ -169,7 +169,8 @@ func (h *IAMAPI) listAccountingAccounts(
 				       OR account.code ILIKE '%' || $1 || '%'
 				       OR account.name ILIKE '%' || $1 || '%'
 				   )
-			`, query).Scan(&total); err != nil {
+				   AND ($2::boolean IS NULL OR account.posting_allowed = $2)
+			`, query, params.Postable).Scan(&total); err != nil {
 				return fmt.Errorf("count accounting accounts: %w", err)
 			}
 			rows, err := tx.Query(ctx, `
@@ -190,13 +191,14 @@ func (h *IAMAPI) listAccountingAccounts(
 				       OR account.code ILIKE '%' || $1 || '%'
 				       OR account.name ILIKE '%' || $1 || '%'
 				   )
+				   AND ($2::boolean IS NULL OR account.posting_allowed = $2)
 				   AND (
-				       $2 = ''
-				       OR (lower(account.code), account.id) > ($2, $3::uuid)
+				       $3 = ''
+				       OR (lower(account.code), account.id) > ($3, $4::uuid)
 				   )
 				 ORDER BY lower(account.code), account.id
-				 LIMIT $4
-			`, query, cursor.Sort, nullableCursorID(cursor.ID), limit+1)
+				 LIMIT $5
+			`, query, params.Postable, cursor.Sort, nullableCursorID(cursor.ID), limit+1)
 			if err != nil {
 				return fmt.Errorf("list accounting accounts: %w", err)
 			}
@@ -223,6 +225,42 @@ func (h *IAMAPI) listAccountingAccounts(
 		Items: items,
 		Page:  api.PageInfo{NextCursor: next, Total: total},
 	})
+}
+
+func (h *IAMAPI) getAccountingSettings(w http.ResponseWriter, r *http.Request) {
+	response := api.AccountingSettings{
+		CountryCode:        "AR",
+		FunctionalCurrency: "ARS",
+		Timezone:           "America/Argentina/Buenos_Aires",
+	}
+	if !h.withinBusinessTx(
+		w,
+		r,
+		productiam.PermissionAccountingView,
+		func(
+			ctx context.Context,
+			tx pgx.Tx,
+			_ platformiam.ActiveMembership,
+			_ clerkadapter.SessionClaims,
+		) error {
+			err := tx.QueryRow(ctx, `
+				SELECT country_code, functional_currency, timezone
+				  FROM accounting.organization_settings
+				 LIMIT 1
+			`).Scan(
+				&response.CountryCode,
+				&response.FunctionalCurrency,
+				&response.Timezone,
+			)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			return err
+		},
+	) {
+		return
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (h *IAMAPI) createAccountingAccount(
@@ -541,7 +579,21 @@ func (h *IAMAPI) listJournalDrafts(
 		return
 	}
 	limit := accountingAPILimit(params.Limit)
-	var drafts []accounting.Draft
+	query := strings.TrimSpace(stringValue(params.Query))
+	var from, to *time.Time
+	if params.From != nil {
+		value := params.From.Time
+		from = &value
+	}
+	if params.To != nil {
+		value := params.To.Time
+		to = &value
+	}
+	if from != nil && to != nil && to.Before(*from) {
+		writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", "Invalid date range")
+		return
+	}
+	items := make([]api.JournalDraftSummary, 0, limit+1)
 	var total int
 	if !h.withinBusinessTx(
 		w,
@@ -555,59 +607,216 @@ func (h *IAMAPI) listJournalDrafts(
 		) error {
 			if err := tx.QueryRow(ctx, `
 				SELECT count(*)
-				  FROM accounting.drafts
-				 WHERE status = 'active'
-			`).Scan(&total); err != nil {
+				  FROM accounting.drafts AS draft
+				 WHERE draft.status = 'active'
+				   AND ($1::date IS NULL OR draft.entry_date >= $1)
+				   AND ($2::date IS NULL OR draft.entry_date <= $2)
+				   AND (
+						$3 = ''
+						OR draft.description ILIKE '%' || $3 || '%'
+						OR lower(draft.reference) LIKE lower($3) || '%'
+						OR EXISTS (
+							SELECT 1
+							  FROM accounting.draft_lines AS line
+							  JOIN accounting.accounts AS account
+							    ON account.org_id = line.org_id
+							   AND account.id = line.account_id
+							 WHERE line.draft_id = draft.id
+							   AND line.org_id = draft.org_id
+							   AND (
+									line.description ILIKE '%' || $3 || '%'
+									OR account.code ILIKE '%' || $3 || '%'
+									OR account.name ILIKE '%' || $3 || '%'
+							   )
+						)
+				   )
+			`, nullableDate(from), nullableDate(to), query).Scan(&total); err != nil {
 				return fmt.Errorf("count journal drafts: %w", err)
 			}
 			rows, err := tx.Query(ctx, `
-				SELECT id
-				  FROM accounting.drafts
-				 WHERE status = 'active'
+				SELECT
+					draft.id,
+					draft.entry_date,
+					coalesce(draft.reference, ''),
+					draft.description,
+					draft.entry_kind,
+					coalesce(settings.functional_currency, 'ARS'),
+					draft.currency_code,
+					draft.exchange_rate::text,
+					draft.exchange_rate_date,
+					coalesce(draft.exchange_rate_source, ''),
+					coalesce(lines.line_count, 0),
+					coalesce(lines.debit_total, 0)::text,
+					coalesce(lines.credit_total, 0)::text,
+					coalesce(
+						period.status = 'open'
+						OR (
+							period.status = 'soft_closed'
+							AND draft.entry_kind IN (
+								'adjustment',
+								'closing',
+								'inflation',
+								'revaluation',
+								'reversal'
+							)
+						),
+						false
+					),
+					coalesce(lines.has_archived_account, false),
+					coalesce(lines.has_invalid_account, false),
+					draft.updated_by,
+					draft.updated_at,
+					draft.version
+				  FROM accounting.drafts AS draft
+				  LEFT JOIN accounting.organization_settings AS settings
+				    ON settings.org_id = draft.org_id
+				  LEFT JOIN accounting.periods AS period
+				    ON period.org_id = draft.org_id
+				   AND draft.entry_date BETWEEN period.start_date AND period.end_date
+				  LEFT JOIN LATERAL (
+					SELECT
+						count(*)::integer AS line_count,
+						sum(line.debit_amount) AS debit_total,
+						sum(line.credit_amount) AS credit_total,
+						bool_or(account.archived_at IS NOT NULL)
+							AS has_archived_account,
+						bool_or(
+							NOT account.posting_allowed
+							OR account.trashed_at IS NOT NULL
+						) AS has_invalid_account
+					  FROM accounting.draft_lines AS line
+					  JOIN accounting.accounts AS account
+					    ON account.org_id = line.org_id
+					   AND account.id = line.account_id
+					 WHERE line.org_id = draft.org_id
+					   AND line.draft_id = draft.id
+				  ) AS lines ON true
+				 WHERE draft.status = 'active'
+				   AND ($1::date IS NULL OR draft.entry_date >= $1)
+				   AND ($2::date IS NULL OR draft.entry_date <= $2)
 				   AND (
-				       $1 = ''
-				       OR (entry_date, id) < ($1::date, $2::uuid)
+						$3 = ''
+						OR draft.description ILIKE '%' || $3 || '%'
+						OR lower(draft.reference) LIKE lower($3) || '%'
+						OR EXISTS (
+							SELECT 1
+							  FROM accounting.draft_lines AS search_line
+							  JOIN accounting.accounts AS search_account
+							    ON search_account.org_id = search_line.org_id
+							   AND search_account.id = search_line.account_id
+							 WHERE search_line.draft_id = draft.id
+							   AND search_line.org_id = draft.org_id
+							   AND (
+									search_line.description ILIKE '%' || $3 || '%'
+									OR search_account.code ILIKE '%' || $3 || '%'
+									OR search_account.name ILIKE '%' || $3 || '%'
+							   )
+						)
 				   )
-				 ORDER BY entry_date DESC, id DESC
-				 LIMIT $3
-			`, cursor.Sort, nullableCursorID(cursor.ID), limit+1)
+				   AND (
+				       $4 = ''
+				       OR (draft.updated_at, draft.id) < ($4::timestamptz, $5::uuid)
+				   )
+				 ORDER BY draft.updated_at DESC, draft.id DESC
+				 LIMIT $6
+			`,
+				nullableDate(from),
+				nullableDate(to),
+				query,
+				cursor.Sort,
+				nullableCursorID(cursor.ID),
+				limit+1,
+			)
 			if err != nil {
-				return fmt.Errorf("list journal draft ids: %w", err)
+				return fmt.Errorf("list journal drafts: %w", err)
 			}
-			ids := make([]uuid.UUID, 0, limit+1)
+			defer rows.Close()
 			for rows.Next() {
-				var id uuid.UUID
-				if err := rows.Scan(&id); err != nil {
-					rows.Close()
-					return err
+				var (
+					item               api.JournalDraftSummary
+					reference          string
+					functionalCurrency string
+					currency           string
+					exchangeRate       string
+					exchangeRateDate   *time.Time
+					exchangeRateSource string
+					debitText          string
+					creditText         string
+					periodOpen         bool
+					hasArchived        bool
+					hasInvalid         bool
+				)
+				if err := rows.Scan(
+					&item.Id,
+					&item.AccountingDate.Time,
+					&reference,
+					&item.Description,
+					&item.Kind,
+					&functionalCurrency,
+					&currency,
+					&exchangeRate,
+					&exchangeRateDate,
+					&exchangeRateSource,
+					&item.LineCount,
+					&debitText,
+					&creditText,
+					&periodOpen,
+					&hasArchived,
+					&hasInvalid,
+					&item.UpdatedBy,
+					&item.UpdatedAt,
+					&item.Version,
+				); err != nil {
+					return fmt.Errorf("scan journal draft summary: %w", err)
 				}
-				ids = append(ids, id)
-			}
-			rows.Close()
-			if err := rows.Err(); err != nil {
-				return err
-			}
-			for _, id := range ids {
-				draft, err := loadAccountingDraft(ctx, tx, id, false)
+				debit, err := accounting.ParseAmount(debitText)
 				if err != nil {
 					return err
 				}
-				drafts = append(drafts, draft)
+				credit, err := accounting.ParseAmount(creditText)
+				if err != nil {
+					return err
+				}
+				item.FunctionalCurrency = functionalCurrency
+				item.Currency = currency
+				item.ExchangeRate = exchangeRate
+				item.TotalDebit = debit.String()
+				item.TotalCredit = credit.String()
+				if exchangeRateDate != nil {
+					value := openapi_types.Date{Time: *exchangeRateDate}
+					item.ExchangeRateDate = &value
+				}
+				if exchangeRateSource != "" {
+					item.ExchangeRateSource = &exchangeRateSource
+				}
+				item.PostingStatus = apiDraftPostingStatus(
+					accounting.EvaluateDraftPostingSummary(
+						accounting.DraftPostingSummaryContext{
+							Description:         item.Description,
+							LineCount:           item.LineCount,
+							Debit:               debit,
+							Credit:              credit,
+							PeriodAllowsPosting: periodOpen,
+							HasArchivedAccount:  hasArchived,
+							HasInvalidAccount:   hasInvalid,
+						},
+					),
+				)
+				if reference != "" {
+					item.Reference = &reference
+				}
+				items = append(items, item)
 			}
-			return nil
+			return rows.Err()
 		},
 	) {
 		return
 	}
-	items := make([]api.JournalDraft, 0, min(len(drafts), limit))
 	var next *string
-	if len(drafts) > limit {
-		last := drafts[limit-1]
-		next = encodeKeysetCursor(last.Date.Format("2006-01-02"), last.ID.String())
-		drafts = drafts[:limit]
-	}
-	for _, draft := range drafts {
-		items = append(items, apiDraft(draft))
+	if len(items) > limit {
+		last := items[limit-1]
+		next = encodeKeysetCursor(last.UpdatedAt.Format(time.RFC3339Nano), last.Id.String())
+		items = items[:limit]
 	}
 	writeJSON(w, http.StatusOK, api.JournalDraftList{
 		Items: items,
@@ -649,6 +858,9 @@ func (h *IAMAPI) createJournalDraft(
 			if err != nil {
 				return err
 			}
+			if err := hydrateDraftPostingStatus(ctx, tx, &created); err != nil {
+				return err
+			}
 			response = apiDraft(created)
 			return nil
 		},
@@ -656,6 +868,35 @@ func (h *IAMAPI) createJournalDraft(
 		return
 	}
 	writeJSON(w, http.StatusCreated, response)
+}
+
+func (h *IAMAPI) getJournalDraft(
+	w http.ResponseWriter,
+	r *http.Request,
+	draftID api.DraftID,
+) {
+	var response api.JournalDraft
+	if !h.withinBusinessTx(
+		w,
+		r,
+		productiam.PermissionAccountingView,
+		func(
+			ctx context.Context,
+			tx pgx.Tx,
+			_ platformiam.ActiveMembership,
+			_ clerkadapter.SessionClaims,
+		) error {
+			draft, err := loadAccountingDraft(ctx, tx, draftID, false)
+			if err != nil {
+				return err
+			}
+			response = apiDraft(draft)
+			return nil
+		},
+	) {
+		return
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (h *IAMAPI) updateJournalDraft(
@@ -692,10 +933,14 @@ func (h *IAMAPI) updateJournalDraft(
 				return err
 			}
 			base := api.JournalDraftInput{
-				AccountingDate: input.AccountingDate,
-				Currency:       input.Currency,
-				Description:    input.Description,
-				Lines:          input.Lines,
+				AccountingDate:     input.AccountingDate,
+				Currency:           input.Currency,
+				Description:        input.Description,
+				ExchangeRate:       input.ExchangeRate,
+				ExchangeRateDate:   input.ExchangeRateDate,
+				ExchangeRateSource: input.ExchangeRateSource,
+				Lines:              input.Lines,
+				Reference:          input.Reference,
 			}
 			draft, err := draftFromAPI(ctx, tx, base, originalKey, scope.ActorID)
 			if err != nil {
@@ -705,6 +950,9 @@ func (h *IAMAPI) updateJournalDraft(
 			draft.Version = input.Version
 			updated, err := service.UpdateDraft(ctx, scope, draft, input.Version)
 			if err != nil {
+				return err
+			}
+			if err := hydrateDraftPostingStatus(ctx, tx, &updated); err != nil {
 				return err
 			}
 			response = apiDraft(updated)
@@ -756,19 +1004,62 @@ func (h *IAMAPI) postJournalDraft(
 	writeJSON(w, http.StatusCreated, response)
 }
 
+func (h *IAMAPI) discardJournalDraft(
+	w http.ResponseWriter,
+	r *http.Request,
+	draftID api.DraftID,
+	_ api.DiscardJournalDraftParams,
+) {
+	var input api.VersionedCommandInput
+	if !decodeBusinessBody(w, r, &input) {
+		return
+	}
+	if !h.withAccountingService(
+		w,
+		r,
+		productiam.PermissionAccountingManage,
+		func(
+			ctx context.Context,
+			service *accounting.Service,
+			scope accounting.Scope,
+			_ pgx.Tx,
+		) error {
+			return service.DiscardDraft(
+				ctx,
+				scope,
+				draftID,
+				input.Version,
+				strings.TrimSpace(stringValue(input.Reason)),
+			)
+		},
+	) {
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *IAMAPI) listJournalEntries(
 	w http.ResponseWriter,
 	r *http.Request,
 	params api.ListJournalEntriesParams,
 ) {
+	if params.ReversalState != nil && !params.ReversalState.Valid() {
+		writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", "Invalid reversal state")
+		return
+	}
 	cursor, err := decodeKeysetCursor((*string)(params.Cursor))
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", err.Error())
 		return
 	}
 	filter := accounting.JournalFilter{
-		Limit: accountingAPILimit(params.Limit) + 1,
-		Query: strings.TrimSpace(stringValue(params.Query)),
+		Limit:        accountingAPILimit(params.Limit) + 1,
+		Query:        strings.TrimSpace(stringValue(params.Query)),
+		SourceType:   strings.TrimSpace(stringValue(params.SourceType)),
+		IncludeLines: params.IncludeLines != nil && *params.IncludeLines,
+	}
+	if params.ReversalState != nil {
+		filter.ReversalState = string(*params.ReversalState)
 	}
 	if cursor.Sort != "" {
 		filter.AfterNumber, err = parseInt64(cursor.Sort)
@@ -784,6 +1075,10 @@ func (h *IAMAPI) listJournalEntries(
 	if params.To != nil {
 		value := params.To.Time
 		filter.To = &value
+	}
+	if filter.From != nil && filter.To != nil && filter.To.Before(*filter.From) {
+		writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", "Invalid date range")
+		return
 	}
 	limit := filter.Limit - 1
 	var (
@@ -807,15 +1102,51 @@ func (h *IAMAPI) listJournalEntries(
 			}
 			return tx.QueryRow(ctx, `
 				SELECT count(*)
-				  FROM accounting.journal_entries
-				 WHERE ($1::date IS NULL OR entry_date >= $1)
-				   AND ($2::date IS NULL OR entry_date <= $2)
+				  FROM accounting.journal_entries AS entry
+				  LEFT JOIN accounting.journal_entries AS direct_reversal
+				    ON direct_reversal.org_id = entry.org_id
+				   AND direct_reversal.reverses_entry_id = entry.id
+				 WHERE ($1::date IS NULL OR entry.entry_date >= $1)
+				   AND ($2::date IS NULL OR entry.entry_date <= $2)
+				   AND ($3 = '' OR entry.source_type = $3)
 				   AND (
-				       $3 = ''
-				       OR description ILIKE '%' || $3 || '%'
-				       OR entry_number::text = $3
+				       $4 = ''
+				       OR entry.description ILIKE '%' || $4 || '%'
+				       OR lower(entry.reference) LIKE lower($4) || '%'
+				       OR coalesce(entry.source_type, '') ILIKE '%' || $4 || '%'
+				       OR coalesce(entry.source_id, '') ILIKE '%' || $4 || '%'
+				       OR entry.entry_number::text = $4
+				       OR EXISTS (
+							SELECT 1
+							  FROM accounting.journal_lines AS line
+							  JOIN accounting.accounts AS account
+							    ON account.org_id = line.org_id
+							   AND account.id = line.account_id
+							 WHERE line.journal_entry_id = entry.id
+							   AND (
+									line.description ILIKE '%' || $4 || '%'
+									OR account.code ILIKE '%' || $4 || '%'
+									OR account.name ILIKE '%' || $4 || '%'
+							   )
+					   )
 				   )
-			`, nullableDate(filter.From), nullableDate(filter.To), stringValue(params.Query)).Scan(&total)
+				   AND (
+						$5::text = ''
+						OR ($5 = 'reversal' AND entry.reverses_entry_id IS NOT NULL)
+						OR ($5 = 'reversed' AND direct_reversal.id IS NOT NULL)
+						OR (
+							$5 = 'regular'
+							AND entry.reverses_entry_id IS NULL
+							AND direct_reversal.id IS NULL
+						)
+				   )
+			`,
+				nullableDate(filter.From),
+				nullableDate(filter.To),
+				filter.SourceType,
+				filter.Query,
+				filter.ReversalState,
+			).Scan(&total)
 		},
 	) {
 		return
@@ -827,9 +1158,9 @@ func (h *IAMAPI) listJournalEntries(
 		next = encodeKeysetCursor(fmt.Sprint(last.Number), last.ID.String())
 		entries = entries[:limit]
 	}
-	items := make([]api.JournalEntry, 0, len(entries))
+	items := make([]api.JournalEntrySummary, 0, len(entries))
 	for _, entry := range entries {
-		items = append(items, apiEntry(entry))
+		items = append(items, apiEntrySummary(entry, filter.IncludeLines))
 	}
 	writeJSON(w, http.StatusOK, api.JournalEntryList{
 		Items: items,
@@ -926,17 +1257,21 @@ func (h *IAMAPI) listAccountingPeriods(w http.ResponseWriter, r *http.Request) {
 				return fmt.Errorf("list accounting periods: %w", err)
 			}
 			for rows.Next() {
+				var startDate time.Time
+				var endDate time.Time
 				var period api.AccountingPeriod
 				if err := rows.Scan(
 					&period.Id,
-					&period.StartDate,
-					&period.EndDate,
+					&startDate,
+					&endDate,
 					&period.State,
 					&period.Version,
 				); err != nil {
 					rows.Close()
 					return fmt.Errorf("scan accounting period: %w", err)
 				}
+				period.StartDate = openapi_types.Date{Time: startDate}
+				period.EndDate = openapi_types.Date{Time: endDate}
 				periods = append(periods, period)
 			}
 			rows.Close()
@@ -1502,11 +1837,17 @@ func mapAccountingError(err error) error {
 		return fmt.Errorf("%w: %v", errBusinessPeriodClosed, err)
 	case errors.Is(err, accounting.ErrEntryImmutable):
 		return fmt.Errorf("%w: %v", errBusinessImmutable, err)
-	case errors.Is(err, accounting.ErrAlreadyReversed),
-		errors.Is(err, accounting.ErrAccountArchived),
-		errors.Is(err, accounting.ErrAccountNotPostable),
-		errors.Is(err, accounting.ErrAccountInUse),
-		errors.Is(err, accounting.ErrReconciliationClosed),
+	case errors.Is(err, accounting.ErrAlreadyReversed):
+		return fmt.Errorf("%w: %v", errAccountingAlreadyReversed, err)
+	case errors.Is(err, accounting.ErrReversalNotAllowed):
+		return fmt.Errorf("%w: %v", errAccountingReversalBlocked, err)
+	case errors.Is(err, accounting.ErrAccountArchived):
+		return fmt.Errorf("%w: %v", errAccountingAccountArchived, err)
+	case errors.Is(err, accounting.ErrAccountNotPostable):
+		return fmt.Errorf("%w: %v", errAccountingNotPostable, err)
+	case errors.Is(err, accounting.ErrReconciliationClosed):
+		return fmt.Errorf("%w: %v", errAccountingReconciliationClosed, err)
+	case errors.Is(err, accounting.ErrAccountInUse),
 		errors.Is(err, accounting.ErrConflict):
 		return fmt.Errorf("%w: %v", errBusinessInvalidTransition, err)
 	case errors.Is(err, accounting.ErrInvalidArgument),
@@ -1668,12 +2009,6 @@ func draftFromAPI(
 	idempotencyKey string,
 	actor string,
 ) (accounting.Draft, error) {
-	if strings.TrimSpace(input.Description) == "" || len(input.Lines) < 2 {
-		return accounting.Draft{}, fmt.Errorf(
-			"%w: description and at least two lines are required",
-			accounting.ErrInvalidArgument,
-		)
-	}
 	functionalCurrency, err := loadFunctionalCurrency(ctx, tx)
 	if err != nil {
 		return accounting.Draft{}, err
@@ -1682,71 +2017,139 @@ func draftFromAPI(
 	if err != nil {
 		return accounting.Draft{}, err
 	}
+	exchangeRate := accounting.One
+	var exchangeRateDate time.Time
+	var exchangeRateSource string
+	if transactionCurrency.Code() != functionalCurrency.Code() {
+		if input.ExchangeRate == nil ||
+			input.ExchangeRateDate == nil ||
+			input.ExchangeRateSource == nil {
+			return accounting.Draft{}, fmt.Errorf(
+				"%w: foreign currency requires exchange rate, date and source",
+				accounting.ErrInvalidArgument,
+			)
+		}
+		exchangeRate, err = accounting.ParseExchangeRate(*input.ExchangeRate)
+		if err != nil {
+			return accounting.Draft{}, err
+		}
+		exchangeRateDate = input.ExchangeRateDate.Time
+		exchangeRateSource = strings.TrimSpace(*input.ExchangeRateSource)
+		if exchangeRateSource == "" || exchangeRateDate.After(input.AccountingDate.Time) {
+			return accounting.Draft{}, fmt.Errorf(
+				"%w: exchange rate date and source are invalid",
+				accounting.ErrInvalidArgument,
+			)
+		}
+	} else if input.ExchangeRate != nil {
+		suppliedRate, parseErr := accounting.ParseExchangeRate(*input.ExchangeRate)
+		if parseErr != nil || !suppliedRate.Equal(accounting.One) {
+			return accounting.Draft{}, fmt.Errorf(
+				"%w: functional currency must use exchange rate 1",
+				accounting.ErrInvalidArgument,
+			)
+		}
+	}
 	draft := accounting.Draft{
 		IdempotencyKey:     strings.TrimSpace(idempotencyKey),
 		Date:               input.AccountingDate.Time,
+		Reference:          strings.TrimSpace(stringValue(input.Reference)),
 		Kind:               accounting.EntryManual,
 		FunctionalCurrency: functionalCurrency,
 		Currency:           transactionCurrency,
-		ExchangeRate:       accounting.One,
-		ExchangeRateDate:   input.AccountingDate.Time,
-		ExchangeRateSource: "manual",
+		ExchangeRate:       exchangeRate,
+		ExchangeRateDate:   exchangeRateDate,
+		ExchangeRateSource: exchangeRateSource,
 		Description:        strings.TrimSpace(input.Description),
 		CreatedBy:          actor,
 		UpdatedBy:          actor,
 	}
 	for index, inputLine := range input.Lines {
-		debit, err := accounting.ParseAmount(inputLine.Debit)
+		transactionDebit, err := accounting.ParseAmount(inputLine.Debit)
 		if err != nil {
 			return accounting.Draft{}, fmt.Errorf("line %d debit: %w", index+1, err)
 		}
-		credit, err := accounting.ParseAmount(inputLine.Credit)
+		transactionCredit, err := accounting.ParseAmount(inputLine.Credit)
 		if err != nil {
 			return accounting.Draft{}, fmt.Errorf("line %d credit: %w", index+1, err)
 		}
-		lineCurrency := functionalCurrency
-		if inputLine.TransactionCurrency != nil {
-			lineCurrency, err = accounting.NewCurrency(*inputLine.TransactionCurrency)
-			if err != nil {
-				return accounting.Draft{}, fmt.Errorf("line %d currency: %w", index+1, err)
-			}
-		}
-		exchangeRate := accounting.One
-		if inputLine.ExchangeRate != nil {
-			exchangeRate, err = accounting.ParseExchangeRate(*inputLine.ExchangeRate)
-			if err != nil {
-				return accounting.Draft{}, fmt.Errorf("line %d exchange rate: %w", index+1, err)
-			}
-		} else if lineCurrency.Code() != functionalCurrency.Code() {
+		if transactionDebit.Sign() < 0 ||
+			transactionCredit.Sign() < 0 ||
+			(transactionDebit.IsZero() == transactionCredit.IsZero()) {
 			return accounting.Draft{}, fmt.Errorf(
-				"%w: line %d foreign currency requires an exchange rate",
+				"%w: line %d must contain exactly one positive debit or credit",
 				accounting.ErrInvalidArgument,
 				index+1,
 			)
 		}
-		transactionAmount := debit.Add(credit)
-		if inputLine.TransactionAmount != nil {
-			transactionAmount, err = accounting.ParseAmount(*inputLine.TransactionAmount)
-			if err != nil {
-				return accounting.Draft{}, fmt.Errorf("line %d transaction amount: %w", index+1, err)
+		if inputLine.TransactionCurrency != nil {
+			lineCurrency, currencyErr := accounting.NewCurrency(*inputLine.TransactionCurrency)
+			if currencyErr != nil {
+				return accounting.Draft{}, fmt.Errorf("line %d currency: %w", index+1, currencyErr)
 			}
+			if lineCurrency.Code() != transactionCurrency.Code() {
+				return accounting.Draft{}, fmt.Errorf(
+					"%w: line %d currency differs from draft currency",
+					accounting.ErrInvalidArgument,
+					index+1,
+				)
+			}
+		}
+		if inputLine.ExchangeRate != nil {
+			lineRate, rateErr := accounting.ParseExchangeRate(*inputLine.ExchangeRate)
+			if rateErr != nil {
+				return accounting.Draft{}, fmt.Errorf("line %d exchange rate: %w", index+1, rateErr)
+			}
+			if !lineRate.Equal(exchangeRate) {
+				return accounting.Draft{}, fmt.Errorf(
+					"%w: line %d exchange rate differs from draft exchange rate",
+					accounting.ErrInvalidArgument,
+					index+1,
+				)
+			}
+		}
+		transactionAmount := transactionDebit.Add(transactionCredit)
+		if inputLine.TransactionAmount != nil {
+			suppliedAmount, amountErr := accounting.ParseAmount(*inputLine.TransactionAmount)
+			if amountErr != nil {
+				return accounting.Draft{}, fmt.Errorf(
+					"line %d transaction amount: %w",
+					index+1,
+					amountErr,
+				)
+			}
+			if !suppliedAmount.Equal(transactionAmount) {
+				return accounting.Draft{}, fmt.Errorf(
+					"%w: line %d transaction amount differs from debit or credit",
+					accounting.ErrInvalidArgument,
+					index+1,
+				)
+			}
+		}
+		functionalAmount := functionalCurrency.Round(transactionAmount.Mul(exchangeRate))
+		debit := accounting.Zero
+		credit := accounting.Zero
+		if !transactionDebit.IsZero() {
+			debit = functionalAmount
+		} else if !transactionCredit.IsZero() {
+			credit = functionalAmount
 		}
 		line := accounting.JournalLine{
 			ID:                 uuid.New(),
 			AccountID:          inputLine.AccountId,
 			Debit:              debit,
 			Credit:             credit,
-			Currency:           lineCurrency,
+			Currency:           transactionCurrency,
 			ExchangeRate:       exchangeRate,
-			ExchangeRateDate:   input.AccountingDate.Time,
-			ExchangeRateSource: "manual",
+			ExchangeRateDate:   exchangeRateDate,
+			ExchangeRateSource: exchangeRateSource,
 			PartyID:            inputLine.PartyId,
 			LineNo:             index + 1,
 		}
 		if inputLine.Memo != nil {
 			line.Memo = strings.TrimSpace(*inputLine.Memo)
 		}
-		if !debit.IsZero() {
+		if !transactionDebit.IsZero() {
 			line.TransactionDebit = transactionAmount
 		} else {
 			line.TransactionCredit = transactionAmount
@@ -1779,16 +2182,37 @@ func apiDraft(draft accounting.Draft) api.JournalDraft {
 	for _, line := range draft.Lines {
 		lines = append(lines, apiJournalLine(line))
 	}
-	return api.JournalDraft{
-		AccountingDate: openapi_types.Date{Time: draft.Date},
-		Currency:       draft.Currency.Code(),
-		Description:    draft.Description,
-		Id:             draft.ID,
-		Lines:          lines,
-		TotalCredit:    credit.String(),
-		TotalDebit:     debit.String(),
-		Version:        draft.Version,
+	response := api.JournalDraft{
+		AccountingDate:     openapi_types.Date{Time: draft.Date},
+		CreatedAt:          draft.CreatedAt,
+		CreatedBy:          draft.CreatedBy,
+		Currency:           draft.Currency.Code(),
+		Description:        draft.Description,
+		ExchangeRate:       draft.ExchangeRate.String(),
+		FunctionalCurrency: draft.FunctionalCurrency.Code(),
+		Id:                 draft.ID,
+		Kind:               api.AccountingEntryKind(draft.Kind),
+		Lines:              lines,
+		PostingStatus:      apiDraftPostingStatus(draft.PostingStatus),
+		TotalCredit:        credit.String(),
+		TotalDebit:         debit.String(),
+		UpdatedAt:          draft.UpdatedAt,
+		UpdatedBy:          draft.UpdatedBy,
+		Version:            draft.Version,
 	}
+	if strings.TrimSpace(draft.Reference) != "" {
+		reference := draft.Reference
+		response.Reference = &reference
+	}
+	if !draft.ExchangeRateDate.IsZero() {
+		date := openapi_types.Date{Time: draft.ExchangeRateDate}
+		response.ExchangeRateDate = &date
+	}
+	if strings.TrimSpace(draft.ExchangeRateSource) != "" {
+		source := draft.ExchangeRateSource
+		response.ExchangeRateSource = &source
+	}
+	return response
 }
 
 func draftTotals(draft accounting.Draft) (accounting.Decimal, accounting.Decimal) {
@@ -1810,7 +2234,9 @@ func apiJournalLine(line accounting.JournalLine) api.JournalLine {
 		memo = &value
 	}
 	return api.JournalLine{
+		AccountCode:         line.AccountCode,
 		AccountId:           line.AccountID,
+		AccountName:         line.AccountName,
 		Credit:              line.Credit.String(),
 		Debit:               line.Debit.String(),
 		ExchangeRate:        &exchangeRate,
@@ -1830,16 +2256,36 @@ func apiEntry(entry accounting.JournalEntry) api.JournalEntry {
 		lines = append(lines, apiJournalLine(line))
 	}
 	response := api.JournalEntry{
-		AccountingDate:  openapi_types.Date{Time: entry.Date},
-		CreatedAt:       entry.CreatedAt,
-		Currency:        entry.FunctionalCurrency.Code(),
-		Description:     entry.Description,
-		EntryNumber:     entry.Number,
-		Id:              entry.ID,
-		Lines:           lines,
-		ReversesEntryId: entry.ReversesEntryID,
-		TotalCredit:     credit.String(),
-		TotalDebit:      debit.String(),
+		AccountingDate:        openapi_types.Date{Time: entry.Date},
+		CreatedAt:             entry.CreatedAt,
+		CreatedBy:             entry.CreatedBy,
+		Currency:              entry.Currency.Code(),
+		Description:           entry.Description,
+		EntryNumber:           entry.Number,
+		ExchangeRate:          entry.ExchangeRate.String(),
+		FunctionalCurrency:    entry.FunctionalCurrency.Code(),
+		Id:                    entry.ID,
+		Kind:                  api.AccountingEntryKind(entry.Kind),
+		Lines:                 lines,
+		PostingKind:           entry.PostingKind,
+		ReversedByEntryId:     entry.ReversedByEntryID,
+		ReversedByEntryNumber: entry.ReversedByEntryNumber,
+		ReversesEntryId:       entry.ReversesEntryID,
+		ReversesEntryNumber:   entry.ReversesEntryNumber,
+		TotalCredit:           credit.String(),
+		TotalDebit:            debit.String(),
+	}
+	if strings.TrimSpace(entry.Reference) != "" {
+		reference := entry.Reference
+		response.Reference = &reference
+	}
+	if !entry.ExchangeRateDate.IsZero() {
+		date := openapi_types.Date{Time: entry.ExchangeRateDate}
+		response.ExchangeRateDate = &date
+	}
+	if strings.TrimSpace(entry.ExchangeRateSource) != "" {
+		source := entry.ExchangeRateSource
+		response.ExchangeRateSource = &source
 	}
 	if entry.ReversalReason != "" {
 		reason := entry.ReversalReason
@@ -1856,6 +2302,63 @@ func apiEntry(entry accounting.JournalEntry) api.JournalEntry {
 	return response
 }
 
+func apiDraftPostingStatus(status accounting.DraftPostingStatus) api.JournalPostingStatus {
+	issues := make([]api.JournalPostingIssue, 0, len(status.Issues))
+	for _, issue := range status.Issues {
+		issues = append(issues, api.JournalPostingIssue(issue))
+	}
+	return api.JournalPostingStatus{
+		Difference: status.Difference.String(),
+		Issues:     issues,
+		State:      api.JournalPostingState(status.State),
+	}
+}
+
+func apiEntrySummary(
+	entry accounting.JournalEntry,
+	includeLines bool,
+) api.JournalEntrySummary {
+	debit, credit := entry.Totals()
+	response := api.JournalEntrySummary{
+		AccountingDate:        openapi_types.Date{Time: entry.Date},
+		CreatedAt:             entry.CreatedAt,
+		CreatedBy:             entry.CreatedBy,
+		Currency:              entry.Currency.Code(),
+		Description:           entry.Description,
+		EntryNumber:           entry.Number,
+		FunctionalCurrency:    entry.FunctionalCurrency.Code(),
+		Id:                    entry.ID,
+		Kind:                  api.AccountingEntryKind(entry.Kind),
+		PostingKind:           entry.PostingKind,
+		ReversedByEntryId:     entry.ReversedByEntryID,
+		ReversedByEntryNumber: entry.ReversedByEntryNumber,
+		ReversesEntryId:       entry.ReversesEntryID,
+		ReversesEntryNumber:   entry.ReversesEntryNumber,
+		TotalCredit:           credit.String(),
+		TotalDebit:            debit.String(),
+	}
+	if strings.TrimSpace(entry.Reference) != "" {
+		reference := entry.Reference
+		response.Reference = &reference
+	}
+	if strings.TrimSpace(entry.Source.Type) != "" {
+		sourceType := entry.Source.Type
+		response.SourceType = &sourceType
+	}
+	if entry.Source.ID != uuid.Nil {
+		sourceID := entry.Source.ID
+		response.SourceId = &sourceID
+	}
+	if includeLines {
+		lines := make([]api.JournalLine, 0, len(entry.Lines))
+		for _, line := range entry.Lines {
+			lines = append(lines, apiJournalLine(line))
+		}
+		response.Lines = &lines
+	}
+	return response
+}
+
 func loadAccountingDraft(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -1868,30 +2371,48 @@ func loadAccountingDraft(
 			idempotency_key,
 			entry_date,
 			entry_kind,
+			coalesce(reference, ''),
+			currency_code,
+			exchange_rate::text,
+			exchange_rate_date,
+			coalesce(exchange_rate_source, ''),
 			description,
 			coalesce(source_type, ''),
 			coalesce(source_id, ''),
 			version,
 			created_by,
+			updated_by,
 			created_at,
 			updated_at
 		  FROM accounting.drafts
 		 WHERE id = $1
+		   AND status = 'active'
 	`
 	if lock {
 		query += " FOR UPDATE"
 	}
-	var draft accounting.Draft
+	var (
+		draft        accounting.Draft
+		currencyCode string
+		rateText     string
+		rateDate     *time.Time
+	)
 	if err := tx.QueryRow(ctx, query, id).Scan(
 		&draft.ID,
 		&draft.IdempotencyKey,
 		&draft.Date,
 		&draft.Kind,
+		&draft.Reference,
+		&currencyCode,
+		&rateText,
+		&rateDate,
+		&draft.ExchangeRateSource,
 		&draft.Description,
 		&draft.SourceType,
 		&draft.SourceID,
 		&draft.Version,
 		&draft.CreatedBy,
+		&draft.UpdatedBy,
 		&draft.CreatedAt,
 		&draft.UpdatedAt,
 	); err != nil {
@@ -1900,34 +2421,51 @@ func loadAccountingDraft(
 		}
 		return accounting.Draft{}, fmt.Errorf("load accounting draft: %w", err)
 	}
-	draft.UpdatedBy = draft.CreatedBy
+	currency, err := accounting.NewCurrency(currencyCode)
+	if err != nil {
+		return accounting.Draft{}, err
+	}
+	draft.Currency = currency
+	draft.ExchangeRate, err = accounting.ParseExchangeRate(rateText)
+	if err != nil {
+		return accounting.Draft{}, err
+	}
+	if rateDate != nil {
+		draft.ExchangeRateDate = *rateDate
+	}
 	functionalCurrency, err := loadFunctionalCurrency(ctx, tx)
 	if err != nil {
 		return accounting.Draft{}, err
 	}
+	draft.IsAdjustment = draft.Kind == accounting.EntryAdjustment ||
+		draft.Kind == accounting.EntryClosing ||
+		draft.Kind == accounting.EntryInflation ||
+		draft.Kind == accounting.EntryRevaluation ||
+		draft.Kind == accounting.EntryReversal
 	draft.FunctionalCurrency = functionalCurrency
-	draft.Currency = functionalCurrency
-	draft.ExchangeRate = accounting.One
-	draft.ExchangeRateDate = draft.Date
-	draft.ExchangeRateSource = "manual"
 	rows, err := tx.Query(ctx, `
 		SELECT
-			id,
-			line_no,
-			account_id,
-			description,
-			debit_amount::text,
-			credit_amount::text,
-			currency_code,
-			currency_amount::text,
-			exchange_rate::text,
-			coalesce(exchange_rate_date, $2::date),
-			coalesce(exchange_rate_source, 'manual'),
-			party_id
-		  FROM accounting.draft_lines
-		 WHERE draft_id = $1
-		 ORDER BY line_no, id
-	`, id, draft.Date)
+			line.id,
+			line.line_no,
+			line.account_id,
+			account.code,
+			account.name,
+			line.description,
+			line.debit_amount::text,
+			line.credit_amount::text,
+			line.currency_code,
+			line.currency_amount::text,
+			line.exchange_rate::text,
+			line.exchange_rate_date,
+			coalesce(line.exchange_rate_source, ''),
+			line.party_id
+		  FROM accounting.draft_lines AS line
+		  JOIN accounting.accounts AS account
+		    ON account.org_id = line.org_id
+		   AND account.id = line.account_id
+		 WHERE line.draft_id = $1
+		 ORDER BY line.line_no, line.id
+	`, id)
 	if err != nil {
 		return accounting.Draft{}, fmt.Errorf("load accounting draft lines: %w", err)
 	}
@@ -1938,14 +2476,15 @@ func loadAccountingDraft(
 			return accounting.Draft{}, err
 		}
 		draft.Lines = append(draft.Lines, line)
-		if len(draft.Lines) == 1 {
-			draft.Currency = line.Currency
-			draft.ExchangeRate = line.ExchangeRate
-			draft.ExchangeRateDate = line.ExchangeRateDate
-			draft.ExchangeRateSource = line.ExchangeRateSource
-		}
 	}
-	return draft, rows.Err()
+	if err := rows.Err(); err != nil {
+		return accounting.Draft{}, err
+	}
+	rows.Close()
+	if err := hydrateDraftPostingStatus(ctx, tx, &draft); err != nil {
+		return accounting.Draft{}, err
+	}
+	return draft, nil
 }
 
 func loadAccountingEntry(
@@ -1961,24 +2500,34 @@ func loadAccountingEntry(
 	)
 	err := tx.QueryRow(ctx, `
 		SELECT
-			id,
-			entry_number,
-			entry_date,
-			entry_kind,
-			posting_kind,
-			functional_currency,
-			coalesce(source_type, ''),
-			coalesce(source_id, ''),
-			source_event,
-			idempotency_key,
-			description,
-			created_by,
-			posted_at,
-			reverses_entry_id,
-			coalesce(reversal_reason, ''),
-			draft_id
-		  FROM accounting.journal_entries
-		 WHERE id = $1
+			entry.id,
+			entry.entry_number,
+			entry.entry_date,
+			entry.entry_kind,
+			entry.posting_kind,
+			entry.functional_currency,
+			coalesce(entry.reference, ''),
+			coalesce(entry.source_type, ''),
+			coalesce(entry.source_id, ''),
+			entry.source_event,
+			entry.idempotency_key,
+			entry.description,
+			entry.created_by,
+			entry.posted_at,
+			entry.reverses_entry_id,
+			reversed_entry.entry_number,
+			coalesce(entry.reversal_reason, ''),
+			entry.draft_id,
+			direct_reversal.id,
+			direct_reversal.entry_number
+		  FROM accounting.journal_entries AS entry
+		  LEFT JOIN accounting.journal_entries AS reversed_entry
+		    ON reversed_entry.org_id = entry.org_id
+		   AND reversed_entry.id = entry.reverses_entry_id
+		  LEFT JOIN accounting.journal_entries AS direct_reversal
+		    ON direct_reversal.org_id = entry.org_id
+		   AND direct_reversal.reverses_entry_id = entry.id
+		 WHERE entry.id = $1
 	`, id).Scan(
 		&entry.ID,
 		&entry.Number,
@@ -1986,6 +2535,7 @@ func loadAccountingEntry(
 		&entry.Kind,
 		&entry.PostingKind,
 		&functionalCurrencyCode,
+		&entry.Reference,
 		&sourceType,
 		&sourceID,
 		&entry.Source.Event,
@@ -1994,8 +2544,11 @@ func loadAccountingEntry(
 		&entry.CreatedBy,
 		&entry.CreatedAt,
 		&entry.ReversesEntryID,
+		&entry.ReversesEntryNumber,
 		&entry.ReversalReason,
 		&entry.DraftID,
+		&entry.ReversedByEntryID,
+		&entry.ReversedByEntryNumber,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return accounting.JournalEntry{}, errBusinessNotFound
@@ -2010,30 +2563,33 @@ func loadAccountingEntry(
 	entry.FunctionalCurrency = functionalCurrency
 	entry.Currency = functionalCurrency
 	entry.ExchangeRate = accounting.One
-	entry.ExchangeRateDate = entry.Date
-	entry.ExchangeRateSource = "functional"
 	entry.Source.Type = sourceType
 	if parsed, parseErr := uuid.Parse(sourceID); parseErr == nil {
 		entry.Source.ID = parsed
 	}
 	rows, err := tx.Query(ctx, `
 		SELECT
-			id,
-			line_no,
-			account_id,
-			description,
-			debit_amount::text,
-			credit_amount::text,
-			currency_code,
-			currency_amount::text,
-			exchange_rate::text,
-			coalesce(exchange_rate_date, $2::date),
-			coalesce(exchange_rate_source, 'functional'),
-			party_id
-		  FROM accounting.journal_lines
-		 WHERE journal_entry_id = $1
-		 ORDER BY line_no, id
-	`, id, entry.Date)
+			line.id,
+			line.line_no,
+			line.account_id,
+			account.code,
+			account.name,
+			line.description,
+			line.debit_amount::text,
+			line.credit_amount::text,
+			line.currency_code,
+			line.currency_amount::text,
+			line.exchange_rate::text,
+			line.exchange_rate_date,
+			coalesce(line.exchange_rate_source, ''),
+			line.party_id
+		  FROM accounting.journal_lines AS line
+		  JOIN accounting.accounts AS account
+		    ON account.org_id = line.org_id
+		   AND account.id = line.account_id
+		 WHERE line.journal_entry_id = $1
+		 ORDER BY line.line_no, line.id
+	`, id)
 	if err != nil {
 		return accounting.JournalEntry{}, fmt.Errorf("load accounting entry lines: %w", err)
 	}
@@ -2044,6 +2600,12 @@ func loadAccountingEntry(
 			return accounting.JournalEntry{}, err
 		}
 		entry.Lines = append(entry.Lines, line)
+		if len(entry.Lines) == 1 {
+			entry.Currency = line.Currency
+			entry.ExchangeRate = line.ExchangeRate
+			entry.ExchangeRateDate = line.ExchangeRateDate
+			entry.ExchangeRateSource = line.ExchangeRateSource
+		}
 	}
 	return entry, rows.Err()
 }
@@ -2062,6 +2624,8 @@ func scanDomainJournalLine(row interface{ Scan(...any) error }) (accounting.Jour
 		&line.ID,
 		&line.LineNo,
 		&line.AccountID,
+		&line.AccountCode,
+		&line.AccountName,
 		&line.Memo,
 		&debitRaw,
 		&creditRaw,
@@ -2106,6 +2670,79 @@ func scanDomainJournalLine(row interface{ Scan(...any) error }) (accounting.Jour
 		}
 	}
 	return line, nil
+}
+
+func hydrateDraftPostingStatus(
+	ctx context.Context,
+	tx pgx.Tx,
+	draft *accounting.Draft,
+) error {
+	accountIDs := make([]uuid.UUID, 0, len(draft.Lines))
+	seen := make(map[uuid.UUID]struct{}, len(draft.Lines))
+	for _, line := range draft.Lines {
+		if line.AccountID == uuid.Nil {
+			continue
+		}
+		if _, ok := seen[line.AccountID]; ok {
+			continue
+		}
+		seen[line.AccountID] = struct{}{}
+		accountIDs = append(accountIDs, line.AccountID)
+	}
+	accounts := make(map[uuid.UUID]accounting.Account, len(accountIDs))
+	if len(accountIDs) > 0 {
+		rows, err := tx.Query(ctx, `
+			SELECT id, posting_allowed, archived_at, trashed_at
+			  FROM accounting.accounts
+			 WHERE id = ANY($1::uuid[])
+		`, accountIDs)
+		if err != nil {
+			return fmt.Errorf("load draft posting accounts: %w", err)
+		}
+		for rows.Next() {
+			var account accounting.Account
+			var trashedAt *time.Time
+			if err := rows.Scan(
+				&account.ID,
+				&account.Postable,
+				&account.ArchivedAt,
+				&trashedAt,
+			); err != nil {
+				rows.Close()
+				return fmt.Errorf("scan draft posting account: %w", err)
+			}
+			if trashedAt != nil {
+				account.Postable = false
+			}
+			accounts[account.ID] = account
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return fmt.Errorf("load draft posting accounts: %w", err)
+		}
+		rows.Close()
+	}
+	var periodStatus accounting.PeriodStatus
+	err := tx.QueryRow(ctx, `
+		SELECT status
+		  FROM accounting.periods
+		 WHERE $1::date BETWEEN start_date AND end_date
+		 LIMIT 1
+	`, draft.Date).Scan(&periodStatus)
+	periodAllowsPosting := err == nil &&
+		(periodStatus == accounting.PeriodOpen ||
+			(periodStatus == accounting.PeriodSoftClosed && draft.IsAdjustment))
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("load draft accounting period: %w", err)
+	}
+	draft.PostingStatus = accounting.EvaluateDraftPostingStatus(
+		*draft,
+		accounting.DraftPostingContext{
+			PeriodAllowsPosting: periodAllowsPosting,
+			Accounts:            accounts,
+		},
+	)
+	return nil
 }
 
 func parseInt64(raw string) (int64, error) {

@@ -788,7 +788,11 @@ func baseEntry(
 	actor string,
 	idempotencyKey string,
 ) JournalEntry {
-	if exchangeRateDate.IsZero() {
+	if currency.Code() == functionalCurrency.Code() {
+		exchangeRate = One
+		exchangeRateDate = time.Time{}
+		exchangeRateSource = ""
+	} else if exchangeRateDate.IsZero() {
 		exchangeRateDate = date
 	}
 	return JournalEntry{

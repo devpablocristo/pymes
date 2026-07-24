@@ -17,17 +17,22 @@ import (
 )
 
 var (
-	errBusinessNotFound          = errors.New("business resource not found")
-	errBusinessInvalidRequest    = errors.New("business request is invalid")
-	errBusinessIdempotency       = errors.New("business idempotency key conflict")
-	errBusinessVersionConflict   = errors.New("business resource version conflict")
-	errBusinessDuplicate         = errors.New("business resource already exists")
-	errBusinessInvalidTransition = errors.New("business transition is invalid")
-	errBusinessPeriodClosed      = errors.New("accounting period is closed")
-	errBusinessUnbalanced        = errors.New("journal entry is unbalanced")
-	errBusinessImmutable         = errors.New("business resource is immutable")
-	errFiscalUncertain           = errors.New("fiscal authorization is uncertain")
-	errFiscalProductionNotReady  = errors.New("fiscal production prerequisites are incomplete")
+	errBusinessNotFound               = errors.New("business resource not found")
+	errBusinessInvalidRequest         = errors.New("business request is invalid")
+	errBusinessIdempotency            = errors.New("business idempotency key conflict")
+	errBusinessVersionConflict        = errors.New("business resource version conflict")
+	errBusinessDuplicate              = errors.New("business resource already exists")
+	errBusinessInvalidTransition      = errors.New("business transition is invalid")
+	errBusinessPeriodClosed           = errors.New("accounting period is closed")
+	errBusinessUnbalanced             = errors.New("journal entry is unbalanced")
+	errBusinessImmutable              = errors.New("business resource is immutable")
+	errAccountingAlreadyReversed      = errors.New("accounting entry was already reversed")
+	errAccountingReversalBlocked      = errors.New("accounting entry cannot be reversed safely")
+	errAccountingAccountArchived      = errors.New("accounting account is archived")
+	errAccountingNotPostable          = errors.New("accounting account is not postable")
+	errAccountingReconciliationClosed = errors.New("accounting reconciliation is closed")
+	errFiscalUncertain                = errors.New("fiscal authorization is uncertain")
+	errFiscalProductionNotReady       = errors.New("fiscal production prerequisites are incomplete")
 )
 
 type businessWork func(
@@ -139,6 +144,16 @@ func writeBusinessError(w http.ResponseWriter, err error) {
 		status, code, message = http.StatusUnprocessableEntity, "ACCOUNTING_UNBALANCED", "Debit and credit totals must be equal"
 	case errors.Is(err, errBusinessImmutable):
 		status, code, message = http.StatusConflict, "RESOURCE_IMMUTABLE", "The resource is immutable"
+	case errors.Is(err, errAccountingAlreadyReversed):
+		status, code, message = http.StatusConflict, "ACCOUNTING_ENTRY_ALREADY_REVERSED", "El asiento ya fue revertido"
+	case errors.Is(err, errAccountingReversalBlocked):
+		status, code, message = http.StatusConflict, "ACCOUNTING_REVERSAL_NOT_ALLOWED", "Este asiento tiene efectos vinculados y no puede revertirse desde el Diario"
+	case errors.Is(err, errAccountingAccountArchived):
+		status, code, message = http.StatusConflict, "ACCOUNTING_ACCOUNT_ARCHIVED", "La cuenta contable está archivada"
+	case errors.Is(err, errAccountingNotPostable):
+		status, code, message = http.StatusUnprocessableEntity, "ACCOUNTING_ACCOUNT_NOT_POSTABLE", "La cuenta contable no admite imputaciones"
+	case errors.Is(err, errAccountingReconciliationClosed):
+		status, code, message = http.StatusConflict, "ACCOUNTING_RECONCILIATION_CLOSED", "La cuenta tiene una conciliación cerrada; reabrila antes de contabilizar"
 	case errors.Is(err, errFiscalUncertain):
 		status, code, message = http.StatusConflict, "FISCAL_AUTHORIZATION_UNCERTAIN", "ARCA authorization must be reconciled before retrying"
 	case errors.Is(err, errFiscalProductionNotReady):

@@ -32,6 +32,19 @@ func assertAccountingAndFiscalInvariants(
 		lockedEntry        = "00000000-0000-0000-0000-00000000d104"
 		settlementEntry    = "00000000-0000-0000-0000-00000000d105"
 		settlementUndo     = "00000000-0000-0000-0000-00000000d106"
+		closedReconEntry   = "00000000-0000-0000-0000-00000000d107"
+		softAdjustEntry    = "00000000-0000-0000-0000-00000000d108"
+		softManualEntry    = "00000000-0000-0000-0000-00000000d109"
+		earlyReversalEntry = "00000000-0000-0000-0000-00000000d110"
+		wrongCurrencyEntry = "00000000-0000-0000-0000-00000000d111"
+		futureRateEntry    = "00000000-0000-0000-0000-00000000d112"
+		emptyDraft         = "00000000-0000-0000-0000-00000000d501"
+		unbalancedDraft    = "00000000-0000-0000-0000-00000000d502"
+		badHeaderDraft     = "00000000-0000-0000-0000-00000000d503"
+		badMixedDraft      = "00000000-0000-0000-0000-00000000d504"
+		badRateDateDraft   = "00000000-0000-0000-0000-00000000d505"
+		financialAccountID = "00000000-0000-0000-0000-00000000d601"
+		reconciliationID   = "00000000-0000-0000-0000-00000000d602"
 		openItemID         = "00000000-0000-0000-0000-00000000d401"
 		applicationID      = "00000000-0000-0000-0000-00000000d402"
 		applicationUndo    = "00000000-0000-0000-0000-00000000d403"
@@ -50,6 +63,7 @@ func assertAccountingAndFiscalInvariants(
 
 	assertTenantTablesForceRLS(t, ctx, database)
 	assertNoFloatingPointMoney(t, ctx, database)
+	assertJournalWorkflowPrivileges(t, ctx, database)
 	assertPendingOrganizationsPrivileges(t, ctx, database)
 	assertFiscalWorkerRoutinePrivileges(t, ctx, database)
 	assertHomologationEvidenceInvariants(
@@ -140,6 +154,147 @@ func assertAccountingAndFiscalInvariants(
 		  ]::text[])`,
 		5,
 	)
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO accounting.financial_accounts (
+			org_id,
+			id,
+			ledger_account_id,
+			account_type,
+			name,
+			currency_code
+		)
+		VALUES ($1, $2, $3, 'cash', 'Caja principal', 'ARS')
+	`, orgA, financialAccountID, cashAccountID); err != nil {
+		t.Fatalf("insert closed-reconciliation financial account: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO accounting.reconciliations (
+			org_id,
+			id,
+			financial_account_id,
+			start_date,
+			end_date,
+			opening_balance,
+			closing_balance,
+			created_by
+		)
+		VALUES (
+			$1, $2, $3, DATE '2026-01-01', DATE '2026-01-31',
+			0, 0, 'integration-test'
+		)
+	`, orgA, reconciliationID, financialAccountID); err != nil {
+		t.Fatalf("insert reconciliation draft: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE accounting.reconciliations
+		   SET status = 'closed',
+		       version = version + 1,
+		       status_changed_by = 'integration-test',
+		       updated_at = now()
+		 WHERE org_id = $1
+		   AND id = $2
+	`, orgA, reconciliationID); err != nil {
+		t.Fatalf("close reconciliation fixture: %v", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO accounting.drafts (
+			org_id,
+			id,
+			idempotency_key,
+			entry_date,
+			entry_kind,
+			description,
+			currency_code,
+			exchange_rate,
+			exchange_rate_date,
+			exchange_rate_source,
+			created_by,
+			updated_by
+		)
+		VALUES
+			(
+				$1, $2, 'integration-empty-draft', DATE '2026-01-10',
+				'manual', '', 'USD', 1250, DATE '2026-01-10', 'BNA',
+				'integration-test', 'integration-test'
+			),
+			(
+				$1, $3, 'integration-unbalanced-draft', DATE '2026-01-10',
+				'manual', '', 'ARS', 1, NULL, NULL,
+				'integration-test', 'integration-test'
+			)
+	`, orgA, emptyDraft, unbalancedDraft); err != nil {
+		t.Fatalf("insert flexible accounting drafts: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO accounting.draft_lines (
+			org_id,
+			draft_id,
+			line_no,
+			account_id,
+			debit_amount,
+			credit_amount,
+			currency_code,
+			currency_amount,
+			exchange_rate
+		)
+		VALUES
+			($1, $2, 1, $3, 10, 0, 'ARS', 10, 1),
+			($1, $2, 2, $4, 0, 9, 'ARS', 9, 1)
+	`, orgA, unbalancedDraft, receivableAccountID, revenueAccountID); err != nil {
+		t.Fatalf("insert unbalanced draft lines: %v", err)
+	}
+	var (
+		savedCurrency  string
+		savedRate      string
+		savedLineCount int
+	)
+	if err := tx.QueryRow(ctx, `
+		SELECT
+			draft.currency_code,
+			draft.exchange_rate::text,
+			(
+				SELECT count(*)
+				  FROM accounting.draft_lines AS line
+				 WHERE line.org_id = draft.org_id
+				   AND line.draft_id = draft.id
+			)
+		  FROM accounting.drafts AS draft
+		 WHERE draft.id = $1
+	`, emptyDraft).Scan(&savedCurrency, &savedRate, &savedLineCount); err != nil {
+		t.Fatalf("read empty foreign-currency draft: %v", err)
+	}
+	if savedCurrency != "USD" || savedRate != "1250.0000000000" || savedLineCount != 0 {
+		t.Fatalf(
+			"empty foreign draft = currency %s, rate %s, lines %d",
+			savedCurrency,
+			savedRate,
+			savedLineCount,
+		)
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE accounting.drafts
+		   SET reference = 'EXT-EMPTY',
+		       updated_by = 'integration-editor',
+		       version = version + 1,
+		       updated_at = now()
+		 WHERE id = $1
+	`, emptyDraft); err != nil {
+		t.Fatalf("update empty draft: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE accounting.drafts
+		   SET status = 'discarded',
+		       updated_by = 'integration-discarder',
+		       discarded_by = 'integration-discarder',
+		       discard_reason = 'Discarded by integration test',
+		       discarded_at = now(),
+		       version = version + 1,
+		       updated_at = now()
+		 WHERE id = $1
+	`, emptyDraft); err != nil {
+		t.Fatalf("discard empty draft: %v", err)
+	}
 
 	insertJournalEntry(
 		t,
@@ -160,6 +315,386 @@ func assertAccountingAndFiscalInvariants(
 	)
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatalf("commit balanced journal entry: %v", err)
+	}
+
+	tx = beginTenantTx(t, ctx, backend, orgA, userA)
+	if _, err := tx.Exec(ctx, `
+		UPDATE accounting.drafts
+		   SET updated_by = 'integration-line-editor',
+		       version = version + 1,
+		       updated_at = now()
+		 WHERE org_id = $1
+		   AND id = $2
+	`, orgA, unbalancedDraft); err != nil {
+		t.Fatalf("update draft header for audit snapshot: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM accounting.draft_lines
+		 WHERE org_id = $1
+		   AND draft_id = $2
+	`, orgA, unbalancedDraft); err != nil {
+		t.Fatalf("replace draft lines for audit snapshot: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO accounting.draft_lines (
+			org_id, draft_id, line_no, account_id, debit_amount,
+			credit_amount, currency_code, currency_amount, exchange_rate
+		)
+		VALUES
+			($1, $2, 1, $3, 12, 0, 'ARS', 12, 1),
+			($1, $2, 2, $4, 0, 11, 'ARS', 11, 1)
+	`, orgA, unbalancedDraft, receivableAccountID, revenueAccountID); err != nil {
+		t.Fatalf("edit draft lines for audit snapshot: %v", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit draft line audit edit: %v", err)
+	}
+
+	tx = beginTenantTx(t, ctx, backend, orgA, userA)
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO accounting.drafts (
+			org_id, id, idempotency_key, entry_date, entry_kind,
+			description, currency_code, exchange_rate, created_by, updated_by
+		)
+		VALUES (
+			$1, $2, 'integration-bad-functional-rate', DATE '2026-01-10',
+			'manual', '', 'ARS', 2, 'integration-test', 'integration-test'
+		)
+	`, orgA, badHeaderDraft); err != nil {
+		t.Fatalf("insert functional-currency draft with wrong rate: %v", err)
+	}
+	if err := tx.Commit(ctx); err == nil {
+		t.Fatal("functional-currency draft accepted exchange rate other than 1")
+	}
+
+	tx = beginTenantTx(t, ctx, backend, orgA, userA)
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO accounting.drafts (
+			org_id, id, idempotency_key, entry_date, entry_kind,
+			description, currency_code, exchange_rate, exchange_rate_date,
+			exchange_rate_source, created_by, updated_by
+		)
+		VALUES (
+			$1, $2, 'integration-mixed-draft-currency', DATE '2026-01-10',
+			'manual', '', 'USD', 1250, DATE '2026-01-10',
+			'BNA', 'integration-test', 'integration-test'
+		)
+	`, orgA, badMixedDraft); err != nil {
+		t.Fatalf("insert foreign-currency draft header: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO accounting.draft_lines (
+			org_id, draft_id, line_no, account_id, debit_amount,
+			credit_amount, currency_code, currency_amount, exchange_rate
+		)
+		VALUES ($1, $2, 1, $3, 10, 0, 'ARS', 10, 1)
+	`, orgA, badMixedDraft, receivableAccountID); err != nil {
+		t.Fatalf("insert draft line with mixed currency: %v", err)
+	}
+	if err := tx.Commit(ctx); err == nil {
+		t.Fatal("draft accepted line currency metadata differing from its header")
+	}
+
+	tx = beginTenantTx(t, ctx, backend, orgA, userA)
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO accounting.drafts (
+			org_id, id, idempotency_key, entry_date, entry_kind,
+			description, currency_code, exchange_rate, exchange_rate_date,
+			exchange_rate_source, created_by, updated_by
+		)
+		VALUES (
+			$1, $2, 'integration-future-rate-date', DATE '2026-01-10',
+			'manual', '', 'USD', 1250, DATE '2026-01-11',
+			'BNA', 'integration-test', 'integration-test'
+		)
+	`, orgA, badRateDateDraft); err == nil {
+		t.Fatal("foreign-currency draft accepted a rate date after its entry date")
+	}
+	_ = tx.Rollback(ctx)
+
+	tx = beginTenantTx(t, ctx, backend, orgA, userA)
+	insertJournalEntryAt(
+		t,
+		ctx,
+		tx,
+		orgA,
+		earlyReversalEntry,
+		periodID,
+		"2026-01-09",
+		"reversal",
+		"integration-early-reversal",
+		entryID,
+	)
+	insertJournalLine(
+		t, ctx, tx, orgA, earlyReversalEntry, 1, receivableAccountID, "0", "121.00",
+	)
+	insertJournalLine(
+		t, ctx, tx, orgA, earlyReversalEntry, 2, revenueAccountID, "121.00", "0",
+	)
+	if err := tx.Commit(ctx); err == nil {
+		t.Fatal("reversal committed with a date before the original entry")
+	}
+
+	tx = beginTenantTx(t, ctx, backend, orgA, userA)
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO accounting.journal_entries (
+			org_id, id, entry_date, period_id, entry_kind, description,
+			functional_currency, source_type, source_id, posting_kind,
+			idempotency_key, created_by
+		)
+		VALUES (
+			$1, $2, DATE '2026-01-10', $3, 'manual',
+			'Wrong functional currency', 'USD', 'integration',
+			'integration-wrong-functional-currency', 'primary',
+			'integration-wrong-functional-currency', 'integration-test'
+		)
+	`, orgA, wrongCurrencyEntry, periodID); err != nil {
+		t.Fatalf("insert wrong-functional-currency entry: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO accounting.journal_lines (
+			org_id, journal_entry_id, line_no, account_id, debit_amount,
+			credit_amount, currency_code, currency_amount, exchange_rate
+		)
+		VALUES
+			($1, $2, 1, $3, 1, 0, 'USD', 1, 1),
+			($1, $2, 2, $4, 0, 1, 'USD', 1, 1)
+	`, orgA, wrongCurrencyEntry, receivableAccountID, revenueAccountID); err != nil {
+		t.Fatalf("insert wrong-functional-currency lines: %v", err)
+	}
+	if err := tx.Commit(ctx); err == nil {
+		t.Fatal("journal entry accepted a functional currency different from the organization")
+	}
+
+	tx = beginTenantTx(t, ctx, backend, orgA, userA)
+	insertJournalEntry(
+		t,
+		ctx,
+		tx,
+		orgA,
+		futureRateEntry,
+		periodID,
+		"manual",
+		"integration-future-line-rate",
+		"",
+	)
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO accounting.journal_lines (
+			org_id, journal_entry_id, line_no, account_id, debit_amount,
+			credit_amount, currency_code, currency_amount, exchange_rate,
+			exchange_rate_date, exchange_rate_source
+		)
+		VALUES
+			(
+				$1, $2, 1, $3, 1, 0, 'USD', 0.01, 100,
+				DATE '2026-01-11', 'BNA'
+			),
+			($1, $2, 2, $4, 0, 1, 'ARS', 1, 1, NULL, NULL)
+	`, orgA, futureRateEntry, receivableAccountID, revenueAccountID); err != nil {
+		t.Fatalf("insert future-rate-date journal lines: %v", err)
+	}
+	if err := tx.Commit(ctx); err == nil {
+		t.Fatal("journal line accepted an exchange-rate date after the entry date")
+	}
+
+	tx = beginTenantTx(t, ctx, backend, orgA, userA)
+	for action, want := range map[string]int{
+		"create":  2,
+		"update":  2,
+		"discard": 1,
+		"post":    1,
+	} {
+		assertTxCount(
+			t,
+			ctx,
+			tx,
+			`SELECT count(*)
+			   FROM accounting.journal_events
+			  WHERE action = $1`,
+			want,
+			action,
+		)
+	}
+	var (
+		discardActor  string
+		discardReason string
+	)
+	if err := tx.QueryRow(ctx, `
+		SELECT actor, details ->> 'discard_reason'
+		  FROM accounting.journal_events
+		 WHERE draft_id = $1
+		   AND action = 'discard'
+	`, emptyDraft).Scan(&discardActor, &discardReason); err != nil {
+		t.Fatalf("read draft discard audit actor: %v", err)
+	}
+	if discardActor != "integration-discarder" {
+		t.Fatalf("draft discard actor = %q", discardActor)
+	}
+	if discardReason != "Discarded by integration test" {
+		t.Fatalf("draft discard reason = %q", discardReason)
+	}
+	assertTxCount(
+		t,
+		ctx,
+		tx,
+		`SELECT count(*)
+		   FROM accounting.journal_events AS event
+		  WHERE event.snapshot_hash = accounting.journal_snapshot_hash(
+		      event.org_id,
+		      event.subject_type,
+		      event.draft_id,
+		      event.journal_entry_id,
+		      event.action,
+		      event.actor,
+		      event.version,
+		      event.before_snapshot,
+		      event.after_snapshot
+		  )`,
+		6,
+	)
+	var (
+		updateBeforeReference string
+		updateAfterReference  string
+		updateLineCount       int
+	)
+	if err := tx.QueryRow(ctx, `
+		SELECT
+			coalesce(before_snapshot -> 'header' ->> 'reference', ''),
+			coalesce(after_snapshot -> 'header' ->> 'reference', ''),
+			jsonb_array_length(after_snapshot -> 'lines')
+		  FROM accounting.journal_events
+		 WHERE draft_id = $1
+		   AND action = 'update'
+	`, emptyDraft).Scan(
+		&updateBeforeReference,
+		&updateAfterReference,
+		&updateLineCount,
+	); err != nil {
+		t.Fatalf("read draft update audit snapshots: %v", err)
+	}
+	if updateBeforeReference != "" ||
+		updateAfterReference != "EXT-EMPTY" ||
+		updateLineCount != 0 {
+		t.Fatalf(
+			"draft update snapshots = before %q, after %q, lines %d",
+			updateBeforeReference,
+			updateAfterReference,
+			updateLineCount,
+		)
+	}
+	var (
+		discardBeforeStatus string
+		discardAfterStatus  string
+	)
+	if err := tx.QueryRow(ctx, `
+		SELECT
+			before_snapshot -> 'header' ->> 'status',
+			after_snapshot -> 'header' ->> 'status'
+		  FROM accounting.journal_events
+		 WHERE draft_id = $1
+		   AND action = 'discard'
+	`, emptyDraft).Scan(
+		&discardBeforeStatus,
+		&discardAfterStatus,
+	); err != nil {
+		t.Fatalf("read draft discard audit snapshots: %v", err)
+	}
+	if discardBeforeStatus != "active" || discardAfterStatus != "discarded" {
+		t.Fatalf(
+			"draft discard status snapshots = %s -> %s",
+			discardBeforeStatus,
+			discardAfterStatus,
+		)
+	}
+	var (
+		postLineCount         int
+		postFirstAccountCode  string
+		postContainsSensitive bool
+	)
+	if err := tx.QueryRow(ctx, `
+		SELECT
+			jsonb_array_length(after_snapshot -> 'lines'),
+			after_snapshot -> 'lines' -> 0 ->> 'account_code',
+			(after_snapshot -> 'header')
+				?| ARRAY['org_id', 'idempotency_key']
+		  FROM accounting.journal_events
+		 WHERE journal_entry_id = $1
+		   AND action = 'post'
+	`, entryID).Scan(
+		&postLineCount,
+		&postFirstAccountCode,
+		&postContainsSensitive,
+	); err != nil {
+		t.Fatalf("read journal post audit snapshot: %v", err)
+	}
+	if postLineCount != 2 || postFirstAccountCode == "" {
+		t.Fatalf(
+			"journal post snapshot = lines %d, first account %q",
+			postLineCount,
+			postFirstAccountCode,
+		)
+	}
+	if postContainsSensitive {
+		t.Fatal("journal audit snapshot leaked tenant or idempotency context")
+	}
+	var (
+		lineBeforeDebit string
+		lineAfterDebit  string
+	)
+	if err := tx.QueryRow(ctx, `
+		SELECT
+			before_snapshot -> 'lines' -> 0 ->> 'debit_amount',
+			after_snapshot -> 'lines' -> 0 ->> 'debit_amount'
+		  FROM accounting.journal_events
+		 WHERE draft_id = $1
+		   AND action = 'update'
+	`, unbalancedDraft).Scan(&lineBeforeDebit, &lineAfterDebit); err != nil {
+		t.Fatalf("read draft line before/after audit snapshots: %v", err)
+	}
+	if lineBeforeDebit != "10.000000" || lineAfterDebit != "12.000000" {
+		t.Fatalf(
+			"draft line audit snapshots = %s -> %s",
+			lineBeforeDebit,
+			lineAfterDebit,
+		)
+	}
+
+	insertJournalEntry(
+		t,
+		ctx,
+		tx,
+		orgA,
+		closedReconEntry,
+		periodID,
+		"manual",
+		"closed-reconciliation-entry",
+		"",
+	)
+	insertJournalLine(
+		t, ctx, tx, orgA, closedReconEntry, 1, cashAccountID, "1.00", "0",
+	)
+	insertJournalLine(
+		t, ctx, tx, orgA, closedReconEntry, 2, revenueAccountID, "0", "1.00",
+	)
+	if err := tx.Commit(ctx); err == nil {
+		t.Fatal("closed reconciliation accepted a posting to its financial account")
+	}
+
+	tx = beginTenantTx(t, ctx, backend, orgA, userA)
+	if _, err := tx.Exec(ctx, `
+		UPDATE accounting.reconciliations
+		   SET status = 'draft',
+		       version = version + 1,
+		       status_changed_by = 'integration-test',
+		       transition_reason = 'Continue integration accounting scenarios',
+		       updated_at = now()
+		 WHERE org_id = $1
+		   AND id = $2
+	`, orgA, reconciliationID); err != nil {
+		t.Fatalf("reopen reconciliation after posting guard assertion: %v", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit reconciliation reopen: %v", err)
 	}
 
 	tx = beginTenantTx(t, ctx, backend, orgA, userA)
@@ -391,6 +926,49 @@ func assertAccountingAndFiscalInvariants(
 	if originalEntryAfterReversal != originalEntryJSON {
 		t.Fatal("reversal modified the original journal entry")
 	}
+	tx = beginTenantTx(t, ctx, backend, orgA, userA)
+	assertTxCount(
+		t,
+		ctx,
+		tx,
+		`SELECT count(*)
+		   FROM accounting.journal_events
+		  WHERE journal_entry_id = $1
+		    AND action = 'reverse'`,
+		1,
+		reversalID,
+	)
+	var reversalAuditLineCount int
+	if err := tx.QueryRow(ctx, `
+		SELECT jsonb_array_length(after_snapshot -> 'lines')
+		  FROM accounting.journal_events
+		 WHERE journal_entry_id = $1
+		   AND action = 'reverse'
+		   AND before_snapshot IS NULL
+		   AND snapshot_hash = accounting.journal_snapshot_hash(
+		       org_id,
+		       subject_type,
+		       draft_id,
+		       journal_entry_id,
+		       action,
+		       actor,
+		       version,
+		       before_snapshot,
+		       after_snapshot
+		   )
+	`, reversalID).Scan(&reversalAuditLineCount); err != nil {
+		t.Fatalf("read journal reversal audit snapshot: %v", err)
+	}
+	if reversalAuditLineCount != 2 {
+		t.Fatalf(
+			"journal reversal audit line count = %d, want 2",
+			reversalAuditLineCount,
+		)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit journal reversal audit read: %v", err)
+	}
+	assertJournalEventImmutability(t, ctx, database, orgA)
 
 	tx = beginTenantTx(t, ctx, backend, orgA, userA)
 	insertJournalEntry(
@@ -467,6 +1045,55 @@ func assertAccountingAndFiscalInvariants(
 	`, orgA, periodID); err != nil {
 		t.Fatalf("soft-close period: %v", err)
 	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit period soft close: %v", err)
+	}
+
+	tx = beginTenantTx(t, ctx, backend, orgA, userA)
+	insertJournalEntry(
+		t,
+		ctx,
+		tx,
+		orgA,
+		softAdjustEntry,
+		periodID,
+		"adjustment",
+		"soft-closed-adjustment",
+		"",
+	)
+	insertJournalLine(
+		t, ctx, tx, orgA, softAdjustEntry, 1, receivableAccountID, "1.00", "0",
+	)
+	insertJournalLine(
+		t, ctx, tx, orgA, softAdjustEntry, 2, revenueAccountID, "0", "1.00",
+	)
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("soft-closed period rejected an adjustment: %v", err)
+	}
+
+	tx = beginTenantTx(t, ctx, backend, orgA, userA)
+	insertJournalEntry(
+		t,
+		ctx,
+		tx,
+		orgA,
+		softManualEntry,
+		periodID,
+		"manual",
+		"soft-closed-manual",
+		"",
+	)
+	insertJournalLine(
+		t, ctx, tx, orgA, softManualEntry, 1, receivableAccountID, "1.00", "0",
+	)
+	insertJournalLine(
+		t, ctx, tx, orgA, softManualEntry, 2, revenueAccountID, "0", "1.00",
+	)
+	if err := tx.Commit(ctx); err == nil {
+		t.Fatal("soft-closed period accepted a non-adjusting manual entry")
+	}
+
+	tx = beginTenantTx(t, ctx, backend, orgA, userA)
 	if _, err := tx.Exec(ctx, `
 		UPDATE accounting.periods
 		   SET status = 'locked',
@@ -644,6 +1271,7 @@ func assertAccountingAndFiscalInvariants(
 
 	tx = beginTenantTx(t, ctx, backend, orgB, userA)
 	assertTxCount(t, ctx, tx, "SELECT count(*) FROM accounting.accounts", 0)
+	assertTxCount(t, ctx, tx, "SELECT count(*) FROM accounting.journal_events", 0)
 	assertTxCount(t, ctx, tx, "SELECT count(*) FROM iam.membership_permissions", 0)
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatalf("commit tenant B accounting read: %v", err)
@@ -2036,6 +2664,113 @@ func assertFiscalAccountingWorkerBoundary(
 		t.Fatal("fiscal accounting worker can read fiscal certificates")
 	}
 	_ = tx.Rollback(ctx)
+}
+
+func assertJournalWorkflowPrivileges(
+	t *testing.T,
+	ctx context.Context,
+	database *postgres.DB,
+) {
+	t.Helper()
+	for _, check := range []struct {
+		role      string
+		relation  string
+		privilege string
+	}{
+		{"pymes_backend", "accounting.journal_entries", "UPDATE"},
+		{"pymes_backend", "accounting.journal_entries", "DELETE"},
+		{"pymes_fiscal_accounting_worker", "accounting.journal_entries", "UPDATE"},
+		{"pymes_fiscal_accounting_worker", "accounting.journal_entries", "DELETE"},
+		{"pymes_backend", "accounting.journal_events", "INSERT"},
+		{"pymes_backend", "accounting.journal_events", "UPDATE"},
+		{"pymes_backend", "accounting.journal_events", "DELETE"},
+		{"pymes_fiscal_accounting_worker", "accounting.journal_events", "INSERT"},
+		{"pymes_fiscal_accounting_worker", "accounting.journal_events", "UPDATE"},
+		{"pymes_fiscal_accounting_worker", "accounting.journal_events", "DELETE"},
+	} {
+		var granted bool
+		if err := database.QueryRow(
+			ctx,
+			"SELECT has_table_privilege($1, $2, $3)",
+			check.role,
+			check.relation,
+			check.privilege,
+		).Scan(&granted); err != nil {
+			t.Fatalf(
+				"query %s %s on %s: %v",
+				check.role,
+				check.privilege,
+				check.relation,
+				err,
+			)
+		}
+		if granted {
+			t.Fatalf(
+				"%s unexpectedly has %s on %s",
+				check.role,
+				check.privilege,
+				check.relation,
+			)
+		}
+	}
+}
+
+func assertJournalEventImmutability(
+	t *testing.T,
+	ctx context.Context,
+	database *postgres.DB,
+	orgID string,
+) {
+	t.Helper()
+	for name, statement := range map[string]string{
+		"update": `
+			UPDATE accounting.journal_events
+			   SET details = details || '{"tampered": true}'::jsonb
+			 WHERE org_id = $1
+			   AND id = (
+					SELECT id
+					  FROM accounting.journal_events
+					 WHERE org_id = $1
+					 ORDER BY occurred_at, id
+					 LIMIT 1
+			   )
+		`,
+		"delete": `
+			DELETE FROM accounting.journal_events
+			 WHERE org_id = $1
+			   AND id = (
+					SELECT id
+					  FROM accounting.journal_events
+					 WHERE org_id = $1
+					 ORDER BY occurred_at, id
+					 LIMIT 1
+			   )
+		`,
+	} {
+		tx, err := database.Pool().Begin(ctx)
+		if err != nil {
+			t.Fatalf("begin journal event %s transaction: %v", name, err)
+		}
+		if _, err := tx.Exec(ctx, `
+			SELECT
+				set_config('app.org_id', $1, true),
+				set_config('app.user_id', 'integration-test', true)
+		`, orgID); err != nil {
+			_ = tx.Rollback(ctx)
+			t.Fatalf("set journal event %s context: %v", name, err)
+		}
+		_, err = tx.Exec(ctx, statement, orgID)
+		var postgresError *pgconn.PgError
+		if !errors.As(err, &postgresError) || postgresError.Code != "55000" {
+			_ = tx.Rollback(ctx)
+			t.Fatalf(
+				"journal event %s error = %v, want immutable SQLSTATE 55000",
+				name,
+				err,
+			)
+		}
+		_ = tx.Rollback(ctx)
+	}
 }
 
 func beginTenantTx(

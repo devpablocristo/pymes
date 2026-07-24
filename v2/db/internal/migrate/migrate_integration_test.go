@@ -2,15 +2,21 @@ package migrate
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"os"
+	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	postgres "github.com/devpablocristo/platform/databases/postgres/go"
 	platformiam "github.com/devpablocristo/platform/iam/go"
+	platformidempotency "github.com/devpablocristo/platform/idempotency/go"
 	platformoutbox "github.com/devpablocristo/platform/outbox/go"
 	"github.com/devpablocristo/pymes/v2/db/migrations"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -49,6 +55,183 @@ func TestUpFromEmptyDatabaseIsRepeatableAcrossReconnect(t *testing.T) {
 	assertSchemaState(t, ctx, database)
 	assertTenantIsolationAndOwnerInvariant(t, ctx, database, databaseURL)
 	assertAccountingAndFiscalInvariants(t, ctx, database, databaseURL)
+}
+
+func TestJournalWorkflowMigrationRejectsHistoricalCurrencyDrift(t *testing.T) {
+	databaseURL := os.Getenv("PYMES_DATABASE_TEST_URL")
+	if databaseURL == "" {
+		t.Skip("PYMES_DATABASE_TEST_URL is not set")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	database := openDatabase(t, ctx, databaseURL)
+	resetDatabase(t, ctx, database)
+	ensureTestRoles(t, ctx, database)
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(
+			context.Background(),
+			10*time.Second,
+		)
+		defer cleanupCancel()
+		resetDatabase(t, cleanupCtx, database)
+		database.Close()
+	})
+
+	productMigrations := productMigrationsThrough(
+		t,
+		"000018_accounting_bootstrap.sql",
+	)
+	if err := postgres.MigrateProfiles(
+		ctx,
+		database,
+		platformiam.MigrationProfile(),
+		postgres.MigrationProfile{
+			Scope:      IdempotencyScope,
+			Migrations: platformidempotency.Migrations,
+			Dir:        "migrations",
+		},
+		platformoutbox.MigrationProfile(),
+		postgres.MigrationProfile{
+			Scope:      migrations.Scope,
+			Migrations: productMigrations,
+			Dir:        ".",
+		},
+	); err != nil {
+		t.Fatalf("apply migrations through 000018: %v", err)
+	}
+
+	const (
+		orgID     = "00000000-0000-0000-0000-00000000f001"
+		accountID = "00000000-0000-0000-0000-00000000f002"
+		draftID   = "00000000-0000-0000-0000-00000000f003"
+	)
+	if _, err := database.Exec(ctx, `
+		INSERT INTO iam.organizations (
+			id, provider, external_id, name, slug, status
+		)
+		VALUES (
+			$1, 'clerk', 'migration_preflight', 'Migration preflight',
+			'migration-preflight', 'provisioning'
+		)
+	`, orgID); err != nil {
+		t.Fatalf("seed preflight organization: %v", err)
+	}
+	if _, err := database.Exec(ctx, `
+		INSERT INTO accounting.organization_settings (
+			org_id, country_code, functional_currency
+		)
+		VALUES ($1, 'AR', 'ARS')
+	`, orgID); err != nil {
+		t.Fatalf("seed preflight accounting settings: %v", err)
+	}
+	if _, err := database.Exec(ctx, `
+		INSERT INTO accounting.accounts (
+			org_id, id, code, name, account_class, normal_balance,
+			monetary_class, posting_allowed
+		)
+		VALUES (
+			$1, $2, '1.1.99', 'Migration test account', 'asset', 'debit',
+			'monetary', true
+		)
+	`, orgID, accountID); err != nil {
+		t.Fatalf("seed preflight accounting account: %v", err)
+	}
+	if _, err := database.Exec(ctx, `
+		INSERT INTO accounting.drafts (
+			org_id, id, idempotency_key, entry_date, entry_kind,
+			description, created_by
+		)
+		VALUES (
+			$1, $2, 'migration-preflight-draft', DATE '2026-01-10',
+			'manual', 'Historical draft', 'migration-test'
+		)
+	`, orgID, draftID); err != nil {
+		t.Fatalf("seed preflight historical draft: %v", err)
+	}
+	if _, err := database.Exec(ctx, `
+		INSERT INTO accounting.draft_lines (
+			org_id, draft_id, line_no, account_id, description,
+			debit_amount, credit_amount, currency_code, currency_amount,
+			exchange_rate, exchange_rate_date, exchange_rate_source
+		)
+		VALUES
+			(
+				$1, $3, 1, $2, 'USD line', 100, 0, 'USD', 1, 100,
+				DATE '2026-01-10', 'BNA'
+			),
+			(
+				$1, $3, 2, $2, 'EUR line', 0, 100, 'EUR', 1, 100,
+				DATE '2026-01-10', 'BNA'
+			)
+	`, orgID, accountID, draftID); err != nil {
+		t.Fatalf("seed historical draft with currency drift: %v", err)
+	}
+
+	err := Up(ctx, database)
+	var postgresError *pgconn.PgError
+	if !errors.As(err, &postgresError) {
+		t.Fatalf("Up() error = %v, want PostgreSQL preflight error", err)
+	}
+	if postgresError.ConstraintName !=
+		"accounting_draft_lines_historical_currency" {
+		t.Fatalf(
+			"preflight constraint = %q",
+			postgresError.ConstraintName,
+		)
+	}
+	var appliedCount int
+	if err := database.QueryRow(ctx, `
+		SELECT count(*)
+		  FROM schema_migrations
+		 WHERE scope = $1
+		   AND version = '000019_journal_workflow.sql'
+	`, migrations.Scope).Scan(&appliedCount); err != nil {
+		t.Fatalf("query failed migration registration: %v", err)
+	}
+	if appliedCount != 0 {
+		t.Fatal("failed journal workflow migration was registered")
+	}
+
+	if _, err := database.Exec(ctx, `
+		UPDATE accounting.draft_lines
+		   SET currency_code = 'USD'
+		 WHERE org_id = $1
+		   AND draft_id = $2
+		   AND line_no = 2
+	`, orgID, draftID); err != nil {
+		t.Fatalf("repair historical draft currency metadata: %v", err)
+	}
+	if err := Up(ctx, database); err != nil {
+		t.Fatalf("Up() after historical draft repair error = %v", err)
+	}
+}
+
+func productMigrationsThrough(t *testing.T, through string) fstest.MapFS {
+	t.Helper()
+
+	result := fstest.MapFS{}
+	entries, err := fs.ReadDir(migrations.Files, ".")
+	if err != nil {
+		t.Fatalf("read product migrations: %v", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() ||
+			!strings.HasSuffix(entry.Name(), ".sql") ||
+			entry.Name() > through {
+			continue
+		}
+		body, err := fs.ReadFile(migrations.Files, entry.Name())
+		if err != nil {
+			t.Fatalf("read product migration %s: %v", entry.Name(), err)
+		}
+		result[entry.Name()] = &fstest.MapFile{
+			Data: body,
+			Mode: 0o444,
+		}
+	}
+	return result
 }
 
 func openDatabase(t *testing.T, ctx context.Context, databaseURL string) *postgres.DB {
@@ -131,6 +314,7 @@ func assertSchemaState(t *testing.T, ctx context.Context, database *postgres.DB)
 		"accounting.accounts",
 		"accounting.journal_entries",
 		"accounting.journal_lines",
+		"accounting.journal_events",
 		"accounting.reconciliations",
 		"fiscal.vouchers",
 		"fiscal.voucher_snapshots",
@@ -175,8 +359,8 @@ func assertSchemaState(t *testing.T, ctx context.Context, database *postgres.DB)
 	).Scan(&productMigrationCount); err != nil {
 		t.Fatalf("query product migrations: %v", err)
 	}
-	if productMigrationCount != 18 {
-		t.Fatalf("product migration count = %d, want 18", productMigrationCount)
+	if productMigrationCount != 20 {
+		t.Fatalf("product migration count = %d, want 20", productMigrationCount)
 	}
 
 	var iamMigrationCount int

@@ -196,6 +196,12 @@ func (repository *Repository) CreateReconciliation(
 	ctx context.Context,
 	reconciliation accounting.Reconciliation,
 ) (accounting.Reconciliation, error) {
+	if err := repository.lockReconciliationFinancialAccounts(
+		ctx,
+		reconciliation.FinancialAccountID,
+	); err != nil {
+		return accounting.Reconciliation{}, err
+	}
 	status := reconciliationStatusToDatabase(reconciliation.Status)
 	if status == "" {
 		status = "draft"
@@ -376,9 +382,18 @@ func (repository *Repository) SaveReconciliation(
 	reconciliation accounting.Reconciliation,
 	expectedVersion int64,
 ) (accounting.Reconciliation, error) {
+	if err := repository.lockReconciliationFinancialAccounts(
+		ctx,
+		reconciliation.FinancialAccountID,
+	); err != nil {
+		return accounting.Reconciliation{}, err
+	}
 	current, err := repository.GetReconciliation(ctx, reconciliation.ID, true)
 	if err != nil {
 		return accounting.Reconciliation{}, err
+	}
+	if current.FinancialAccountID != reconciliation.FinancialAccountID {
+		return accounting.Reconciliation{}, accounting.ErrInvalidArgument
 	}
 	if current.Version != expectedVersion {
 		return accounting.Reconciliation{}, accounting.ErrVersionConflict

@@ -20,9 +20,12 @@ func (repository *Repository) PostEntry(
 		  FROM accounting.periods
 		 WHERE org_id = $1
 		   AND $2::date BETWEEN start_date AND end_date
-		 FOR UPDATE
+		 FOR SHARE
 	`, repository.orgID, entry.Date).Scan(&periodID); err != nil {
 		return accounting.JournalEntry{}, mapError(err)
+	}
+	if err := repository.lockPostingDependencies(ctx, entry.Lines); err != nil {
+		return accounting.JournalEntry{}, err
 	}
 	var (
 		number   int64
@@ -48,6 +51,7 @@ func (repository *Repository) PostEntry(
 			entry_date,
 			period_id,
 			entry_kind,
+			reference,
 			description,
 			functional_currency,
 			source_type,
@@ -62,8 +66,8 @@ func (repository *Repository) PostEntry(
 			created_by
 		)
 		VALUES (
-			$1, $2, 1, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-			$12, $13, $14, $15, $16, $17
+			$1, $2, 1, $3, $4, $5, NULLIF($6, ''), $7, $8, $9,
+			$10, $11, $12, $13, $14, $15, $16, $17, $18
 		)
 		RETURNING entry_number, posted_at
 	`,
@@ -72,6 +76,7 @@ func (repository *Repository) PostEntry(
 		entry.Date,
 		periodID,
 		entry.Kind,
+		entry.Reference,
 		entry.Description,
 		entry.FunctionalCurrency.Code(),
 		entry.Source.Type,
@@ -148,6 +153,9 @@ func (repository *Repository) PostEntry(
 			return accounting.JournalEntry{}, mapError(err)
 		}
 	}
+	if err := repository.validateJournalConstraints(ctx); err != nil {
+		return accounting.JournalEntry{}, err
+	}
 	entry.Number = number
 	entry.CreatedAt = postedAt
 	return entry, nil
@@ -158,26 +166,36 @@ func (repository *Repository) GetEntry(
 	id uuid.UUID,
 ) (accounting.JournalEntry, error) {
 	entry, err := repository.scanEntry(repository.tx.QueryRow(ctx, `
-		SELECT
-			id,
-			entry_number,
-			entry_date,
-			entry_kind,
-			posting_kind,
-			functional_currency,
-			coalesce(source_type, ''),
-			coalesce(source_id, ''),
-			source_event,
-			idempotency_key,
-			description,
-			created_by,
-			posted_at,
-			reverses_entry_id,
-			coalesce(reversal_reason, ''),
-			draft_id
-		  FROM accounting.journal_entries
-		 WHERE org_id = $1
-		   AND id = $2
+			SELECT
+				entry.id,
+				entry.entry_number,
+				entry.entry_date,
+				entry.entry_kind,
+				entry.posting_kind,
+				entry.functional_currency,
+				coalesce(entry.reference, ''),
+				coalesce(entry.source_type, ''),
+				coalesce(entry.source_id, ''),
+				entry.source_event,
+				entry.idempotency_key,
+				entry.description,
+				entry.created_by,
+				entry.posted_at,
+				entry.reverses_entry_id,
+				reversed_entry.entry_number,
+				coalesce(entry.reversal_reason, ''),
+				entry.draft_id,
+				direct_reversal.id,
+				direct_reversal.entry_number
+			  FROM accounting.journal_entries AS entry
+			  LEFT JOIN accounting.journal_entries AS reversed_entry
+			    ON reversed_entry.org_id = entry.org_id
+			   AND reversed_entry.id = entry.reverses_entry_id
+			  LEFT JOIN accounting.journal_entries AS direct_reversal
+			    ON direct_reversal.org_id = entry.org_id
+			   AND direct_reversal.reverses_entry_id = entry.id
+			 WHERE entry.org_id = $1
+			   AND entry.id = $2
 	`, repository.orgID, id))
 	if err != nil {
 		return accounting.JournalEntry{}, err
@@ -188,10 +206,17 @@ func (repository *Repository) GetEntry(
 	}
 	entry.Lines = lines
 	if len(lines) > 0 {
-		entry.Currency = lines[0].Currency
-		entry.ExchangeRate = lines[0].ExchangeRate
-		entry.ExchangeRateDate = lines[0].ExchangeRateDate
-		entry.ExchangeRateSource = lines[0].ExchangeRateSource
+		representative := lines[0]
+		for _, line := range lines {
+			if line.Currency.Code() != entry.FunctionalCurrency.Code() {
+				representative = line
+				break
+			}
+		}
+		entry.Currency = representative.Currency
+		entry.ExchangeRate = representative.ExchangeRate
+		entry.ExchangeRateDate = representative.ExchangeRateDate
+		entry.ExchangeRateSource = representative.ExchangeRateSource
 	}
 	return entry, nil
 }
@@ -233,6 +258,68 @@ func (repository *Repository) FindDirectReversal(
 	return repository.GetEntry(ctx, reversalID)
 }
 
+func (repository *Repository) EntryHasOpenItemEffects(
+	ctx context.Context,
+	id uuid.UUID,
+) (bool, error) {
+	var linked bool
+	if err := repository.tx.QueryRow(ctx, `
+		SELECT
+			EXISTS (
+				SELECT 1
+				  FROM accounting.open_items AS item
+				 WHERE item.org_id = $1
+				   AND item.origin_journal_entry_id = $2
+			)
+			OR EXISTS (
+				SELECT 1
+				  FROM accounting.open_item_applications AS application
+				 WHERE application.org_id = $1
+				   AND application.settlement_journal_entry_id = $2
+			)
+	`, repository.orgID, id).Scan(&linked); err != nil {
+		return false, mapError(err)
+	}
+	return linked, nil
+}
+
+func (repository *Repository) TouchesClosedReconciliation(
+	ctx context.Context,
+	entryDate time.Time,
+	accountIDs []uuid.UUID,
+) (bool, error) {
+	if len(accountIDs) == 0 {
+		return false, nil
+	}
+	rows, err := repository.tx.Query(ctx, `
+		SELECT reconciliation.status
+		  FROM accounting.reconciliations AS reconciliation
+		  JOIN accounting.financial_accounts AS financial_account
+		    ON financial_account.org_id = reconciliation.org_id
+		   AND financial_account.id = reconciliation.financial_account_id
+		 WHERE reconciliation.org_id = $1
+		   AND $2::date BETWEEN reconciliation.start_date
+		                    AND reconciliation.end_date
+		   AND financial_account.ledger_account_id = ANY($3::uuid[])
+	`, repository.orgID, entryDate, accountIDs)
+	if err != nil {
+		return false, mapError(err)
+	}
+	defer rows.Close()
+	closed := false
+	for rows.Next() {
+		var status string
+		if err := rows.Scan(&status); err != nil {
+			return false, mapError(err)
+		}
+		closed = closed || status == "closed"
+	}
+	if err := rows.Err(); err != nil {
+		return false, mapError(err)
+	}
+	return closed, nil
+}
+
 func (repository *Repository) ListJournal(
 	ctx context.Context,
 	filter accounting.JournalFilter,
@@ -245,8 +332,78 @@ func (repository *Repository) ListJournal(
 		limit = 200
 	}
 	rows, err := repository.tx.Query(ctx, `
-		SELECT entry.id
+		SELECT
+			entry.id,
+			entry.entry_number,
+			entry.entry_date,
+			entry.entry_kind,
+			entry.posting_kind,
+			entry.functional_currency,
+			coalesce(entry.reference, ''),
+			coalesce(entry.source_type, ''),
+			coalesce(entry.source_id, ''),
+			entry.source_event,
+			entry.idempotency_key,
+			entry.description,
+			entry.created_by,
+			entry.posted_at,
+			entry.reverses_entry_id,
+			reversed_entry.entry_number,
+			coalesce(entry.reversal_reason, ''),
+			entry.draft_id,
+			direct_reversal.id,
+			direct_reversal.entry_number,
+			totals.debit_total::text,
+			totals.credit_total::text,
+			totals.currency_code,
+			totals.exchange_rate::text,
+			totals.exchange_rate_date,
+			totals.exchange_rate_source
 		  FROM accounting.journal_entries AS entry
+		  LEFT JOIN accounting.journal_entries AS direct_reversal
+		    ON direct_reversal.org_id = entry.org_id
+		   AND direct_reversal.reverses_entry_id = entry.id
+		  LEFT JOIN accounting.journal_entries AS reversed_entry
+		    ON reversed_entry.org_id = entry.org_id
+		   AND reversed_entry.id = entry.reverses_entry_id
+		  JOIN LATERAL (
+			SELECT
+				sum(line.debit_amount) AS debit_total,
+				sum(line.credit_amount) AS credit_total,
+				(array_agg(
+					line.currency_code
+					ORDER BY
+						(line.currency_code = entry.functional_currency),
+						line.line_no
+				))[1]
+					AS currency_code,
+				(array_agg(
+					line.exchange_rate
+					ORDER BY
+						(line.currency_code = entry.functional_currency),
+						line.line_no
+				))[1]
+					AS exchange_rate,
+				(array_agg(
+					line.exchange_rate_date
+					ORDER BY
+						(line.currency_code = entry.functional_currency),
+						line.line_no
+				))[1]
+					AS exchange_rate_date,
+				coalesce(
+					(array_agg(
+						line.exchange_rate_source
+						ORDER BY
+							(line.currency_code = entry.functional_currency),
+							line.line_no
+					))[1],
+					''
+				) AS exchange_rate_source
+			  FROM accounting.journal_lines AS line
+			 WHERE line.org_id = entry.org_id
+			   AND line.journal_entry_id = entry.id
+		  ) AS totals ON true
 		 WHERE entry.org_id = $1
 		   AND ($2::date IS NULL OR entry.entry_date >= $2)
 		   AND ($3::date IS NULL OR entry.entry_date <= $3)
@@ -276,10 +433,37 @@ func (repository *Repository) ListJournal(
 		   AND (
 				$9::text = ''
 				OR entry.description ILIKE '%' || $9 || '%'
+				OR lower(entry.reference) LIKE lower($9) || '%'
+				OR coalesce(entry.source_type, '') ILIKE '%' || $9 || '%'
+				OR coalesce(entry.source_id, '') ILIKE '%' || $9 || '%'
 				OR entry.entry_number::text = $9
+				OR EXISTS (
+					SELECT 1
+					  FROM accounting.journal_lines AS search_line
+					  JOIN accounting.accounts AS search_account
+					    ON search_account.org_id = search_line.org_id
+					   AND search_account.id = search_line.account_id
+					 WHERE search_line.org_id = entry.org_id
+					   AND search_line.journal_entry_id = entry.id
+					   AND (
+							search_line.description ILIKE '%' || $9 || '%'
+							OR search_account.code ILIKE '%' || $9 || '%'
+							OR search_account.name ILIKE '%' || $9 || '%'
+					   )
+				)
+		   )
+		   AND (
+				$10::text = ''
+				OR ($10 = 'reversal' AND entry.reverses_entry_id IS NOT NULL)
+				OR ($10 = 'reversed' AND direct_reversal.id IS NOT NULL)
+				OR (
+					$10 = 'regular'
+					AND entry.reverses_entry_id IS NULL
+					AND direct_reversal.id IS NULL
+				)
 		   )
 		 ORDER BY entry.entry_number DESC
-		 LIMIT $10
+		 LIMIT $11
 	`,
 		repository.orgID,
 		filter.From,
@@ -290,41 +474,130 @@ func (repository *Repository) ListJournal(
 		filter.AccountID,
 		partyFilter(filter.PartyID),
 		filter.Query,
+		filter.ReversalState,
 		limit+1,
 	)
 	if err != nil {
 		return accounting.PageResult[accounting.JournalEntry]{}, mapError(err)
 	}
 	defer rows.Close()
-	ids := make([]uuid.UUID, 0, limit+1)
+	entries := make([]accounting.JournalEntry, 0, limit+1)
 	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			return accounting.PageResult[accounting.JournalEntry]{}, mapError(err)
+		entry, scanErr := scanJournalSummary(rows)
+		if scanErr != nil {
+			return accounting.PageResult[accounting.JournalEntry]{}, scanErr
 		}
-		ids = append(ids, id)
+		entries = append(entries, entry)
 	}
 	if err := rows.Err(); err != nil {
 		return accounting.PageResult[accounting.JournalEntry]{}, mapError(err)
 	}
-	hasMore := len(ids) > limit
+	hasMore := len(entries) > limit
 	if hasMore {
-		ids = ids[:limit]
+		entries = entries[:limit]
 	}
 	result := accounting.PageResult[accounting.JournalEntry]{
-		Items: make([]accounting.JournalEntry, 0, len(ids)),
+		Items: entries,
 	}
-	for _, id := range ids {
-		entry, getErr := repository.GetEntry(ctx, id)
+	if filter.IncludeLines && len(result.Items) > 0 {
+		entryIDs := make([]uuid.UUID, 0, len(result.Items))
+		for _, entry := range result.Items {
+			entryIDs = append(entryIDs, entry.ID)
+		}
+		linesByEntry, getErr := repository.listJournalLinesByEntryIDs(ctx, entryIDs)
 		if getErr != nil {
 			return accounting.PageResult[accounting.JournalEntry]{}, getErr
 		}
-		result.Items = append(result.Items, entry)
+		for index := range result.Items {
+			result.Items[index].Lines = linesByEntry[result.Items[index].ID]
+		}
 	}
 	if hasMore && len(result.Items) > 0 {
 		result.NextCursor = fmt.Sprintf("%d", result.Items[len(result.Items)-1].Number)
 	}
 	return result, nil
+}
+
+func scanJournalSummary(row scanner) (accounting.JournalEntry, error) {
+	var (
+		entry          accounting.JournalEntry
+		functionalCode string
+		currencyCode   string
+		sourceID       string
+		debitText      string
+		creditText     string
+		rateText       string
+		rateDate       *time.Time
+	)
+	if err := row.Scan(
+		&entry.ID,
+		&entry.Number,
+		&entry.Date,
+		&entry.Kind,
+		&entry.PostingKind,
+		&functionalCode,
+		&entry.Reference,
+		&entry.Source.Type,
+		&sourceID,
+		&entry.Source.Event,
+		&entry.Source.IdempotencyKey,
+		&entry.Description,
+		&entry.CreatedBy,
+		&entry.CreatedAt,
+		&entry.ReversesEntryID,
+		&entry.ReversesEntryNumber,
+		&entry.ReversalReason,
+		&entry.DraftID,
+		&entry.ReversedByEntryID,
+		&entry.ReversedByEntryNumber,
+		&debitText,
+		&creditText,
+		&currencyCode,
+		&rateText,
+		&rateDate,
+		&entry.ExchangeRateSource,
+	); err != nil {
+		return accounting.JournalEntry{}, mapError(err)
+	}
+	var err error
+	entry.FunctionalCurrency, err = accounting.NewCurrency(functionalCode)
+	if err != nil {
+		return accounting.JournalEntry{}, err
+	}
+	entry.Currency, err = accounting.NewCurrency(currencyCode)
+	if err != nil {
+		return accounting.JournalEntry{}, err
+	}
+	entry.DebitTotal, err = accounting.ParseAmount(debitText)
+	if err != nil {
+		return accounting.JournalEntry{}, err
+	}
+	entry.CreditTotal, err = accounting.ParseAmount(creditText)
+	if err != nil {
+		return accounting.JournalEntry{}, err
+	}
+	entry.ExchangeRate, err = accounting.ParseExchangeRate(rateText)
+	if err != nil {
+		return accounting.JournalEntry{}, err
+	}
+	if rateDate != nil {
+		entry.ExchangeRateDate = *rateDate
+	}
+	if sourceID != "" {
+		entry.Source.ID, err = uuid.Parse(sourceID)
+		if err != nil {
+			return accounting.JournalEntry{}, fmt.Errorf(
+				"accounting postgres: invalid source id: %w",
+				err,
+			)
+		}
+	}
+	entry.IsAdjustment = entry.Kind == accounting.EntryAdjustment ||
+		entry.Kind == accounting.EntryClosing ||
+		entry.Kind == accounting.EntryInflation ||
+		entry.Kind == accounting.EntryRevaluation ||
+		entry.Kind == accounting.EntryReversal
+	return entry, nil
 }
 
 func (repository *Repository) ReportLines(
@@ -617,6 +890,7 @@ func (repository *Repository) scanEntry(row scanner) (accounting.JournalEntry, e
 		&entry.Kind,
 		&entry.PostingKind,
 		&functionalCode,
+		&entry.Reference,
 		&entry.Source.Type,
 		&sourceID,
 		&entry.Source.Event,
@@ -625,8 +899,11 @@ func (repository *Repository) scanEntry(row scanner) (accounting.JournalEntry, e
 		&entry.CreatedBy,
 		&entry.CreatedAt,
 		&entry.ReversesEntryID,
+		&entry.ReversesEntryNumber,
 		&entry.ReversalReason,
 		&entry.DraftID,
+		&entry.ReversedByEntryID,
+		&entry.ReversedByEntryNumber,
 	); err != nil {
 		return accounting.JournalEntry{}, mapError(err)
 	}
@@ -729,6 +1006,99 @@ func (repository *Repository) listJournalLines(
 		return nil, mapError(err)
 	}
 	return lines, nil
+}
+
+func (repository *Repository) listJournalLinesByEntryIDs(
+	ctx context.Context,
+	entryIDs []uuid.UUID,
+) (map[uuid.UUID][]accounting.JournalLine, error) {
+	rows, err := repository.tx.Query(ctx, `
+		SELECT
+			line.journal_entry_id,
+			line.id,
+			line.line_no,
+			line.account_id,
+			account.code,
+			account.name,
+			line.description,
+			line.debit_amount::text,
+			line.credit_amount::text,
+			line.currency_code,
+			line.currency_amount::text,
+			line.exchange_rate::text,
+			line.exchange_rate_date,
+			coalesce(line.exchange_rate_source, ''),
+			line.party_id
+		  FROM accounting.journal_lines AS line
+		  JOIN accounting.accounts AS account
+		    ON account.org_id = line.org_id
+		   AND account.id = line.account_id
+		 WHERE line.org_id = $1
+		   AND line.journal_entry_id = ANY($2::uuid[])
+		 ORDER BY line.journal_entry_id, line.line_no
+	`, repository.orgID, entryIDs)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	defer rows.Close()
+
+	linesByEntry := make(map[uuid.UUID][]accounting.JournalLine, len(entryIDs))
+	for rows.Next() {
+		var (
+			entryID        uuid.UUID
+			line           accounting.JournalLine
+			debitText      string
+			creditText     string
+			currencyCode   string
+			currencyAmount string
+			rateText       string
+			rateDate       *time.Time
+			partyID        *string
+		)
+		if err := rows.Scan(
+			&entryID,
+			&line.ID,
+			&line.LineNo,
+			&line.AccountID,
+			&line.AccountCode,
+			&line.AccountName,
+			&line.Memo,
+			&debitText,
+			&creditText,
+			&currencyCode,
+			&currencyAmount,
+			&rateText,
+			&rateDate,
+			&line.ExchangeRateSource,
+			&partyID,
+		); err != nil {
+			return nil, mapError(err)
+		}
+		if err := hydrateLineAmounts(
+			&line,
+			debitText,
+			creditText,
+			currencyCode,
+			currencyAmount,
+			rateText,
+		); err != nil {
+			return nil, err
+		}
+		if rateDate != nil {
+			line.ExchangeRateDate = *rateDate
+		}
+		if partyID != nil {
+			parsed, parseErr := uuid.Parse(*partyID)
+			if parseErr == nil {
+				line.PartyID = &parsed
+			}
+		}
+		linesByEntry[entryID] = append(linesByEntry[entryID], line)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, mapError(err)
+	}
+	return linesByEntry, nil
 }
 
 func hydrateLineAmounts(

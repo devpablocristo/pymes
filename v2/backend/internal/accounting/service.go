@@ -262,6 +262,9 @@ func (s *Service) CreateDraft(
 	scope Scope,
 	draft Draft,
 ) (Draft, error) {
+	draft.Reference = strings.TrimSpace(draft.Reference)
+	draft.Description = strings.TrimSpace(draft.Description)
+	draft.ExchangeRateSource = strings.TrimSpace(draft.ExchangeRateSource)
 	if draft.ID == uuid.Nil {
 		draft.ID = s.ids.NewID()
 	}
@@ -279,6 +282,20 @@ func (s *Service) CreateDraft(
 	}
 	var created Draft
 	err := s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
+		existing, findErr := repos.FindDraftByIdempotency(
+			ctx,
+			draft.IdempotencyKey,
+		)
+		if findErr == nil {
+			if !sameDraftIntent(existing, draft) {
+				return ErrIdempotencyConflict
+			}
+			created = existing
+			return nil
+		}
+		if !errors.Is(findErr, ErrNotFound) {
+			return findErr
+		}
 		var err error
 		created, err = repos.CreateDraft(ctx, draft)
 		return err
@@ -295,6 +312,9 @@ func (s *Service) UpdateDraft(
 	if draft.ID == uuid.Nil || expectedVersion <= 0 {
 		return Draft{}, fmt.Errorf("%w: draft id and version are required", ErrInvalidArgument)
 	}
+	draft.Reference = strings.TrimSpace(draft.Reference)
+	draft.Description = strings.TrimSpace(draft.Description)
+	draft.ExchangeRateSource = strings.TrimSpace(draft.ExchangeRateSource)
 	draft.UpdatedBy = scope.ActorID
 	draft.UpdatedAt = s.clock.Now()
 	normalizeDraftLines(&draft)
@@ -310,14 +330,22 @@ func (s *Service) UpdateDraft(
 	return updated, err
 }
 
-func (s *Service) DeleteDraft(
+func (s *Service) DiscardDraft(
 	ctx context.Context,
 	scope Scope,
 	id uuid.UUID,
 	expectedVersion int64,
+	reason string,
 ) error {
+	if id == uuid.Nil || expectedVersion <= 0 {
+		return fmt.Errorf("%w: draft id and version are required", ErrInvalidArgument)
+	}
+	reason = strings.TrimSpace(reason)
+	if len(reason) > 500 {
+		return fmt.Errorf("%w: discard reason must not exceed 500 characters", ErrInvalidArgument)
+	}
 	return s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
-		return repos.DeleteDraft(ctx, id, expectedVersion)
+		return repos.DiscardDraft(ctx, id, expectedVersion, scope.ActorID, reason)
 	})
 }
 
@@ -333,18 +361,30 @@ func (s *Service) PostDraft(
 	}
 	var posted JournalEntry
 	err := s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
+		source := EntrySource{
+			Type:           "manual_draft",
+			ID:             id,
+			Event:          "primary",
+			IdempotencyKey: idempotencyKey,
+		}
+		existing, findErr := repos.FindEntryBySource(ctx, source)
+		if findErr == nil {
+			if existing.Source.IdempotencyKey != idempotencyKey ||
+				existing.Source.Event != source.Event {
+				return ErrIdempotencyConflict
+			}
+			posted = existing
+			return nil
+		}
+		if !errors.Is(findErr, ErrNotFound) {
+			return findErr
+		}
 		draft, err := repos.GetDraft(ctx, id, true)
 		if err != nil {
 			return err
 		}
 		if draft.Version != expectedVersion {
 			return ErrVersionConflict
-		}
-		source := EntrySource{
-			Type:           "manual_draft",
-			ID:             id,
-			Event:          "primary",
-			IdempotencyKey: idempotencyKey,
 		}
 		entry := draft.ToEntry(source, scope.ActorID)
 		entry.DraftID = &id
@@ -355,6 +395,45 @@ func (s *Service) PostDraft(
 		return repos.MarkDraftPosted(ctx, id, expectedVersion, posted.ID)
 	})
 	return posted, err
+}
+
+func sameDraftIntent(left Draft, right Draft) bool {
+	if !left.Date.Equal(right.Date) ||
+		left.Reference != right.Reference ||
+		left.Kind != right.Kind ||
+		left.FunctionalCurrency.Code() != right.FunctionalCurrency.Code() ||
+		left.Currency.Code() != right.Currency.Code() ||
+		!left.ExchangeRate.Equal(right.ExchangeRate) ||
+		!left.ExchangeRateDate.Equal(right.ExchangeRateDate) ||
+		left.ExchangeRateSource != right.ExchangeRateSource ||
+		left.Description != right.Description ||
+		left.IsAdjustment != right.IsAdjustment ||
+		left.SourceType != right.SourceType ||
+		left.SourceID != right.SourceID ||
+		len(left.Lines) != len(right.Lines) {
+		return false
+	}
+	for index := range left.Lines {
+		a := left.Lines[index]
+		b := right.Lines[index]
+		if a.AccountID != b.AccountID ||
+			!a.Debit.Equal(b.Debit) ||
+			!a.Credit.Equal(b.Credit) ||
+			!a.TransactionDebit.Equal(b.TransactionDebit) ||
+			!a.TransactionCredit.Equal(b.TransactionCredit) ||
+			a.Currency.Code() != b.Currency.Code() ||
+			!a.ExchangeRate.Equal(b.ExchangeRate) ||
+			!a.ExchangeRateDate.Equal(b.ExchangeRateDate) ||
+			a.ExchangeRateSource != b.ExchangeRateSource ||
+			a.Memo != b.Memo {
+			return false
+		}
+		if (a.PartyID == nil) != (b.PartyID == nil) ||
+			(a.PartyID != nil && *a.PartyID != *b.PartyID) {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Service) PostPlan(
@@ -501,6 +580,22 @@ func (s *Service) ReverseEntry(
 		if err != nil {
 			return err
 		}
+		if command.Date.Before(original.Date) {
+			return fmt.Errorf(
+				"%w: reversal date cannot precede the original entry date",
+				ErrInvalidArgument,
+			)
+		}
+		if !isSafelyReversibleEntry(original) {
+			return ErrReversalNotAllowed
+		}
+		hasOpenItemEffects, err := repos.EntryHasOpenItemEffects(ctx, original.ID)
+		if err != nil {
+			return err
+		}
+		if hasOpenItemEffects {
+			return ErrReversalNotAllowed
+		}
 		if existing, findErr := repos.FindDirectReversal(ctx, command.EntryID); findErr == nil {
 			posted = existing
 			if existing.Source.IdempotencyKey == command.IdempotencyKey {
@@ -532,6 +627,7 @@ func (s *Service) ReverseEntry(
 			IsAdjustment:    true,
 			Lines:           make([]JournalLine, 0, len(original.Lines)),
 		}
+		reversal.ReversesEntryNumber = &original.Number
 		for index, line := range original.Lines {
 			reversal.Lines = append(reversal.Lines, JournalLine{
 				AccountID:          line.AccountID,
@@ -552,6 +648,41 @@ func (s *Service) ReverseEntry(
 		return err
 	})
 	return posted, err
+}
+
+func isSafelyReversibleEntry(entry JournalEntry) bool {
+	sourceType := strings.TrimSpace(entry.Source.Type)
+	switch entry.Kind {
+	case EntryManual:
+		switch sourceType {
+		case "", "manual", "manual_draft":
+			return true
+		default:
+			return false
+		}
+	case EntryAdjustment:
+		return !isDocumentaryAccountingSource(sourceType)
+	case EntryReversal:
+		return sourceType == "journal_entry"
+	default:
+		return false
+	}
+}
+
+func isDocumentaryAccountingSource(sourceType string) bool {
+	switch strings.TrimSpace(sourceType) {
+	case "sale",
+		"purchase",
+		"receipt",
+		"supplier_payment",
+		"customer_credit_note",
+		"customer_debit_note",
+		"fiscal_voucher",
+		"inventory":
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *Service) CreatePeriod(
@@ -844,6 +975,7 @@ func (s *Service) postEntryWithStatusInTx(
 	entry JournalEntry,
 ) (JournalEntry, bool, error) {
 	entry.CreatedBy = scope.ActorID
+	entry.Reference = strings.TrimSpace(entry.Reference)
 	if entry.ID == uuid.Nil {
 		entry.ID = s.ids.NewID()
 	}
@@ -863,6 +995,9 @@ func (s *Service) postEntryWithStatusInTx(
 	}
 	period, err := repos.FindPeriodForDate(ctx, entry.Date, true)
 	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return JournalEntry{}, false, ErrPeriodClosed
+		}
 		return JournalEntry{}, false, err
 	}
 	// The period row serializes normal posting for a date. Recheck after taking
@@ -878,18 +1013,40 @@ func (s *Service) postEntryWithStatusInTx(
 	if !errors.Is(err, ErrNotFound) {
 		return JournalEntry{}, false, err
 	}
+	if entry.ReversesEntryID != nil {
+		directReversal, reversalErr := repos.FindDirectReversal(
+			ctx,
+			*entry.ReversesEntryID,
+		)
+		if reversalErr == nil {
+			if directReversal.Source.IdempotencyKey ==
+				entry.Source.IdempotencyKey {
+				return directReversal, false, nil
+			}
+			return JournalEntry{}, false, ErrAlreadyReversed
+		}
+		if !errors.Is(reversalErr, ErrNotFound) {
+			return JournalEntry{}, false, reversalErr
+		}
+	}
 	if period.Status == PeriodLocked ||
-		(period.Status == PeriodSoftClosed && (!entry.IsAdjustment || !scope.CanPostAdjustments)) {
+		(period.Status == PeriodSoftClosed &&
+			(!isAdjustingEntryKind(entry.Kind) || !scope.CanPostAdjustments)) {
 		return JournalEntry{}, false, ErrPeriodClosed
 	}
 	seen := make(map[uuid.UUID]struct{}, len(entry.Lines))
+	accountIDs := make([]uuid.UUID, 0, len(entry.Lines))
 	for _, line := range entry.Lines {
 		if _, ok := seen[line.AccountID]; ok {
 			continue
 		}
 		seen[line.AccountID] = struct{}{}
+		accountIDs = append(accountIDs, line.AccountID)
 		account, accountErr := repos.GetAccount(ctx, line.AccountID)
 		if accountErr != nil {
+			if errors.Is(accountErr, ErrNotFound) {
+				return JournalEntry{}, false, ErrAccountNotPostable
+			}
 			return JournalEntry{}, false, accountErr
 		}
 		if account.ArchivedAt != nil {
@@ -899,8 +1056,28 @@ func (s *Service) postEntryWithStatusInTx(
 			return JournalEntry{}, false, ErrAccountNotPostable
 		}
 	}
+	closedReconciliation, err := repos.TouchesClosedReconciliation(
+		ctx,
+		entry.Date,
+		accountIDs,
+	)
+	if err != nil {
+		return JournalEntry{}, false, err
+	}
+	if closedReconciliation {
+		return JournalEntry{}, false, ErrReconciliationClosed
+	}
 	posted, err := repos.PostEntry(ctx, entry)
 	return posted, err == nil, err
+}
+
+func isAdjustingEntryKind(kind EntryKind) bool {
+	switch kind {
+	case EntryAdjustment, EntryClosing, EntryInflation, EntryRevaluation, EntryReversal:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *Service) withTenant(

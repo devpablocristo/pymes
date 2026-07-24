@@ -113,6 +113,9 @@ func mapError(err error) error {
 	constraint := strings.ToLower(postgresError.ConstraintName)
 	switch postgresError.Code {
 	case "23505":
+		if strings.Contains(constraint, "direct_reversal") {
+			return accounting.ErrAlreadyReversed
+		}
 		if strings.Contains(constraint, "idempotency") {
 			return fmt.Errorf("%w: %s", accounting.ErrIdempotencyConflict, postgresError.Detail)
 		}
@@ -137,6 +140,15 @@ func mapError(err error) error {
 			return accounting.ErrPeriodClosed
 		case strings.Contains(constraint, "active_posting_account"):
 			return accounting.ErrAccountNotPostable
+		case strings.Contains(constraint, "closed_reconciliation"):
+			return accounting.ErrReconciliationClosed
+		case strings.Contains(constraint, "reversal_date"),
+			strings.Contains(constraint, "functional_currency"),
+			strings.Contains(constraint, "exchange_rate_date"),
+			strings.Contains(constraint, "header_currency"),
+			strings.Contains(constraint, "period_date"),
+			strings.Contains(constraint, "currency_conversion"):
+			return accounting.ErrInvalidArgument
 		case strings.Contains(constraint, "direct_reversal"),
 			strings.Contains(constraint, "exact_reversal"):
 			return accounting.ErrAlreadyReversed

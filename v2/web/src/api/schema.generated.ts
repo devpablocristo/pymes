@@ -449,6 +449,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounting/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAccountingSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/accounts": {
         parameters: {
             query?: never;
@@ -536,9 +552,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["getJournalDraft"];
         put: operations["updateJournalDraft"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/drafts/{draft_id}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["discardJournalDraft"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1462,6 +1494,11 @@ export interface components {
         AccountingNormalBalance: "debit" | "credit";
         /** @enum {string} */
         MonetaryClassification: "monetary" | "non_monetary" | "not_applicable";
+        AccountingSettings: {
+            country_code: string;
+            functional_currency: components["schemas"]["CurrencyCode"];
+            timezone: string;
+        };
         AccountingAccount: {
             /** Format: uuid */
             id: string;
@@ -1527,12 +1564,32 @@ export interface components {
             /** Format: uuid */
             id: string;
             line_number: number;
+            account_code: string;
+            account_name: string;
         };
+        /** @enum {string} */
+        AccountingEntryKind: "manual" | "sale" | "purchase" | "collection" | "payment" | "refund" | "inventory" | "cogs" | "tax" | "adjustment" | "closing" | "inflation" | "revaluation" | "reversal";
+        /** @enum {string} */
+        JournalPostingState: "incomplete" | "unbalanced" | "blocked" | "ready";
+        /** @enum {string} */
+        JournalPostingIssue: "description_required" | "minimum_lines" | "line_account_required" | "line_side_invalid" | "unbalanced" | "zero_total" | "period_closed" | "account_archived" | "account_not_postable";
+        JournalPostingStatus: {
+            state: components["schemas"]["JournalPostingState"];
+            difference: components["schemas"]["DecimalAmount"];
+            issues: components["schemas"]["JournalPostingIssue"][];
+        };
+        /** @enum {string} */
+        JournalReversalState: "regular" | "reversal" | "reversed";
         JournalDraftInput: {
             /** Format: date */
             accounting_date: string;
+            reference?: string;
             description: string;
             currency: components["schemas"]["CurrencyCode"];
+            exchange_rate?: components["schemas"]["DecimalAmount"];
+            /** Format: date */
+            exchange_rate_date?: string;
+            exchange_rate_source?: string;
             lines: components["schemas"]["JournalLineInput"][];
         };
         UpdateJournalDraftInput: components["schemas"]["JournalDraftInput"] & {
@@ -1544,16 +1601,54 @@ export interface components {
             id: string;
             /** Format: date */
             accounting_date: string;
+            reference?: string;
             description: string;
+            functional_currency: components["schemas"]["CurrencyCode"];
             currency: components["schemas"]["CurrencyCode"];
+            exchange_rate: components["schemas"]["DecimalAmount"];
+            /** Format: date */
+            exchange_rate_date?: string;
+            exchange_rate_source?: string;
+            kind: components["schemas"]["AccountingEntryKind"];
             lines: components["schemas"]["JournalLine"][];
             total_debit: components["schemas"]["DecimalAmount"];
             total_credit: components["schemas"]["DecimalAmount"];
+            posting_status: components["schemas"]["JournalPostingStatus"];
+            created_by: string;
+            updated_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int64 */
+            version: number;
+        };
+        JournalDraftSummary: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            accounting_date: string;
+            reference?: string;
+            description: string;
+            functional_currency: components["schemas"]["CurrencyCode"];
+            currency: components["schemas"]["CurrencyCode"];
+            exchange_rate: components["schemas"]["DecimalAmount"];
+            /** Format: date */
+            exchange_rate_date?: string;
+            exchange_rate_source?: string;
+            kind: components["schemas"]["AccountingEntryKind"];
+            line_count: number;
+            total_debit: components["schemas"]["DecimalAmount"];
+            total_credit: components["schemas"]["DecimalAmount"];
+            posting_status: components["schemas"]["JournalPostingStatus"];
+            updated_by: string;
+            /** Format: date-time */
+            updated_at: string;
             /** Format: int64 */
             version: number;
         };
         JournalDraftList: {
-            items: components["schemas"]["JournalDraft"][];
+            items: components["schemas"]["JournalDraftSummary"][];
             page: components["schemas"]["PageInfo"];
         };
         JournalEntry: {
@@ -1563,13 +1658,28 @@ export interface components {
             entry_number: number;
             /** Format: date */
             accounting_date: string;
+            reference?: string;
             description: string;
+            functional_currency: components["schemas"]["CurrencyCode"];
             currency: components["schemas"]["CurrencyCode"];
+            exchange_rate: components["schemas"]["DecimalAmount"];
+            /** Format: date */
+            exchange_rate_date?: string;
+            exchange_rate_source?: string;
+            kind: components["schemas"]["AccountingEntryKind"];
+            posting_kind: string;
+            created_by: string;
             source_type?: string;
             /** Format: uuid */
             source_id?: string | null;
             /** Format: uuid */
             reverses_entry_id?: string | null;
+            /** Format: int64 */
+            reverses_entry_number?: number | null;
+            /** Format: uuid */
+            reversed_by_entry_id?: string | null;
+            /** Format: int64 */
+            reversed_by_entry_number?: number | null;
             reversal_reason?: string | null;
             lines: components["schemas"]["JournalLine"][];
             total_debit: components["schemas"]["DecimalAmount"];
@@ -1577,8 +1687,40 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
+        JournalEntrySummary: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            entry_number: number;
+            /** Format: date */
+            accounting_date: string;
+            reference?: string;
+            description: string;
+            functional_currency: components["schemas"]["CurrencyCode"];
+            currency: components["schemas"]["CurrencyCode"];
+            kind: components["schemas"]["AccountingEntryKind"];
+            posting_kind: string;
+            created_by: string;
+            source_type?: string;
+            /** Format: uuid */
+            source_id?: string | null;
+            /** Format: uuid */
+            reverses_entry_id?: string | null;
+            /** Format: int64 */
+            reverses_entry_number?: number | null;
+            /** Format: uuid */
+            reversed_by_entry_id?: string | null;
+            /** Format: int64 */
+            reversed_by_entry_number?: number | null;
+            /** @description Presente únicamente cuando include_lines=true. */
+            lines?: components["schemas"]["JournalLine"][];
+            total_debit: components["schemas"]["DecimalAmount"];
+            total_credit: components["schemas"]["DecimalAmount"];
+            /** Format: date-time */
+            created_at: string;
+        };
         JournalEntryList: {
-            items: components["schemas"]["JournalEntry"][];
+            items: components["schemas"]["JournalEntrySummary"][];
             page: components["schemas"]["PageInfo"];
         };
         /** @enum {string} */
@@ -3398,6 +3540,29 @@ export interface operations {
             503: components["responses"]["Unavailable"];
         };
     };
+    getAccountingSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Configuración contable efectiva de la organización activa. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
     listAccountingAccounts: {
         parameters: {
             query?: {
@@ -3405,6 +3570,8 @@ export interface operations {
                 limit?: components["parameters"]["Limit"];
                 lifecycle_state?: components["schemas"]["LifecycleState"];
                 query?: string;
+                /** @description Filtra cuentas que admiten o no imputaciones. */
+                postable?: boolean;
             };
             header?: never;
             path?: never;
@@ -3612,6 +3779,9 @@ export interface operations {
             query?: {
                 cursor?: components["parameters"]["Cursor"];
                 limit?: components["parameters"]["Limit"];
+                query?: string;
+                from?: string;
+                to?: string;
             };
             header?: never;
             path?: never;
@@ -3664,6 +3834,32 @@ export interface operations {
             503: components["responses"]["Unavailable"];
         };
     };
+    getJournalDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: components["parameters"]["DraftID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Borrador contable completo. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalDraft"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
     updateJournalDraft: {
         parameters: {
             query?: never;
@@ -3689,6 +3885,38 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["JournalDraft"];
                 };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    discardJournalDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                draft_id: components["parameters"]["DraftID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionedCommandInput"];
+            };
+        };
+        responses: {
+            /** @description Borrador descartado de forma lógica. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
@@ -3741,6 +3969,10 @@ export interface operations {
                 from?: string;
                 to?: string;
                 query?: string;
+                source_type?: string;
+                reversal_state?: components["schemas"]["JournalReversalState"];
+                /** @description Incluye líneas completas; se reserva para consumidores que necesitan conciliación o drill-down. */
+                include_lines?: boolean;
             };
             header?: never;
             path?: never;

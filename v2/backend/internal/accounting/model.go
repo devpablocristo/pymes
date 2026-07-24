@@ -386,25 +386,31 @@ func (l JournalLine) Validate(posting bool) error {
 }
 
 type JournalEntry struct {
-	ID                 uuid.UUID     `json:"id"`
-	Number             int64         `json:"number"`
-	Date               time.Time     `json:"date"`
-	Kind               EntryKind     `json:"kind"`
-	PostingKind        string        `json:"posting_kind"`
-	FunctionalCurrency Currency      `json:"functional_currency"`
-	Currency           Currency      `json:"currency"`
-	ExchangeRate       Decimal       `json:"exchange_rate"`
-	ExchangeRateDate   time.Time     `json:"exchange_rate_date"`
-	ExchangeRateSource string        `json:"exchange_rate_source"`
-	Source             EntrySource   `json:"source"`
-	Description        string        `json:"description"`
-	CreatedBy          string        `json:"created_by"`
-	CreatedAt          time.Time     `json:"created_at"`
-	ReversesEntryID    *uuid.UUID    `json:"reverses_entry_id,omitempty"`
-	ReversalReason     string        `json:"reversal_reason,omitempty"`
-	IsAdjustment       bool          `json:"is_adjustment"`
-	DraftID            *uuid.UUID    `json:"draft_id,omitempty"`
-	Lines              []JournalLine `json:"lines"`
+	ID                    uuid.UUID     `json:"id"`
+	Number                int64         `json:"number"`
+	Date                  time.Time     `json:"date"`
+	Reference             string        `json:"reference,omitempty"`
+	Kind                  EntryKind     `json:"kind"`
+	PostingKind           string        `json:"posting_kind"`
+	FunctionalCurrency    Currency      `json:"functional_currency"`
+	Currency              Currency      `json:"currency"`
+	ExchangeRate          Decimal       `json:"exchange_rate"`
+	ExchangeRateDate      time.Time     `json:"exchange_rate_date"`
+	ExchangeRateSource    string        `json:"exchange_rate_source"`
+	Source                EntrySource   `json:"source"`
+	Description           string        `json:"description"`
+	CreatedBy             string        `json:"created_by"`
+	CreatedAt             time.Time     `json:"created_at"`
+	ReversesEntryID       *uuid.UUID    `json:"reverses_entry_id,omitempty"`
+	ReversesEntryNumber   *int64        `json:"reverses_entry_number,omitempty"`
+	ReversedByEntryID     *uuid.UUID    `json:"reversed_by_entry_id,omitempty"`
+	ReversedByEntryNumber *int64        `json:"reversed_by_entry_number,omitempty"`
+	ReversalReason        string        `json:"reversal_reason,omitempty"`
+	IsAdjustment          bool          `json:"is_adjustment"`
+	DraftID               *uuid.UUID    `json:"draft_id,omitempty"`
+	Lines                 []JournalLine `json:"lines"`
+	DebitTotal            Decimal       `json:"-"`
+	CreditTotal           Decimal       `json:"-"`
 }
 
 func (e JournalEntry) ValidateForPosting() error {
@@ -420,6 +426,9 @@ func (e JournalEntry) ValidateForPosting() error {
 	if strings.TrimSpace(e.Description) == "" {
 		return fmt.Errorf("%w: entry description is required", ErrInvalidArgument)
 	}
+	if len(strings.TrimSpace(e.Reference)) > 160 {
+		return fmt.Errorf("%w: entry reference must not exceed 160 characters", ErrInvalidArgument)
+	}
 	if strings.TrimSpace(e.CreatedBy) == "" {
 		return fmt.Errorf("%w: entry actor is required", ErrInvalidArgument)
 	}
@@ -428,6 +437,28 @@ func (e JournalEntry) ValidateForPosting() error {
 	}
 	if e.ExchangeRate.Sign() <= 0 {
 		return fmt.Errorf("%w: exchange rate must be positive", ErrInvalidArgument)
+	}
+	if e.Currency.Code() == e.FunctionalCurrency.Code() {
+		if !e.ExchangeRate.Equal(One) {
+			return fmt.Errorf(
+				"%w: functional-currency entry must use exchange rate 1",
+				ErrInvalidArgument,
+			)
+		}
+		if !e.ExchangeRateDate.IsZero() ||
+			strings.TrimSpace(e.ExchangeRateSource) != "" {
+			return fmt.Errorf(
+				"%w: functional-currency entry must not include exchange-rate metadata",
+				ErrInvalidArgument,
+			)
+		}
+	} else if e.ExchangeRateDate.IsZero() ||
+		e.ExchangeRateDate.After(e.Date) ||
+		strings.TrimSpace(e.ExchangeRateSource) == "" {
+		return fmt.Errorf(
+			"%w: foreign-currency entry requires a valid exchange-rate date and source",
+			ErrInvalidArgument,
+		)
 	}
 	if len(e.Lines) < 2 {
 		return fmt.Errorf("%w: an entry needs at least two lines", ErrInvalidArgument)
@@ -448,7 +479,9 @@ func (e JournalEntry) ValidateForPosting() error {
 			if !line.ExchangeRate.Equal(One) || !transactionAmount.Equal(functionalAmount) {
 				return fmt.Errorf("line %d: %w: functional-currency line must use exchange rate 1", index+1, ErrInvalidArgument)
 			}
-		} else if line.ExchangeRateDate.IsZero() || strings.TrimSpace(line.ExchangeRateSource) == "" {
+		} else if line.ExchangeRateDate.IsZero() ||
+			line.ExchangeRateDate.After(e.Date) ||
+			strings.TrimSpace(line.ExchangeRateSource) == "" {
 			return fmt.Errorf("line %d: %w: foreign-currency line requires rate date and source", index+1, ErrInvalidArgument)
 		}
 	}
@@ -459,6 +492,9 @@ func (e JournalEntry) ValidateForPosting() error {
 }
 
 func (e JournalEntry) Totals() (debit Decimal, credit Decimal) {
+	if len(e.Lines) == 0 && (!e.DebitTotal.IsZero() || !e.CreditTotal.IsZero()) {
+		return e.DebitTotal, e.CreditTotal
+	}
 	for _, line := range e.Lines {
 		debit = debit.Add(line.Debit)
 		credit = credit.Add(line.Credit)
@@ -467,25 +503,27 @@ func (e JournalEntry) Totals() (debit Decimal, credit Decimal) {
 }
 
 type Draft struct {
-	ID                 uuid.UUID     `json:"id"`
-	Version            int64         `json:"version"`
-	IdempotencyKey     string        `json:"-"`
-	Date               time.Time     `json:"date"`
-	Kind               EntryKind     `json:"kind"`
-	FunctionalCurrency Currency      `json:"functional_currency"`
-	Currency           Currency      `json:"currency"`
-	ExchangeRate       Decimal       `json:"exchange_rate"`
-	ExchangeRateDate   time.Time     `json:"exchange_rate_date"`
-	ExchangeRateSource string        `json:"exchange_rate_source"`
-	Description        string        `json:"description"`
-	IsAdjustment       bool          `json:"is_adjustment"`
-	SourceType         string        `json:"source_type,omitempty"`
-	SourceID           string        `json:"source_id,omitempty"`
-	Lines              []JournalLine `json:"lines"`
-	CreatedBy          string        `json:"created_by"`
-	UpdatedBy          string        `json:"updated_by"`
-	CreatedAt          time.Time     `json:"created_at"`
-	UpdatedAt          time.Time     `json:"updated_at"`
+	ID                 uuid.UUID          `json:"id"`
+	Version            int64              `json:"version"`
+	IdempotencyKey     string             `json:"-"`
+	Date               time.Time          `json:"date"`
+	Reference          string             `json:"reference,omitempty"`
+	Kind               EntryKind          `json:"kind"`
+	FunctionalCurrency Currency           `json:"functional_currency"`
+	Currency           Currency           `json:"currency"`
+	ExchangeRate       Decimal            `json:"exchange_rate"`
+	ExchangeRateDate   time.Time          `json:"exchange_rate_date"`
+	ExchangeRateSource string             `json:"exchange_rate_source"`
+	Description        string             `json:"description"`
+	IsAdjustment       bool               `json:"is_adjustment"`
+	SourceType         string             `json:"source_type,omitempty"`
+	SourceID           string             `json:"source_id,omitempty"`
+	Lines              []JournalLine      `json:"lines"`
+	CreatedBy          string             `json:"created_by"`
+	UpdatedBy          string             `json:"updated_by"`
+	CreatedAt          time.Time          `json:"created_at"`
+	UpdatedAt          time.Time          `json:"updated_at"`
+	PostingStatus      DraftPostingStatus `json:"posting_status"`
 }
 
 func (d Draft) ValidateForSave() error {
@@ -498,11 +536,43 @@ func (d Draft) ValidateForSave() error {
 	if strings.TrimSpace(d.IdempotencyKey) == "" {
 		return fmt.Errorf("%w: draft idempotency key is required", ErrInvalidArgument)
 	}
-	if strings.TrimSpace(d.Description) == "" {
-		return fmt.Errorf("%w: draft description is required", ErrInvalidArgument)
+	if len(strings.TrimSpace(d.Reference)) > 160 {
+		return fmt.Errorf("%w: draft reference must not exceed 160 characters", ErrInvalidArgument)
+	}
+	if len(d.Description) > 500 {
+		return fmt.Errorf("%w: draft description must not exceed 500 characters", ErrInvalidArgument)
 	}
 	if d.ExchangeRate.Sign() <= 0 {
 		return fmt.Errorf("%w: draft exchange rate must be positive", ErrInvalidArgument)
+	}
+	if d.Currency.Code() == d.FunctionalCurrency.Code() {
+		if !d.ExchangeRate.Equal(One) {
+			return fmt.Errorf(
+				"%w: functional-currency draft must use exchange rate 1",
+				ErrInvalidArgument,
+			)
+		}
+		if !d.ExchangeRateDate.IsZero() || strings.TrimSpace(d.ExchangeRateSource) != "" {
+			return fmt.Errorf(
+				"%w: functional-currency draft must not include exchange-rate metadata",
+				ErrInvalidArgument,
+			)
+		}
+	} else {
+		if d.ExchangeRateDate.IsZero() ||
+			d.ExchangeRateDate.After(d.Date) ||
+			strings.TrimSpace(d.ExchangeRateSource) == "" {
+			return fmt.Errorf(
+				"%w: foreign-currency draft requires a valid exchange-rate date and source",
+				ErrInvalidArgument,
+			)
+		}
+	}
+	if len(strings.TrimSpace(d.ExchangeRateSource)) > 160 {
+		return fmt.Errorf(
+			"%w: draft exchange-rate source must not exceed 160 characters",
+			ErrInvalidArgument,
+		)
 	}
 	for index, line := range d.Lines {
 		if err := line.Validate(false); err != nil {
@@ -511,6 +581,42 @@ func (d Draft) ValidateForSave() error {
 		if line.Debit.IsZero() == line.Credit.IsZero() {
 			return fmt.Errorf("%w: draft line must contain exactly one debit or credit", ErrInvalidArgument)
 		}
+		if line.TransactionDebit.IsZero() == line.TransactionCredit.IsZero() {
+			return fmt.Errorf(
+				"%w: draft line must contain exactly one transaction debit or credit",
+				ErrInvalidArgument,
+			)
+		}
+		if (!line.Debit.IsZero()) != (!line.TransactionDebit.IsZero()) {
+			return fmt.Errorf(
+				"%w: functional and transaction amounts must use the same side",
+				ErrInvalidArgument,
+			)
+		}
+		if line.Currency.Code() != d.Currency.Code() ||
+			!line.ExchangeRate.Equal(d.ExchangeRate) ||
+			!line.ExchangeRateDate.Equal(d.ExchangeRateDate) ||
+			strings.TrimSpace(line.ExchangeRateSource) !=
+				strings.TrimSpace(d.ExchangeRateSource) {
+			return fmt.Errorf(
+				"line %d: %w: currency metadata differs from draft header",
+				index+1,
+				ErrInvalidArgument,
+			)
+		}
+		transactionAmount := line.TransactionDebit.Add(line.TransactionCredit)
+		functionalAmount := line.Debit.Add(line.Credit)
+		if !convert(
+			transactionAmount,
+			d.ExchangeRate,
+			d.FunctionalCurrency,
+		).Equal(functionalAmount) {
+			return fmt.Errorf(
+				"line %d: %w: currency conversion is inconsistent",
+				index+1,
+				ErrInvalidArgument,
+			)
+		}
 	}
 	return nil
 }
@@ -518,6 +624,7 @@ func (d Draft) ValidateForSave() error {
 func (d Draft) ToEntry(source EntrySource, actor string) JournalEntry {
 	return JournalEntry{
 		Date:               d.Date,
+		Reference:          strings.TrimSpace(d.Reference),
 		Kind:               d.Kind,
 		PostingKind:        "primary",
 		FunctionalCurrency: d.FunctionalCurrency,
@@ -532,6 +639,182 @@ func (d Draft) ToEntry(source EntrySource, actor string) JournalEntry {
 		DraftID:            &d.ID,
 		Lines:              append([]JournalLine(nil), d.Lines...),
 	}
+}
+
+type DraftPostingState string
+
+const (
+	DraftPostingIncomplete DraftPostingState = "incomplete"
+	DraftPostingUnbalanced DraftPostingState = "unbalanced"
+	DraftPostingBlocked    DraftPostingState = "blocked"
+	DraftPostingReady      DraftPostingState = "ready"
+)
+
+type DraftPostingIssue string
+
+const (
+	PostingDescriptionRequired DraftPostingIssue = "description_required"
+	PostingMinimumLines        DraftPostingIssue = "minimum_lines"
+	PostingLineAccountRequired DraftPostingIssue = "line_account_required"
+	PostingLineSideInvalid     DraftPostingIssue = "line_side_invalid"
+	PostingUnbalanced          DraftPostingIssue = "unbalanced"
+	PostingZeroTotal           DraftPostingIssue = "zero_total"
+	PostingPeriodClosed        DraftPostingIssue = "period_closed"
+	PostingAccountArchived     DraftPostingIssue = "account_archived"
+	PostingAccountNotPostable  DraftPostingIssue = "account_not_postable"
+)
+
+type DraftPostingContext struct {
+	PeriodAllowsPosting bool
+	Accounts            map[uuid.UUID]Account
+}
+
+type DraftPostingStatus struct {
+	State      DraftPostingState   `json:"state"`
+	Difference Decimal             `json:"difference"`
+	Issues     []DraftPostingIssue `json:"issues"`
+}
+
+type DraftPostingSummaryContext struct {
+	Description         string
+	LineCount           int
+	Debit               Decimal
+	Credit              Decimal
+	PeriodAllowsPosting bool
+	HasArchivedAccount  bool
+	HasInvalidAccount   bool
+}
+
+func EvaluateDraftPostingSummary(
+	context DraftPostingSummaryContext,
+) DraftPostingStatus {
+	issues := make([]DraftPostingIssue, 0, 6)
+	incomplete := false
+	blocked := false
+	if strings.TrimSpace(context.Description) == "" {
+		issues = append(issues, PostingDescriptionRequired)
+		incomplete = true
+	}
+	if context.LineCount < 2 {
+		issues = append(issues, PostingMinimumLines)
+		incomplete = true
+	}
+	if context.Debit.IsZero() && context.Credit.IsZero() {
+		issues = append(issues, PostingZeroTotal)
+		incomplete = true
+	}
+	unbalanced := !context.Debit.Equal(context.Credit)
+	if unbalanced {
+		issues = append(issues, PostingUnbalanced)
+	}
+	if context.HasArchivedAccount {
+		issues = append(issues, PostingAccountArchived)
+		blocked = true
+	}
+	if context.HasInvalidAccount {
+		issues = append(issues, PostingAccountNotPostable)
+		blocked = true
+	}
+	if !context.PeriodAllowsPosting {
+		issues = append(issues, PostingPeriodClosed)
+		blocked = true
+	}
+	state := DraftPostingReady
+	switch {
+	case incomplete:
+		state = DraftPostingIncomplete
+	case blocked:
+		state = DraftPostingBlocked
+	case unbalanced:
+		state = DraftPostingUnbalanced
+	}
+	return DraftPostingStatus{
+		State:      state,
+		Difference: context.Debit.Sub(context.Credit).Abs(),
+		Issues:     issues,
+	}
+}
+
+func EvaluateDraftPostingStatus(draft Draft, context DraftPostingContext) DraftPostingStatus {
+	var debit, credit Decimal
+	issues := make([]DraftPostingIssue, 0, 6)
+	incomplete := false
+	blocked := false
+
+	if strings.TrimSpace(draft.Description) == "" {
+		issues = append(issues, PostingDescriptionRequired)
+		incomplete = true
+	}
+	if len(draft.Lines) < 2 {
+		issues = append(issues, PostingMinimumLines)
+		incomplete = true
+	}
+	for _, line := range draft.Lines {
+		debit = debit.Add(line.Debit)
+		credit = credit.Add(line.Credit)
+		if line.AccountID == uuid.Nil {
+			issues = appendDraftPostingIssue(issues, PostingLineAccountRequired)
+			incomplete = true
+		}
+		if line.Debit.Sign() < 0 || line.Credit.Sign() < 0 ||
+			(line.Debit.IsZero() == line.Credit.IsZero()) {
+			issues = appendDraftPostingIssue(issues, PostingLineSideInvalid)
+			incomplete = true
+		}
+		account, ok := context.Accounts[line.AccountID]
+		if !ok {
+			issues = appendDraftPostingIssue(issues, PostingAccountNotPostable)
+			blocked = true
+			continue
+		}
+		if account.ArchivedAt != nil {
+			issues = appendDraftPostingIssue(issues, PostingAccountArchived)
+			blocked = true
+		}
+		if !account.Postable {
+			issues = appendDraftPostingIssue(issues, PostingAccountNotPostable)
+			blocked = true
+		}
+	}
+	if debit.IsZero() && credit.IsZero() {
+		issues = append(issues, PostingZeroTotal)
+		incomplete = true
+	}
+	unbalanced := !debit.Equal(credit)
+	if unbalanced {
+		issues = append(issues, PostingUnbalanced)
+	}
+	if !context.PeriodAllowsPosting {
+		issues = append(issues, PostingPeriodClosed)
+		blocked = true
+	}
+
+	state := DraftPostingReady
+	switch {
+	case incomplete:
+		state = DraftPostingIncomplete
+	case blocked:
+		state = DraftPostingBlocked
+	case unbalanced:
+		state = DraftPostingUnbalanced
+	}
+	return DraftPostingStatus{
+		State:      state,
+		Difference: debit.Sub(credit).Abs(),
+		Issues:     issues,
+	}
+}
+
+func appendDraftPostingIssue(
+	issues []DraftPostingIssue,
+	issue DraftPostingIssue,
+) []DraftPostingIssue {
+	for _, existing := range issues {
+		if existing == issue {
+			return issues
+		}
+	}
+	return append(issues, issue)
 }
 
 type OpenItemKind string

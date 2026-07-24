@@ -55,7 +55,7 @@ smoke:
 	docker compose exec -T postgres sh -ec \
 		'test "$$(psql -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''idempotency/core'\''")" = 1'
 	docker compose exec -T postgres sh -ec \
-		'test "$$(psql -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 18'
+		'test "$$(psql -U pymes -d pymes_v2 -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 20'
 
 clerk-check:
 	./scripts/check-clerk-config.sh
@@ -83,8 +83,22 @@ api-generate:
 	cd backend && GOWORK=off go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --config oapi-codegen.yaml ../api/openapi.yaml
 	cd web && npm run api:generate
 
-api-check: api-generate
-	git -C .. diff --exit-code -- v2/backend/internal/api/openapi.gen.go v2/web/src/api/schema.generated.ts
+api-check:
+	@check_dir="$$(mktemp -d)"; \
+	trap 'rm -rf "$$check_dir"' EXIT; \
+	cp backend/internal/api/openapi.gen.go "$$check_dir/openapi.gen.go"; \
+	cp web/src/api/schema.generated.ts "$$check_dir/schema.generated.ts"; \
+	$(MAKE) api-generate || exit $$?; \
+	status=0; \
+	cmp -s "$$check_dir/openapi.gen.go" backend/internal/api/openapi.gen.go || { \
+		diff -u "$$check_dir/openapi.gen.go" backend/internal/api/openapi.gen.go; \
+		status=1; \
+	}; \
+	cmp -s "$$check_dir/schema.generated.ts" web/src/api/schema.generated.ts || { \
+		diff -u "$$check_dir/schema.generated.ts" web/src/api/schema.generated.ts; \
+		status=1; \
+	}; \
+	exit $$status
 
 backend-run:
 	cd backend && GOWORK=off go run ./cmd/api

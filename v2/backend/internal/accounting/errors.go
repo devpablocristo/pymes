@@ -19,6 +19,7 @@ var (
 	ErrMappingMissing       = errors.New("accounting: account mapping is missing")
 	ErrEntryImmutable       = errors.New("accounting: posted journal entry is immutable")
 	ErrAlreadyReversed      = errors.New("accounting: journal entry already has a direct reversal")
+	ErrReversalNotAllowed   = errors.New("accounting: journal entry cannot be reversed safely")
 	ErrReconciliationClosed = errors.New("accounting: reconciliation is closed")
 	ErrInflationIncomplete  = errors.New("accounting: inflation index series is incomplete")
 )

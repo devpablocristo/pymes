@@ -1046,7 +1046,7 @@ func (h *IAMAPI) fiscalQueueInput(
 			errBusinessInvalidRequest,
 		)
 	}
-	if input.SourceType != api.Sale {
+	if input.SourceType != api.FiscalVoucherInputSourceTypeSale {
 		return fiscal.QueueVoucherInput{}, 0, fmt.Errorf(
 			"%w: outbound ARCA authorization only accepts sale sources; supplier vouchers require registration data",
 			errBusinessInvalidRequest,

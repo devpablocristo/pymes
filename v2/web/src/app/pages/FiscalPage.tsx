@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { HttpError } from "@devpablocristo/platform-http";
 import { Navigate, NavLink, useParams } from "react-router-dom";
 import type { components } from "../../api/schema.generated";
 import { useProductApi } from "../../api/ProductApiContext";
@@ -2134,21 +2135,13 @@ function FiscalSettingsPanel({ canManage }: { canManage: boolean }) {
         "/api/v1/fiscal/points-of-sale",
         { signal, skipJSONContentType: true },
       );
+      setPoints(configuredPoints);
       const response = await api.requestResponse(
         `/api/v1/fiscal/settings?environment=${targetEnvironment}`,
         { signal, skipJSONContentType: true },
       );
       if (signal?.aborted || currentEnvironment.current !== targetEnvironment) {
         return;
-      }
-      setPoints(configuredPoints);
-      if (response.status === 404) {
-        setSettings(undefined);
-        setError(undefined);
-        return;
-      }
-      if (!response.ok) {
-        throw new Error("No pudimos cargar el perfil fiscal.");
       }
       const value = (await response.json()) as Settings;
       if (value.environment !== targetEnvironment) {
@@ -2158,6 +2151,11 @@ function FiscalSettingsPanel({ canManage }: { canManage: boolean }) {
       setError(undefined);
     } catch (cause) {
       if (signal?.aborted) return;
+      if (isNotFound(cause)) {
+        setSettings(undefined);
+        setError(undefined);
+        return;
+      }
       setError(message(cause, "Configurá el perfil fiscal para comenzar."));
     } finally {
       if (!signal?.aborted && currentEnvironment.current === targetEnvironment) {
@@ -3368,4 +3366,8 @@ function formatDateTime(value: string) {
 
 function message(cause: unknown, fallback: string) {
   return cause instanceof Error ? cause.message : fallback;
+}
+
+function isNotFound(cause: unknown) {
+  return cause instanceof HttpError && cause.status === 404;
 }

@@ -175,6 +175,210 @@ func TestServiceReversalLeavesOriginalByteForByteAndIsIdempotent(t *testing.T) {
 	if _, err := service.ReverseEntry(context.Background(), scope, command); !errors.Is(err, ErrAlreadyReversed) {
 		t.Fatalf("second direct reversal error = %v", err)
 	}
+
+	reversalOfReversal, err := service.ReverseEntry(
+		context.Background(),
+		scope,
+		ReverseEntryCommand{
+			EntryID:        reversal.ID,
+			Date:           reversal.Date,
+			Reason:         "Restablecer el asiento original",
+			IdempotencyKey: "reverse-the-reversal",
+		},
+	)
+	if err != nil {
+		t.Fatalf("reverse reversal: %v", err)
+	}
+	if reversalOfReversal.ReversesEntryID == nil ||
+		*reversalOfReversal.ReversesEntryID != reversal.ID {
+		t.Fatalf("reversal-of-reversal link = %v", reversalOfReversal.ReversesEntryID)
+	}
+	for index := range posted.Lines {
+		if !reversalOfReversal.Lines[index].Debit.Equal(posted.Lines[index].Debit) ||
+			!reversalOfReversal.Lines[index].Credit.Equal(posted.Lines[index].Credit) {
+			t.Fatalf("reversal-of-reversal line %d does not restore original direction", index+1)
+		}
+	}
+}
+
+func TestServiceReversalEligibilityAndDateRules(t *testing.T) {
+	t.Parallel()
+
+	t.Run("legacy manual entry without a source is reversible", func(t *testing.T) {
+		repository, service, scope := serviceFixture(t)
+		entry := manualEntryFixture(repository)
+		entry.ID = uuid.New()
+		entry.Number = 1
+		entry.Source = EntrySource{}
+		repository.entries[entry.ID] = cloneEntry(entry)
+
+		if _, err := service.ReverseEntry(
+			context.Background(),
+			scope,
+			ReverseEntryCommand{
+				EntryID:        entry.ID,
+				Date:           entry.Date,
+				Reason:         "Corrección de asiento legacy",
+				IdempotencyKey: "reverse-legacy-manual",
+			},
+		); err != nil {
+			t.Fatalf("reverse legacy manual entry: %v", err)
+		}
+	})
+
+	t.Run("adjustment sources remain reversible unless documentary", func(t *testing.T) {
+		repository, service, scope := serviceFixture(t)
+		entry := manualEntryFixture(repository)
+		entry.Kind = EntryAdjustment
+		entry.Source.Type = "inflation"
+		entry.Source.Event = "adjustment"
+		entry.Source.IdempotencyKey = "inflation-adjustment"
+		posted, err := service.PostEntry(context.Background(), scope, entry)
+		if err != nil {
+			t.Fatalf("post adjustment: %v", err)
+		}
+		if _, err := service.ReverseEntry(
+			context.Background(),
+			scope,
+			ReverseEntryCommand{
+				EntryID:        posted.ID,
+				Date:           posted.Date,
+				Reason:         "Corregir ajuste",
+				IdempotencyKey: "reverse-adjustment",
+			},
+		); err != nil {
+			t.Fatalf("reverse adjustment: %v", err)
+		}
+
+		documentary := manualEntryFixture(repository)
+		documentary.Kind = EntryAdjustment
+		documentary.Source.Type = "sale"
+		documentary.Source.ID = uuid.New()
+		documentary.Source.Event = "adjustment"
+		documentary.Source.IdempotencyKey = "sale-adjustment"
+		postedDocumentary, err := service.PostEntry(context.Background(), scope, documentary)
+		if err != nil {
+			t.Fatalf("post documentary adjustment fixture: %v", err)
+		}
+		if _, err := service.ReverseEntry(
+			context.Background(),
+			scope,
+			ReverseEntryCommand{
+				EntryID:        postedDocumentary.ID,
+				Date:           postedDocumentary.Date,
+				Reason:         "No debe permitirse",
+				IdempotencyKey: "reverse-documentary-adjustment",
+			},
+		); !errors.Is(err, ErrReversalNotAllowed) {
+			t.Fatalf("documentary adjustment reversal error = %v", err)
+		}
+	})
+
+	t.Run("open item effects block reversal", func(t *testing.T) {
+		repository, service, scope := serviceFixture(t)
+		posted, err := service.PostEntry(
+			context.Background(),
+			scope,
+			manualEntryFixture(repository),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		repository.openItems[uuid.New()] = OpenItem{
+			ID:      uuid.New(),
+			EntryID: posted.ID,
+		}
+		if _, err := service.ReverseEntry(
+			context.Background(),
+			scope,
+			ReverseEntryCommand{
+				EntryID:        posted.ID,
+				Date:           posted.Date,
+				Reason:         "No debe permitirse",
+				IdempotencyKey: "reverse-open-item",
+			},
+		); !errors.Is(err, ErrReversalNotAllowed) {
+			t.Fatalf("open-item reversal error = %v", err)
+		}
+	})
+
+	t.Run("reversal date cannot precede original", func(t *testing.T) {
+		repository, service, scope := serviceFixture(t)
+		posted, err := service.PostEntry(
+			context.Background(),
+			scope,
+			manualEntryFixture(repository),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := service.ReverseEntry(
+			context.Background(),
+			scope,
+			ReverseEntryCommand{
+				EntryID:        posted.ID,
+				Date:           posted.Date.AddDate(0, 0, -1),
+				Reason:         "Fecha inválida",
+				IdempotencyKey: "reverse-before-original",
+			},
+		); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("earlier reversal date error = %v", err)
+		}
+	})
+
+	t.Run("concurrent direct reversal is rechecked after the period lock", func(t *testing.T) {
+		repository, service, scope := serviceFixture(t)
+		posted, err := service.PostEntry(
+			context.Background(),
+			scope,
+			manualEntryFixture(repository),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		repository.directReversalOnCall = 2
+		repository.concurrentReversal = JournalEntry{
+			ID:   uuid.New(),
+			Date: posted.Date,
+			Source: EntrySource{
+				Type:           "journal_entry",
+				ID:             posted.ID,
+				Event:          "reversal",
+				IdempotencyKey: "concurrent-reversal",
+			},
+			ReversesEntryID: &posted.ID,
+		}
+
+		if _, err := service.ReverseEntry(
+			context.Background(),
+			scope,
+			ReverseEntryCommand{
+				EntryID:        posted.ID,
+				Date:           posted.Date,
+				Reason:         "Compite con otra reversa",
+				IdempotencyKey: "losing-reversal",
+			},
+		); !errors.Is(err, ErrAlreadyReversed) {
+			t.Fatalf("concurrent reversal error = %v", err)
+		}
+	})
+}
+
+func TestServiceRejectsPostingAgainstClosedReconciliation(t *testing.T) {
+	t.Parallel()
+
+	repository, service, scope := serviceFixture(t)
+	repository.closedReconciliation = true
+	if _, err := service.PostEntry(
+		context.Background(),
+		scope,
+		manualEntryFixture(repository),
+	); !errors.Is(err, ErrReconciliationClosed) {
+		t.Fatalf("closed-reconciliation posting error = %v", err)
+	}
+	if repository.postCount != 0 {
+		t.Fatalf("posted entries = %d, want 0", repository.postCount)
+	}
 }
 
 func TestServiceRejectsPostingToLockedAndNonAdjustmentToSoftClosedPeriod(t *testing.T) {
@@ -201,6 +405,28 @@ func TestServiceRejectsPostingToLockedAndNonAdjustmentToSoftClosedPeriod(t *test
 	scope.CanPostAdjustments = true
 	if _, err := service.PostEntry(context.Background(), scope, entry); err != nil {
 		t.Fatalf("adjustment in soft-closed period: %v", err)
+	}
+
+	manualFlaggedAsAdjustment := manualEntryFixture(repository)
+	manualFlaggedAsAdjustment.IsAdjustment = true
+	manualFlaggedAsAdjustment.Source.ID = uuid.New()
+	manualFlaggedAsAdjustment.Source.IdempotencyKey = "manual-flagged-adjustment"
+	if _, err := service.PostEntry(
+		context.Background(),
+		scope,
+		manualFlaggedAsAdjustment,
+	); !errors.Is(err, ErrPeriodClosed) {
+		t.Fatalf("manual entry flagged as adjustment error = %v", err)
+	}
+
+	inflation := manualEntryFixture(repository)
+	inflation.Kind = EntryInflation
+	inflation.IsAdjustment = false
+	inflation.Source.Type = "inflation"
+	inflation.Source.ID = uuid.New()
+	inflation.Source.IdempotencyKey = "inflation-soft-closed"
+	if _, err := service.PostEntry(context.Background(), scope, inflation); err != nil {
+		t.Fatalf("inflation in soft-closed period: %v", err)
 	}
 }
 
@@ -367,6 +593,63 @@ func TestServicePostDraftUsesOptimisticVersionAndMarksDraftPosted(t *testing.T) 
 	if repository.postedDraft[draftID] != posted.ID {
 		t.Fatalf("posted draft link = %s, want %s", repository.postedDraft[draftID], posted.ID)
 	}
+	replayed, err := service.PostDraft(
+		context.Background(),
+		scope,
+		draftID,
+		3,
+		"draft-post",
+	)
+	if err != nil {
+		t.Fatalf("replay posted draft: %v", err)
+	}
+	if replayed.ID != posted.ID || repository.postCount != 1 {
+		t.Fatalf(
+			"posted draft replay = %s, count %d; want %s, 1",
+			replayed.ID,
+			repository.postCount,
+			posted.ID,
+		)
+	}
+}
+
+func TestServiceCreateDraftReplaysSameIntentAndRejectsKeyReuse(t *testing.T) {
+	t.Parallel()
+
+	repository, service, scope := serviceFixture(t)
+	draft := Draft{
+		IdempotencyKey:     "draft-create-replay",
+		Date:               dateFixture(),
+		Kind:               EntryManual,
+		FunctionalCurrency: MustCurrency("ARS"),
+		Currency:           MustCurrency("ARS"),
+		ExchangeRate:       One,
+		Description:        "",
+	}
+	first, err := service.CreateDraft(context.Background(), scope, draft)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.CreateDraft(context.Background(), scope, draft)
+	if err != nil {
+		t.Fatalf("replay draft create: %v", err)
+	}
+	if second.ID != first.ID || len(repository.drafts) != 1 {
+		t.Fatalf(
+			"draft replay = %s/%s, stored %d",
+			first.ID,
+			second.ID,
+			len(repository.drafts),
+		)
+	}
+	draft.Description = "different intent"
+	if _, err := service.CreateDraft(
+		context.Background(),
+		scope,
+		draft,
+	); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("draft key reuse error = %v", err)
+	}
 }
 
 func serviceFixture(t *testing.T) (*serviceRepository, *Service, Scope) {
@@ -456,23 +739,27 @@ func (transactor *serviceTransactor) WithinTenant(
 }
 
 type serviceRepository struct {
-	accounts       map[uuid.UUID]Account
-	mappings       map[string]AccountMapping
-	drafts         map[uuid.UUID]Draft
-	postedDraft    map[uuid.UUID]uuid.UUID
-	entries        map[uuid.UUID]JournalEntry
-	periods        map[uuid.UUID]Period
-	periodID       uuid.UUID
-	checklist      CloseChecklist
-	postCount      int
-	lastScope      Scope
-	nextNumber     int64
-	openItems      map[uuid.UUID]OpenItem
-	reconciliation map[uuid.UUID]Reconciliation
-	workpapers     map[uuid.UUID]InflationWorkpaper
-	revaluations   map[uuid.UUID]CurrencyRevaluationWorkpaper
-	fxPositions    []CurrencyRevaluationPosition
-	reportLines    []ReportLine
+	accounts             map[uuid.UUID]Account
+	mappings             map[string]AccountMapping
+	drafts               map[uuid.UUID]Draft
+	postedDraft          map[uuid.UUID]uuid.UUID
+	entries              map[uuid.UUID]JournalEntry
+	periods              map[uuid.UUID]Period
+	periodID             uuid.UUID
+	checklist            CloseChecklist
+	postCount            int
+	lastScope            Scope
+	nextNumber           int64
+	openItems            map[uuid.UUID]OpenItem
+	reconciliation       map[uuid.UUID]Reconciliation
+	workpapers           map[uuid.UUID]InflationWorkpaper
+	revaluations         map[uuid.UUID]CurrencyRevaluationWorkpaper
+	fxPositions          []CurrencyRevaluationPosition
+	reportLines          []ReportLine
+	closedReconciliation bool
+	directReversalOnCall int
+	directReversalCalls  int
+	concurrentReversal   JournalEntry
 }
 
 func newServiceRepository() *serviceRepository {
@@ -652,7 +939,13 @@ func (repository *serviceRepository) UpdateDraft(_ context.Context, draft Draft,
 	return draft, nil
 }
 
-func (repository *serviceRepository) DeleteDraft(_ context.Context, id uuid.UUID, version int64) error {
+func (repository *serviceRepository) DiscardDraft(
+	_ context.Context,
+	id uuid.UUID,
+	version int64,
+	_ string,
+	_ string,
+) error {
 	draft, ok := repository.drafts[id]
 	if !ok {
 		return ErrNotFound
@@ -703,12 +996,38 @@ func (repository *serviceRepository) FindEntryBySource(_ context.Context, source
 }
 
 func (repository *serviceRepository) FindDirectReversal(_ context.Context, id uuid.UUID) (JournalEntry, error) {
+	repository.directReversalCalls++
+	if repository.directReversalOnCall > 0 &&
+		repository.directReversalCalls >= repository.directReversalOnCall &&
+		repository.concurrentReversal.ID != uuid.Nil {
+		return cloneEntry(repository.concurrentReversal), nil
+	}
 	for _, entry := range repository.entries {
 		if entry.ReversesEntryID != nil && *entry.ReversesEntryID == id {
 			return cloneEntry(entry), nil
 		}
 	}
 	return JournalEntry{}, ErrNotFound
+}
+
+func (repository *serviceRepository) EntryHasOpenItemEffects(
+	_ context.Context,
+	id uuid.UUID,
+) (bool, error) {
+	for _, item := range repository.openItems {
+		if item.EntryID == id {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (repository *serviceRepository) TouchesClosedReconciliation(
+	context.Context,
+	time.Time,
+	[]uuid.UUID,
+) (bool, error) {
+	return repository.closedReconciliation, nil
 }
 
 func (repository *serviceRepository) ListJournal(context.Context, JournalFilter) (PageResult[JournalEntry], error) {

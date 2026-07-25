@@ -193,7 +193,7 @@ jobs:
           docker compose exec -T postgres sh -ec \
             'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT rolbypassrls FROM pg_roles WHERE rolname = '\''pymes_iam_worker'\''")" = f'
           docker compose exec -T postgres sh -ec \
-            'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = '\''iam'\'' AND c.relrowsecurity AND c.relforcerowsecurity")" = 3'
+            'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = '\''iam'\'' AND c.relrowsecurity AND c.relforcerowsecurity")" = 4'
           docker compose exec -T postgres sh -ec \
             'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid = '\''public.platform_outbox_messages'\''::regclass")" = t'
           docker compose exec -T postgres sh -ec \
@@ -213,7 +213,7 @@ jobs:
       - name: Re-run migrations through the normal startup contract
         run: |
           docker compose exec -T postgres sh -ec \
-            'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 9'
+            'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 24'
           docker compose exec -T postgres sh -ec \
             'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''iam/core'\''")" = 1'
           docker compose exec -T postgres sh -ec \
@@ -222,7 +222,7 @@ jobs:
             'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''idempotency/core'\''")" = 1'
           make up
           docker compose exec -T postgres sh -ec \
-            'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 9'
+            'test "$(psql -U pymes -d pymes_v2 -tAc "SELECT count(*) FROM schema_migrations WHERE scope = '\''pymes-v2'\''")" = 24'
       - name: Verify readiness failure and recovery
         run: |
           docker compose stop postgres

@@ -882,6 +882,35 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/settings/fiscal-calendar:
+    put:
+      operationId: updateAccountingFiscalCalendar
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountingFiscalCalendarInput"
+      responses:
+        "200":
+          description: Calendario fiscal contable actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingSettings"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /api/v1/accounting/accounts:
     get:
       operationId: listAccountingAccounts
@@ -1810,19 +1839,182 @@ paths:
           $ref: "#/components/responses/Unprocessable"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/fiscal-years:
+    get:
+      operationId: listAccountingFiscalYears
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: query
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+        - name: state
+          in: query
+          schema:
+            $ref: "#/components/schemas/AccountingFiscalYearState"
+      responses:
+        "200":
+          description: Ejercicios fiscales de la organización activa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingFiscalYearList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    post:
+      operationId: createAccountingFiscalYear
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountingFiscalYearInput"
+      responses:
+        "201":
+          description: Ejercicio creado junto con sus doce períodos mensuales.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingFiscalYearDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/fiscal-years/{fiscal_year_id}:
+    get:
+      operationId: getAccountingFiscalYear
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/FiscalYearID"
+      responses:
+        "200":
+          description: Ejercicio, períodos y estado de cierre anual.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingFiscalYearDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/fiscal-years/{fiscal_year_id}/annual-close-draft:
+    post:
+      operationId: createFiscalYearAnnualClosingDraft
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/FiscalYearID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnnualClosingDraftInput"
+      responses:
+        "201":
+          description: Borrador anual completo para revisión en Diario.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingAnnualCloseResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/fiscal-years/{fiscal_year_id}/reopen:
+    post:
+      operationId: reopenAccountingFiscalYear
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/FiscalYearID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountingFiscalYearReopenInput"
+      responses:
+        "200":
+          description: Ejercicio reabierto y cierre anual revertido cuando correspondía.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingFiscalYearDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /api/v1/accounting/periods:
     get:
       operationId: listAccountingPeriods
       tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: fiscal_year_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: query
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+        - name: state
+          in: query
+          schema:
+            $ref: "#/components/schemas/AccountingPeriodState"
       responses:
         "200":
           description: Períodos contables.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/AccountingPeriod"
+                $ref: "#/components/schemas/AccountingPeriodList"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -1831,6 +2023,8 @@ paths:
           $ref: "#/components/responses/Unavailable"
     post:
       operationId: createAccountingPeriod
+      deprecated: true
+      description: Compatibilidad para períodos heredados; la web crea ejercicios completos.
       tags: [Accounting]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -1855,6 +2049,52 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/periods/{period_id}:
+    get:
+      operationId: getAccountingPeriod
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/PeriodID"
+      responses:
+        "200":
+          description: Período, controles vivos y capacidades de transición.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingPeriodDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/accounting/periods/{period_id}/events:
+    get:
+      operationId: listAccountingPeriodEvents
+      tags: [Accounting]
+      parameters:
+        - $ref: "#/components/parameters/PeriodID"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Historial inmutable del período.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingPeriodEventList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "503":
           $ref: "#/components/responses/Unavailable"
   /api/v1/accounting/periods/{period_id}/transition:
@@ -3266,6 +3506,13 @@ components:
       schema:
         type: string
         format: uuid
+    FiscalYearID:
+      name: fiscal_year_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     FinancialAccountID:
       name: financial_account_id
       in: path
@@ -3893,7 +4140,15 @@ components:
     AccountingSettings:
       type: object
       additionalProperties: false
-      required: [country_code, functional_currency, timezone]
+      required:
+        [
+          country_code,
+          functional_currency,
+          timezone,
+          fiscal_year_start_month,
+          version,
+          can_change_fiscal_year_start,
+        ]
       properties:
         country_code:
           type: string
@@ -3902,6 +4157,29 @@ components:
           $ref: "#/components/schemas/CurrencyCode"
         timezone:
           type: string
+        fiscal_year_start_month:
+          type: integer
+          minimum: 1
+          maximum: 12
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        can_change_fiscal_year_start:
+          type: boolean
+    AccountingFiscalCalendarInput:
+      type: object
+      additionalProperties: false
+      required: [fiscal_year_start_month, version]
+      properties:
+        fiscal_year_start_month:
+          type: integer
+          minimum: 1
+          maximum: 12
+        version:
+          type: integer
+          format: int64
+          minimum: 1
     AccountingAccount:
       type: object
       additionalProperties: false
@@ -4726,6 +5004,76 @@ components:
     AccountingPeriodState:
       type: string
       enum: [open, soft_closed, locked]
+    AccountingFiscalYearState:
+      type: string
+      enum: [open, closing, closed]
+    AccountingAnnualCloseStatus:
+      type: string
+      enum: [not_ready, ready, draft, posted, reversed, not_required]
+    AccountingCloseCheckStatus:
+      type: string
+      enum: [not_evaluated, passed, warning, blocked]
+    AccountingCloseCheck:
+      type: object
+      additionalProperties: false
+      required: [code, label, status, count]
+      properties:
+        code:
+          type: string
+        label:
+          type: string
+        status:
+          $ref: "#/components/schemas/AccountingCloseCheckStatus"
+        count:
+          type: integer
+          minimum: 0
+        detail:
+          type: string
+        target_path:
+          type: string
+    AccountingCloseReadiness:
+      type: object
+      additionalProperties: false
+      required: [status, blocking_count, checks]
+      properties:
+        status:
+          type: string
+          enum: [not_evaluated, ready, warning, blocked]
+        blocking_count:
+          type: integer
+          minimum: 0
+        evaluated_at:
+          type: string
+          format: date-time
+          nullable: true
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountingCloseCheck"
+    AccountingPeriodCapabilities:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          can_soft_close,
+          can_lock,
+          can_reopen_to_soft_closed,
+          can_reopen_to_open,
+          blockers,
+        ]
+      properties:
+        can_soft_close:
+          type: boolean
+        can_lock:
+          type: boolean
+        can_reopen_to_soft_closed:
+          type: boolean
+        can_reopen_to_open:
+          type: boolean
+        blockers:
+          type: array
+          items:
+            type: string
     AccountingPeriodInput:
       type: object
       additionalProperties: false
@@ -4740,11 +5088,31 @@ components:
     AccountingPeriod:
       type: object
       additionalProperties: false
-      required: [id, start_date, end_date, state, version]
+      required:
+        [
+          id,
+          fiscal_year_id,
+          code,
+          sequence,
+          start_date,
+          end_date,
+          state,
+          version,
+          is_legacy,
+        ]
       properties:
         id:
           type: string
           format: uuid
+        fiscal_year_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        sequence:
+          type: integer
+          minimum: 1
+          maximum: 12
         start_date:
           type: string
           format: date
@@ -4756,6 +5124,8 @@ components:
         version:
           type: integer
           format: int64
+        is_legacy:
+          type: boolean
         checklist:
           type: array
           items:
@@ -4770,6 +5140,321 @@ components:
               count:
                 type: integer
                 minimum: 0
+    AccountingPeriodList:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountingPeriod"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    AccountingPeriodEvent:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          period_id,
+          from_state,
+          to_state,
+          to_version,
+          actor,
+          occurred_at,
+        ]
+      properties:
+        id:
+          type: string
+          format: uuid
+        period_id:
+          type: string
+          format: uuid
+        from_state:
+          $ref: "#/components/schemas/AccountingPeriodState"
+        to_state:
+          $ref: "#/components/schemas/AccountingPeriodState"
+        from_version:
+          type: integer
+          format: int64
+          minimum: 1
+        to_version:
+          type: integer
+          format: int64
+          minimum: 1
+        actor:
+          type: string
+        reason:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+    AccountingPeriodEventList:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountingPeriodEvent"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    AccountingPeriodDetail:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          fiscal_year_id,
+          code,
+          sequence,
+          start_date,
+          end_date,
+          state,
+          version,
+          is_legacy,
+          close_readiness,
+          capabilities,
+          recent_events,
+        ]
+      properties:
+        id:
+          type: string
+          format: uuid
+        fiscal_year_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        sequence:
+          type: integer
+          minimum: 1
+          maximum: 12
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        state:
+          $ref: "#/components/schemas/AccountingPeriodState"
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        is_legacy:
+          type: boolean
+        close_readiness:
+          $ref: "#/components/schemas/AccountingCloseReadiness"
+        capabilities:
+          $ref: "#/components/schemas/AccountingPeriodCapabilities"
+        recent_events:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountingPeriodEvent"
+    AccountingFiscalYearPeriodCounts:
+      type: object
+      additionalProperties: false
+      required: [open, soft_closed, locked]
+      properties:
+        open:
+          type: integer
+          minimum: 0
+        soft_closed:
+          type: integer
+          minimum: 0
+        locked:
+          type: integer
+          minimum: 0
+    AccountingFiscalYearSummary:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          code,
+          start_date,
+          end_date,
+          is_legacy,
+          state,
+          version,
+          period_counts,
+          annual_close_status,
+        ]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        is_legacy:
+          type: boolean
+        state:
+          $ref: "#/components/schemas/AccountingFiscalYearState"
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        period_counts:
+          $ref: "#/components/schemas/AccountingFiscalYearPeriodCounts"
+        annual_close_status:
+          $ref: "#/components/schemas/AccountingAnnualCloseStatus"
+        annual_closing_draft_id:
+          type: string
+          format: uuid
+        annual_closing_entry_id:
+          type: string
+          format: uuid
+    AccountingFiscalYearCapabilities:
+      type: object
+      additionalProperties: false
+      required: [can_prepare_annual_close, can_reopen, blockers]
+      properties:
+        can_prepare_annual_close:
+          type: boolean
+        can_reopen:
+          type: boolean
+        blockers:
+          type: array
+          items:
+            type: string
+    AccountingFiscalYearEvent:
+      type: object
+      additionalProperties: false
+      required: [id, event_type, to_version, actor, occurred_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        from_status:
+          type: string
+        to_status:
+          type: string
+        from_version:
+          type: integer
+          format: int64
+          minimum: 1
+        to_version:
+          type: integer
+          format: int64
+          minimum: 1
+        actor:
+          type: string
+        reason:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+    AccountingFiscalYearDetail:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          code,
+          start_date,
+          end_date,
+          is_legacy,
+          state,
+          version,
+          period_counts,
+          annual_close_status,
+          periods,
+          capabilities,
+          recent_events,
+        ]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        is_legacy:
+          type: boolean
+        state:
+          $ref: "#/components/schemas/AccountingFiscalYearState"
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        period_counts:
+          $ref: "#/components/schemas/AccountingFiscalYearPeriodCounts"
+        annual_close_status:
+          $ref: "#/components/schemas/AccountingAnnualCloseStatus"
+        annual_closing_draft_id:
+          type: string
+          format: uuid
+        annual_closing_entry_id:
+          type: string
+          format: uuid
+        periods:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountingPeriodDetail"
+        capabilities:
+          $ref: "#/components/schemas/AccountingFiscalYearCapabilities"
+        recent_events:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountingFiscalYearEvent"
+    AccountingFiscalYearList:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountingFiscalYearSummary"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    AccountingFiscalYearInput:
+      type: object
+      additionalProperties: false
+      required: [start_year]
+      properties:
+        start_year:
+          type: integer
+          minimum: 1900
+          maximum: 9999
+    AccountingFiscalYearReopenInput:
+      type: object
+      additionalProperties: false
+      required: [version, reason]
+      properties:
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    AccountingAnnualCloseResult:
+      type: object
+      additionalProperties: false
+      required: [fiscal_year]
+      properties:
+        fiscal_year:
+          $ref: "#/components/schemas/AccountingFiscalYearSummary"
+        draft:
+          $ref: "#/components/schemas/JournalDraft"
     AnnualClosingDraftInput:
       type: object
       additionalProperties: false

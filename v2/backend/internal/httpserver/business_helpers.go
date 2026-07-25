@@ -40,6 +40,14 @@ var (
 	errAccountingAccountHasChildren     = errors.New("accounting account has active children")
 	errAccountingAccountParentInactive  = errors.New("accounting account parent is inactive")
 	errAccountingAccountProtected       = errors.New("accounting account is protected")
+	errAccountingFiscalYearOverlap      = errors.New("accounting fiscal year overlaps")
+	errAccountingPeriodSequence         = errors.New("accounting period sequence is invalid")
+	errAccountingPeriodInFuture         = errors.New("accounting period is in the future")
+	errAccountingFiscalYearCloseOrder   = errors.New("accounting fiscal year close order is invalid")
+	errAccountingFiscalYearReopenOrder  = errors.New("accounting fiscal year reopen order is invalid")
+	errAccountingCloseChecklistBlocked  = errors.New("accounting close checklist is blocked")
+	errAccountingAnnualClosePending     = errors.New("accounting annual close is pending")
+	errAccountingAnnualCloseNotRequired = errors.New("accounting annual close is not required")
 	errFiscalUncertain                  = errors.New("fiscal authorization is uncertain")
 	errFiscalProductionNotReady         = errors.New("fiscal production prerequisites are incomplete")
 )
@@ -181,6 +189,22 @@ func writeBusinessError(w http.ResponseWriter, err error) {
 		status, code, message = http.StatusConflict, "ACCOUNTING_ACCOUNT_PARENT_INACTIVE", "Restaurá primero el rubro superior"
 	case errors.Is(err, errAccountingAccountProtected):
 		status, code, message = http.StatusConflict, "ACCOUNTING_ACCOUNT_PROTECTED", "Este rubro pertenece a la estructura base y no admite la operación"
+	case errors.Is(err, errAccountingFiscalYearOverlap):
+		status, code, message = http.StatusConflict, "ACCOUNTING_FISCAL_YEAR_OVERLAP", "El ejercicio se superpone con otro existente"
+	case errors.Is(err, errAccountingPeriodSequence):
+		status, code, message = http.StatusConflict, "ACCOUNTING_PERIOD_SEQUENCE_INVALID", "Los períodos deben cerrarse en orden cronológico"
+	case errors.Is(err, errAccountingPeriodInFuture):
+		status, code, message = http.StatusConflict, "ACCOUNTING_PERIOD_FUTURE", "No se puede cerrar un período cuya fecha final todavía es futura"
+	case errors.Is(err, errAccountingFiscalYearCloseOrder):
+		status, code, message = http.StatusConflict, "ACCOUNTING_FISCAL_YEAR_CLOSE_ORDER", "Completá primero los cierres anteriores del ejercicio"
+	case errors.Is(err, errAccountingFiscalYearReopenOrder):
+		status, code, message = http.StatusConflict, "ACCOUNTING_FISCAL_YEAR_REOPEN_ORDER", "Los cierres deben reabrirse en orden inverso"
+	case errors.Is(err, errAccountingCloseChecklistBlocked):
+		status, code, message = http.StatusConflict, "ACCOUNTING_CLOSE_CHECKLIST_BLOCKED", "Resolvé los controles pendientes antes de continuar el cierre"
+	case errors.Is(err, errAccountingAnnualClosePending):
+		status, code, message = http.StatusConflict, "ACCOUNTING_ANNUAL_CLOSE_PENDING", "El cierre anual debe completarse antes de bloquear el último período"
+	case errors.Is(err, errAccountingAnnualCloseNotRequired):
+		status, code, message = http.StatusConflict, "ACCOUNTING_ANNUAL_CLOSE_NOT_REQUIRED", "El ejercicio no tiene saldos temporales que requieran un asiento de cierre"
 	case errors.Is(err, errFiscalUncertain):
 		status, code, message = http.StatusConflict, "FISCAL_AUTHORIZATION_UNCERTAIN", "ARCA authorization must be reconciled before retrying"
 	case errors.Is(err, errFiscalProductionNotReady):

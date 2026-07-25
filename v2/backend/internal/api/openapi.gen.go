@@ -70,6 +70,84 @@ func (e AccountingAccountType) Valid() bool {
 	}
 }
 
+// Defines values for AccountingAnnualCloseStatus.
+const (
+	AccountingAnnualCloseStatusDraft       AccountingAnnualCloseStatus = "draft"
+	AccountingAnnualCloseStatusNotReady    AccountingAnnualCloseStatus = "not_ready"
+	AccountingAnnualCloseStatusNotRequired AccountingAnnualCloseStatus = "not_required"
+	AccountingAnnualCloseStatusPosted      AccountingAnnualCloseStatus = "posted"
+	AccountingAnnualCloseStatusReady       AccountingAnnualCloseStatus = "ready"
+	AccountingAnnualCloseStatusReversed    AccountingAnnualCloseStatus = "reversed"
+)
+
+// Valid indicates whether the value is a known member of the AccountingAnnualCloseStatus enum.
+func (e AccountingAnnualCloseStatus) Valid() bool {
+	switch e {
+	case AccountingAnnualCloseStatusDraft:
+		return true
+	case AccountingAnnualCloseStatusNotReady:
+		return true
+	case AccountingAnnualCloseStatusNotRequired:
+		return true
+	case AccountingAnnualCloseStatusPosted:
+		return true
+	case AccountingAnnualCloseStatusReady:
+		return true
+	case AccountingAnnualCloseStatusReversed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountingCloseCheckStatus.
+const (
+	AccountingCloseCheckStatusBlocked      AccountingCloseCheckStatus = "blocked"
+	AccountingCloseCheckStatusNotEvaluated AccountingCloseCheckStatus = "not_evaluated"
+	AccountingCloseCheckStatusPassed       AccountingCloseCheckStatus = "passed"
+	AccountingCloseCheckStatusWarning      AccountingCloseCheckStatus = "warning"
+)
+
+// Valid indicates whether the value is a known member of the AccountingCloseCheckStatus enum.
+func (e AccountingCloseCheckStatus) Valid() bool {
+	switch e {
+	case AccountingCloseCheckStatusBlocked:
+		return true
+	case AccountingCloseCheckStatusNotEvaluated:
+		return true
+	case AccountingCloseCheckStatusPassed:
+		return true
+	case AccountingCloseCheckStatusWarning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountingCloseReadinessStatus.
+const (
+	AccountingCloseReadinessStatusBlocked      AccountingCloseReadinessStatus = "blocked"
+	AccountingCloseReadinessStatusNotEvaluated AccountingCloseReadinessStatus = "not_evaluated"
+	AccountingCloseReadinessStatusReady        AccountingCloseReadinessStatus = "ready"
+	AccountingCloseReadinessStatusWarning      AccountingCloseReadinessStatus = "warning"
+)
+
+// Valid indicates whether the value is a known member of the AccountingCloseReadinessStatus enum.
+func (e AccountingCloseReadinessStatus) Valid() bool {
+	switch e {
+	case AccountingCloseReadinessStatusBlocked:
+		return true
+	case AccountingCloseReadinessStatusNotEvaluated:
+		return true
+	case AccountingCloseReadinessStatusReady:
+		return true
+	case AccountingCloseReadinessStatusWarning:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AccountingEntryKind.
 const (
 	AccountingEntryKindAdjustment  AccountingEntryKind = "adjustment"
@@ -118,6 +196,27 @@ func (e AccountingEntryKind) Valid() bool {
 	case AccountingEntryKindSale:
 		return true
 	case AccountingEntryKindTax:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountingFiscalYearState.
+const (
+	AccountingFiscalYearStateClosed  AccountingFiscalYearState = "closed"
+	AccountingFiscalYearStateClosing AccountingFiscalYearState = "closing"
+	AccountingFiscalYearStateOpen    AccountingFiscalYearState = "open"
+)
+
+// Valid indicates whether the value is a known member of the AccountingFiscalYearState enum.
+func (e AccountingFiscalYearState) Valid() bool {
+	switch e {
+	case AccountingFiscalYearStateClosed:
+		return true
+	case AccountingFiscalYearStateClosing:
+		return true
+	case AccountingFiscalYearStateOpen:
 		return true
 	default:
 		return false
@@ -189,19 +288,19 @@ func (e AccountingPaymentMethod) Valid() bool {
 
 // Defines values for AccountingPeriodState.
 const (
-	Locked     AccountingPeriodState = "locked"
-	Open       AccountingPeriodState = "open"
-	SoftClosed AccountingPeriodState = "soft_closed"
+	AccountingPeriodStateLocked     AccountingPeriodState = "locked"
+	AccountingPeriodStateOpen       AccountingPeriodState = "open"
+	AccountingPeriodStateSoftClosed AccountingPeriodState = "soft_closed"
 )
 
 // Valid indicates whether the value is a known member of the AccountingPeriodState enum.
 func (e AccountingPeriodState) Valid() bool {
 	switch e {
-	case Locked:
+	case AccountingPeriodStateLocked:
 		return true
-	case Open:
+	case AccountingPeriodStateOpen:
 		return true
-	case SoftClosed:
+	case AccountingPeriodStateSoftClosed:
 		return true
 	default:
 		return false
@@ -1548,8 +1647,127 @@ type AccountingAccountUsage struct {
 	Used                    bool `json:"used"`
 }
 
+// AccountingAnnualCloseResult defines model for AccountingAnnualCloseResult.
+type AccountingAnnualCloseResult struct {
+	Draft      *JournalDraft               `json:"draft,omitempty"`
+	FiscalYear AccountingFiscalYearSummary `json:"fiscal_year"`
+}
+
+// AccountingAnnualCloseStatus defines model for AccountingAnnualCloseStatus.
+type AccountingAnnualCloseStatus string
+
+// AccountingCloseCheck defines model for AccountingCloseCheck.
+type AccountingCloseCheck struct {
+	Code       string                     `json:"code"`
+	Count      int                        `json:"count"`
+	Detail     *string                    `json:"detail,omitempty"`
+	Label      string                     `json:"label"`
+	Status     AccountingCloseCheckStatus `json:"status"`
+	TargetPath *string                    `json:"target_path,omitempty"`
+}
+
+// AccountingCloseCheckStatus defines model for AccountingCloseCheckStatus.
+type AccountingCloseCheckStatus string
+
+// AccountingCloseReadiness defines model for AccountingCloseReadiness.
+type AccountingCloseReadiness struct {
+	BlockingCount int                            `json:"blocking_count"`
+	Checks        []AccountingCloseCheck         `json:"checks"`
+	EvaluatedAt   *time.Time                     `json:"evaluated_at,omitempty"`
+	Status        AccountingCloseReadinessStatus `json:"status"`
+}
+
+// AccountingCloseReadinessStatus defines model for AccountingCloseReadiness.Status.
+type AccountingCloseReadinessStatus string
+
 // AccountingEntryKind defines model for AccountingEntryKind.
 type AccountingEntryKind string
+
+// AccountingFiscalCalendarInput defines model for AccountingFiscalCalendarInput.
+type AccountingFiscalCalendarInput struct {
+	FiscalYearStartMonth int   `json:"fiscal_year_start_month"`
+	Version              int64 `json:"version"`
+}
+
+// AccountingFiscalYearCapabilities defines model for AccountingFiscalYearCapabilities.
+type AccountingFiscalYearCapabilities struct {
+	Blockers              []string `json:"blockers"`
+	CanPrepareAnnualClose bool     `json:"can_prepare_annual_close"`
+	CanReopen             bool     `json:"can_reopen"`
+}
+
+// AccountingFiscalYearDetail defines model for AccountingFiscalYearDetail.
+type AccountingFiscalYearDetail struct {
+	AnnualCloseStatus    AccountingAnnualCloseStatus      `json:"annual_close_status"`
+	AnnualClosingDraftId *openapi_types.UUID              `json:"annual_closing_draft_id,omitempty"`
+	AnnualClosingEntryId *openapi_types.UUID              `json:"annual_closing_entry_id,omitempty"`
+	Capabilities         AccountingFiscalYearCapabilities `json:"capabilities"`
+	Code                 string                           `json:"code"`
+	EndDate              openapi_types.Date               `json:"end_date"`
+	Id                   openapi_types.UUID               `json:"id"`
+	IsLegacy             bool                             `json:"is_legacy"`
+	PeriodCounts         AccountingFiscalYearPeriodCounts `json:"period_counts"`
+	Periods              []AccountingPeriodDetail         `json:"periods"`
+	RecentEvents         []AccountingFiscalYearEvent      `json:"recent_events"`
+	StartDate            openapi_types.Date               `json:"start_date"`
+	State                AccountingFiscalYearState        `json:"state"`
+	Version              int64                            `json:"version"`
+}
+
+// AccountingFiscalYearEvent defines model for AccountingFiscalYearEvent.
+type AccountingFiscalYearEvent struct {
+	Actor       string             `json:"actor"`
+	EventType   string             `json:"event_type"`
+	FromStatus  *string            `json:"from_status,omitempty"`
+	FromVersion *int64             `json:"from_version,omitempty"`
+	Id          openapi_types.UUID `json:"id"`
+	OccurredAt  time.Time          `json:"occurred_at"`
+	Reason      *string            `json:"reason,omitempty"`
+	ToStatus    *string            `json:"to_status,omitempty"`
+	ToVersion   int64              `json:"to_version"`
+}
+
+// AccountingFiscalYearInput defines model for AccountingFiscalYearInput.
+type AccountingFiscalYearInput struct {
+	StartYear int `json:"start_year"`
+}
+
+// AccountingFiscalYearList defines model for AccountingFiscalYearList.
+type AccountingFiscalYearList struct {
+	Items []AccountingFiscalYearSummary `json:"items"`
+	Page  PageInfo                      `json:"page"`
+}
+
+// AccountingFiscalYearPeriodCounts defines model for AccountingFiscalYearPeriodCounts.
+type AccountingFiscalYearPeriodCounts struct {
+	Locked     int `json:"locked"`
+	Open       int `json:"open"`
+	SoftClosed int `json:"soft_closed"`
+}
+
+// AccountingFiscalYearReopenInput defines model for AccountingFiscalYearReopenInput.
+type AccountingFiscalYearReopenInput struct {
+	Reason  string `json:"reason"`
+	Version int64  `json:"version"`
+}
+
+// AccountingFiscalYearState defines model for AccountingFiscalYearState.
+type AccountingFiscalYearState string
+
+// AccountingFiscalYearSummary defines model for AccountingFiscalYearSummary.
+type AccountingFiscalYearSummary struct {
+	AnnualCloseStatus    AccountingAnnualCloseStatus      `json:"annual_close_status"`
+	AnnualClosingDraftId *openapi_types.UUID              `json:"annual_closing_draft_id,omitempty"`
+	AnnualClosingEntryId *openapi_types.UUID              `json:"annual_closing_entry_id,omitempty"`
+	Code                 string                           `json:"code"`
+	EndDate              openapi_types.Date               `json:"end_date"`
+	Id                   openapi_types.UUID               `json:"id"`
+	IsLegacy             bool                             `json:"is_legacy"`
+	PeriodCounts         AccountingFiscalYearPeriodCounts `json:"period_counts"`
+	StartDate            openapi_types.Date               `json:"start_date"`
+	State                AccountingFiscalYearState        `json:"state"`
+	Version              int64                            `json:"version"`
+}
 
 // AccountingMapping defines model for AccountingMapping.
 type AccountingMapping struct {
@@ -1641,17 +1859,71 @@ type AccountingPeriod struct {
 		Code  string `json:"code"`
 		Count *int   `json:"count,omitempty"`
 	} `json:"checklist,omitempty"`
-	EndDate   openapi_types.Date    `json:"end_date"`
-	Id        openapi_types.UUID    `json:"id"`
-	StartDate openapi_types.Date    `json:"start_date"`
-	State     AccountingPeriodState `json:"state"`
-	Version   int64                 `json:"version"`
+	Code         string                `json:"code"`
+	EndDate      openapi_types.Date    `json:"end_date"`
+	FiscalYearId openapi_types.UUID    `json:"fiscal_year_id"`
+	Id           openapi_types.UUID    `json:"id"`
+	IsLegacy     bool                  `json:"is_legacy"`
+	Sequence     int                   `json:"sequence"`
+	StartDate    openapi_types.Date    `json:"start_date"`
+	State        AccountingPeriodState `json:"state"`
+	Version      int64                 `json:"version"`
+}
+
+// AccountingPeriodCapabilities defines model for AccountingPeriodCapabilities.
+type AccountingPeriodCapabilities struct {
+	Blockers              []string `json:"blockers"`
+	CanLock               bool     `json:"can_lock"`
+	CanReopenToOpen       bool     `json:"can_reopen_to_open"`
+	CanReopenToSoftClosed bool     `json:"can_reopen_to_soft_closed"`
+	CanSoftClose          bool     `json:"can_soft_close"`
+}
+
+// AccountingPeriodDetail defines model for AccountingPeriodDetail.
+type AccountingPeriodDetail struct {
+	Capabilities   AccountingPeriodCapabilities `json:"capabilities"`
+	CloseReadiness AccountingCloseReadiness     `json:"close_readiness"`
+	Code           string                       `json:"code"`
+	EndDate        openapi_types.Date           `json:"end_date"`
+	FiscalYearId   openapi_types.UUID           `json:"fiscal_year_id"`
+	Id             openapi_types.UUID           `json:"id"`
+	IsLegacy       bool                         `json:"is_legacy"`
+	RecentEvents   []AccountingPeriodEvent      `json:"recent_events"`
+	Sequence       int                          `json:"sequence"`
+	StartDate      openapi_types.Date           `json:"start_date"`
+	State          AccountingPeriodState        `json:"state"`
+	Version        int64                        `json:"version"`
+}
+
+// AccountingPeriodEvent defines model for AccountingPeriodEvent.
+type AccountingPeriodEvent struct {
+	Actor       string                `json:"actor"`
+	FromState   AccountingPeriodState `json:"from_state"`
+	FromVersion *int64                `json:"from_version,omitempty"`
+	Id          openapi_types.UUID    `json:"id"`
+	OccurredAt  time.Time             `json:"occurred_at"`
+	PeriodId    openapi_types.UUID    `json:"period_id"`
+	Reason      *string               `json:"reason,omitempty"`
+	ToState     AccountingPeriodState `json:"to_state"`
+	ToVersion   int64                 `json:"to_version"`
+}
+
+// AccountingPeriodEventList defines model for AccountingPeriodEventList.
+type AccountingPeriodEventList struct {
+	Items []AccountingPeriodEvent `json:"items"`
+	Page  PageInfo                `json:"page"`
 }
 
 // AccountingPeriodInput defines model for AccountingPeriodInput.
 type AccountingPeriodInput struct {
 	EndDate   openapi_types.Date `json:"end_date"`
 	StartDate openapi_types.Date `json:"start_date"`
+}
+
+// AccountingPeriodList defines model for AccountingPeriodList.
+type AccountingPeriodList struct {
+	Items []AccountingPeriod `json:"items"`
+	Page  PageInfo           `json:"page"`
 }
 
 // AccountingPeriodState defines model for AccountingPeriodState.
@@ -1699,11 +1971,14 @@ type AccountingReportRow struct {
 
 // AccountingSettings defines model for AccountingSettings.
 type AccountingSettings struct {
-	CountryCode string `json:"country_code"`
+	CanChangeFiscalYearStart bool   `json:"can_change_fiscal_year_start"`
+	CountryCode              string `json:"country_code"`
+	FiscalYearStartMonth     int    `json:"fiscal_year_start_month"`
 
 	// FunctionalCurrency Example: ARS
 	FunctionalCurrency CurrencyCode `json:"functional_currency"`
 	Timezone           string       `json:"timezone"`
+	Version            int64        `json:"version"`
 }
 
 // AccountingSettlementInput defines model for AccountingSettlementInput.
@@ -3565,6 +3840,9 @@ type EntryID = openapi_types.UUID
 // FinancialAccountID defines model for FinancialAccountID.
 type FinancialAccountID = openapi_types.UUID
 
+// FiscalYearID defines model for FiscalYearID.
+type FiscalYearID = openapi_types.UUID
+
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
 
@@ -3739,6 +4017,29 @@ type UpdateFinancialAccountParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// ListAccountingFiscalYearsParams defines parameters for ListAccountingFiscalYears.
+type ListAccountingFiscalYearsParams struct {
+	Cursor *Cursor                    `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit                     `form:"limit,omitempty" json:"limit,omitempty"`
+	Query  *string                    `form:"query,omitempty" json:"query,omitempty"`
+	State  *AccountingFiscalYearState `form:"state,omitempty" json:"state,omitempty"`
+}
+
+// CreateAccountingFiscalYearParams defines parameters for CreateAccountingFiscalYear.
+type CreateAccountingFiscalYearParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateFiscalYearAnnualClosingDraftParams defines parameters for CreateFiscalYearAnnualClosingDraft.
+type CreateFiscalYearAnnualClosingDraftParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ReopenAccountingFiscalYearParams defines parameters for ReopenAccountingFiscalYear.
+type ReopenAccountingFiscalYearParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // GetGeneralLedgerParams defines parameters for GetGeneralLedger.
 type GetGeneralLedgerParams struct {
 	AccountId openapi_types.UUID `form:"account_id" json:"account_id"`
@@ -3812,6 +4113,15 @@ type ListAccountingOpenItemsParams struct {
 	OpenOnly *bool               `form:"open_only,omitempty" json:"open_only,omitempty"`
 }
 
+// ListAccountingPeriodsParams defines parameters for ListAccountingPeriods.
+type ListAccountingPeriodsParams struct {
+	Cursor       *Cursor                `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit        *Limit                 `form:"limit,omitempty" json:"limit,omitempty"`
+	FiscalYearId *openapi_types.UUID    `form:"fiscal_year_id,omitempty" json:"fiscal_year_id,omitempty"`
+	Query        *string                `form:"query,omitempty" json:"query,omitempty"`
+	State        *AccountingPeriodState `form:"state,omitempty" json:"state,omitempty"`
+}
+
 // CreateAccountingPeriodParams defines parameters for CreateAccountingPeriod.
 type CreateAccountingPeriodParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
@@ -3820,6 +4130,12 @@ type CreateAccountingPeriodParams struct {
 // CreateAnnualClosingDraftParams defines parameters for CreateAnnualClosingDraft.
 type CreateAnnualClosingDraftParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListAccountingPeriodEventsParams defines parameters for ListAccountingPeriodEvents.
+type ListAccountingPeriodEventsParams struct {
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // TransitionAccountingPeriodParams defines parameters for TransitionAccountingPeriod.
@@ -3881,6 +4197,11 @@ type ExportAccountingReportParamsFormat string
 
 // ExportAccountingReportParamsReport defines parameters for ExportAccountingReport.
 type ExportAccountingReportParamsReport string
+
+// UpdateAccountingFiscalCalendarParams defines parameters for UpdateAccountingFiscalCalendar.
+type UpdateAccountingFiscalCalendarParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
 
 // ImportAccountingStatementParams defines parameters for ImportAccountingStatement.
 type ImportAccountingStatementParams struct {
@@ -4232,6 +4553,15 @@ type CreateFinancialAccountJSONRequestBody = FinancialAccountInput
 // UpdateFinancialAccountJSONRequestBody defines body for UpdateFinancialAccount for application/json ContentType.
 type UpdateFinancialAccountJSONRequestBody = UpdateFinancialAccountInput
 
+// CreateAccountingFiscalYearJSONRequestBody defines body for CreateAccountingFiscalYear for application/json ContentType.
+type CreateAccountingFiscalYearJSONRequestBody = AccountingFiscalYearInput
+
+// CreateFiscalYearAnnualClosingDraftJSONRequestBody defines body for CreateFiscalYearAnnualClosingDraft for application/json ContentType.
+type CreateFiscalYearAnnualClosingDraftJSONRequestBody = AnnualClosingDraftInput
+
+// ReopenAccountingFiscalYearJSONRequestBody defines body for ReopenAccountingFiscalYear for application/json ContentType.
+type ReopenAccountingFiscalYearJSONRequestBody = AccountingFiscalYearReopenInput
+
 // PreviewInflationAdjustmentJSONRequestBody defines body for PreviewInflationAdjustment for application/json ContentType.
 type PreviewInflationAdjustmentJSONRequestBody = InflationAdjustmentInput
 
@@ -4242,6 +4572,8 @@ type ImportInflationIndicesJSONRequestBody = ImportInflationIndicesJSONBody
 type ReverseJournalEntryJSONRequestBody = ReverseJournalEntryInput
 
 // CreateAccountingPeriodJSONRequestBody defines body for CreateAccountingPeriod for application/json ContentType.
+//
+// Deprecated: this type has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 type CreateAccountingPeriodJSONRequestBody = AccountingPeriodInput
 
 // CreateAnnualClosingDraftJSONRequestBody defines body for CreateAnnualClosingDraft for application/json ContentType.
@@ -4261,6 +4593,9 @@ type UpdateAccountingReconciliationJSONRequestBody = UpdateReconciliationInput
 
 // TransitionAccountingReconciliationJSONRequestBody defines body for TransitionAccountingReconciliation for application/json ContentType.
 type TransitionAccountingReconciliationJSONRequestBody = VersionedCommandInput
+
+// UpdateAccountingFiscalCalendarJSONRequestBody defines body for UpdateAccountingFiscalCalendar for application/json ContentType.
+type UpdateAccountingFiscalCalendarJSONRequestBody = AccountingFiscalCalendarInput
 
 // ImportAccountingStatementJSONRequestBody defines body for ImportAccountingStatement for application/json ContentType.
 type ImportAccountingStatementJSONRequestBody = StatementImportInput
@@ -4426,6 +4761,21 @@ type ServerInterface interface {
 	// (PUT /api/v1/accounting/financial-accounts/{financial_account_id})
 	UpdateFinancialAccount(w http.ResponseWriter, r *http.Request, financialAccountId FinancialAccountID, params UpdateFinancialAccountParams)
 
+	// (GET /api/v1/accounting/fiscal-years)
+	ListAccountingFiscalYears(w http.ResponseWriter, r *http.Request, params ListAccountingFiscalYearsParams)
+
+	// (POST /api/v1/accounting/fiscal-years)
+	CreateAccountingFiscalYear(w http.ResponseWriter, r *http.Request, params CreateAccountingFiscalYearParams)
+
+	// (GET /api/v1/accounting/fiscal-years/{fiscal_year_id})
+	GetAccountingFiscalYear(w http.ResponseWriter, r *http.Request, fiscalYearId FiscalYearID)
+
+	// (POST /api/v1/accounting/fiscal-years/{fiscal_year_id}/annual-close-draft)
+	CreateFiscalYearAnnualClosingDraft(w http.ResponseWriter, r *http.Request, fiscalYearId FiscalYearID, params CreateFiscalYearAnnualClosingDraftParams)
+
+	// (POST /api/v1/accounting/fiscal-years/{fiscal_year_id}/reopen)
+	ReopenAccountingFiscalYear(w http.ResponseWriter, r *http.Request, fiscalYearId FiscalYearID, params ReopenAccountingFiscalYearParams)
+
 	// (GET /api/v1/accounting/general-ledger)
 	GetGeneralLedger(w http.ResponseWriter, r *http.Request, params GetGeneralLedgerParams)
 
@@ -4451,13 +4801,21 @@ type ServerInterface interface {
 	ListAccountingOpenItems(w http.ResponseWriter, r *http.Request, params ListAccountingOpenItemsParams)
 
 	// (GET /api/v1/accounting/periods)
-	ListAccountingPeriods(w http.ResponseWriter, r *http.Request)
+	ListAccountingPeriods(w http.ResponseWriter, r *http.Request, params ListAccountingPeriodsParams)
 
 	// (POST /api/v1/accounting/periods)
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	CreateAccountingPeriod(w http.ResponseWriter, r *http.Request, params CreateAccountingPeriodParams)
+
+	// (GET /api/v1/accounting/periods/{period_id})
+	GetAccountingPeriod(w http.ResponseWriter, r *http.Request, periodId PeriodID)
 
 	// (POST /api/v1/accounting/periods/{period_id}/annual-close-draft)
 	CreateAnnualClosingDraft(w http.ResponseWriter, r *http.Request, periodId PeriodID, params CreateAnnualClosingDraftParams)
+
+	// (GET /api/v1/accounting/periods/{period_id}/events)
+	ListAccountingPeriodEvents(w http.ResponseWriter, r *http.Request, periodId PeriodID, params ListAccountingPeriodEventsParams)
 
 	// (POST /api/v1/accounting/periods/{period_id}/transition)
 	TransitionAccountingPeriod(w http.ResponseWriter, r *http.Request, periodId PeriodID, params TransitionAccountingPeriodParams)
@@ -4488,6 +4846,9 @@ type ServerInterface interface {
 
 	// (GET /api/v1/accounting/settings)
 	GetAccountingSettings(w http.ResponseWriter, r *http.Request)
+
+	// (PUT /api/v1/accounting/settings/fiscal-calendar)
+	UpdateAccountingFiscalCalendar(w http.ResponseWriter, r *http.Request, params UpdateAccountingFiscalCalendarParams)
 
 	// (POST /api/v1/accounting/statement-imports)
 	ImportAccountingStatement(w http.ResponseWriter, r *http.Request, params ImportAccountingStatementParams)
@@ -5691,6 +6052,257 @@ func (siw *ServerInterfaceWrapper) UpdateFinancialAccount(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// ListAccountingFiscalYears operation middleware
+func (siw *ServerInterfaceWrapper) ListAccountingFiscalYears(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAccountingFiscalYearsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAccountingFiscalYears(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAccountingFiscalYear operation middleware
+func (siw *ServerInterfaceWrapper) CreateAccountingFiscalYear(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAccountingFiscalYearParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAccountingFiscalYear(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAccountingFiscalYear operation middleware
+func (siw *ServerInterfaceWrapper) GetAccountingFiscalYear(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "fiscal_year_id" -------------
+	var fiscalYearId FiscalYearID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "fiscal_year_id", r.PathValue("fiscal_year_id"), &fiscalYearId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fiscal_year_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAccountingFiscalYear(w, r, fiscalYearId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateFiscalYearAnnualClosingDraft operation middleware
+func (siw *ServerInterfaceWrapper) CreateFiscalYearAnnualClosingDraft(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "fiscal_year_id" -------------
+	var fiscalYearId FiscalYearID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "fiscal_year_id", r.PathValue("fiscal_year_id"), &fiscalYearId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fiscal_year_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateFiscalYearAnnualClosingDraftParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateFiscalYearAnnualClosingDraft(w, r, fiscalYearId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReopenAccountingFiscalYear operation middleware
+func (siw *ServerInterfaceWrapper) ReopenAccountingFiscalYear(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "fiscal_year_id" -------------
+	var fiscalYearId FiscalYearID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "fiscal_year_id", r.PathValue("fiscal_year_id"), &fiscalYearId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fiscal_year_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReopenAccountingFiscalYearParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReopenAccountingFiscalYear(w, r, fiscalYearId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetGeneralLedger operation middleware
 func (siw *ServerInterfaceWrapper) GetGeneralLedger(w http.ResponseWriter, r *http.Request) {
 
@@ -6308,8 +6920,79 @@ func (siw *ServerInterfaceWrapper) ListAccountingOpenItems(w http.ResponseWriter
 // ListAccountingPeriods operation middleware
 func (siw *ServerInterfaceWrapper) ListAccountingPeriods(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAccountingPeriodsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "fiscal_year_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "fiscal_year_id", r.URL.Query(), &params.FiscalYearId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "fiscal_year_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fiscal_year_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListAccountingPeriods(w, r)
+		siw.Handler.ListAccountingPeriods(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6364,6 +7047,32 @@ func (siw *ServerInterfaceWrapper) CreateAccountingPeriod(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// GetAccountingPeriod operation middleware
+func (siw *ServerInterfaceWrapper) GetAccountingPeriod(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "period_id" -------------
+	var periodId PeriodID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "period_id", r.PathValue("period_id"), &periodId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "period_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAccountingPeriod(w, r, periodId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateAnnualClosingDraft operation middleware
 func (siw *ServerInterfaceWrapper) CreateAnnualClosingDraft(w http.ResponseWriter, r *http.Request) {
 
@@ -6409,6 +7118,61 @@ func (siw *ServerInterfaceWrapper) CreateAnnualClosingDraft(w http.ResponseWrite
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAnnualClosingDraft(w, r, periodId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAccountingPeriodEvents operation middleware
+func (siw *ServerInterfaceWrapper) ListAccountingPeriodEvents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "period_id" -------------
+	var periodId PeriodID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "period_id", r.PathValue("period_id"), &periodId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "period_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAccountingPeriodEventsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAccountingPeriodEvents(w, r, periodId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6931,6 +7695,51 @@ func (siw *ServerInterfaceWrapper) GetAccountingSettings(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAccountingSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAccountingFiscalCalendar operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAccountingFiscalCalendar(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateAccountingFiscalCalendarParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAccountingFiscalCalendar(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -10192,6 +11001,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/team/invitations/{invitation_id}/resend", wrapper.ResendTeamInvitation)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/team/invitations/{invitation_id}/revoke", wrapper.RevokeTeamInvitation)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/settings", wrapper.GetAccountingSettings)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/accounting/settings/fiscal-calendar", wrapper.UpdateAccountingFiscalCalendar)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/accounts", wrapper.ListAccountingAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/accounts", wrapper.CreateAccountingAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/accounts/tree", wrapper.GetAccountingAccountsTree)
@@ -10217,8 +11027,15 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/open-items", wrapper.ListAccountingOpenItems)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/receipts", wrapper.CreateAccountingReceipt)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/supplier-payments", wrapper.CreateAccountingSupplierPayment)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/fiscal-years", wrapper.ListAccountingFiscalYears)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/fiscal-years", wrapper.CreateAccountingFiscalYear)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/fiscal-years/{fiscal_year_id}", wrapper.GetAccountingFiscalYear)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/fiscal-years/{fiscal_year_id}/annual-close-draft", wrapper.CreateFiscalYearAnnualClosingDraft)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/fiscal-years/{fiscal_year_id}/reopen", wrapper.ReopenAccountingFiscalYear)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/periods", wrapper.ListAccountingPeriods)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/periods", wrapper.CreateAccountingPeriod)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/periods/{period_id}", wrapper.GetAccountingPeriod)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/periods/{period_id}/events", wrapper.ListAccountingPeriodEvents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/periods/{period_id}/transition", wrapper.TransitionAccountingPeriod)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounting/periods/{period_id}/annual-close-draft", wrapper.CreateAnnualClosingDraft)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounting/financial-accounts", wrapper.ListFinancialAccounts)
@@ -10268,291 +11085,312 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"7L3JdhtHtij6K7HwamCfAzaSm1OW1l1nUSTl4i2K5CUp16ry5YUCmRtgSJkRqYhIiLBKg/cB7wferIYe",
-	"eORZTfljd0WTfWQiMwGCkAwPLBDIjGbH7mM3HwceCyNGgUoxePZxEGGOQ5DA9V8HnsdiKk+O1B+EDp4N",
-	"IixvB8MBxSEMng2w+X1E/MFwwOF9TDj4g2eSxzAcCO8WQqzenDAeYjl4Nohj/aScR+ptITmh08GnT8PB",
-	"YcwF4+ks72Pg82waz/yaHzLEd6dAp/J28Oy7J09dQx5xPKlfua9+XX7dx1Tyee0koH5dfpKXhGLqERws",
-	"Oo5J8uBoZQdz4kMYMQnUm/8V5um8t4B94NnMucd21HNNk+aO7ul33w0HIaHJ3392LoHOiMSSMFq7cZI+",
-	"svyOT0lIZB0mBvrH/IA+THAcSLWXodoaCeNw8OzJ/r7emP0rnYdQCVPgeqJXEI6B1+4p1D8vv58L4IT5",
-	"tdNE+uflp7kEj1GPBKT5pHjhseWnvQIhmuYT5vdFEzXg5BPntBJLCIHKkzBivJ4iRfLciOgHl9/wNVDc",
-	"wAKk/nn5aV6LBtSMxSoQ8ycWe7cNs8zM78tO9Mm8DEK+YD4BLddOyQS8uRfAIQtDTH31nceoBKopH0dR",
-	"QDyNoXtvBaPqu2zCP3GYDJ4N/p+9THLumV/FXnngExrFMltEtgPzjYgYFWZJL7B/aZa5ssUcc874pZ3E",
-	"LMIH4XESqcEGzwZ2QkTo7P5fAfEZ+urN5fH/en18dT06Ofvp4PTk6M3XuwMlnxmdBMRb49qSGRnyGEUQ",
-	"IBAS+wxhT8Y4QF+9+en48urk/Gx0eH728vTk8PrNEL25PL46f315eDw6en1xenJ4cH2svrVbGV1fHpxd",
-	"nVyfnJ+pbw8OD89fn12fnP04uji+PDk/Gh2enl8dHxXGOXn16vX1wYtTPc7Lk6vDg9PRwevrv5xfnvzj",
-	"QI00en12eHx5fXBylnvi4vL86PWh/vns/Hp0eXxw9He9kINXo8vz0+PCmtWXJ2c/nVyb8S6Oz45Ozn7U",
-	"vxwdv7o4vz4+O/z76K/Hf8/eQqz448mZmvLHy+OrK3teLxkfE98Hur4DO/GBSuJjHxlkwkgQirDngWBI",
-	"xBPiEaAS0FdvFABH55c/HpwlQFRId3JpYK/g8er41Yvjy6u/nFxkP+lNH7wavTy/fHFydHR8Zrd6xuRL",
-	"Fq+QhluQjVZIEaFwR4TUu2KIMjQjgowD0FRkEUid/8vz12cJIV1iCVrDgDUu+DAA/g5p3eX+dySVqsZx",
-	"EOqFBxixCDj2yP3vNDmci8vzn06Oji9HlwfXx6PTk1cn18d6B0Or+WmWdQmSz3cOJhJ4cbEVFqwECsWx",
-	"vGWc/LLWnXPwQavECMfCnlTC7nCy3ZRBnP81RavXFM8wCfA4gPUt9yBWkxDPngbVzG9CpjHH2WoVSilW",
-	"cPLja0UXXyOGIs5mAD7jpcMl1CdqNouVxbN9fXbw08HJqeZuX++i1xSjCQ4CnI6BfI0eOJaMa8I+OXiF",
-	"AubhAMUCG2rMD2LhFnHmgRDrhdxpAY1BKOYj7//lKWAaWCRnHgHXxCqwJGKCPUAxxWiKOaby/jesIC6x",
-	"hVcmIl6fvTg4PTg7PE4I+W8wvmXs3WOI7Qs8Dxj21fF8MKsoSPC/Hb/4y/n5X1Osvjj4++n5QWndj0OO",
-	"LwkPMdLsaO9qRu5qiLK8g6uTH88Orl9fHlf2sH4SvQKPg2R54BfIlDWQKaFjdqepqJFMy3SlNv0pUXnz",
-	"fhlCp/aT3rTvE7VIHFxwRQtSK7sTHAgYDqLcVx9Tv41h1M0Qqcx1rV76NBx4zAcHtx8OiN9CLx8OgkRX",
-	"HmkrqbVqrW0vNUDIKEjM5yMvwEKQiT3xRQO9sq8dFt/6lBgejh1R5kM/YJ0xHxKAUQWRYDTGAaZeh6HO",
-	"9Hsv7GufhoMIczBGngPONA4sSRhLqbKZiAmZ0IwPEQcPy8ywKmvhYYQlGRNFmf5zpGyYGQ4AYZTC5H+o",
-	"AQmd7maHPGYsAKxhOgMu7KGkKyVUfv/tYKGDJLOYfh7orWmMs8eUP5RhEaErkK5HlRw0qgiZLf4mXR8b",
-	"vwVPqo1VjvoQR1gBKiWyDvTIvVsyg9E4YN47q12VDuL+d59MmdBm0DgAgeZGFJNf9J/PEY2ph1EIVOC3",
-	"IJAPARpj7x1QXx0MkRAKJ27bLzDneK7JGtORXU/u+dyJqgf82DDYhkfAJ3JUoijXI0Ly2JMxb3iOg5Cs",
-	"6QHJsbh1/6zn2AS42k1sxFo0vDZgJSUiL6KNE0fK6FfE1zw2FFGnjAjDKs1VwOI4s1aM4AgkJoGm6yA4",
-	"nwye/dxRaFzFYYi5OqlOXCTEUQT+iLPA/N0eH2KBp91l22v9VvkQzVjD4mqqcLtxQc64yx5Rl8n5gb95",
-	"WnYDR1hK4Io+/s/P+zs/HOz8A+/8srtz859/cqk3D6ad5Nb45Pv9Bb7qre5idZdU5d5FVwQJQEBnytx7",
-	"G1PrY0wBNUQ4HDPF1MZAkccI9YhPuEu/KTOwlSsorRhOqhpfM4mDzsqHJ62sT/Wx/ao+ljJMf/GTmo8u",
-	"frAEPLuO3ETZSC3BILoyj5RFph96MuoKS41acNQLPIUTOmFVbVevxg7Sau8prT77OACqAP7zYMpZHFkV",
-	"V9HPjYOgarf0GEy4pEB3GqSgfTdZp9pNcCdHjAZzt8roQyRvF2P5LRYj75YEPjdu9upAazOEtah1r2Fr",
-	"JPcTNNigQMoXFp5ihQE0iqrqQYm5kBCOQkzxtO4wY1H3yxdhZiekN0xuggskZrefonsFZCXaLjGUVmz0",
-	"mgP0FSGVSyLGOfEZijgw7gPFPnuOPOxjxCGwjuq3wO//xd/HxMNKJ/FBAg8JxShiHKUYXDCpViWgZKor",
-	"dBqxrGvUiS47fDuolwQXFgKkxhRzfOos1RT6A6EeM9YhE+ohuIuACmgn3V4nhk5n/ajA6hcoSuaFSjSW",
-	"WPxq+0lMAFtAKLQYts9SCJ0EJkin5SRvWcwpDto+rqiY0GmLJ1kEdJTif/OzHGY4iDutW2PqyIcIqL4r",
-	"bPNOHSOu2MKaLRUhUzy7HCCc59SETgXQVE/MBY0cig0rmO2ERTMF6wDIvxJz/Z7Qb4hpjAPFoLHm+FHM",
-	"vVssDNEGAXiJUMDzEKjUC53E1Nd7mAGVTMfceUwDReI7tVb/bSykfdwLmFAknttzcbfmL+ACBwsYwysD",
-	"/Z76bq2WmQvAbKM8JI/XKlecBe4fmgT/AmGvxxwWg3gLGyutq60/3IL0CCaEkkTZ7ABcD1NGiYeDUbLr",
-	"heqaZ239AEZ5HWUJ0y7RRyvu8WymGm2n/aT1SnbDrEWlq88OK6pyebacJjMq2DYZwAuPuJ2MPhFRgOcj",
-	"pfzwFvJGjHBAsHDrtwEeQ1C3GPujexkZxrvGraErN6WkS8xNmVtaBSoVSOZGLcOnAYcbj78dRrYi2GW8",
-	"ry35XALuvCsV7/xyo/63v/PD6Objk+H333xyOlRXZOJUuV4zcIrUkpNyPox1LLjHwSdygZg5j4CeSAgf",
-	"FrxezDlQb76IFxza5w4Vl1ekGsPIt66HdBLfGGcLeW/LtREhYvBHWLomqT6tDLtuzoQExAnn1roRDpPw",
-	"iKZBjsAjIQ4OzMPJu5OYeuaceg/DyZQoyrd5IG3gZN5Zdk4crGD5Eeay9boFi7kHHZ9OTriZ/eohMozI",
-	"LaykvZThXZwnv8Y8Pubopgr+RoAWkawWbZoZTIK3a3Rfp9zoER3XBXLNsVUOHpCZ9RVFeK4/NTPXC2NH",
-	"vAJ5ywqGiGcugseYvhtJjqmYGEmLucKADzgItJ/BuwXv3aI5dJ5MV01WDRzYc03PqMsAAWBeE/dQ7+C2",
-	"tN7h7sWq+2Y617mVsQSoXysx+koIITGX7Udt5SwvH2DqM1/CbjKMJVtsDhrJqtqaSjY5q4fi1ekAOkG2",
-	"tFv3Rtts6yo5oIQcFXvUXHgiR8qE12qwDq3wF1DfJUSMdwVRX21owlnYCqw8XZVD0f3QhzGbfV6yD26P",
-	"batVGR+O1Uq7ivzEATTu/G5ZzTawsdDUiy/IWQ2g4nylpTejWAapbkjR8mKpApie8OwDyeHgHczrDd3F",
-	"+tI7nYFrHh6W7ZRhCoJmAF+BlIl/tgvRqdeVBWrFU97SO9j5x83Hp27rLqc19aVbSUL4hdEWCmVhke65",
-	"c8MthlNgckH728+ETttz857aPNx5t5hOYcRbyM3mt9uvtfia0b/LQUxPFwcxpX7utvaFdS2PwlQnbKkl",
-	"FFTJMt4UljGsHF5l2vSsytB3wrMGWk7080NCTQK5uCVRV7Ohm7OmCXKX6hmrjMWLHZ7piq/M84pq04zl",
-	"Vrfs5ukaP7lLUctnROffHiaeILv0WjCbjOt+Ed1Of8eO4ixtPCseByybx3i05Ivam4oo5lMY4SQrsN/O",
-	"RRBPnaO3w7NzPsWU/KKdnxmmiTn1Ru0GuJpTL4eiJgptqbOMI7/jWbqQ2WKuBk8KDFdIRX6vBUQqrGQB",
-	"zj+8RyJHX+t3RajJXwuDpusmbTzDEvNRzIMiuXLyUIwhuW6oJVwIbdR6Op75Zljz6GgGnExI3c3K2oLf",
-	"UpnSEe9y4tOFe5z5sSdHbYTghXk2kYWr4YCt+JRC38fmU6sNPktwroRiJfxt5H2FoysiSD7WrDNTVMBe",
-	"D0vUXGn9DJHSGAeHJrbClM/qYdGsCBka/Wd8Ckrtxi+J8HBQsFTbZdy4B7DVWoYfyzat+qgvU2EEdxHh",
-	"IJbT60o2cuIfO7h0usEsPhNGRxywP28ReFQycCsj1OTjNIGlR9AckfNRR6euFxt3SSnX5ubjkyduvwHQ",
-	"GeGMhrDYIja7Os69sBq/QwBTHIwc6TlP9xdbthLfjbDvcxCinIDU8m2PUZ+0ielOj/ca3x2mL7Xl3y0u",
-	"EWLtXsqBo7i98nKHTiwpHmmdc6YVeyjss3DFNCVCggnDCBllkpNxrD2UcAdhJHVssxzZAk2k9gZKCDKl",
-	"itQvWRLoXYgBZgEIhBVHJ0Jyk0npA5Vc1w+IKTIG6S56wz5Q4G8QCPUtZwGaBmysS3AEyFIvQ3NEGdIn",
-	"hCLMJZhBMFISjoO4/w3vavDZKFo1byr/nBuwvP7Yuh0usYQ+xN477KAtV+jlsertbLK3xPryTsRhNV5l",
-	"ojnS99+6OZJ9ncME1G7LK/huf3+RqZd3kxuIJJdLZkvVJbrI4FDrNzkTqxcfV6+P6k2DQsLkviv90JG1",
-	"2OYMrAMg99r33xTeejosRxGpU/nPr/772U76x9f/8aeFdnXRpM7vdwFQdYm8Pjd3/YHZxSPXxa9WAklq",
-	"9+WLCbIAGiCSK9K5eSAp8em67dZvMc+31HLvcBipaQcHl1eDYfWOoyaCLRnnMheo3DUeQDPs9vqUDjVf",
-	"BJ//aeLTtcq/Ip2otfVPO4SwOuB3SqgzhJWCFt+6MmtHuaFYboc11YlQx6KWFCzmdnSKCe15rRswIZa7",
-	"1TX5YXkkrFPQyntN4JqceWE7hQUWDi/B4CayzKFDL+2lK02tDkFCfHdixrDVBuxfTxYVyiiegFlQSxBp",
-	"itnwbAcPcz5XG+x51ZnAp5fe2JflJe+Nlr2f9ckkpzp24136nMHvt4ZKQn7rxJAc4ZfBUD3N0vlUV+2G",
-	"RT1+S1sFWjPUYkmUwhVpu6tJE0SbXSB1uWzS7hrgIdHrac8kLtJ3KnJjOIgpeR+DZQ26eHCm9rTzdxm1",
-	"52ZYtU8RTEAZ4cogFVF8/6syUJGy8LkAT2KOIND2qKn7aGvxagOVxyC0Havr+enCfLlq2y6yju1lyyKP",
-	"tiuPjg9Kp5J37GaXuXngF9bjwp4i+lfMd/szgjusrG8BnOgKSD5DHgsZMhtLaiGdHB8f7/zXd99qEzxV",
-	"EJ88/W5/97v9opK4899f7f/z5yc7P9wY39b+8Ml/ffr6q//9v3etr2v4/aev/9upAxxBAFMswX8RCyVH",
-	"RQ5z8hm0aWTCM5MdrZMLhYeD5O8b5+Az4kEtMfW5dTLcQNbU5lrsS62533ZERgk5svmMXYZreR1sQJLc",
-	"tNTEgzruWkvLKmw5A44LN4uFKCtnAepnxxFZCe0s55VU89rVJSh1CVdH+dsh6lmgeViuz9y94nVD8eHk",
-	"11JZzcpL+cKZw2qNWl3cu1jhvKnS9rC+0PYQ1VZaRXPUUMN012Exqv/p/Kf/cFK9ryuKNYTiFS4aMiQK",
-	"QSQJ7868OBDSzavd4eHJcFV8LVvUGjtdaF3uZdJehlW6oNRc1uTLFPW/lQZ/Cny0UPEtPVer0K7yhtS1",
-	"NvdKCqWU6j3mN64eMw9cia08X1oDqKfyDXeKnnBQ63bVpdKq0oQKSWSsb8bq6qstOvSWKNWrfFvp/Ksz",
-	"V2uylBTyNkRYTsHJpc1UsmVceoO5WDtIM/R7IY8QzCNacuYaf6zeh2TWanuPKFs4M8brzW91CtjWkS67",
-	"8rucn3uT6ejJXtxnpmFsi3ankW2Fc3sfQ6xp3ZZgNyUScoW+1UxqQP0xph5wiQltONPD7Oa7d1U5h963",
-	"5J1tH71xQugUeMQJlcsUrZ7hgPgjZ4ZIhzC+0g1nbmmFGUrqogVpPXbkTquXIywX5hCZVOUccn//7QPc",
-	"vkeczNR072DebsqyolEAZHkD1fEbYMeoB5HMk5O9dzWGJFemkS7XQu5q0pWqO8wNdstCFrBpWg8rjcho",
-	"GOovuXcOdY5i11wMZYV2DhRMy9eWzWGpRIDps6BdBoJQ5KUdNkAgSpCPJRNImCr5YtcZsjEjfiKhO6mz",
-	"yYsjcYuffvd9V//5u1KZmrRovz2THPooeScw1v9MYGTMuDwf1e6QUYglJ3fOE6xVBRn3CcVBIUHziasg",
-	"RsQIlSM2GekqOvVVUHKv6DCKjsfdzgKuImQWdpiIskTvW7TOclKFBYg9oCzIObGoLULmEKeKCoW9D4uY",
-	"X0/0+f1cxnQJflkSL4tDwBQ5j6qpuk/cVcHAe9dVxakyj5q6Mt05RAp8ymRNLPFylDrBJIg5jFqlMreW",
-	"3QWCajv245CUiD2lwI365HIX3VGuTRfRrzxbGfwuYitiQBPxpdjbjgqvUtAlXFovDnzNddXCGoXvhdrt",
-	"+eQKd/GOV16tdS006LR94iys/Vaj1d24dtUvVXw5Ja0uhKcq82IdaWYeNej6g/qvk4/DDlLULeuR58LW",
-	"lstMuW7AKeg4Ha07HZRurO+ed35Zubt8K1m70CqSUeg90/sYU0nkvHvoAL4bSQ5YljVaie9slY5c0CQd",
-	"SVynH5s7/p7rjynRbCwELGyzkMZi/dXLJzVAxEmPW9UZ7g129WqPW+gSTeSRNHeUVagUtlk+u9xqCqhU",
-	"2GDpmBYT3jW+6+Xv6QdPq4TLLHi+GxaYJPisLvMiiqtnD216L7yNORE+8Ryvf/O0hYUy0wKUSa1d6zKY",
-	"H4i8vWWBb1w7EXBltNZZkb3CHyxZj8ZYLIm1Vp0vHdmwhM2F+dKA19boZz15/b2NSXHSBW7HB8nJe5R6",
-	"bct735arI6BkRW952aHWXPuArqQ+b1OdtoVgXUI2p2Kzd823hEOA6F3rLWUlvUco+yscxlQcRQFp79pP",
-	"n6/1pqRPKFFXExuwlN6xjOzvUGIq86JkSnSHl0p19HJP5ATGSoLCHP7r/KlWT6R8iqVFl/GmAogCNRci",
-	"zcolNQoqTZHPOGispPU4SMgJPBellFCsJsm0tSxb8vqsRqCVOrFiT8YcIx+QQgGOUVLmcBcdC8TGAZli",
-	"yTjRqUYYUSaxDg3z+P2vPtHJSP79r2P7CcaA1GqAggcc4QCFRIS5xsS6p5JpAD5HAUiuU5W6C9k/osB8",
-	"qMI7f16swHYUpH2uYqsGfCEw+sm+NcPr72YrgqeL96Fn4dJuYQZLy72OSaUOqdg6oVazwJ5nmNqC5SOs",
-	"HloLcdd8bGXRZ22mJ8Onw2+G3w//a/jn4ZMnwydPh0++uVnodCoJtFyZ2E0Rbu3rReUyLPRRtpY7D17b",
-	"wG25rb3OgVmGTg62oz6W78IdpukDsgnJiFBNFT5DGB1cHh48z0lmZiSzfVQgytDJTwe7Jmku4X+LqKjB",
-	"v/F0Xf4Nh/vws3d6WKotOTcWejWW9mYs68TALftt4MZKGO2KYKQBF4t5RhKdsWY/y7KaX0txn5BF67g1",
-	"3XBH2f1jAXzm6DrSojvdYmN9hQXdW1Zrrg1yS6z47tcGfcoZdbfEWxjJMp/C7ypInxBEQQ0wu+5WrKiA",
-	"Kl2bURf5UPUOdJXGTGaVPIbhYfd4RXEkbplMMombTQ1b39PvsjhT0R74yGderF/PMKvFwyUFd3D4+uR6",
-	"MFT/nA6Gg6OzE/XH+dnV61fHl6OXJ2cHp265mAxc32MqeaJSVaZKzSYebtS6VHbyQqsa1mVqyqvIxW3U",
-	"wqsB6rUbrSrddeG4N2UqW7b0bw6dijrhT0A9EhKgUuuFAUZeDFRipLtLApXgUAln+gmc+moKrpbaykt9",
-	"5fEjydaHYUQl98jDBZt3cnDk+rCUTIbA+NQ8RvWlZgtkQHPEQiJ1Z1L1u8eoiEPiM27iOUvo1ctN14tN",
-	"Vks2l/ZqVjaJqacJDDGk+1UQOkWxwL5pmgoBipiQwJ4joNmm38fgY5O2GYJPWOruNEA4O9zjoKU5N0Gr",
-	"K+sgUoy/alt5uUFiFFxBw8cUIGWn1FICxUSn5R4pBx9PCAUkiDpgLAxD9DD1INAoLDlGMbVnq53aY84Q",
-	"Q1OgoH8yJbOIxRL1M+aOg25o5vWwMm9JfbsELXv0OlEZuEd0JTHLCt7HkGC/kic4llrZNg2JfdB+hl10",
-	"ioW9GRBIADIl0zimCZFx8GKu87994mFfsZUAC0VIZ0f6GRHrATD1mUAgIvDuf5sQr0he2vq46RblX69B",
-	"V2gtr1SvVFEooauj8HuDK29Rkk/eyMuRLaEzptAJmzap+vM499lL0VdHZern8n+PS397SW+I7PHcn+Pi",
-	"n15D0GVFvnXNUhC9r1j1uzqOn4fgLxvS0ybir3ccnYjH/UzYPg75gnPTYf73DobrFJiWhKGlW1/ski65",
-	"opf3Nj+yl9llZC4VoOpQMEQqM5t9vY+CuquMHe0XNPqZxnym5zpsSWXlYM8c1eXiPquhnk7s/VHrTcGp",
-	"TjjuZ9h2brmcr9zUsk1TYZm5jsYP3vqrGysqLLOuZB2LgK5g69242mfWVSxBrYJ+le8wVgZiFaMae44N",
-	"F/N1J9zXcn8oiN8LK67UexVIJjxAj9p2o1fEb+qBPBz8Apw5GXiVBB6+UdayTGSdLd8WiflOPYTNw71D",
-	"K5SB0qX6Qt470ThwCCGrSYpV9miNVzoXabPITkz7/iZbKMGiuF5XB69sunRVZQGsd9Gxr97JTwdXJIwC",
-	"OL6LGJcHXJIJ9jqUvykNcBWHIeZzfUHTydaiUpmpYyzg+28LBzyet3DFl953e8ZrltrRKuxxzQt6vlEu",
-	"7rYZHSckgNrbkJb4H4JPcMO1pzP/dX/nB7wzqct/dV4mFreWW3thCemECyNP00O64BBh3sty76ixNAVI",
-	"F/1X57nwUxygGQtmwBFGkV4r5iimaMw4xz7jCO6IkOYmRMehau82F6DeVEAwPmHg978xn2nXVMRJCNo1",
-	"/kvBve3iji2S2eth26ttbV9oEnWCoxnukT4Qy76vZsE4os+7tqW2q4mcjhETI4XnVQQ50HWtbKgUHuO3",
-	"DHnM18n4PkNAkWFQzvIT2dgUeihhOHiQVZlx+6xIF4zRsRIjXXetYyRILrhqyeLQ9jzzeyngVhn0eZQt",
-	"raOIWJlode22kbtdc0yNHd2HwfWs+jRcdROktEJU417/xvi7ScA+9GtVr/txL9fWqJvt7mqx3F3kL19K",
-	"ii2q77A4QUAP0t4dUKvLVYizpRKyrCDOOHElTPzbTztf7etatf988vP+ztObr//U3Aq91catYGxdK6OC",
-	"41mpjMduWJdyvWq8ly7AUfVIpK3RM/JOMKhboFcdVPIGuq6ePxyk7fYThHca6Sd0EmjemtXy28gGFQ9S",
-	"GdCx+TpXnTnzDrf5EQ6X6F+02g5F9Ug8crV3qO05lG4sSzio79XgAG4fgdwF8E7tpK4UeN3hb3ijBFyg",
-	"0149Egj14a7HxStMJsQjfWa+JUKZdl6PCx3jkWnPXezz/fbIQQft+mvropDfXWnt5fMqnkABprmFFxCk",
-	"Ee1P1Kj9KbJOdTAfnjY1SuvfoC2J13A03rNOPIIRQ8ZnRXyGqEIXW8E/FjiNgMOBFwfGT5Bwt91i76lv",
-	"93/4frHSj4MYVmRCmbGq3Dfds/s0kyZcjoLxHbo79y7Lv1gUdmhg1lIzTPe8dKP3pnbEtr1EqtUVCrPm",
-	"52s+l1XENeROee1BDRVoV6M0iRdoD8iM+Nh0DXmuCEuxJF//IAj1OKNpyJkApJRSCiZsTHv4fJaPEouA",
-	"2twv7HkQSVvJeMbeJSqt3oBLoy1ojg9/49QrOcm+M567eyH1TXlfdKG0SVnp1QqQa2tB1yb5KgtVOKaS",
-	"z5P0q272hUXFWpuCCY1r7fiWHezCvJSxvqbbske7xO9npCfv1NBFl+oq7rqL5au/4i2fu63dwrDOBeEF",
-	"pVNOa97mmEBh5/UOgeYeyHm+t2xySvve3SvhVAt65W5uPY2abhF9mYQjV+Q7VyWFLqUo3LZJLQ3ksL0+",
-	"aDmPaqvQb/LjNbhGH1bRcS3is6Ggrax/GFnftmb0VpR/AaI8rX7dS54XRHhXqa0Rb2utrDCibcsAN9PY",
-	"SdbTKepP2/7Ahe72lVzQL7ykNe9ozF2u0Gd1oJZoubh/hx1arGSBYtWra0xQXLiqRQVCNiPA3BUyunLx",
-	"YmVEgQhKJmArY3JBiF9emqxQMdfjPbZiXljEVlKuTlJ+XrKo6Hu+4CB0OYT7f1Pi4dCURogx9Rki1Ati",
-	"H0b61f+heNTuYLg5smwrl7Zyae1yqYUcWoH8SeMoWuU5OBxgH/tGWSwb298ht8XZqNeVauK8+nfnUVRA",
-	"0S8YpeVm15rttJw9lqQRLfQU5wvndGYMutwL9pYpiZ8fop80bQomKSUgNZCg9S2dCBGX0vdSfjFKp0nZ",
-	"7yhRQjUiJ1PnntPfC+LDiFAdl61Tkm2go2+zAUdJErINwEojEZMBcz2qU6JgcqS4kj6fhmvdnM8MiqUy",
-	"kh5k5RWNA+a9s/fH2J+3HDwWXZP2ySQn87ulcahD6qyUF064rKToRPH3MdhbBIXvbSsyugBdRsqktGFu",
-	"0+k2GpDy0hrxldPjMI0DbOqvmEcGmXbjPLFTMgFv7gVwyMIQU3+1sf7VO5TKltIFpJspaqbHJvrBw/T+",
-	"d0o8hrCviExIjm1O0kWApWJRKEiGykdA2CZxhYbukmNxWwOQV5AIrZLB91hhOmZB4pZES4fpDAexMHtr",
-	"euO1qBPL+u1qRM+iIB6zgxexUExRXAAPiRBJ3lMHPAv1OG2lclScpxVLOIIApkoxqy62eJ34tAWfKEEw",
-	"W31xbZ0g1jPOcKMA0W7zq3C7WFpeu6clI9ml+Ug71d9wlJthOZiTBSaOzJYqk6b5NA5C7AG1mXVKQE05",
-	"XP2v091lmJKLXxQZRTOkqgkY+dg1y8M5hMyw8Pcx5lhZcHVsnFGQmM8PAyyEaTVs3T7J8KF9whbQKfwp",
-	"RziKAuLValHnfIqprbPc+4zry8mu9vBN9VPFfziI+98w8iFAsYgxJxoDQEiMmN2Rjiw0mBDE09qC1ItR",
-	"JA+inOT6QKR3O3oH8+bY4wh72NamLLikGEWHAfB3uwLkgUaLr752Z4WuLpI16aqt4JETewl2L5B+eTis",
-	"gqkVUG9p1pb20x+10VwuzLMG45q4YmnYRXBxED9nM6JkRIkDiFgovqB5gE+EIlA3A0i3WAE3hTs50iUY",
-	"eavrr7SAVodO0vXloUyK6XLJtT4INdGolR2SOYLN1GlZ+MdO0S3uYtguZTenh1Sd2Po3hk4OXiGYgCdN",
-	"RjknMxM/HSDOgvSXvJHAcrj4bEbgg04iyX1n4hAUnwEcJk/oz0atKz1gvzTiKvmSpBHgz4z7z/FDiKkh",
-	"HwFGQ7LfPBMQTAqOy2QRuW/Slyc6Xzd5wv5lf3XSSo6sq1yZBWgasLEWJAGydM2eozfsAwX+BkkCFKyG",
-	"4WMfCTbmgCTzmUABE0gCxVQKNE9kTqGOqR4ksS1ci7sEj1GPBCQVtg/oyet7s7SE06KlQ1WXWOqdphxi",
-	"6d128I0Ugf5Kvb2Cwms12dMj3QO/XaXfNhyvuPiU3+l3Q1ODp99ysxFaX3+uKEBrlM81NeCqLMeVMF3d",
-	"cwWVSt6n3CVHlTEnaOTizEWor8Pt3pNYV0ALNcXo9zeFQtaL5U2e9tWgbA4p26PgKpTtkvBZuyfBxYfb",
-	"G4b1iPtxBTXD+qSSE3/R5eeNe9d9+EnSnLpTUT7DHPvWmUxxd+kBlOaoP/QBs3uYYQUijhWXQbAYKyu3",
-	"EGnlDHuTZO6MFKXX2Gql8eLpFEQfZa8fzPugibFQOtaLEh7jxS6rT6y11RARv3aMyMqb6uVme3Vjgr5b",
-	"yoeWrStnqqf5ujCPp8H4rDeQEqMys4pAJFaTae+Qud8SiwjFAlP0Rt9n/dNYjG9clpF+wBTPHNfZSGoL",
-	"IRwyOiHTrrCP5W3nvgNqnphDPmor1ydAO298c9OUdgkJgNf0eYnHARG3utuj0y+YBqcJguZI3P8eMPXx",
-	"TbYMDe4kMm1BMZNkbcP8NqqnXcYTBSUXTlwZQ30VysYRzIgHdsD16xp24rr0dHsRm68EYRzLAoTORs86",
-	"rkaMWy9t/iJ2jKnPqI1WsO68zMefOPWSlPS8s59DFGCvkLvuQqSrhMedhD2KR/YufE4CqI+XmhCKqUdw",
-	"MOpo3SQPLHBdF7f80rzU3q1AwsVF3KqFW60EaY/Z6TJf2Ved4tFZ8LV7RSYnyPPnlAI3X/M1szDyMMlv",
-	"1kkzTvjn2Z6YDYaDu0DcKWNnctcGcfu1gllUnjif3/rND39+sv/k+xUa1QUqyLe3+u67hf7kx6GREup0",
-	"wZp8TOiiss65002Rfy1q7ZgpRlnTY3htMfUTQqfAI07MDtpTdvvCOI0x4roaUDsguHhJBsTcUOVo4Xzh",
-	"81R7zndZyMHAiSDZ/WOOc7yPIQa/ICPF3MbiTTCpu/e6tq32zpX2KG5J1IebdIm0qQ1zcW31mhMc9Gv9",
-	"oFvVsWChrMlPcZi8s3mNTfLLPJEQruIqt0tDkk4LvDZvVGrauzuJJJqmnWeYHV2D9pmfbuN6g+QX17Mn",
-	"iBMte1YI7X/blBr/S4yRuGx7D1GCnWM890KHLggsgrWmrZ61KAMsROdeTNdqNd0LVnYsAe0iF11csiax",
-	"Y605CmkgbrsIhVIIcFNklLE+2wIpO5sz/V4OUB3vZWrAHWHjOylaymdMu3q0ecwEUg8LyZlA80Ij6iEC",
-	"ihj3gaK3wO//xd/HxGOF3LoFLsWmixebLGNV1yJKV+BYPTK7N9cFTaV7Sxl1F5Fk/1ZIDpnUj4X2JIeU",
-	"//Qii5Sn9Zw944m9pk9OsufsKZtePiWvOFRlZZWdVkFXPoph+WRdOPhax+hUGHamILe6Vat5v3qntuJO",
-	"Bu6rMrsnPyT0WnuV26n7IaH5b5+U6cRhybcqL2tDRnOvff9N4a2nw5IN+IuyAf/zq/9+tpP+8fV/uD09",
-	"dQeqNv9aAF/N1n0iogDPRz1BUF8tNjfQN87+470jMYcPj2sJsF8mbpJ+xON+3ZGomiTrOO8XVt4jJJ2u",
-	"icjchQG7pObmXn1UdmGi7nulerVAzQMhyJTicQDOOOHagGCztnxYcJ8V9iLb0hJrMouTJS4f6fRZhSAt",
-	"H1G0cnptFzXUFCr0WriS/PAMS8xHMS9y8JiTNmnPZcnRQTasLrgmGbGwmDoIVL2O6c1cY3D9T+YkwF9H",
-	"1ugapJvCcvBiTuT8SiGxbScHmAM/sPfj5q/khmfwP/92PSin3Fyzd0B1oW57JaovQZ8rk6+QXoM0lPEw",
-	"qbCi63iTKQzRjMxAmYUiFsgLMAkFmgG3fdB03LQmMi0P9XoypLiVMtLkOiN3J37VKj3xgUo7EkcTYq5q",
-	"fQgQzIBKZha7dzUjd9oGVe/cAjZX5Qal9dg7eUzEEfkrzJNprxTflzF3BEm8VPPlpkhaB/jYxotDgMbM",
-	"nyPTuwEHzWsQ6Uw1S7kmIQiJw6i6lPSnZYAg0/ErC/ikOwqazJNSl7uLE3TLOPmFUWnysi7mIQg0e7qL",
-	"Tt04ggSBMOKAdNwCUNCLlQrRdKwDkYohDZJx0MHFSS5i99lgf/fJ7n4iBXBEBs8G3+zu735jDXyN53s4",
-	"InuzJ3tZLEzycSfEUUTodMeHCaEkbVY4Nc32FDkbGegPng1OiZCZcfTKvHmUe1G314gYFYa8nu7v524u",
-	"NfcwSXfq6b23ljkYodJaUjYswOE/KV9gDQ6xvP9XwKb5hHMfkNJZBJrE1NO8DQSaIzU5lmRMAuJjH4TO",
-	"mft2/0ndCtO9772mOJYaD8A3L32z+KWXjI+J74Pexndt3nhN8QwTI7K0+YSnQrHBDESDG/X94uPveOaP",
-	"dNJtzvcVjoAVT1IntQRY823jmPtMj3I4sEK4eERlr0fukCLMcQgSuKi1YLJH9k58CCMmgXpzzedujHQF",
-	"IV8wf76GA85UXkITldd15JnMt/U6NhsZZ2QKVKYMZH8xOrzA/qWB/BoR9dv9Hxa/ccjoJCBGwfz26dM2",
-	"64o480AIg9trY21tWdpB8nhXajk0CabKzl/w5CkJiXEIaHXjfQwmC91oG1XHfIaaXS5V6sZP/sxGLVvO",
-	"FaNDqTURB890+DLGUEmMFmTjcxQLzBFlvikWl2pWpaWkdYvyqyl7f+r2kY7eGkKVQz5jPpjbu7pJkmuU",
-	"5eZpniPCPI3OziZYaAm6B4tNwagGcN4syR477VxHyTo44UVR/tprMpc+vOFMcqXSnAkHezrUyTMVyD6m",
-	"NO9zW9JGTj95uFU4dX+NfLrxvY+3wnidwnhPcoBaifwjOATytXqjgvSfjQTdirDPVIRpvHNwj/v/l49Z",
-	"oFtmKkpANvmNDU2Ih06dwDLmODCVbOa6lk0WG6JFnkAeI9Qjvq6CI/4wwm4Bd/iYRbZ86sQlOkvFREgd",
-	"DdaLVUcgMQmapJLFq921CplvF79xxuRLFpvi4mv3ZazgmIeboik1Rqc8gF9jVfoS9mRsEsI2X2nqiM9f",
-	"mpaV56N7HzO9yNRZ1qzVbXRk5apWTXta4ttQw4q+ZtY1KGN+XhlI7y1NBIeuP5l91oVebVtvxl3FjzaH",
-	"/t13qhtM+LpEN9F+9C3pPzgRJ7kWOxxmOIhxehfX5CZIclkus3c21VHgWOqjuApcIHN5rHAE+gZXcjzG",
-	"bxmaozHjXN+t+4DsIWnP1XNE9RW/UeGIEpW6Wlp4/y+ZFLb80twND00NusRIsw8/H3P3eO77lTkHbIKV",
-	"w5yuy2Z0j6MztNqP8pBWUKX9rYPOXliiAoFCTGMcwOd7O9vAqAvN9jeUQzuCWNfLmgtAasAV48JlW57a",
-	"h6fufdT/LnK1LIWwBoUe2MfSHlvKLrutj2VJhpSe74Y5V3pysEfAycypwraW1br53p5PhIe5X29dHZkH",
-	"vjAiWcID8W012PVFZg4pYElbMEornCi4/31KvK3XYP24nSC0G7EvmJBbrH4w1dW0p3cw/gNBdPh5zkew",
-	"5fwb6k5PK0XttIolLKc8iuWjFnyY4DiQ+jbfpuvUtzu7ae0a6O6ruFlHbG0ZgO3i+N9iMURjTD0mhkhi",
-	"/hYkFmiOxiQIFOT1XbvJqRsHILZxZdoPUYH1hvoiavKI18vUq4hZe1dieQbwLzW+bP1Md++jq2SfucSs",
-	"t2uXRvAK5m2embsEcew/MnFsgwnWR1JToMBxsGPqvTc5+340T56aB1upL4VaRPXX9z1jAu1lSItxe1yO",
-	"LDVqyQaOhYcRvf93CFxbv9jo+UPE0153Q53yCnSIfJA4CAAxFEJoqivf/0YB1+VLNOtr3++3WOC5njrf",
-	"LStI1vgcqWNO/squX9IQRR3AKGLkBVjU5nSYdN6uF2Crvpx7SD9zkThcaV5sRkILxDkSOPCZQHCHPWnC",
-	"PmOaVARDJIzifJjfF8P81svL9uAuKQDuZGnH+ufN42pJfeHF4U6FstKRP+lg5W0u71wZj1sRI+rGNdQp",
-	"FJhGVoCbUNNYtlq+Iz/AjPq7LAJ6FwbmVbHDJhPigc+8OAQqd0WkbAdxCyDDYFf/231KCXdyT+FPxzcr",
-	"fO2UjDlDr/CccWQITjdqZ1RXPQyJCJlAExIk4e0eoyIOpBZnpqaChuqhAefOERERM0GGxaVVFrJljV1Y",
-	"I6GTQCPYDvbfxkKmlftrPMAcZgQ+nCRvHaQvbaovwLHUR7F4XCDrHjmG1bvwHNGYengbM/YghECoTzxo",
-	"IIKkD4N94cQ+v+kVE/ILhjtHhbDvbXukZaonOK767v8/A6BcZ3ntXUWTOMl1ugXvnYjDLc52w1nbnmsH",
-	"qOS2btaigMdj++hjRTw+UqDiQ8dfChZzz5GemRvuz+1H47pvGg46pqTaI760b+cSU0u1vqgXxPPEfyCS",
-	"yCYsniMBiIMAPsPGvtdaWUhMiOX7GBAFDwSRmKb3Iyb/niGfkyDY8dkHWmftEzWvD7qbnHBfWdlacGtN",
-	"4szfvtYFmhpt9ohgThiK8JTQzb+BXTP32fuoPsxbhgaau+6uXMi0EFxPaGCv2/g/phFRjwl7hpVBvTLl",
-	"6BHZHy025qqltvPlhkaWmKQUJTZseDQShKKQ+bokJEcQ5Eovbm9eHpSaWAR0J9XoW1ShOo/A6uyPpdWp",
-	"1fatGZGsfmHRCDlfUc2IfBP7TllfpulTVaF6Cd5tloRvvFlcwi66IkqjYiGRMEQ+zGIIZrqYqfbz2/vM",
-	"OnUJixGbrELLVQg1YjSYu3WuQr3iddfNSE6/tvYT5pL4WCA8JsBt9ScvILomHprrwqcAWj/9g6tjppd+",
-	"W55xYZ9eb/lDM2ubEK0L4Pe/MespkPkgrC+0UpcFzcYX6jLrfOQ6XQke1eNNxo0N49jme/VjJ3sfzQet",
-	"zGNKYxzseAETsGP6+C9IMT/Qbxya7jv9YsYtwm2Sdl/d1WZnPCqRSYBzQDpKw7h2OMyIqUPvg61M5TO+",
-	"1e4fga5kWkClW5GVnjJjAynKLCnb4yOXN2khX/L1Tba5GA9NNRw8IJFcWNIkG+rSvLH5CtUVSBlAx3vp",
-	"9XmIDtmYl3ydaI6wnk6ZsFnHShTpdOkxx1spspm5SbzQKKqtqXhZeuvBnUwP6XkobqbO63CY3m0xCkIn",
-	"CmFO8BdughZhs6mc09Vfbc08swSoRgRSCvY2qWcF3GrvY/GL9uVel8TrEsIdrZNBtcAtRhHWDa8ss4ow",
-	"90jWhWhMKPbXy7k2vzLsyjFiw3K8evPIx8PjeRGLc6leYmtdPT6nrXzXqyrsQ9Cdo0asc6ntMicCJkA/",
-	"ySKg24qwK5dWwDn2MWKIg73RMxIs9olk/P63bWLnwxN7xLjURK4+tNahdM6UOw+qTH320cXkZgOHBsNB",
-	"Kd10OJCc4GAna9drP+2YvJbhgFCPhbCTdvYdDAd4qvY9HMyw3EmTRYaDfHK4JDMi519sPlQhA235jDNH",
-	"Bn2ncdcTQmBR08F7zC+Q3QWavEoTfE4CXfFDMomDP3zwQJkptMuR3LKHbVLmF8aE/nB5moaSrXrGIeLM",
-	"jz1iwtgCxC0HFSwgHpH6qmubn7nG0GoBUjb2WC5oaVfJ02sRvOlsbrV/QqYxz7xUVgKbWhJ4cRPHL0Ku",
-	"pvJnh+ikwYVZhTno5kTXRjri0wUm+ZCP4IkvrcHN4CTXWp85AXN/6YMfJ1eYka3yDJRsy4IvjeB7H9Ov",
-	"RuYr7T4S8XQKovna8co8k++WLb3bHsmKZcw8GnTULv5AJYlco4b4buTjeU2O3jc6Z5iESq39xmQMmz+y",
-	"hGFCJZh6N2upAVn0Ql2lqNYm0PgqntpSSwLBnV7KOAChucIEvFs8tIwD0DxXl2lbgqcjn4jVMQPfifB8",
-	"QY2J8rX0lX31wry5jehZMqLnAk87BPREeLqN59nQeJ6iE6TBQrhWD75InSUtall9XjX0tAp3/7tPpmyI",
-	"KAvHHBBDPJaJnWEQeqWl8ppcH16AhVhF/2R34j72Ibz/l0gb4qeF4YQ1oYRO3zRJZpSgMKsx91z3ETbl",
-	"n7GvHrz/PWAIR5iDByac4JYIyTjBaG6aDttZgKIIRxAAx7b+jABEzJIW5vz/Apx1S/n/zAr9FUjMFYxv",
-	"flL4KOIQV4r9DU0xLG0kz7clBhwMrp1Puger2/pwtxzxc+CIW092oye7nsMmrbtqyg9+2S7th+HRfkjo",
-	"ngSKiw0uylVzhMRoGrAxNjXtzPPPkeZXwAFxFiS/sw8UuDoKRyy6mu3aTvZYNQ6ExDJuz8LOrWdbeyTM",
-	"q7VMsqmbR9Mcp8l7uVJPm9G6o5G5Z6dZF39vzxrNiCDGG4M51kVIFJJYjPmidSMFIyKkIYTFMfwZSDe2",
-	"g3N5oR18I08fAvecrhHOFMoxio1ygALmYZ0cOyE8NJ4SQajHWXZppWTKYQD8nVIHPMVstncITZhcJ0X2",
-	"PpoPC+P6l8B1i3kPHMK/AMnML0Um9iU6hR0sDEvvtjY6fyXnumGB+BvO7ywq5vqJGo73eVQQ3uxI3D58",
-	"b8/2Zau/HDkwD2wOsbihkzxCIKel2kD1QauqwQlqWrtcSV6484KYmEahyoqbBPFbZg18ttkZTp8D7kUx",
-	"n4I5iAAkVI/kIuZTjAg3lQKVYv48cZb4IZGpfacUoQCnrpGqTacG+uOgsILrplcI/Rzwk4OQjDeWEtUP",
-	"/GEQSwEEx9y0Thbmoisjui22LYVtkmNx25jdJm7/MJgWshlJYgO2GLYiDIvpQm3vdfLIHwbTfBB5lY/G",
-	"MDP9TKyat8W6DlgXC3ulUV/lRT33Wj/2mfjV1WK3/vSKja/AUudNfy1izAkT1uX0hSe71XvOy1fHM2Jj",
-	"3CDEJEAYxRTFBlZojpRZoysSmB8M467aMjm/tjqDz8D9rpb5KM4oA/G6RHHz67ZgznLcfu+j+qeVD70X",
-	"umrkWYf/XK+unplt3ecu9/lSR7qJrvNH41WtcDDnN986y9fK3Lo5yh+dLB7KaEoRMWcyYc8DwXQHiq3X",
-	"cTkk6+URhzsyhVSPbO8K/+KRdOsHXx4jO/nAv3iM2jrAHwjNWju/v3gUc3m+t0J2lbjW2Q3+xeNc3ge+",
-	"Ra1WqDUhwsPBngdc6o6Fsql/9yWTWMJL/cph9samuu4qC32UrOIquFxVX5KffYZmOCC+NUnSxt8oBJ9g",
-	"KgH99dXV1r+Xw24DXzdWc/CJ3KGsEauNh9cek37jjG06Uh/4b2MhO2bKP13xIn5isXfrdvScMZNB7PH7",
-	"X30ilTnnsWDrmm6Nuj6Mu2HukXphi7irQlz//tfxFm+74+0tC1nApuZsAqVOyNost/v/P5AkxAhmxNe1",
-	"YZC8/9WjxMOI0DBOe8ISKoFrzB8TLRp1EQ6T14TDsW5pqp5L5tZXYbvojOmyfCB0SY6YYoQjzsZJ333J",
-	"+BT75h7z4PLwQAdNUA8juFOQQJJ470AKRAkS4HGQJt+xciV0qjdpQPKX3O4fspRcdbbL2Hk3mIL4LXix",
-	"2fiEUFsfHs2RiAWaAdeqhykg/+VeDDVgLZnhHUHCKICkvVzjLeDJTwdX+ulWdVujpNlcfbJ5hKUErl79",
-	"Pz/v7/xw8/HbTztf7f/8ZOeHm38++Xl/5+nN139qU9TjIKEGsy+EiQiwz54jU53SIAAIRTgRB18tO9Tl",
-	"EkyeYEDGnOkccJ2+OzMY7wrkADojnFFbVsiRij0wM1pCSMoA3BbpI/fMzXpDP9ITrK+BfMEEMQA7+Ukx",
-	"B2NZMt1HWXI8xm+Zzo/G0mRaesw8acb9kiNFuhHSnmkNUK/EqJ/T8/gb4+8mAfvw+JS1GO3rZ13Mu49z",
-	"I21Qb4T0HB65o2QFH9o0LtYtEhgKYpgy00ve1LbjKCm8wIRpl6I/bm+e18gEshI0bi5gatBs2cCXwAae",
-	"rH4dtmw+l2SCPae4/sfJRc5qMGXvtQ8tAi6IkGQbavIIBC/2PpoPjYF1R+wDDRj2S8e9IcRfnC/dzkNU",
-	"u30oxrIWVXoxjR5wCRNdUrpArduSsP3JLOIQ4WJcQ+lmgYN2lIyznvaB4olGZ2JoFkMwA4SRZCHmKKZI",
-	"UByJWyZNPShTBIqzMaYSBNLlPTjW5o4k9P7fgEw7KuYI0TFr2wr1DRPqyblsuGL/IsHYcrTog2gYHdaj",
-	"g+y3xWqW4Fq2S2BDMJb6fcs4tk6BZZ0CSbdE9hzBLPEAQNK6x3RMpVKNw0EgoZ0GAvgM0621sEaG8CGh",
-	"8DZe9z8mO7jZMMrKfN05E9teKeFE0ReZli+2an47+ogYobpk7I7AATRmIZtRLvQL55MrHMBgHW1DctPa",
-	"WVv0C7mINff1Ac30hayXNLry11uCaDXHNmwRkpEH0EYHZeQW+oghcgV8qsGfHPpslfAuPCW9ad0Dql+s",
-	"dRj8RUdZSIwgJELffyYvz7CtWiWIYvkTEgyRlwUuDlFUPKK5DrooRGVkER4zMtU31YLpSqBKfqi/HTEW",
-	"x3rBFkfyt8obSVEb0V38gCvgEooN1Jr6DaYhA+kpM3RrUWDrMn84goy5d4sF7MxMLJpoI+ftOz8lrzxW",
-	"5ZFUp34oHXqz6oQ4oV9XM+Qw7y31NVnNAHxtXnKY6jB83bzk89GM16gxFWG84VpTcbGPqTmVwNaMlgWs",
-	"RHPTWZZlnWazot0CYXn/e0g8/HnUtd0Q3t6m9XBJMFcQvUZIa7NJxIHE/HlJs4r03Y4+y65Re5vkiuig",
-	"ulxoHTSNdbQvsg3pkPxI/oThQLGhmloni7BuQxpCulFg0zXpEjp+RiVONoRvdlCF16oCt4qxRu9jQEIJ",
-	"VwE5Lt2OFa/00mgFtQJtro5FrLQVD3xeGnsXTd1kmSQeShxLvXGTSbLVzotpUxutlXfXxteYXXbFAuIR",
-	"GfsJ8/Bj07hym2bWT1TsfbSfFhXuWw6DE6R64Pp9hUUegcQkWGTLzbNwLYtSWRCszulJJBGaI/w2FvIP",
-	"muHlRJik1WMrpLk4erk+vOnRg7Kqjx69rOJEGhht6v5AkOFPIvS2tTMWoBTLdSi0vs/68pKHMedAZb6r",
-	"4aYKULPg/EofRYoWQOW6sUgsK2PZlzrNYUenOQ4hk3jbZs6F4AVo16L5olalARY5h4sOq9Lnkmsj7Cte",
-	"E4/fgqdZjbKqPcVrTJ62bWsaU7fjRp0dBEiyd0DTRG2PAy7PqhYX64gvLND9v2niu7T8TvcbdPdKfTU/",
-	"L2z4wS3Lh9Qk8lups3/OF59XUowxf17rJJ6lMPvEV2uW8yJW85hKEsKOCT9pkv6X5slD8+ADHlZxIqfC",
-	"Z0NlrKf3/t9jNRWi4IHAnGCj6hFKPII5CjD6AONdDQwBXswVEJ79fJOBxs5YhIwAIaxEqwOJFWZX9skH",
-	"hElpJlfZc328PvaHJY6hU75CIpgwVxvr7nH2AEhrj2YRF9Z93gRJGn8IEIa0vXjO9JUP8YGjWABHHiPU",
-	"IyZJFi3DmeuY6VWy5M+aj9pd1LHQqwTCEXAJFDztGRQIPz7r/PZpCy3iEkvQUHwwdptg7t5H+ykx1Osq",
-	"A1/CjHmmXIvCX4VoJujIBxHF978Kk9ltLGCu9AIBfEZ8xrUHNjkIUGfgROpLiEASzSW5niurinFHJBOO",
-	"RCa1pneQ4nRnlLbvLVFGcVEFxCsLKrMjHyOG5kogwJ2Nq/rSdN4NQW8JONwjaXuO5quLa8DhSe7Zz6Rx",
-	"ULbktH3Qg8aip9PVcd2k4YlV+Bdc9n6RfnuFSgu99kV82+wGO9k6N7zDztZTX4+ODYxx72P2R1KQHajf",
-	"WI8dqL8sCmdYtSLZuy6UuwSgs/vf0gKEW6fV0vimdLgmfFO//4HxLacKb1lca5QLIRwvCllRr76yz33W",
-	"1rDZRJ1a9opAqOsH2r7yTtXMT7y4fwDtrAZX9j6aD1VLuMyRQjaDDHk64455bfM4kd2O82pHd4cwVzrj",
-	"gL2PwRRx4hCy0l3Olkc1WAVNN5KPiVEPdWlpF/YYpkM9Nh/icKyb3UEkdRXWAFeuJj1GzaUUimIw7lhJ",
-	"aGw8W2PsvZtyFlN/i+a92OveOBaEghA75kqg2Yl+BLYYUv7eMDBXYTBNHA5wFwX3v3lE6h/QFIRMTtKE",
-	"WMzT4C4IUGiE4i46ZSK7l4g4i4iRkOwDBW46vJjwUU5m2MhJzgI0R5Tp72ONnxTh9/H9b85C1Bldv7C7",
-	"vshtuj+pP7xG4Vqvg56O6o7B5pJ+wZFNGWePpctnDmEU4F90oS+P0bc6Dxd7TJpInyIC59AS+UAlb8yY",
-	"QGcMeYqRYSRijZImhCio4mBZvKwWDTdG4tRu7lESFPpTUJahgLe1cB9CIGnWLm5JtCM5pmICvJh1H3Hw",
-	"sMyi/qtRnliSpOWBVLityA6dYiM/QH09x0pAFG69TMP1Z+iNnv8NAoFiaihXt35W1H4xDxUGpI2h8g2G",
-	"3jjajr3ZRcdCAgLq6/IkSBAIIw7IAMcH9Obb/R/eVHnCtd35eQKLTXVDVxbampq3almFCj7A+Jaxd2LP",
-	"U6ptfa2JY6pwD6MkdC+J0Nq7mpE7LXpigdEYMAd+EMvb51odkxwE8vAYPOBGCdPv61ISbByQKZaMEyzQ",
-	"XEk1+xvYvlpIsDEHUxHT16GCCAcSuEnVKVvgHpAZ6CX9zWxp0B/7sO/r2mm6ioWiWKLwx5C+DeZl+r66",
-	"nQhx3AIf6wpnaUMP29XYWB82go7QMbt7jgKlfBqV0mcCSSXg73/VGigHj1HmdfHQWNj0wHH7Zq+4r+zd",
-	"AjrmIp4+DsSM3Kmj/PlmqD9fkSnFMuaQfXVNQhASh5H66lMuSMqOLxROl8fNUDJ5SwCfJRwt5sHg2WBv",
-	"kBvtY3L5moReKX3GfpVeLee+K/Xsy/1SDI/Nvtfklx/B85iai07z39p45tw36TY/3Xz6vwEAAP//",
+	"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",
+	"/vrm1/8bAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -428,21 +428,19 @@ func (s PeriodStatus) Valid() bool {
 }
 
 type Period struct {
-	ID               uuid.UUID    `json:"id"`
-	Name             string       `json:"name"`
-	StartDate        time.Time    `json:"start_date"`
-	EndDate          time.Time    `json:"end_date"`
-	Status           PeriodStatus `json:"status"`
-	Version          int64        `json:"version"`
-	SoftClosedAt     *time.Time   `json:"soft_closed_at,omitempty"`
-	SoftClosedBy     string       `json:"soft_closed_by,omitempty"`
-	LockedAt         *time.Time   `json:"locked_at,omitempty"`
-	LockedBy         string       `json:"locked_by,omitempty"`
-	ReopenedAt       *time.Time   `json:"reopened_at,omitempty"`
-	ReopenedBy       string       `json:"reopened_by,omitempty"`
-	ReopenedReason   string       `json:"reopened_reason,omitempty"`
-	StatusChangedBy  string       `json:"status_changed_by,omitempty"`
-	TransitionReason string       `json:"transition_reason,omitempty"`
+	ID               uuid.UUID          `json:"id"`
+	Name             string             `json:"name"`
+	StartDate        time.Time          `json:"start_date"`
+	EndDate          time.Time          `json:"end_date"`
+	Status           PeriodStatus       `json:"status"`
+	Version          int64              `json:"version"`
+	FiscalYearID     *uuid.UUID         `json:"fiscal_year_id,omitempty"`
+	SequenceNo       int                `json:"sequence_no,omitempty"`
+	IsLegacy         bool               `json:"is_legacy,omitempty"`
+	Checklist        CloseChecklist     `json:"checklist"`
+	Capabilities     PeriodCapabilities `json:"capabilities"`
+	StatusChangedBy  string             `json:"status_changed_by,omitempty"`
+	TransitionReason string             `json:"transition_reason,omitempty"`
 }
 
 func (p Period) Validate() error {
@@ -459,12 +457,14 @@ func (p Period) Validate() error {
 }
 
 type CloseChecklist struct {
-	UnpostedDocuments       int `json:"unposted_documents"`
-	PendingFiscalDocuments  int `json:"pending_fiscal_documents"`
-	PostingErrors           int `json:"posting_errors"`
-	MissingMappings         int `json:"missing_mappings"`
-	MissingExchangeRates    int `json:"missing_exchange_rates"`
-	UnclosedReconciliations int `json:"unclosed_reconciliations"`
+	UnpostedDocuments       int        `json:"unposted_documents"`
+	PendingFiscalDocuments  int        `json:"pending_fiscal_documents"`
+	PostingErrors           int        `json:"posting_errors"`
+	MissingMappings         int        `json:"missing_mappings"`
+	MissingExchangeRates    int        `json:"missing_exchange_rates"`
+	UnclosedReconciliations int        `json:"unclosed_reconciliations"`
+	PendingDrafts           int        `json:"pending_drafts"`
+	EvaluatedAt             *time.Time `json:"evaluated_at,omitempty"`
 }
 
 func (c CloseChecklist) BlockingCount() int {
@@ -473,7 +473,8 @@ func (c CloseChecklist) BlockingCount() int {
 		c.PostingErrors +
 		c.MissingMappings +
 		c.MissingExchangeRates +
-		c.UnclosedReconciliations
+		c.UnclosedReconciliations +
+		c.PendingDrafts
 }
 
 type EntrySource struct {

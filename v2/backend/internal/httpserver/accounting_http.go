@@ -397,9 +397,12 @@ func (h *IAMAPI) getAccountingAccountsTree(
 
 func (h *IAMAPI) getAccountingSettings(w http.ResponseWriter, r *http.Request) {
 	response := api.AccountingSettings{
-		CountryCode:        "AR",
-		FunctionalCurrency: "ARS",
-		Timezone:           "America/Argentina/Buenos_Aires",
+		CanChangeFiscalYearStart: true,
+		CountryCode:              "AR",
+		FiscalYearStartMonth:     1,
+		FunctionalCurrency:       "ARS",
+		Timezone:                 "America/Argentina/Buenos_Aires",
+		Version:                  1,
 	}
 	if !h.withinBusinessTx(
 		w,
@@ -412,13 +415,67 @@ func (h *IAMAPI) getAccountingSettings(w http.ResponseWriter, r *http.Request) {
 			_ clerkadapter.SessionClaims,
 		) error {
 			err := tx.QueryRow(ctx, `
-				SELECT country_code, functional_currency, timezone
-				  FROM accounting.organization_settings
+				SELECT
+					setting.country_code,
+					setting.functional_currency,
+					setting.timezone,
+					setting.fiscal_year_start_month,
+					setting.version,
+					NOT (
+						(SELECT count(*) FROM accounting.fiscal_years) > 1
+						OR EXISTS (
+							SELECT 1
+							  FROM accounting.periods
+							 WHERE status <> 'open'
+							 LIMIT 1
+						)
+						OR EXISTS (
+							SELECT 1
+							  FROM accounting.journal_entries
+							 LIMIT 1
+						)
+						OR EXISTS (
+							SELECT 1
+							  FROM accounting.period_events
+							 LIMIT 1
+						)
+						OR EXISTS (
+							SELECT 1
+							  FROM accounting.period_close_checks
+							 LIMIT 1
+						)
+						OR EXISTS (
+							SELECT 1
+							  FROM accounting.inflation_runs
+							 LIMIT 1
+						)
+						OR EXISTS (
+							SELECT 1
+							  FROM accounting.currency_revaluation_runs
+							 LIMIT 1
+						)
+						OR EXISTS (
+							SELECT 1
+							  FROM accounting.drafts
+							 WHERE status = 'active'
+							 LIMIT 1
+						)
+						OR EXISTS (
+							SELECT 1
+							  FROM accounting.fiscal_years
+							 WHERE annual_close_status <> 'not_ready'
+							 LIMIT 1
+						)
+					) AS can_change_fiscal_year_start
+				  FROM accounting.organization_settings AS setting
 				 LIMIT 1
 			`).Scan(
 				&response.CountryCode,
 				&response.FunctionalCurrency,
 				&response.Timezone,
+				&response.FiscalYearStartMonth,
+				&response.Version,
+				&response.CanChangeFiscalYearStart,
 			)
 			if errors.Is(err, pgx.ErrNoRows) {
 				return nil
@@ -1158,10 +1215,14 @@ func (h *IAMAPI) discardJournalDraft(
 	w http.ResponseWriter,
 	r *http.Request,
 	draftID api.DraftID,
-	_ api.DiscardJournalDraftParams,
+	params api.DiscardJournalDraftParams,
 ) {
 	var input api.VersionedCommandInput
 	if !decodeBusinessBody(w, r, &input) {
+		return
+	}
+	idempotencyKey, valid := validateIdempotencyKey(w, params.IdempotencyKey)
+	if !valid {
 		return
 	}
 	if !h.withAccountingService(
@@ -1180,6 +1241,7 @@ func (h *IAMAPI) discardJournalDraft(
 				draftID,
 				input.Version,
 				strings.TrimSpace(stringValue(input.Reason)),
+				idempotencyKey,
 			)
 		},
 	) {
@@ -1386,8 +1448,53 @@ func (h *IAMAPI) reverseJournalEntry(
 	writeJSON(w, http.StatusCreated, response)
 }
 
-func (h *IAMAPI) listAccountingPeriods(w http.ResponseWriter, r *http.Request) {
-	periods := make([]api.AccountingPeriod, 0)
+func (h *IAMAPI) listAccountingPeriods(
+	w http.ResponseWriter,
+	r *http.Request,
+	params api.ListAccountingPeriodsParams,
+) {
+	rawCursor := (*string)(params.Cursor)
+	cursor, err := decodeKeysetCursor(rawCursor)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", "Invalid cursor")
+		return
+	}
+	var (
+		cursorDate *time.Time
+		cursorID   *uuid.UUID
+	)
+	if cursor.Sort != "" {
+		parsedDate, parseErr := time.Parse("2006-01-02", cursor.Sort)
+		if parseErr != nil {
+			writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", "Invalid cursor")
+			return
+		}
+		parsedID, parseErr := uuid.Parse(cursor.ID)
+		if parseErr != nil {
+			writeAPIError(w, http.StatusBadRequest, "REQUEST_INVALID", "Invalid cursor")
+			return
+		}
+		cursorDate = &parsedDate
+		cursorID = &parsedID
+	}
+	limit := accountingAPILimit(params.Limit)
+	query := ""
+	if params.Query != nil {
+		query = strings.TrimSpace(*params.Query)
+	}
+	state := ""
+	if params.State != nil {
+		state = string(*params.State)
+	}
+	var fiscalYearID *uuid.UUID
+	if params.FiscalYearId != nil {
+		value := uuid.UUID(*params.FiscalYearId)
+		fiscalYearID = &value
+	}
+	response := api.AccountingPeriodList{
+		Items: make([]api.AccountingPeriod, 0),
+		Page:  api.PageInfo{Total: 0},
+	}
 	if !h.withinBusinessTx(
 		w,
 		r,
@@ -1398,59 +1505,112 @@ func (h *IAMAPI) listAccountingPeriods(w http.ResponseWriter, r *http.Request) {
 			_ platformiam.ActiveMembership,
 			_ clerkadapter.SessionClaims,
 		) error {
+			if err := tx.QueryRow(ctx, `
+				SELECT count(*)
+				  FROM accounting.periods AS period
+				  JOIN accounting.fiscal_years AS fiscal_year
+				    ON fiscal_year.org_id = period.org_id
+				   AND fiscal_year.id = period.fiscal_year_id
+				 WHERE ($1::uuid IS NULL OR period.fiscal_year_id = $1)
+				   AND ($2::text = '' OR period.status::text = $2)
+				   AND (
+						$3::text = ''
+						OR period.code ILIKE '%' || $3 || '%'
+						OR fiscal_year.code ILIKE '%' || $3 || '%'
+				   )
+			`, fiscalYearID, state, query).Scan(&response.Page.Total); err != nil {
+				return fmt.Errorf("count accounting periods: %w", err)
+			}
 			rows, err := tx.Query(ctx, `
-				SELECT id, start_date, end_date, status, version
-				  FROM accounting.periods
-				 ORDER BY start_date DESC, id DESC
-			`)
+				SELECT
+					period.id,
+					period.fiscal_year_id,
+					period.code,
+					period.period_no,
+					period.start_date,
+					period.end_date,
+					period.status,
+					period.version,
+					period.is_legacy
+				  FROM accounting.periods AS period
+				  JOIN accounting.fiscal_years AS fiscal_year
+				    ON fiscal_year.org_id = period.org_id
+				   AND fiscal_year.id = period.fiscal_year_id
+				 WHERE ($1::uuid IS NULL OR period.fiscal_year_id = $1)
+				   AND ($2::text = '' OR period.status::text = $2)
+				   AND (
+						$3::text = ''
+						OR period.code ILIKE '%' || $3 || '%'
+						OR fiscal_year.code ILIKE '%' || $3 || '%'
+				   )
+				   AND (
+						$4::date IS NULL
+						OR (period.start_date, period.id)
+						   < ($4::date, $5::uuid)
+				   )
+				 ORDER BY period.start_date DESC, period.id DESC
+				 LIMIT $6
+			`, fiscalYearID, state, query, cursorDate, cursorID, limit+1)
 			if err != nil {
 				return fmt.Errorf("list accounting periods: %w", err)
 			}
+			defer rows.Close()
 			for rows.Next() {
-				var startDate time.Time
-				var endDate time.Time
-				var period api.AccountingPeriod
+				var (
+					period       api.AccountingPeriod
+					fiscalYearID uuid.UUID
+					startDate    time.Time
+					endDate      time.Time
+				)
 				if err := rows.Scan(
 					&period.Id,
+					&fiscalYearID,
+					&period.Code,
+					&period.Sequence,
 					&startDate,
 					&endDate,
 					&period.State,
 					&period.Version,
+					&period.IsLegacy,
 				); err != nil {
-					rows.Close()
 					return fmt.Errorf("scan accounting period: %w", err)
 				}
+				period.FiscalYearId = openapi_types.UUID(fiscalYearID)
 				period.StartDate = openapi_types.Date{Time: startDate}
 				period.EndDate = openapi_types.Date{Time: endDate}
-				periods = append(periods, period)
+				response.Items = append(response.Items, period)
 			}
-			rows.Close()
 			if err := rows.Err(); err != nil {
 				return err
 			}
-			for index := range periods {
-				checklist, err := loadPeriodChecklist(ctx, tx, periods[index].Id)
-				if err != nil {
-					return err
-				}
-				periods[index].Checklist = &checklist
+			if len(response.Items) > limit {
+				response.Items = response.Items[:limit]
+				last := response.Items[len(response.Items)-1]
+				response.Page.NextCursor = encodeKeysetCursor(
+					last.StartDate.Time.Format("2006-01-02"),
+					uuid.UUID(last.Id).String(),
+				)
 			}
 			return nil
 		},
 	) {
 		return
 	}
-	writeJSON(w, http.StatusOK, periods)
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (h *IAMAPI) transitionAccountingPeriod(
 	w http.ResponseWriter,
 	r *http.Request,
 	periodID api.PeriodID,
-	_ api.TransitionAccountingPeriodParams,
+	params api.TransitionAccountingPeriodParams,
 ) {
 	var input api.PeriodTransitionInput
 	if !decodeBusinessBody(w, r, &input) {
+		return
+	}
+	idempotencyKey, valid := validateIdempotencyKey(w, params.IdempotencyKey)
+	if !valid {
 		return
 	}
 	if !input.DesiredState.Valid() {
@@ -1475,6 +1635,7 @@ func (h *IAMAPI) transitionAccountingPeriod(
 				input.Version,
 				accounting.PeriodStatus(input.DesiredState),
 				strings.TrimSpace(input.Reason),
+				idempotencyKey,
 			)
 			if err != nil {
 				return err
@@ -2026,6 +2187,23 @@ func mapAccountingError(err error) error {
 		return fmt.Errorf("%w: account", errAccountingAccountProtected)
 	case errors.Is(err, accounting.ErrAccountInUse):
 		return fmt.Errorf("%w: account", errAccountingAccountStructureLocked)
+	case errors.Is(err, accounting.ErrFiscalYearOverlap):
+		return fmt.Errorf("%w: %v", errAccountingFiscalYearOverlap, err)
+	case errors.Is(err, accounting.ErrPeriodSequence),
+		errors.Is(err, accounting.ErrFiscalYearSequence):
+		return fmt.Errorf("%w: %v", errAccountingPeriodSequence, err)
+	case errors.Is(err, accounting.ErrPeriodInFuture):
+		return fmt.Errorf("%w: %v", errAccountingPeriodInFuture, err)
+	case errors.Is(err, accounting.ErrFiscalYearCloseOrder):
+		return fmt.Errorf("%w: %v", errAccountingFiscalYearCloseOrder, err)
+	case errors.Is(err, accounting.ErrFiscalYearReopenOrder):
+		return fmt.Errorf("%w: %v", errAccountingFiscalYearReopenOrder, err)
+	case errors.Is(err, accounting.ErrFiscalYearNotReady):
+		return fmt.Errorf("%w: %v", errAccountingCloseChecklistBlocked, err)
+	case errors.Is(err, accounting.ErrAnnualClosePending):
+		return fmt.Errorf("%w: %v", errAccountingAnnualClosePending, err)
+	case errors.Is(err, accounting.ErrAnnualCloseNotRequired):
+		return fmt.Errorf("%w: %v", errAccountingAnnualCloseNotRequired, err)
 	case errors.Is(err, accounting.ErrConflict):
 		return fmt.Errorf("%w: %v", errBusinessInvalidTransition, err)
 	case errors.Is(err, accounting.ErrInvalidArgument),
@@ -2999,8 +3177,10 @@ func loadPeriodChecklist(
 		"account_mappings",
 		"exchange_rates",
 		"unreconciled_accounts",
+		"pending_drafts",
 	}
 	counts := make(map[string]int, len(order))
+	evaluated := false
 	rows, err := tx.Query(ctx, `
 		SELECT
 			check_key,
@@ -3016,6 +3196,7 @@ func loadPeriodChecklist(
 	}
 	defer rows.Close()
 	for rows.Next() {
+		evaluated = true
 		var key string
 		var count int
 		if err := rows.Scan(&key, &count); err != nil {
@@ -3025,6 +3206,9 @@ func loadPeriodChecklist(
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+	if !evaluated {
+		return nil, nil
 	}
 	result := make([]struct {
 		Clear bool   `json:"clear"`
@@ -3048,25 +3232,42 @@ func loadPeriodChecklist(
 }
 
 func apiPeriod(period accounting.Period, checklist accounting.CloseChecklist) api.AccountingPeriod {
-	checks := []struct {
+	var checks *[]struct {
 		Clear bool   `json:"clear"`
 		Code  string `json:"code"`
 		Count *int   `json:"count,omitempty"`
-	}{
-		check("unposted_documents", checklist.UnpostedDocuments),
-		check("fiscal_pending", checklist.PendingFiscalDocuments),
-		check("posting_errors", checklist.PostingErrors),
-		check("account_mappings", checklist.MissingMappings),
-		check("exchange_rates", checklist.MissingExchangeRates),
-		check("unreconciled_accounts", checklist.UnclosedReconciliations),
+	}
+	if checklist.EvaluatedAt != nil {
+		values := []struct {
+			Clear bool   `json:"clear"`
+			Code  string `json:"code"`
+			Count *int   `json:"count,omitempty"`
+		}{
+			check("unposted_documents", checklist.UnpostedDocuments),
+			check("fiscal_pending", checklist.PendingFiscalDocuments),
+			check("posting_errors", checklist.PostingErrors),
+			check("account_mappings", checklist.MissingMappings),
+			check("exchange_rates", checklist.MissingExchangeRates),
+			check("unreconciled_accounts", checklist.UnclosedReconciliations),
+			check("pending_drafts", checklist.PendingDrafts),
+		}
+		checks = &values
+	}
+	fiscalYearID := uuid.Nil
+	if period.FiscalYearID != nil {
+		fiscalYearID = *period.FiscalYearID
 	}
 	return api.AccountingPeriod{
-		Checklist: &checks,
-		EndDate:   openapi_types.Date{Time: period.EndDate},
-		Id:        period.ID,
-		StartDate: openapi_types.Date{Time: period.StartDate},
-		State:     api.AccountingPeriodState(period.Status),
-		Version:   period.Version,
+		Checklist:    checks,
+		Code:         period.Name,
+		EndDate:      openapi_types.Date{Time: period.EndDate},
+		FiscalYearId: openapi_types.UUID(fiscalYearID),
+		Id:           openapi_types.UUID(period.ID),
+		IsLegacy:     period.IsLegacy,
+		Sequence:     period.SequenceNo,
+		StartDate:    openapi_types.Date{Time: period.StartDate},
+		State:        api.AccountingPeriodState(period.Status),
+		Version:      period.Version,
 	}
 }
 

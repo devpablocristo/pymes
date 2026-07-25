@@ -94,6 +94,54 @@ func TestMapErrorReturnsStableAccountingErrors(t *testing.T) {
 			},
 			expected: accounting.ErrConflict,
 		},
+		{
+			name: "period close checklist",
+			postgres: &pgconn.PgError{
+				Code:           "23514",
+				ConstraintName: "accounting_periods_close_checklist",
+			},
+			expected: accounting.ErrFiscalYearNotReady,
+		},
+		{
+			name: "period pending drafts",
+			postgres: &pgconn.PgError{
+				Code:           "23514",
+				ConstraintName: "accounting_periods_pending_drafts",
+			},
+			expected: accounting.ErrFiscalYearNotReady,
+		},
+		{
+			name: "fiscal year close checklist",
+			postgres: &pgconn.PgError{
+				Code:           "23514",
+				ConstraintName: "accounting_fiscal_years_close_checklist",
+			},
+			expected: accounting.ErrFiscalYearNotReady,
+		},
+		{
+			name: "period reopen reason",
+			postgres: &pgconn.PgError{
+				Code:           "23514",
+				ConstraintName: "accounting_periods_reopen_reason",
+			},
+			expected: accounting.ErrInvalidArgument,
+		},
+		{
+			name: "annual close transition",
+			postgres: &pgconn.PgError{
+				Code:           "23514",
+				ConstraintName: "accounting_fiscal_years_annual_transition",
+			},
+			expected: accounting.ErrAnnualClosePending,
+		},
+		{
+			name: "annual close posting freeze",
+			postgres: &pgconn.PgError{
+				Code:           "23514",
+				ConstraintName: "accounting_journal_entries_annual_close_frozen",
+			},
+			expected: accounting.ErrAnnualClosePending,
+		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

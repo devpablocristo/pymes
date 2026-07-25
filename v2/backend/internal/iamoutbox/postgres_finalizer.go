@@ -165,13 +165,6 @@ func installDefaultAccountingChart(
 		return fmt.Errorf("iam outbox: install default accounting chart: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `
-		SELECT pg_advisory_xact_lock(
-			hashtextextended($1::uuid::text, 910010)
-		)
-	`, organizationID); err != nil {
-		return fmt.Errorf("iam outbox: lock initial accounting period: %w", err)
-	}
-	if _, err := tx.Exec(ctx, `
 		WITH configured AS (
 			SELECT
 				fiscal_year_start_month,
@@ -179,7 +172,7 @@ func installDefaultAccountingChart(
 			  FROM accounting.organization_settings
 			 WHERE org_id = $1::uuid
 		),
-		bounds AS (
+		fiscal_year AS (
 			SELECT make_date(
 				extract(year FROM local_today)::integer
 					- CASE
@@ -193,32 +186,17 @@ func installDefaultAccountingChart(
 			) AS start_date
 			  FROM configured
 		)
-		INSERT INTO accounting.periods (
-			org_id,
-			code,
-			start_date,
-			end_date
-		)
-		SELECT
+		SELECT accounting.ensure_fiscal_year(
 			$1::uuid,
-			extract(year FROM start_date)::integer::text,
-			start_date,
-			(start_date + interval '1 year - 1 day')::date
-		  FROM bounds
-		 WHERE NOT EXISTS (
-			SELECT 1
-			  FROM accounting.periods AS period
-			 WHERE period.org_id = $1::uuid
-			   AND daterange(period.start_date, period.end_date, '[]')
-			       && daterange(
-					bounds.start_date,
-					(bounds.start_date + interval '1 year - 1 day')::date,
-					'[]'
-			       )
-		 )
-		ON CONFLICT DO NOTHING
+			fiscal_year.start_date,
+			'system:provisioning'
+		)
+		  FROM fiscal_year
 	`, organizationID); err != nil {
-		return fmt.Errorf("iam outbox: create initial accounting period: %w", err)
+		return fmt.Errorf(
+			"iam outbox: create initial accounting fiscal year: %w",
+			err,
+		)
 	}
 	return nil
 }

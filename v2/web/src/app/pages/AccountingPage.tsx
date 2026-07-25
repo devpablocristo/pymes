@@ -117,6 +117,7 @@ type PaymentMethod = components["schemas"]["AccountingPaymentMethod"];
 type SettlementInput = components["schemas"]["AccountingSettlementInput"];
 type PageInfo = components["schemas"]["PageInfo"];
 type Period = components["schemas"]["AccountingPeriod"];
+type PeriodList = components["schemas"]["AccountingPeriodList"];
 type FinancialAccount = components["schemas"]["FinancialAccount"];
 type StatementImport = components["schemas"]["StatementImport"];
 type Reconciliation = components["schemas"]["Reconciliation"];
@@ -223,6 +224,9 @@ type AccountingSettingsView = {
   country_code: string;
   functional_currency: string;
   timezone: string;
+  fiscal_year_start_month?: number;
+  version?: number;
+  can_change_fiscal_year_start?: boolean;
 };
 
 type LogicalOperationKey = {
@@ -230,15 +234,155 @@ type LogicalOperationKey = {
   value: string;
 };
 
+type FiscalYearState = "open" | "closing" | "closed";
+type FiscalYearFilter = "all" | FiscalYearState;
+type AnnualCloseState =
+  | "not_started"
+  | "preparing"
+  | "draft"
+  | "posted"
+  | "not_required"
+  | "reversed"
+  | string;
+
+type PeriodChecklistState =
+  | "unevaluated"
+  | "passed"
+  | "warning"
+  | "blocked";
+
+type PeriodChecklistItemView = {
+  code: string;
+  label?: string;
+  clear?: boolean;
+  count?: number;
+  status?: PeriodChecklistState;
+  detail?: string;
+  target_path?: string;
+  checked_at?: string | null;
+};
+
+type PeriodCloseReadinessView = {
+  status: "not_evaluated" | "ready" | "warning" | "blocked";
+  blocking_count: number;
+  evaluated_at?: string | null;
+  checks: Array<{
+    code: string;
+    label: string;
+    status: "not_evaluated" | "passed" | "warning" | "blocked";
+    count: number;
+    detail?: string;
+    target_path?: string;
+  }>;
+};
+
+type PeriodCapabilitiesView = {
+  can_soft_close: boolean;
+  can_lock: boolean;
+  can_reopen_to_soft_closed: boolean;
+  can_reopen_to_open: boolean;
+  blockers: string[];
+};
+
+type FiscalYearPeriodView = {
+  id: string;
+  fiscal_year_id?: string;
+  code?: string;
+  sequence?: number;
+  period_number?: number;
+  start_date: string;
+  end_date: string;
+  state: Period["state"];
+  version: number;
+  is_legacy?: boolean;
+  checklist?: PeriodChecklistItemView[];
+  last_evaluated_at?: string | null;
+  close_readiness?: PeriodCloseReadinessView;
+  capabilities?: PeriodCapabilitiesView;
+  recent_events?: FiscalYearEventView[];
+};
+
+type FiscalYearEventView = {
+  id: string;
+  entity_type?: "fiscal_year" | "period";
+  period_id?: string | null;
+  from_state?: string | null;
+  to_state?: string;
+  event_type?: string;
+  from_status?: string | null;
+  to_status?: string | null;
+  actor?: string;
+  reason?: string | null;
+  actor_name?: string | null;
+  actor_email?: string | null;
+  occurred_at: string;
+};
+
+type FiscalYearCapabilities = {
+  can_prepare_annual_close?: boolean;
+  can_reopen?: boolean;
+  blockers?: string[];
+  annual_close_blockers?: string[];
+  reopen_blockers?: string[];
+};
+
+type FiscalYearSummaryView = {
+  id: string;
+  code: string;
+  start_date: string;
+  end_date: string;
+  is_legacy?: boolean;
+  state: FiscalYearState;
+  version: number;
+  period_counts: {
+    open: number;
+    soft_closed: number;
+    locked: number;
+  };
+  annual_close_status: AnnualCloseState;
+  annual_closing_draft_id?: string | null;
+  annual_closing_entry_id?: string | null;
+  periods?: FiscalYearPeriodView[];
+  capabilities?: FiscalYearCapabilities;
+};
+
+type FiscalYearDetailView = FiscalYearSummaryView & {
+  periods: FiscalYearPeriodView[];
+  recent_events?: FiscalYearEventView[];
+  events?: FiscalYearEventView[];
+};
+
+type FiscalYearListView = {
+  items: FiscalYearSummaryView[];
+  page: PageInfo;
+};
+
+type FiscalYearAnnualCloseResultView = {
+  fiscal_year: FiscalYearSummaryView;
+  draft?: Draft | null;
+};
+
+type FiscalYearTransitionDialog =
+  | {
+      kind: "period";
+      fiscalYear: FiscalYearDetailView;
+      period: FiscalYearPeriodView;
+      desiredState: Period["state"];
+    }
+  | {
+      kind: "fiscal-year";
+      fiscalYear: FiscalYearDetailView;
+    };
+
 const sections = [
   ["accounts", "Plan de cuentas"],
   ["journal", "Diario"],
   ["ledger", "Mayor"],
   ["trial-balance", "Sumas y saldos"],
+  ["fiscal-years", "Ejercicios"],
   ["open-items", "Cobros y pagos"],
   ["reports", "Informes"],
   ["reconciliation", "Conciliación"],
-  ["periods", "Cierre"],
   ["inflation", "Inflación"],
 ] as const;
 
@@ -247,7 +391,8 @@ type AccountingSection = (typeof sections)[number][0];
 export function AccountingPage() {
   const api = useProductApi();
   const params = useParams<{ section?: string }>();
-  const section = (params.section ?? "accounts") as AccountingSection;
+  const requestedSection = params.section ?? "accounts";
+  const section = requestedSection as AccountingSection;
   const [session, setSession] = useState<CurrentSession>();
   const [permissionError, setPermissionError] = useState<string>();
 
@@ -274,7 +419,11 @@ export function AccountingPage() {
     return () => controller.abort();
   }, [api]);
 
-  if (!sections.some(([value]) => value === section)) {
+  if (requestedSection === "periods") {
+    return <Navigate replace to="/accounting/fiscal-years" />;
+  }
+
+  if (!sections.some(([value]) => value === requestedSection)) {
     return <Navigate replace to="/accounting/accounts" />;
   }
 
@@ -313,12 +462,14 @@ function AccountingSectionView({
   if (section === "journal") return <JournalPanel canManage={canManage} />;
   if (section === "ledger") return <LedgerPanel />;
   if (section === "trial-balance") return <TrialBalancePanel />;
+  if (section === "fiscal-years") {
+    return <FiscalYearsPanel canManage={canManage} />;
+  }
   if (section === "open-items") return <OpenItemsPanel canManage={canManage} />;
   if (section === "reports") return <ReportsPanel />;
   if (section === "reconciliation") {
     return <ReconciliationPanel canManage={canManage} />;
   }
-  if (section === "periods") return <PeriodsPanel canManage={canManage} />;
   return <InflationPanel canManage={canManage} />;
 }
 
@@ -1738,6 +1889,7 @@ function AccountMappingsPanel({
 
 function JournalPanel({ canManage }: { canManage: boolean }) {
   const api = useProductApi();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [entries, setEntries] = useState<JournalEntryView[]>([]);
   const [drafts, setDrafts] = useState<JournalDraftView[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -1770,6 +1922,7 @@ function JournalPanel({ canManage }: { canManage: boolean }) {
   const discardIdempotencyKeys = useRef(
     new Map<string, LogicalOperationKey>(),
   );
+  const handledDeepLink = useRef("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1841,6 +1994,64 @@ function JournalPanel({ canManage }: { canManage: boolean }) {
       setSelectedDraftIDs([]);
     }
   }, [canManage]);
+  useEffect(() => {
+    const draftID = searchParams.get("draft_id")?.trim();
+    const entryID = searchParams.get("entry_id")?.trim();
+    const deepLink = draftID
+      ? `draft:${draftID}`
+      : entryID
+        ? `entry:${entryID}`
+        : "";
+    if (!deepLink || handledDeepLink.current === deepLink) return;
+    handledDeepLink.current = deepLink;
+
+    if (draftID) {
+      setMode("drafts");
+      setDraftDetailBusy(draftID);
+      setError(undefined);
+      void api
+        .request<JournalDraftView>(
+          `/api/v1/accounting/drafts/${draftID}`,
+          { skipJSONContentType: true },
+        )
+        .then((draft) => {
+          setShowCreate(false);
+          setCopySeed(undefined);
+          setEditingDraft(draft);
+        })
+        .catch((cause) => {
+          setError(
+            journalErrorMessage(
+              cause,
+              "No pudimos abrir el borrador enlazado.",
+            ),
+          );
+        })
+        .finally(() => setDraftDetailBusy(undefined));
+      return;
+    }
+
+    if (entryID) {
+      setMode("posted");
+      setEntryDetailBusy(true);
+      setError(undefined);
+      void api
+        .request<JournalEntryView>(
+          `/api/v1/accounting/journal-entries/${entryID}`,
+          { skipJSONContentType: true },
+        )
+        .then(setSelectedEntry)
+        .catch((cause) => {
+          setError(
+            journalErrorMessage(
+              cause,
+              "No pudimos abrir el asiento enlazado.",
+            ),
+          );
+        })
+        .finally(() => setEntryDetailBusy(false));
+    }
+  }, [api, searchParams]);
 
   function resetPagination() {
     setEntryCursor(undefined);
@@ -1859,6 +2070,14 @@ function JournalPanel({ canManage }: { canManage: boolean }) {
     if (next === "drafts") setSourceType("");
     setSelectedDraftIDs([]);
     resetPagination();
+  }
+
+  function clearDeepLink(name: "draft_id" | "entry_id") {
+    if (!searchParams.has(name)) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete(name);
+    handledDeepLink.current = "";
+    setSearchParams(next, { replace: true });
   }
 
   async function openEntry(entry: JournalEntryView | string) {
@@ -2172,6 +2391,7 @@ function JournalPanel({ canManage }: { canManage: boolean }) {
             setEditingDraft(undefined);
             setCopySeed(undefined);
             setShowCreate(false);
+            clearDeepLink("draft_id");
           }}
           onPosted={(entry) => {
             setEditorDirty(false);
@@ -2179,6 +2399,7 @@ function JournalPanel({ canManage }: { canManage: boolean }) {
             setCopySeed(undefined);
             setShowCreate(false);
             setMode("posted");
+            clearDeepLink("draft_id");
             void openEntry(entry.id);
             void load();
           }}
@@ -2194,7 +2415,10 @@ function JournalPanel({ canManage }: { canManage: boolean }) {
       {!canManage && editingDraft ? (
         <JournalDraftDrawer
           draft={editingDraft}
-          onClose={() => setEditingDraft(undefined)}
+          onClose={() => {
+            setEditingDraft(undefined);
+            clearDeepLink("draft_id");
+          }}
         />
       ) : null}
       <InlineFeedback error={error} loading={loading} />
@@ -2416,7 +2640,10 @@ function JournalPanel({ canManage }: { canManage: boolean }) {
           accounts={accounts}
           canManage={canManage}
           entry={selectedEntry}
-          onClose={() => setSelectedEntry(undefined)}
+          onClose={() => {
+            setSelectedEntry(undefined);
+            clearDeepLink("entry_id");
+          }}
           onCopy={() => copyEntry(selectedEntry)}
           onOpenRelated={(id) => void openEntry(id)}
           onReverse={() => setReverseEntry(selectedEntry)}
@@ -4210,6 +4437,12 @@ function useDialogFocus(
     const element = container.current;
     element?.focus();
     function handleKey(event: KeyboardEvent) {
+      const modalStack = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[role="dialog"][aria-modal="true"]',
+        ),
+      );
+      if (modalStack.at(-1) !== element) return;
       if (event.key === "Escape") {
         event.preventDefault();
         onCloseRef.current();
@@ -6670,138 +6903,1436 @@ function ReconciliationPanel({ canManage }: { canManage: boolean }) {
   );
 }
 
-function PeriodsPanel({ canManage }: { canManage: boolean }) {
+function FiscalYearsPanel({ canManage }: { canManage: boolean }) {
   const api = useProductApi();
-  const [periods, setPeriods] = useState<Period[]>([]);
+  const currentYear = new Date().getFullYear();
+  const [fiscalYears, setFiscalYears] = useState<FiscalYearSummaryView[]>([]);
+  const [page, setPage] = useState<PageInfo>({ total: 0 });
+  const [query, setQuery] = useState("");
+  const [stateFilter, setStateFilter] = useState<FiscalYearFilter>("all");
+  const [cursor, setCursor] = useState<string>();
+  const [cursorTrail, setCursorTrail] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
-  const [showCreate, setShowCreate] = useState(false);
+  const [notice, setNotice] = useState<string>();
   const [busy, setBusy] = useState<string>();
+  const [showCreate, setShowCreate] = useState(false);
+  const [showCalendarSettings, setShowCalendarSettings] = useState(false);
+  const [startYear, setStartYear] = useState(String(currentYear));
+  const [calendarStartMonth, setCalendarStartMonth] = useState(1);
+  const [settingsStatus, setSettingsStatus] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+  const [settingsError, setSettingsError] = useState<string>();
+  const [settings, setSettings] = useState<AccountingSettingsView>({
+    country_code: "AR",
+    functional_currency: "ARS",
+    timezone: "America/Argentina/Buenos_Aires",
+    fiscal_year_start_month: 1,
+  });
+  const [expandedID, setExpandedID] = useState<string>();
+  const [details, setDetails] = useState<Record<string, FiscalYearDetailView>>(
+    {},
+  );
+  const [detailBusyID, setDetailBusyID] = useState<string>();
+  const [drawerYearID, setDrawerYearID] = useState<string>();
+  const [transitionDialog, setTransitionDialog] =
+    useState<FiscalYearTransitionDialog>();
+  const [annualDialog, setAnnualDialog] = useState<FiscalYearDetailView>();
+  const [dialogReason, setDialogReason] = useState("");
+  const [dialogError, setDialogError] = useState<string>();
   const [annualDraft, setAnnualDraft] = useState<Draft>();
-  const load = useCallback(() => api.request<Period[]>("/api/v1/accounting/periods").then(setPeriods).catch((cause) => setError(message(cause, "No pudimos cargar los períodos."))), [api]);
+  const loadRequestID = useRef(0);
+
+  const load = useCallback(async () => {
+    const requestID = ++loadRequestID.current;
+    setLoading(true);
+    setError(undefined);
+    const search = new URLSearchParams({ limit: "30" });
+    if (query.trim()) search.set("query", query.trim());
+    if (stateFilter !== "all") search.set("state", stateFilter);
+    if (cursor) search.set("cursor", cursor);
+    try {
+      const response = await api.request<
+        FiscalYearListView | FiscalYearSummaryView[]
+      >(`/api/v1/accounting/fiscal-years?${search}`, {
+        skipJSONContentType: true,
+      });
+      const normalized = normalizeFiscalYearList(response);
+      if (requestID !== loadRequestID.current) return;
+      setFiscalYears(normalized.items);
+      setPage(normalized.page);
+    } catch (cause) {
+      if (requestID !== loadRequestID.current) return;
+      setError(
+        fiscalYearErrorMessage(
+          cause,
+          "No pudimos cargar los ejercicios contables.",
+        ),
+      );
+    } finally {
+      if (requestID === loadRequestID.current) setLoading(false);
+    }
+  }, [api, cursor, query, stateFilter]);
+
   useEffect(() => void load(), [load]);
+
   useEffect(() => {
-    if (!canManage) setShowCreate(false);
+    const controller = new AbortController();
+    setSettingsStatus("loading");
+    setSettingsError(undefined);
+    api
+      .request<AccountingSettingsView>("/api/v1/accounting/settings", {
+        signal: controller.signal,
+        skipJSONContentType: true,
+      })
+      .then((value) => {
+        if (controller.signal.aborted) return;
+        const normalizedMonth = validMonth(value.fiscal_year_start_month)
+          ? value.fiscal_year_start_month
+          : 1;
+        setSettings((current) => ({
+          ...current,
+          ...value,
+          fiscal_year_start_month: normalizedMonth,
+        }));
+        setCalendarStartMonth(normalizedMonth);
+        setSettingsStatus("ready");
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setSettingsStatus("error");
+        setSettingsError(
+          "No pudimos cargar la configuración del calendario fiscal. Las altas y los cambios de calendario quedan deshabilitados hasta recargar.",
+        );
+        setShowCreate(false);
+        setShowCalendarSettings(false);
+      });
+    return () => controller.abort();
+  }, [api]);
+
+  function resetFiscalYearPagination() {
+    loadRequestID.current += 1;
+    setCursor(undefined);
+    setCursorTrail([]);
+  }
+
+  function changeFiscalYearQuery(value: string) {
+    if (value === query && !cursor) return;
+    resetFiscalYearPagination();
+    setQuery(value);
+  }
+
+  function changeFiscalYearState(value: FiscalYearFilter) {
+    if (value === stateFilter && !cursor) return;
+    resetFiscalYearPagination();
+    setStateFilter(value);
+  }
+
+  useEffect(() => {
+    if (!canManage) {
+      setShowCreate(false);
+      setShowCalendarSettings(false);
+      setTransitionDialog(undefined);
+      setAnnualDialog(undefined);
+    }
   }, [canManage]);
 
-  async function createPeriod(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    setBusy("create");
+  async function loadDetail(id: string, force = false) {
+    if (details[id] && !force) return details[id];
+    setDetailBusyID(id);
     setError(undefined);
     try {
-      await api.request<Period>("/api/v1/accounting/periods", {
-        method: "POST",
-        headers: { "Idempotency-Key": createIdempotencyKey("period-create") },
-        body: JSON.stringify({
-          start_date: form.get("start_date"),
-          end_date: form.get("end_date"),
-        }),
-      });
-      setShowCreate(false);
-      await load();
+      const response = await api.request<FiscalYearDetailView>(
+        `/api/v1/accounting/fiscal-years/${id}`,
+        { skipJSONContentType: true },
+      );
+      const detail = normalizeFiscalYearDetail(response);
+      setDetails((current) => ({ ...current, [id]: detail }));
+      return detail;
     } catch (cause) {
-      setError(message(cause, "No pudimos crear el período."));
+      setError(
+        fiscalYearErrorMessage(
+          cause,
+          "No pudimos abrir el ejercicio contable.",
+        ),
+      );
+      return undefined;
+    } finally {
+      setDetailBusyID(undefined);
+    }
+  }
+
+  async function openDrawer(id: string) {
+    const detail = await loadDetail(id);
+    if (detail) setDrawerYearID(id);
+  }
+
+  async function togglePeriods(id: string) {
+    if (expandedID === id) {
+      setExpandedID(undefined);
+      return;
+    }
+    setExpandedID(id);
+    await loadDetail(id);
+  }
+
+  async function createFiscalYear(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (settingsStatus !== "ready") return;
+    const numericYear = Number(startYear);
+    if (!Number.isInteger(numericYear) || numericYear < 1900 || numericYear > 9998) {
+      setError("Ingresá un año válido para iniciar el ejercicio.");
+      return;
+    }
+    setBusy("create");
+    setError(undefined);
+    setNotice(undefined);
+    try {
+      const created = await api.request<FiscalYearDetailView>(
+        "/api/v1/accounting/fiscal-years",
+        {
+          method: "POST",
+          headers: {
+            "Idempotency-Key": createIdempotencyKey("fiscal-year-create"),
+          },
+          body: JSON.stringify({ start_year: numericYear }),
+        },
+      );
+      setShowCreate(false);
+      setNotice("El ejercicio y sus doce períodos quedaron preparados.");
+      await load();
+      const detail = normalizeFiscalYearDetail(created);
+      setDetails((current) => ({ ...current, [detail.id]: detail }));
+      setExpandedID(detail.id);
+    } catch (cause) {
+      setError(
+        fiscalYearErrorMessage(cause, "No pudimos crear el ejercicio."),
+      );
     } finally {
       setBusy(undefined);
     }
   }
 
-  async function transition(period: Period, desired_state: Period["state"]) {
-    const reason = window.prompt("Motivo del cambio de estado");
-    if (!reason?.trim()) return;
-    setBusy(period.id);
+  async function updateFiscalCalendar(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (
+      settingsStatus !== "ready" ||
+      !validMonth(calendarStartMonth) ||
+      settings.can_change_fiscal_year_start === false
+    ) {
+      return;
+    }
+    setBusy("calendar");
+    setError(undefined);
+    setNotice(undefined);
     try {
-      await api.request<Period>(`/api/v1/accounting/periods/${period.id}/transition`, { method: "POST", headers: { "Idempotency-Key": createIdempotencyKey("period") }, body: JSON.stringify({ desired_state, version: period.version, reason: reason.trim() }) });
+      const updated = await api.request<AccountingSettingsView>(
+        "/api/v1/accounting/settings/fiscal-calendar",
+        {
+          method: "PUT",
+          headers: {
+            "Idempotency-Key": createIdempotencyKey("fiscal-calendar"),
+          },
+          body: JSON.stringify({
+            fiscal_year_start_month: calendarStartMonth,
+            version: settings.version ?? 1,
+          }),
+        },
+      );
+      setSettings(updated);
+      setCalendarStartMonth(
+        validMonth(updated.fiscal_year_start_month)
+          ? updated.fiscal_year_start_month
+          : calendarStartMonth,
+      );
+      setShowCalendarSettings(false);
+      setExpandedID(undefined);
+      setDrawerYearID(undefined);
+      setDetails({});
+      setNotice(
+        "El calendario fiscal vacío fue regenerado con el nuevo mes de inicio.",
+      );
       await load();
-    } catch (cause) { setError(message(cause, "No pudimos cambiar el período.")); }
-    finally { setBusy(undefined); }
+    } catch (cause) {
+      setError(
+        fiscalYearErrorMessage(
+          cause,
+          "No pudimos cambiar el inicio del ejercicio.",
+        ),
+      );
+    } finally {
+      setBusy(undefined);
+    }
   }
 
-  async function createAnnualDraft(period: Period) {
-    setBusy(`annual-${period.id}`);
+  async function confirmTransition() {
+    if (!transitionDialog || !dialogReason.trim()) return;
+    const targetID =
+      transitionDialog.kind === "period"
+        ? transitionDialog.period.id
+        : transitionDialog.fiscalYear.id;
+    setBusy(`transition-${targetID}`);
+    setDialogError(undefined);
     setError(undefined);
     try {
-      setAnnualDraft(
-        await api.request<Draft>(
-          `/api/v1/accounting/periods/${period.id}/annual-close-draft`,
+      if (transitionDialog.kind === "period") {
+        await api.request<Period>(
+          `/api/v1/accounting/periods/${transitionDialog.period.id}/transition`,
           {
             method: "POST",
             headers: {
-              "Idempotency-Key": createIdempotencyKey("annual-close"),
+              "Idempotency-Key": createIdempotencyKey("period-transition"),
             },
             body: JSON.stringify({
-              version: period.version,
+              desired_state: transitionDialog.desiredState,
+              version: transitionDialog.period.version,
+              reason: dialogReason.trim(),
             }),
           },
+        );
+      } else {
+        await api.request<FiscalYearDetailView>(
+          `/api/v1/accounting/fiscal-years/${transitionDialog.fiscalYear.id}/reopen`,
+          {
+            method: "POST",
+            headers: {
+              "Idempotency-Key": createIdempotencyKey("fiscal-year-reopen"),
+            },
+            body: JSON.stringify({
+              version: transitionDialog.fiscalYear.version,
+              reason: dialogReason.trim(),
+            }),
+          },
+        );
+      }
+      const fiscalYear = transitionDialog.fiscalYear;
+      setTransitionDialog(undefined);
+      setDialogReason("");
+      setNotice(
+        transitionDialog.kind === "period"
+          ? "El período cambió de estado y el historial fue actualizado."
+          : "El ejercicio fue reabierto mediante una reversa auditada.",
+      );
+      await Promise.all([load(), loadDetail(fiscalYear.id, true)]);
+    } catch (cause) {
+      setDialogError(
+        fiscalYearErrorMessage(
+          cause,
+          "No pudimos completar el cambio de estado.",
         ),
       );
-    } catch (cause) {
-      setError(message(cause, "No pudimos preparar el cierre anual."));
     } finally {
       setBusy(undefined);
     }
   }
 
+  async function createAnnualDraft() {
+    if (!annualDialog) return;
+    setBusy(`annual-${annualDialog.id}`);
+    setDialogError(undefined);
+    setError(undefined);
+    try {
+      const response = await api.request<
+        Draft | FiscalYearAnnualCloseResultView
+      >(
+        `/api/v1/accounting/fiscal-years/${annualDialog.id}/annual-close-draft`,
+        {
+          method: "POST",
+          headers: {
+            "Idempotency-Key": createIdempotencyKey("annual-close"),
+          },
+          body: JSON.stringify({ version: annualDialog.version }),
+        },
+      );
+      const draft = isAnnualCloseResult(response)
+        ? response.draft ?? undefined
+        : response;
+      setAnnualDraft(draft);
+      setAnnualDialog(undefined);
+      setNotice(
+        draft
+          ? "El borrador de cierre anual quedó disponible en el Diario."
+          : "El ejercicio no tiene saldos temporales: no se requiere asiento de cierre.",
+      );
+      await Promise.all([load(), loadDetail(annualDialog.id, true)]);
+    } catch (cause) {
+      setDialogError(
+        fiscalYearErrorMessage(
+          cause,
+          "No pudimos preparar el cierre anual.",
+        ),
+      );
+    } finally {
+      setBusy(undefined);
+    }
+  }
+
+  const fiscalYearStartMonth = validMonth(settings.fiscal_year_start_month)
+    ? settings.fiscal_year_start_month
+    : 1;
+  const preview = fiscalYearPreview(Number(startYear), fiscalYearStartMonth);
+  const drawerYear = drawerYearID ? details[drawerYearID] : undefined;
+
   return (
-    <section className="directory-section">
-      <div className="finance-callout finance-callout--close">
-        <div><small>Control contable</small><strong>Cerrar es verificar</strong></div>
-        <p>El checklist reúne fiscales pendientes, mappings, cotizaciones y bancos sin conciliar. Cada reapertura exige un motivo y queda auditada.</p>
-        {canManage ? <button className="directory-create-button" onClick={() => setShowCreate((value) => !value)} type="button">Nuevo período</button> : null}
-      </div>
+    <section className="directory-section fiscal-years-panel">
+      <header className="fiscal-years-heading">
+        <div>
+          <span>CALENDARIO CONTABLE</span>
+          <h2>Ejercicios y períodos contables</h2>
+          <p>
+            Cerrá cada mes en orden y conservá una traza verificable de cada
+            bloqueo y reapertura.
+          </p>
+        </div>
+        <div className="fiscal-years-heading__calendar">
+          <small>
+            Inicio fiscal ·{" "}
+            {settingsStatus === "ready"
+              ? monthLongLabel(fiscalYearStartMonth)
+              : "No disponible"}
+          </small>
+          {canManage &&
+          settingsStatus === "ready" &&
+          settings.can_change_fiscal_year_start !== false ? (
+            <button
+              aria-expanded={showCalendarSettings}
+              onClick={() =>
+                setShowCalendarSettings((current) => !current)
+              }
+              type="button"
+            >
+              Configurar
+            </button>
+          ) : null}
+        </div>
+      </header>
+
       {!canManage ? <ReadOnlyNote /> : null}
-      {canManage && showCreate ? (
-        <form className="finance-form" onSubmit={(event) => void createPeriod(event)}>
-          <label>Inicio<input name="start_date" required type="date" /></label>
-          <label>Fin<input name="end_date" required type="date" /></label>
-          <button className="directory-create-button" disabled={busy === "create"} type="submit">Crear período</button>
-        </form>
-      ) : null}
-      <InlineFeedback error={error} />
-      {annualDraft ? (
-        <div className="finance-work-result">
-          <span>Cierre anual preparado</span>
-          <strong>{annualDraft.description}</strong>
-          <small>Borrador {annualDraft.id.slice(0, 8)} · Debe {formatMoney(annualDraft.total_debit, annualDraft.currency)} / Haber {formatMoney(annualDraft.total_credit, annualDraft.currency)}</small>
+      {settingsError ? (
+        <div className="inline-state inline-state--error" role="alert">
+          {settingsError}
         </div>
       ) : null}
-      <div className="period-grid">
-        {periods.map((period) => (
-          <article className="period-card" key={period.id}>
-            <header>
-              <span>{formatDate(period.start_date)} — {formatDate(period.end_date)}</span>
-              <span className={`status-pill status-pill--${period.state}`}>{periodState(period.state)}</span>
-            </header>
-            <ul>
-              {(period.checklist ?? []).map((check) => (
-                <li className={check.clear ? "is-clear" : ""} key={check.code}>
-                  <span>{check.clear ? "✓" : "!"}</span>
-                  {checklistLabel(check.code)}
-                  {check.count ? <strong>{check.count}</strong> : null}
+
+      {canManage && settingsStatus === "ready" && showCalendarSettings ? (
+        <form
+          className="fiscal-calendar-settings"
+          onSubmit={(event) => void updateFiscalCalendar(event)}
+        >
+          <div>
+            <strong>Mes de inicio fiscal</strong>
+            <span>
+              Sólo puede cambiarse mientras el calendario no tenga actividad
+              contable.
+            </span>
+          </div>
+          <label>
+            Mes
+            <select
+              onChange={(event) =>
+                setCalendarStartMonth(Number(event.target.value))
+              }
+              value={calendarStartMonth}
+            >
+              {Array.from({ length: 12 }, (_, index) => index + 1).map(
+                (month) => (
+                  <option key={month} value={month}>
+                    {monthLongLabel(month)}
+                  </option>
+                ),
+              )}
+            </select>
+          </label>
+          <div>
+            <button
+              disabled={busy === "calendar"}
+              onClick={() => setShowCalendarSettings(false)}
+              type="button"
+            >
+              Cancelar
+            </button>
+            <button
+              className="directory-create-button"
+              disabled={
+                busy === "calendar" ||
+                calendarStartMonth === fiscalYearStartMonth
+              }
+              type="submit"
+            >
+              {busy === "calendar" ? "Guardando…" : "Guardar calendario"}
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      <div className="fiscal-years-toolbar">
+        <div className="fiscal-years-toolbar__create">
+          {canManage ? (
+            <button
+              aria-expanded={showCreate}
+              className="directory-create-button"
+              disabled={settingsStatus !== "ready"}
+              onClick={() => setShowCreate((value) => !value)}
+              title={
+                settingsStatus === "error"
+                  ? "Recargá la página para recuperar la configuración fiscal."
+                  : undefined
+              }
+              type="button"
+            >
+              + Nuevo ejercicio
+            </button>
+          ) : null}
+          <span>{page.total} ejercicios</span>
+        </div>
+        <div className="fiscal-years-toolbar__filters">
+          <SectionSearch
+            label="Buscar ejercicios"
+            onChange={changeFiscalYearQuery}
+            placeholder="Buscar por código o fecha…"
+            value={query}
+          />
+          <div
+            aria-label="Filtrar ejercicios por estado"
+            className="account-filter-tabs fiscal-year-state-tabs"
+            role="group"
+          >
+            {(
+              [
+                ["all", "Todos"],
+                ["open", "Abiertos"],
+                ["closing", "En cierre"],
+                ["closed", "Cerrados"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                aria-pressed={stateFilter === value}
+                className={stateFilter === value ? "is-active" : ""}
+                key={value}
+                onClick={() => changeFiscalYearState(value)}
+                type="button"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {canManage && settingsStatus === "ready" && showCreate ? (
+        <form
+          className="fiscal-year-create-panel"
+          onSubmit={(event) => void createFiscalYear(event)}
+        >
+          <header>
+            <div>
+              <small>NUEVO EJERCICIO</small>
+              <h3>Preparar doce períodos mensuales</h3>
+            </div>
+            <button
+              aria-label="Cerrar alta de ejercicio"
+              onClick={() => setShowCreate(false)}
+              type="button"
+            >
+              ×
+            </button>
+          </header>
+          <div className="fiscal-year-create-panel__body">
+            <label>
+              Año de inicio
+              <input
+                inputMode="numeric"
+                max="9998"
+                min="1900"
+                onChange={(event) => setStartYear(event.target.value)}
+                required
+                type="number"
+                value={startYear}
+              />
+            </label>
+            <div className="fiscal-year-preview">
+              <span>
+                {preview.code}
+                <small>
+                  {formatDate(preview.startDate)} —{" "}
+                  {formatDate(preview.endDate)}
+                </small>
+              </span>
+              <div aria-label="Vista previa de los doce períodos">
+                {preview.periods.map((period) => (
+                  <span key={period.startDate}>
+                    <strong>{period.shortLabel}</strong>
+                    <small>{period.year}</small>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+          <footer>
+            <p>
+              Los períodos se crearán contiguos y no podrán superponerse con
+              otro ejercicio.
+            </p>
+            <div>
+              <button onClick={() => setShowCreate(false)} type="button">
+                Cancelar
+              </button>
+              <button
+                className="directory-create-button"
+                disabled={busy === "create" || preview.periods.length !== 12}
+                type="submit"
+              >
+                {busy === "create" ? "Creando…" : "Crear ejercicio"}
+              </button>
+            </div>
+          </footer>
+        </form>
+      ) : null}
+
+      <InlineFeedback error={error} loading={loading} />
+      {notice ? (
+        <div className="inline-state inline-state--success" role="status">
+          {notice}
+        </div>
+      ) : null}
+      {annualDraft ? (
+        <div className="finance-work-result fiscal-year-work-result">
+          <span>Cierre anual preparado</span>
+          <strong>{annualDraft.description || "Borrador de cierre anual"}</strong>
+          <small>
+            Debe {formatMoney(annualDraft.total_debit, annualDraft.currency)} ·
+            Haber {formatMoney(annualDraft.total_credit, annualDraft.currency)}
+          </small>
+          <NavLink to={`/accounting/journal?draft_id=${annualDraft.id}`}>
+            Abrir en Diario
+          </NavLink>
+        </div>
+      ) : null}
+
+      <div className="directory-table-wrap fiscal-years-table-wrap">
+        <table className="directory-table finance-table fiscal-years-table">
+          <thead>
+            <tr>
+              <th>Ejercicio</th>
+              <th>Fechas</th>
+              <th>Estado</th>
+              <th>Períodos</th>
+              <th>Cierre anual</th>
+              <th>Calendario</th>
+            </tr>
+          </thead>
+          <tbody>
+            {fiscalYears.map((fiscalYear) => {
+              const expanded = expandedID === fiscalYear.id;
+              const detail = details[fiscalYear.id];
+              return (
+                <Fragment key={fiscalYear.id}>
+                  <tr
+                    aria-label={`Abrir ejercicio ${fiscalYear.code}`}
+                    className="fiscal-year-row"
+                    onClick={() => void openDrawer(fiscalYear.id)}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) {
+                        return;
+                      }
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        void openDrawer(fiscalYear.id);
+                      }
+                    }}
+                    tabIndex={0}
+                  >
+                    <td>
+                      <div className="fiscal-year-identity">
+                        <button
+                          aria-controls={`fiscal-year-periods-${fiscalYear.id}`}
+                          aria-expanded={expanded}
+                          aria-label={`${expanded ? "Contraer" : "Desplegar"} períodos de ${fiscalYear.code}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void togglePeriods(fiscalYear.id);
+                          }}
+                          onKeyDown={(event) => event.stopPropagation()}
+                          type="button"
+                        >
+                          <ChevronRightIcon />
+                        </button>
+                        <span>
+                          <strong>{fiscalYear.code}</strong>
+                          {fiscalYear.is_legacy ? (
+                            <small className="fiscal-year-legacy-badge">
+                              Heredado
+                            </small>
+                          ) : null}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="fiscal-year-date-range">
+                        {formatDate(fiscalYear.start_date)}
+                        <small>{formatDate(fiscalYear.end_date)}</small>
+                      </span>
+                    </td>
+                    <td>
+                      <FiscalYearStateBadge state={fiscalYear.state} />
+                    </td>
+                    <td>
+                      <PeriodCountSummary counts={fiscalYear.period_counts} />
+                    </td>
+                    <td>
+                      <span className="fiscal-year-annual-status">
+                        {annualCloseLabel(fiscalYear.annual_close_status)}
+                      </span>
+                    </td>
+                    <td>
+                      <FiscalYearRail fiscalYear={fiscalYear} />
+                    </td>
+                  </tr>
+                  {expanded ? (
+                    <tr
+                      className="fiscal-year-expanded-row"
+                      id={`fiscal-year-periods-${fiscalYear.id}`}
+                    >
+                      <td colSpan={6}>
+                        {detailBusyID === fiscalYear.id && !detail ? (
+                          <span>Cargando períodos…</span>
+                        ) : detail ? (
+                          <FiscalYearPeriodStrip
+                            fiscalYear={detail}
+                            onOpen={() => setDrawerYearID(fiscalYear.id)}
+                          />
+                        ) : (
+                          <span>No pudimos cargar los períodos.</span>
+                        )}
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              );
+            })}
+            {!loading && fiscalYears.length === 0 ? (
+              <EmptyRow
+                columns={6}
+                text={
+                  query.trim() || stateFilter !== "all"
+                    ? "No hay ejercicios que coincidan."
+                    : "Todavía no hay ejercicios contables."
+                }
+              />
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+
+      <CursorPagination
+        currentPage={cursorTrail.length + 1}
+        hasNext={Boolean(page.next_cursor)}
+        hasPrevious={cursorTrail.length > 0}
+        onNext={() => {
+          if (!page.next_cursor) return;
+          setCursorTrail((current) => [...current, cursor ?? ""]);
+          setCursor(page.next_cursor ?? undefined);
+        }}
+        onPrevious={() => {
+          const previous = cursorTrail.at(-1) ?? "";
+          setCursorTrail((current) => current.slice(0, -1));
+          setCursor(previous || undefined);
+        }}
+        total={page.total}
+      />
+
+      {drawerYear ? (
+        <FiscalYearDrawer
+          canManage={canManage}
+          fiscalYear={drawerYear}
+          onAnnualClose={() => {
+            setDialogError(undefined);
+            setAnnualDialog(drawerYear);
+          }}
+          onClose={() => setDrawerYearID(undefined)}
+          onReopen={() => {
+            setDialogError(undefined);
+            setDialogReason("");
+            setTransitionDialog({
+              kind: "fiscal-year",
+              fiscalYear: drawerYear,
+            });
+          }}
+          onTransition={(period, desiredState) => {
+            setDialogError(undefined);
+            setDialogReason("");
+            setTransitionDialog({
+              kind: "period",
+              fiscalYear: drawerYear,
+              period,
+              desiredState,
+            });
+          }}
+        />
+      ) : null}
+
+      {transitionDialog ? (
+        <FiscalYearTransitionModal
+          busy={busy === `transition-${
+            transitionDialog.kind === "period"
+              ? transitionDialog.period.id
+              : transitionDialog.fiscalYear.id
+          }`}
+          dialog={transitionDialog}
+          error={dialogError}
+          onClose={() => {
+            if (busy) return;
+            setTransitionDialog(undefined);
+            setDialogReason("");
+            setDialogError(undefined);
+          }}
+          onConfirm={() => void confirmTransition()}
+          onReasonChange={setDialogReason}
+          reason={dialogReason}
+        />
+      ) : null}
+
+      {annualDialog ? (
+        <JournalModal
+          eyebrow="CIERRE ANUAL"
+          onClose={() => {
+            if (!busy) {
+              setAnnualDialog(undefined);
+              setDialogError(undefined);
+            }
+          }}
+          title={`Preparar cierre ${annualDialog.code}`}
+        >
+          <p>
+            Se generará un borrador revisable en el Diario. El ejercicio no
+            quedará bloqueado hasta que el asiento sea contabilizado.
+          </p>
+          <div className="fiscal-year-dialog-summary">
+            <span>
+              Ejercicio
+              <strong>{annualDialog.code}</strong>
+            </span>
+            <span>
+              Período
+              <strong>
+                {formatDate(annualDialog.start_date)} —{" "}
+                {formatDate(annualDialog.end_date)}
+              </strong>
+            </span>
+            <span>
+              Estado
+              <strong>{fiscalYearStateLabel(annualDialog.state)}</strong>
+            </span>
+          </div>
+          {dialogError ? (
+            <div className="inline-state inline-state--error" role="alert">
+              {dialogError}
+            </div>
+          ) : null}
+          <p className="journal-modal__warning">
+            Revisá que los primeros once períodos estén bloqueados y el último
+            se encuentre en cierre preliminar.
+          </p>
+          <div className="journal-modal__actions">
+            <button
+              disabled={Boolean(busy)}
+              onClick={() => setAnnualDialog(undefined)}
+              type="button"
+            >
+              Cancelar
+            </button>
+            <button
+              className="directory-create-button"
+              disabled={Boolean(busy)}
+              onClick={() => void createAnnualDraft()}
+              type="button"
+            >
+              {busy ? "Preparando…" : "Generar borrador"}
+            </button>
+          </div>
+        </JournalModal>
+      ) : null}
+    </section>
+  );
+}
+
+function FiscalYearStateBadge({ state }: { state: FiscalYearState }) {
+  return (
+    <span className={`fiscal-year-state is-${state}`}>
+      {fiscalYearStateLabel(state)}
+    </span>
+  );
+}
+
+function PeriodCountSummary({
+  counts,
+}: {
+  counts: FiscalYearSummaryView["period_counts"];
+}) {
+  return (
+    <span
+      aria-label={`${counts.locked} bloqueados, ${counts.soft_closed} en cierre y ${counts.open} abiertos`}
+      className="fiscal-year-period-counts"
+    >
+      <span className="is-locked">{counts.locked} B</span>
+      <span className="is-closing">{counts.soft_closed} C</span>
+      <span className="is-open">{counts.open} A</span>
+    </span>
+  );
+}
+
+function FiscalYearRail({
+  fiscalYear,
+}: {
+  fiscalYear: FiscalYearSummaryView;
+}) {
+  const states = fiscalYearRailStates(fiscalYear);
+  return (
+    <span
+      aria-label={`${
+        fiscalYear.is_legacy ? "Calendario heredado" : "Calendario"
+      } del ejercicio ${fiscalYear.code}: ${fiscalYear.period_counts.locked} bloqueados, ${fiscalYear.period_counts.soft_closed} en cierre y ${fiscalYear.period_counts.open} abiertos`}
+      className={`fiscal-year-rail${fiscalYear.is_legacy ? " is-legacy" : ""}`}
+      role="img"
+    >
+      {states.map((state, index) => (
+        <i
+          className={`is-${state}`}
+          key={`${fiscalYear.id}-${index}`}
+          title={
+            fiscalYear.is_legacy
+              ? `Período heredado: ${periodStateLabel(state)}`
+              : `${monthShortLabel(
+                  ((Number(fiscalYear.start_date.slice(5, 7)) - 1 + index) %
+                    12) +
+                    1,
+                )}: ${periodStateLabel(state)}`
+          }
+        />
+      ))}
+    </span>
+  );
+}
+
+function FiscalYearPeriodStrip({
+  fiscalYear,
+  onOpen,
+}: {
+  fiscalYear: FiscalYearDetailView;
+  onOpen: () => void;
+}) {
+  return (
+    <div className="fiscal-year-period-strip">
+      <div>
+        <strong>
+          {fiscalYear.is_legacy ? "Período heredado" : "Doce períodos"}
+        </strong>
+        <span>
+          {fiscalYear.is_legacy
+            ? "Conserva su rango original y toda la historia contable asociada."
+            : "Seleccioná el ejercicio para revisar controles e historial."}
+        </span>
+      </div>
+      <ol>
+        {fiscalYear.periods.map((period) => {
+          const checklist = periodChecklistState(period);
+          return (
+            <li className={`is-${period.state}`} key={period.id}>
+              <button
+                aria-label={`Abrir ${monthYearLabel(period.start_date)}`}
+                onClick={onOpen}
+                type="button"
+              >
+                <span>{monthShortFromDate(period.start_date)}</span>
+                <small>{period.start_date.slice(0, 4)}</small>
+                <i className={`is-${checklist}`}>
+                  {periodChecklistStateLabel(checklist)}
+                </i>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+function FiscalYearDrawer({
+  canManage,
+  fiscalYear,
+  onAnnualClose,
+  onClose,
+  onReopen,
+  onTransition,
+}: {
+  canManage: boolean;
+  fiscalYear: FiscalYearDetailView;
+  onAnnualClose: () => void;
+  onClose: () => void;
+  onReopen: () => void;
+  onTransition: (
+    period: FiscalYearPeriodView,
+    desiredState: Period["state"],
+  ) => void;
+}) {
+  const drawer = useRef<HTMLElement>(null);
+  useDialogFocus(drawer, onClose);
+  const events = fiscalYear.recent_events ?? fiscalYear.events ?? [];
+  const canPrepareAnnualClose =
+    fiscalYear.capabilities?.can_prepare_annual_close ??
+    annualCloseCanBePrepared(fiscalYear);
+  const canReopen =
+    fiscalYear.capabilities?.can_reopen ?? fiscalYear.state === "closed";
+
+  return (
+    <div
+      className="finance-drawer-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <aside
+        aria-labelledby="fiscal-year-drawer-title"
+        aria-modal="true"
+        className="finance-drawer fiscal-year-drawer"
+        ref={drawer}
+        role="dialog"
+        tabIndex={-1}
+      >
+        <header>
+          <div>
+            <small>EJERCICIO CONTABLE</small>
+            <h2 id="fiscal-year-drawer-title">{fiscalYear.code}</h2>
+            <span>
+              {formatDate(fiscalYear.start_date)} —{" "}
+              {formatDate(fiscalYear.end_date)}
+            </span>
+          </div>
+          <button
+            aria-label="Cerrar ficha del ejercicio"
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </header>
+
+        <div className="finance-drawer__facts fiscal-year-drawer__facts">
+          <span>
+            Estado
+            <strong>
+              <FiscalYearStateBadge state={fiscalYear.state} />
+            </strong>
+          </span>
+          <span>
+            Períodos
+            <strong>{fiscalYear.periods.length}</strong>
+          </span>
+          <span>
+            Tipo
+            <strong>
+              {fiscalYear.is_legacy ? "Calendario heredado" : "Mensual"}
+            </strong>
+          </span>
+          <span>
+            Cierre anual
+            <strong>{annualCloseLabel(fiscalYear.annual_close_status)}</strong>
+          </span>
+          <span>
+            Versión
+            <strong>{fiscalYear.version}</strong>
+          </span>
+        </div>
+
+        <section className="fiscal-year-drawer__section">
+          <header>
+            <div>
+              <small>CALENDARIO</small>
+              <h3>
+                {fiscalYear.is_legacy
+                  ? "Período contable heredado"
+                  : "Períodos mensuales"}
+              </h3>
+            </div>
+            {canManage && canPrepareAnnualClose ? (
+              <button
+                className="directory-create-button"
+                onClick={onAnnualClose}
+                type="button"
+              >
+                Preparar cierre anual
+              </button>
+            ) : null}
+            {canManage && fiscalYear.state === "closed" && canReopen ? (
+              <button onClick={onReopen} type="button">
+                Reabrir ejercicio
+              </button>
+            ) : null}
+          </header>
+          {!canManage ? (
+            <p className="fiscal-year-drawer__note">
+              La consulta está habilitada; los cambios de estado requieren
+              gestión contable.
+            </p>
+          ) : null}
+          <div className="fiscal-year-period-list">
+            {fiscalYear.periods.map((period, index) => (
+              <FiscalYearPeriodRow
+                canManage={canManage}
+                index={index}
+                key={period.id}
+                onTransition={onTransition}
+                period={period}
+              />
+            ))}
+          </div>
+          {(fiscalYear.capabilities?.annual_close_blockers ??
+            fiscalYear.capabilities?.blockers)?.length ? (
+            <ul className="fiscal-year-blockers">
+              {(
+                fiscalYear.capabilities.annual_close_blockers ??
+                fiscalYear.capabilities.blockers ??
+                []
+              ).map((blocker) => (
+                  <li key={blocker}>{fiscalYearBlockerLabel(blocker)}</li>
+                ))}
+            </ul>
+          ) : null}
+          {fiscalYear.annual_closing_draft_id ? (
+            <NavLink
+              className="fiscal-year-journal-link"
+              to={`/accounting/journal?draft_id=${fiscalYear.annual_closing_draft_id}`}
+            >
+              Abrir borrador de cierre en Diario
+            </NavLink>
+          ) : null}
+          {fiscalYear.annual_closing_entry_id ? (
+            <NavLink
+              className="fiscal-year-journal-link"
+              to={`/accounting/journal?entry_id=${fiscalYear.annual_closing_entry_id}`}
+            >
+              Abrir asiento de cierre en Diario
+            </NavLink>
+          ) : null}
+        </section>
+
+        <section className="fiscal-year-drawer__section">
+          <header>
+            <div>
+              <small>AUDITORÍA</small>
+              <h3>Historial reciente</h3>
+            </div>
+          </header>
+          {events.length ? (
+            <ol className="fiscal-year-events">
+              {events.map((event) => (
+                <li key={event.id}>
+                  <i aria-hidden="true" />
+                  <div>
+                    <strong>
+                      {event.from_state ?? event.from_status
+                        ? `${periodStateLabel(
+                            event.from_state ?? event.from_status ?? "",
+                          )} → `
+                        : ""}
+                      {periodStateLabel(
+                        event.to_state ?? event.to_status ?? event.event_type ?? "",
+                      )}
+                    </strong>
+                    <span>
+                      {event.actor_name ||
+                        event.actor_email ||
+                        event.actor ||
+                        "Responsable contable"}{" "}
+                      · {formatDateTime(event.occurred_at)}
+                    </span>
+                    {event.reason ? <p>{event.reason}</p> : null}
+                  </div>
                 </li>
               ))}
-              {!period.checklist?.length ? <li className="is-clear"><span>✓</span>Sin observaciones</li> : null}
-            </ul>
-            {canManage ? (
-              <footer>
-                <button disabled={busy === `annual-${period.id}`} onClick={() => void createAnnualDraft(period)} type="button">Borrador anual</button>
-                {period.state === "open" ? (
-                  <button disabled={busy === period.id} onClick={() => void transition(period, "soft_closed")} type="button">Cierre preliminar</button>
-                ) : period.state === "soft_closed" ? (
-                  <>
-                    <button disabled={busy === period.id} onClick={() => void transition(period, "open")} type="button">Reabrir</button>
-                    <button className="is-primary" disabled={busy === period.id} onClick={() => void transition(period, "locked")} type="button">Bloquear</button>
-                  </>
-                ) : (
-                  <button disabled={busy === period.id} onClick={() => void transition(period, "soft_closed")} type="button">Reabrir con auditoría</button>
-                )}
-              </footer>
+            </ol>
+          ) : (
+            <div className="directory-empty fiscal-year-events-empty">
+              <strong>Sin cambios de estado registrados</strong>
+              <span>Las transiciones auditadas aparecerán en este historial.</span>
+            </div>
+          )}
+        </section>
+      </aside>
+    </div>
+  );
+}
+
+function FiscalYearPeriodRow({
+  canManage,
+  index,
+  onTransition,
+  period,
+}: {
+  canManage: boolean;
+  index: number;
+  onTransition: (
+    period: FiscalYearPeriodView,
+    desiredState: Period["state"],
+  ) => void;
+  period: FiscalYearPeriodView;
+}) {
+  const [showChecks, setShowChecks] = useState(false);
+  const checklistState = periodChecklistState(period);
+  const checks = periodChecklistItems(period);
+  const capabilities = period.capabilities;
+  const events = period.recent_events ?? [];
+  return (
+    <article className="fiscal-year-period-row">
+      <button
+        aria-expanded={showChecks}
+        aria-label={`${showChecks ? "Ocultar" : "Mostrar"} controles de ${monthYearLabel(period.start_date)}`}
+        className="fiscal-year-period-row__toggle"
+        onClick={() => setShowChecks((value) => !value)}
+        type="button"
+      >
+        <span>{String(index + 1).padStart(2, "0")}</span>
+        <div>
+          <strong>{monthYearLabel(period.start_date)}</strong>
+          <small>
+            {formatDate(period.start_date)} — {formatDate(period.end_date)}
+          </small>
+          {period.is_legacy ? (
+            <small className="fiscal-year-legacy-badge">Heredado</small>
+          ) : null}
+        </div>
+        <span className={`fiscal-year-check-state is-${checklistState}`}>
+          {periodChecklistStateLabel(checklistState)}
+        </span>
+        <span className={`fiscal-year-period-state is-${period.state}`}>
+          {periodState(period.state)}
+        </span>
+        <ChevronRightIcon />
+      </button>
+      {showChecks ? (
+        <div className="fiscal-year-period-row__detail">
+          <div className="fiscal-year-checklist">
+            {checks.map((check) => {
+              const state = checklistItemState(check);
+              const content = (
+                <>
+                  <i aria-hidden="true" />
+                  <span>{check.label || checklistLabel(check.code)}</span>
+                  {typeof check.count === "number" ? (
+                    <strong>{check.count}</strong>
+                  ) : null}
+                </>
+              );
+              return check.target_path ? (
+                <NavLink
+                  aria-label={`${check.label || checklistLabel(check.code)}: revisar`}
+                  className={`is-${state}`}
+                  key={check.code}
+                  to={check.target_path}
+                >
+                  {content}
+                  <b aria-hidden="true">→</b>
+                </NavLink>
+              ) : (
+                <span className={`is-${state}`} key={check.code}>
+                  {content}
+                </span>
+              );
+            })}
+            {!checks.length ? (
+              <span className="is-unevaluated">
+                <i aria-hidden="true" />
+                Checklist todavía sin evaluar
+              </span>
             ) : null}
-          </article>
-        ))}
+          </div>
+          {period.last_evaluated_at ?? period.close_readiness?.evaluated_at ? (
+            <small>
+              Última evaluación{" "}
+              {formatDateTime(
+                period.last_evaluated_at ??
+                  period.close_readiness?.evaluated_at ??
+                  "",
+              )}
+            </small>
+          ) : (
+            <small>Este período todavía no tiene una evaluación registrada.</small>
+          )}
+          {capabilities?.blockers?.length ? (
+            <ul className="fiscal-year-period-blockers">
+              {capabilities.blockers.map((blocker) => (
+                <li key={blocker}>{fiscalYearBlockerLabel(blocker)}</li>
+              ))}
+            </ul>
+          ) : null}
+          {events.length ? (
+            <div className="fiscal-year-period-history">
+              <strong>Historial de transiciones</strong>
+              <ol>
+                {events.map((event) => (
+                  <li key={event.id}>
+                    <span>
+                      {periodStateLabel(
+                        event.from_state ?? event.from_status ?? "",
+                      )}{" "}
+                      →{" "}
+                      {periodStateLabel(
+                        event.to_state ?? event.to_status ?? "",
+                      )}
+                    </span>
+                    <small>
+                      {event.actor ?? "Responsable contable"} ·{" "}
+                      {formatDateTime(event.occurred_at)}
+                    </small>
+                    {event.reason ? <p>{event.reason}</p> : null}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
+          {canManage ? (
+            <div className="fiscal-year-period-row__actions">
+              {period.state === "open" ? (
+                capabilities?.can_soft_close === false ? null : (
+                  <button
+                    onClick={() => onTransition(period, "soft_closed")}
+                    type="button"
+                  >
+                    Iniciar cierre preliminar
+                  </button>
+                )
+              ) : period.state === "soft_closed" ? (
+                <>
+                  {capabilities?.can_reopen_to_open === false ? null : (
+                    <button
+                      onClick={() => onTransition(period, "open")}
+                      type="button"
+                    >
+                      Reabrir
+                    </button>
+                  )}
+                  {capabilities?.can_lock === false ? null : (
+                    <button
+                      className="directory-create-button"
+                      onClick={() => onTransition(period, "locked")}
+                      type="button"
+                    >
+                      Bloquear período
+                    </button>
+                  )}
+                </>
+              ) : capabilities?.can_reopen_to_soft_closed === false ? null : (
+                <button
+                  onClick={() => onTransition(period, "soft_closed")}
+                  type="button"
+                >
+                  Reabrir a cierre preliminar
+                </button>
+              )}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function FiscalYearTransitionModal({
+  busy,
+  dialog,
+  error,
+  onClose,
+  onConfirm,
+  onReasonChange,
+  reason,
+}: {
+  busy: boolean;
+  dialog: FiscalYearTransitionDialog;
+  error?: string;
+  onClose: () => void;
+  onConfirm: () => void;
+  onReasonChange: (value: string) => void;
+  reason: string;
+}) {
+  const fiscalYear = dialog.fiscalYear;
+  const period = dialog.kind === "period" ? dialog.period : undefined;
+  const targetState =
+    dialog.kind === "period" ? dialog.desiredState : "soft_closed";
+  const title =
+    dialog.kind === "fiscal-year"
+      ? `Reabrir ejercicio ${fiscalYear.code}`
+      : periodTransitionTitle(dialog.period, dialog.desiredState);
+  return (
+    <JournalModal
+      eyebrow={dialog.kind === "fiscal-year" ? "REAPERTURA ANUAL" : "CAMBIO DE ESTADO"}
+      onClose={onClose}
+      title={title}
+    >
+      <p>
+        {dialog.kind === "fiscal-year"
+          ? "La reapertura creará una reversa exacta del cierre anual y conservará intacto el asiento original."
+          : periodTransitionDescription(dialog.period, dialog.desiredState)}
+      </p>
+      <div className="fiscal-year-dialog-summary">
+        <span>
+          Ejercicio
+          <strong>{fiscalYear.code}</strong>
+        </span>
+        <span>
+          Período
+          <strong>
+            {period
+              ? monthYearLabel(period.start_date)
+              : monthYearLabel(fiscalYear.end_date)}
+          </strong>
+        </span>
+        <span>
+          Estado resultante
+          <strong>{periodStateLabel(targetState)}</strong>
+        </span>
       </div>
-      {periods.length === 0 ? <div className="directory-empty"><strong>No hay períodos configurados</strong><span>Creá el primer período para habilitar los controles de cierre.</span></div> : null}
-    </section>
+      {period ? (
+        <span
+          className={`fiscal-year-check-state is-${periodChecklistState(period)}`}
+        >
+          Controles: {periodChecklistStateLabel(periodChecklistState(period))}
+        </span>
+      ) : null}
+      <label className="fiscal-year-dialog-reason">
+        Motivo
+        <textarea
+          autoFocus
+          onChange={(event) => onReasonChange(event.target.value)}
+          placeholder="Dejá una explicación clara para la auditoría."
+          required
+          value={reason}
+        />
+      </label>
+      {error ? (
+        <div className="inline-state inline-state--error" role="alert">
+          {error}
+        </div>
+      ) : null}
+      <p className="journal-modal__warning">
+        Los cierres avanzan en orden cronológico y las reaperturas en orden
+        inverso. El servidor volverá a validar la secuencia antes de aplicar el
+        cambio.
+      </p>
+      <div className="journal-modal__actions">
+        <button disabled={busy} onClick={onClose} type="button">
+          Cancelar
+        </button>
+        <button
+          className="directory-create-button"
+          disabled={busy || !reason.trim()}
+          onClick={onConfirm}
+          type="button"
+        >
+          {busy ? "Aplicando…" : "Confirmar cambio"}
+        </button>
+      </div>
+    </JournalModal>
   );
 }
 
@@ -6829,10 +8360,14 @@ function InflationPanel({ canManage }: { canManage: boolean }) {
 
   useEffect(() => {
     api
-      .request<Period[]>("/api/v1/accounting/periods")
+      .request<PeriodList>("/api/v1/accounting/periods?limit=200", {
+        skipJSONContentType: true,
+      })
       .then((value) => {
-        setPeriods(value);
-        setSelectedPeriodID((current) => current || value[0]?.id || "");
+        setPeriods(value.items);
+        setSelectedPeriodID(
+          (current) => current || value.items[0]?.id || "",
+        );
       })
       .catch((cause) =>
         setError(message(cause, "No pudimos cargar los períodos.")),
@@ -8058,6 +9593,488 @@ function periodState(value: Period["state"]) {
   return value === "open" ? "Abierto" : value === "soft_closed" ? "Cierre preliminar" : "Bloqueado";
 }
 
+function normalizeFiscalYearList(
+  value: FiscalYearListView | FiscalYearSummaryView[],
+): FiscalYearListView {
+  if (Array.isArray(value)) {
+    return {
+      items: value.map(normalizeFiscalYearSummary),
+      page: { total: value.length },
+    };
+  }
+  const items = Array.isArray(value?.items)
+    ? value.items.map(normalizeFiscalYearSummary)
+    : [];
+  return {
+    items,
+    page: value?.page ?? { total: items.length },
+  };
+}
+
+function isAnnualCloseResult(
+  value: Draft | FiscalYearAnnualCloseResultView,
+): value is FiscalYearAnnualCloseResultView {
+  return "fiscal_year" in value;
+}
+
+function normalizeFiscalYearSummary(
+  value: FiscalYearSummaryView,
+): FiscalYearSummaryView {
+  const raw = value as FiscalYearSummaryView & {
+    annual_close?: {
+      state?: AnnualCloseState;
+      draft_id?: string | null;
+      entry_id?: string | null;
+    };
+    annual_close_status?: AnnualCloseState | { state?: AnnualCloseState };
+    open_periods?: number;
+    soft_closed_periods?: number;
+    locked_periods?: number;
+  };
+  const periods = Array.isArray(raw.periods)
+    ? raw.periods.map(normalizeFiscalYearPeriod).sort(comparePeriods)
+    : undefined;
+  const counted = countPeriodStates(periods ?? []);
+  const periodCounts = {
+    open: numberOrZero(
+      raw.period_counts?.open ?? raw.open_periods ?? counted.open,
+    ),
+    soft_closed: numberOrZero(
+      raw.period_counts?.soft_closed ??
+        raw.soft_closed_periods ??
+        counted.soft_closed,
+    ),
+    locked: numberOrZero(
+      raw.period_counts?.locked ?? raw.locked_periods ?? counted.locked,
+    ),
+  };
+  const annualStatusValue = (
+    value as unknown as { annual_close_status?: unknown }
+  ).annual_close_status;
+  const annualStatus =
+    typeof annualStatusValue === "string"
+      ? annualStatusValue
+      : annualCloseStateFromUnknown(annualStatusValue) ??
+        raw.annual_close?.state ??
+        "not_started";
+  const state = isFiscalYearState(raw.state)
+    ? raw.state
+    : deriveFiscalYearState(periodCounts, annualStatus);
+  return {
+    ...raw,
+    state,
+    period_counts: periodCounts,
+    annual_close_status: annualStatus,
+    annual_closing_draft_id:
+      raw.annual_closing_draft_id ?? raw.annual_close?.draft_id ?? null,
+    annual_closing_entry_id:
+      raw.annual_closing_entry_id ?? raw.annual_close?.entry_id ?? null,
+    periods,
+  };
+}
+
+function normalizeFiscalYearDetail(
+  value: FiscalYearDetailView,
+): FiscalYearDetailView {
+  const summary = normalizeFiscalYearSummary(value);
+  const raw = value as FiscalYearDetailView & {
+    period_events?: FiscalYearEventView[];
+  };
+  return {
+    ...summary,
+    periods: (summary.periods ?? []).sort(comparePeriods),
+    recent_events: Array.isArray(raw.recent_events)
+      ? raw.recent_events
+      : Array.isArray(raw.events)
+        ? raw.events
+        : Array.isArray(raw.period_events)
+          ? raw.period_events
+          : [],
+  };
+}
+
+function normalizeFiscalYearPeriod(
+  period: FiscalYearPeriodView,
+): FiscalYearPeriodView {
+  return {
+    ...period,
+    checklist: Array.isArray(period.checklist)
+      ? period.checklist.map((check) => ({ ...check }))
+      : [],
+  };
+}
+
+function comparePeriods(
+  left: FiscalYearPeriodView,
+  right: FiscalYearPeriodView,
+) {
+  return (
+    left.start_date.localeCompare(right.start_date) ||
+    left.id.localeCompare(right.id)
+  );
+}
+
+function countPeriodStates(periods: FiscalYearPeriodView[]) {
+  return periods.reduce(
+    (counts, period) => {
+      counts[period.state] += 1;
+      return counts;
+    },
+    { open: 0, soft_closed: 0, locked: 0 },
+  );
+}
+
+function numberOrZero(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.trunc(value)
+    : 0;
+}
+
+function isFiscalYearState(value: unknown): value is FiscalYearState {
+  return value === "open" || value === "closing" || value === "closed";
+}
+
+function annualCloseStateFromUnknown(value: unknown) {
+  if (!value || typeof value !== "object" || !("state" in value)) {
+    return undefined;
+  }
+  const state = value.state;
+  return typeof state === "string" ? state : undefined;
+}
+
+function deriveFiscalYearState(
+  counts: FiscalYearSummaryView["period_counts"],
+  annualStatus: AnnualCloseState,
+): FiscalYearState {
+  if (counts.open > 0) return "open";
+  if (
+    counts.locked >= 12 &&
+    (annualStatus === "posted" || annualStatus === "not_required")
+  ) {
+    return "closed";
+  }
+  return "closing";
+}
+
+function fiscalYearStateLabel(state: FiscalYearState) {
+  return state === "open"
+    ? "Abierto"
+    : state === "closing"
+      ? "En cierre"
+      : "Cerrado";
+}
+
+function annualCloseLabel(state: AnnualCloseState) {
+  return {
+    not_ready: "Todavía no disponible",
+    ready: "Listo para preparar",
+    not_started: "Pendiente",
+    preparing: "En preparación",
+    draft: "Borrador preparado",
+    posted: "Contabilizado",
+    not_required: "No requerido",
+    reversed: "Revertido",
+    failed: "Con errores",
+    cancelled: "Cancelado",
+  }[state] ?? "Estado no disponible";
+}
+
+function validMonth(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= 12
+  );
+}
+
+function fiscalYearPreview(startYear: number, startMonth: number) {
+  if (
+    !Number.isInteger(startYear) ||
+    startYear < 1900 ||
+    startYear > 9998 ||
+    !validMonth(startMonth)
+  ) {
+    return {
+      code: "—",
+      startDate: "",
+      endDate: "",
+      periods: [] as Array<{
+        startDate: string;
+        endDate: string;
+        shortLabel: string;
+        year: number;
+      }>,
+    };
+  }
+  const periods = Array.from({ length: 12 }, (_, index) => {
+    const start = new Date(Date.UTC(startYear, startMonth - 1 + index, 1));
+    const end = new Date(
+      Date.UTC(
+        start.getUTCFullYear(),
+        start.getUTCMonth() + 1,
+        0,
+      ),
+    );
+    return {
+      startDate: isoDate(start),
+      endDate: isoDate(end),
+      shortLabel: monthShortLabel(start.getUTCMonth() + 1),
+      year: start.getUTCFullYear(),
+    };
+  });
+  return {
+    code:
+      startMonth === 1 ? String(startYear) : `${startYear}/${startYear + 1}`,
+    startDate: periods[0]?.startDate ?? "",
+    endDate: periods.at(-1)?.endDate ?? "",
+    periods,
+  };
+}
+
+function isoDate(value: Date) {
+  return [
+    String(value.getUTCFullYear()).padStart(4, "0"),
+    String(value.getUTCMonth() + 1).padStart(2, "0"),
+    String(value.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function monthShortLabel(month: number) {
+  const value = new Date(Date.UTC(2024, month - 1, 1));
+  return new Intl.DateTimeFormat("es-AR", {
+    month: "short",
+    timeZone: "UTC",
+  })
+    .format(value)
+    .replace(".", "")
+    .toUpperCase();
+}
+
+function monthLongLabel(month: number) {
+  const value = new Date(Date.UTC(2024, month - 1, 1));
+  return new Intl.DateTimeFormat("es-AR", {
+    month: "long",
+    timeZone: "UTC",
+  }).format(value);
+}
+
+function monthShortFromDate(value: string) {
+  const month = Number(value.slice(5, 7));
+  return validMonth(month) ? monthShortLabel(month) : value;
+}
+
+function monthYearLabel(value: string) {
+  const [year, month] = value.slice(0, 7).split("-").map(Number);
+  if (!Number.isInteger(year) || !validMonth(month)) return value;
+  const label = monthLongLabel(month);
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)} ${year}`;
+}
+
+function fiscalYearRailStates(fiscalYear: FiscalYearSummaryView) {
+  if (fiscalYear.periods?.length) {
+    return [...fiscalYear.periods]
+      .sort(comparePeriods)
+      .slice(0, fiscalYear.is_legacy ? fiscalYear.periods.length : 12)
+      .map((period) => period.state);
+  }
+  const states: Array<Period["state"] | "unconfigured"> = [
+    ...Array(fiscalYear.period_counts.locked).fill("locked"),
+    ...Array(fiscalYear.period_counts.soft_closed).fill("soft_closed"),
+    ...Array(fiscalYear.period_counts.open).fill("open"),
+  ];
+  if (fiscalYear.is_legacy) {
+    return states.length ? states : ["unconfigured"];
+  }
+  while (states.length < 12) states.push("unconfigured");
+  return states.slice(0, 12);
+}
+
+function periodStateLabel(value: string) {
+  return (
+    {
+      open: "Abierto",
+      soft_closed: "Cierre preliminar",
+      locked: "Bloqueado",
+      closing: "En cierre",
+      closed: "Cerrado",
+      unconfigured: "Sin configurar",
+      not_ready: "Cierre anual no disponible",
+      ready: "Cierre anual listo",
+      not_started: "Cierre anual pendiente",
+      preparing: "Cierre anual en preparación",
+      draft: "Borrador de cierre preparado",
+      posted: "Cierre anual contabilizado",
+      not_required: "Cierre anual no requerido",
+      reversed: "Cierre anual revertido",
+      fiscal_year_created: "Ejercicio creado",
+      fiscal_year_reopened: "Ejercicio reabierto",
+      annual_close_draft: "Borrador de cierre anual",
+      annual_close_posted: "Cierre anual contabilizado",
+      annual_close_reversed: "Cierre anual revertido",
+    }[value] ?? value.replaceAll("_", " ")
+  );
+}
+
+function checklistItemState(
+  check: PeriodChecklistItemView,
+): PeriodChecklistState {
+  if (
+    check.status === "passed" ||
+    check.status === "warning" ||
+    check.status === "blocked" ||
+    check.status === "unevaluated"
+  ) {
+    return check.status;
+  }
+  if (check.clear === true) return "passed";
+  if (check.clear === false) return "blocked";
+  return "unevaluated";
+}
+
+function periodChecklistItems(period: FiscalYearPeriodView) {
+  if (period.close_readiness?.checks?.length) {
+    return period.close_readiness.checks.map(
+      (check): PeriodChecklistItemView => ({
+        ...check,
+        status:
+          check.status === "not_evaluated" ? "unevaluated" : check.status,
+      }),
+    );
+  }
+  return period.checklist ?? [];
+}
+
+function periodChecklistState(
+  period: FiscalYearPeriodView,
+): PeriodChecklistState {
+  if (period.close_readiness) {
+    return {
+      not_evaluated: "unevaluated",
+      ready: "passed",
+      warning: "warning",
+      blocked: "blocked",
+    }[period.close_readiness.status] as PeriodChecklistState;
+  }
+  const checks = periodChecklistItems(period);
+  if (!checks.length) return "unevaluated";
+  const states = checks.map(checklistItemState);
+  if (states.includes("blocked")) return "blocked";
+  if (states.includes("warning")) return "warning";
+  if (states.every((state) => state === "passed")) return "passed";
+  return "unevaluated";
+}
+
+function periodChecklistStateLabel(value: PeriodChecklistState) {
+  return {
+    unevaluated: "Sin evaluar",
+    passed: "Correcto",
+    warning: "Advertencia",
+    blocked: "Bloqueado",
+  }[value];
+}
+
+function annualCloseCanBePrepared(fiscalYear: FiscalYearDetailView) {
+  const periods = [...fiscalYear.periods].sort(comparePeriods);
+  if (periods.length !== 12) return false;
+  if (
+    fiscalYear.annual_close_status === "draft" ||
+    fiscalYear.annual_close_status === "posted" ||
+    fiscalYear.annual_close_status === "not_required"
+  ) {
+    return false;
+  }
+  return (
+    periods.slice(0, 11).every((period) => period.state === "locked") &&
+    periods[11]?.state === "soft_closed"
+  );
+}
+
+function fiscalYearBlockerLabel(value: string) {
+  return (
+    {
+      previous_period_open: "Hay períodos anteriores todavía abiertos.",
+      previous_period_not_locked:
+        "Los períodos anteriores deben estar bloqueados.",
+      final_period_not_soft_closed:
+        "El último período debe estar en cierre preliminar.",
+      checklist_blocked: "El checklist conserva controles bloqueados.",
+      annual_close_pending:
+        "El cierre anual debe contabilizarse antes de bloquear.",
+      later_period_closed:
+        "Primero deben reabrirse los períodos posteriores.",
+    }[value] ?? value.replaceAll("_", " ")
+  );
+}
+
+function periodTransitionTitle(
+  period: FiscalYearPeriodView,
+  desiredState: Period["state"],
+) {
+  const month = monthYearLabel(period.start_date);
+  return desiredState === "locked"
+    ? `Bloquear ${month}`
+    : desiredState === "soft_closed"
+      ? period.state === "open"
+        ? `Iniciar cierre de ${month}`
+        : `Reabrir ${month}`
+      : `Reabrir ${month}`;
+}
+
+function periodTransitionDescription(
+  period: FiscalYearPeriodView,
+  desiredState: Period["state"],
+) {
+  if (desiredState === "locked") {
+    return "El período dejará de admitir cualquier contabilización. El checklist se volverá a evaluar dentro de la misma operación.";
+  }
+  if (desiredState === "soft_closed" && period.state === "open") {
+    return "Las operaciones ordinarias quedarán bloqueadas; sólo podrán contabilizarse ajustes autorizados y reversas.";
+  }
+  return "La reapertura habilitará nuevamente movimientos según el estado resultante y quedará registrada en la auditoría.";
+}
+
+function fiscalYearErrorMessage(cause: unknown, fallback: string) {
+  const normalized = normalizeHttpError(cause, { fallbackMessage: fallback });
+  const messages: Record<string, string> = {
+    ACCOUNTING_FISCAL_YEAR_OVERLAP:
+      "Las fechas se superponen con otro ejercicio contable.",
+    ACCOUNTING_PERIOD_SEQUENCE_INVALID:
+      "Los períodos deben cerrarse en orden y reabrirse en orden inverso.",
+    ACCOUNTING_PERIOD_FUTURE:
+      "No se puede cerrar un período cuya fecha final todavía es futura.",
+    ACCOUNTING_FISCAL_YEAR_CLOSE_ORDER:
+      "Primero cerrá los períodos anteriores.",
+    ACCOUNTING_FISCAL_YEAR_REOPEN_ORDER:
+      "Primero reabrí los períodos posteriores.",
+    ACCOUNTING_CLOSE_CHECKLIST_BLOCKED:
+      "El período conserva controles pendientes. Revisá el checklist antes de continuar.",
+    ACCOUNTING_ANNUAL_CLOSE_PENDING:
+      "El cierre anual debe quedar contabilizado antes de bloquear el ejercicio.",
+    ACCOUNTING_ANNUAL_CLOSE_NOT_REQUIRED:
+      "El ejercicio no tiene saldos temporales que requieran un asiento de cierre.",
+    VERSION_CONFLICT:
+      "El ejercicio cambió mientras lo estabas revisando. Cerrá la ficha y volvé a abrirla.",
+    IDEMPOTENCY_KEY_CONFLICT:
+      "La operación ya fue enviada con otros datos. Volvé a intentarlo.",
+    RESOURCE_NOT_FOUND:
+      "El ejercicio ya no está disponible en esta organización.",
+  };
+  if (normalized.code && messages[normalized.code]) {
+    return messages[normalized.code];
+  }
+  if (normalized.kind === "network") {
+    return "No pudimos conectarnos con Pymes. Revisá la conexión y reintentá.";
+  }
+  if (normalized.kind === "authorization") {
+    return "No tenés permiso para realizar esta operación contable.";
+  }
+  if (normalized.kind === "server") {
+    return "Pymes no pudo completar la operación. Reintentá en unos instantes.";
+  }
+  return fallback;
+}
+
 function reconciliationState(value: Reconciliation["state"]) {
   return value === "draft"
     ? "En preparación"
@@ -8081,9 +10098,12 @@ function checklistLabel(code: string) {
       unposted_documents: "Documentos sin asiento",
       fiscal_pending: "Comprobantes fiscales pendientes",
       posting_errors: "Errores de contabilización",
+      account_mappings: "Mappings contables incompletos",
       missing_mappings: "Mappings contables incompletos",
+      exchange_rates: "Cotizaciones faltantes",
       missing_exchange_rates: "Cotizaciones faltantes",
       unreconciled_accounts: "Cuentas sin conciliar",
+      pending_drafts: "Borradores contables pendientes",
     }[code] ?? code.replaceAll("_", " ")
   );
 }

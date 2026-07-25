@@ -111,8 +111,39 @@ type PeriodRepository interface {
 	GetPeriod(context.Context, uuid.UUID, bool) (Period, error)
 	FindPeriodForDate(context.Context, time.Time, bool) (Period, error)
 	CreatePeriod(context.Context, Period) (Period, error)
-	UpdatePeriod(context.Context, Period, int64) (Period, error)
+	UpdatePeriod(context.Context, Period, int64, string) (Period, error)
+	PeriodTransitionWasApplied(
+		context.Context,
+		uuid.UUID,
+		PeriodStatus,
+		int64,
+		string,
+	) (bool, error)
+	AccountingLocalDate(context.Context) (time.Time, error)
 	CloseChecklist(context.Context, uuid.UUID) (CloseChecklist, error)
+	PreviewCloseChecklist(context.Context, uuid.UUID) (CloseChecklist, error)
+	FiscalYearStartMonth(context.Context) (time.Month, error)
+	ListFiscalYears(context.Context, FiscalYearFilter) (FiscalYearPage, error)
+	GetFiscalYear(context.Context, uuid.UUID, bool) (FiscalYearSummary, error)
+	CreateFiscalYear(
+		context.Context,
+		FiscalYearSummary,
+		[]Period,
+	) (FiscalYearSummary, error)
+	ListFiscalYearPeriods(context.Context, uuid.UUID, bool) ([]Period, error)
+	ListFiscalYearEvents(context.Context, uuid.UUID, int) ([]FiscalYearEvent, error)
+	ListPeriodEvents(context.Context, uuid.UUID, int) ([]PeriodAudit, error)
+	UpdateFiscalYearAnnualClose(
+		context.Context,
+		FiscalYearAnnualCloseUpdate,
+	) (FiscalYearSummary, error)
+	FiscalYearTransitionWasApplied(
+		context.Context,
+		uuid.UUID,
+		AnnualCloseStatus,
+		string,
+	) (bool, error)
+	LatestClosedFiscalYear(context.Context, bool) (FiscalYearSummary, error)
 }
 
 type OpenItemFilter struct {
@@ -124,13 +155,15 @@ type OpenItemFilter struct {
 }
 
 type PeriodAudit struct {
-	ID         uuid.UUID    `json:"id"`
-	PeriodID   uuid.UUID    `json:"period_id"`
-	FromStatus PeriodStatus `json:"from_status"`
-	ToStatus   PeriodStatus `json:"to_status"`
-	Reason     string       `json:"reason"`
-	ActorID    string       `json:"actor_id"`
-	OccurredAt time.Time    `json:"occurred_at"`
+	ID          uuid.UUID    `json:"id"`
+	PeriodID    uuid.UUID    `json:"period_id"`
+	FromStatus  PeriodStatus `json:"from_status"`
+	ToStatus    PeriodStatus `json:"to_status"`
+	FromVersion *int64       `json:"from_version,omitempty"`
+	ToVersion   int64        `json:"to_version"`
+	Reason      string       `json:"reason"`
+	ActorID     string       `json:"actor_id"`
+	OccurredAt  time.Time    `json:"occurred_at"`
 }
 
 type ReconciliationRepository interface {

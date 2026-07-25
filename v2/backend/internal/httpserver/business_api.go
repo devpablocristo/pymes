@@ -35,6 +35,14 @@ func (h *IAMAPI) GetAccountingSettings(w http.ResponseWriter, r *http.Request) {
 	h.getAccountingSettings(w, r)
 }
 
+func (h *IAMAPI) UpdateAccountingFiscalCalendar(
+	w http.ResponseWriter,
+	r *http.Request,
+	params api.UpdateAccountingFiscalCalendarParams,
+) {
+	h.updateAccountingFiscalCalendar(w, r, params)
+}
+
 func (h *IAMAPI) UpdateAccountingMappings(w http.ResponseWriter, r *http.Request, params api.UpdateAccountingMappingsParams) {
 	h.updateAccountingMappings(w, r, params)
 }
@@ -137,12 +145,75 @@ func (h *IAMAPI) CreateAccountingSupplierPayment(
 	h.createAccountingSettlement(w, r, params.IdempotencyKey, true)
 }
 
-func (h *IAMAPI) ListAccountingPeriods(w http.ResponseWriter, r *http.Request) {
-	h.listAccountingPeriods(w, r)
+func (h *IAMAPI) ListAccountingFiscalYears(
+	w http.ResponseWriter,
+	r *http.Request,
+	params api.ListAccountingFiscalYearsParams,
+) {
+	h.listAccountingFiscalYears(w, r, params)
+}
+
+func (h *IAMAPI) CreateAccountingFiscalYear(
+	w http.ResponseWriter,
+	r *http.Request,
+	params api.CreateAccountingFiscalYearParams,
+) {
+	h.createAccountingFiscalYear(w, r, params)
+}
+
+func (h *IAMAPI) GetAccountingFiscalYear(
+	w http.ResponseWriter,
+	r *http.Request,
+	fiscalYearID api.FiscalYearID,
+) {
+	h.getAccountingFiscalYear(w, r, fiscalYearID)
+}
+
+func (h *IAMAPI) CreateFiscalYearAnnualClosingDraft(
+	w http.ResponseWriter,
+	r *http.Request,
+	fiscalYearID api.FiscalYearID,
+	params api.CreateFiscalYearAnnualClosingDraftParams,
+) {
+	h.createFiscalYearAnnualClosingDraft(w, r, fiscalYearID, params)
+}
+
+func (h *IAMAPI) ReopenAccountingFiscalYear(
+	w http.ResponseWriter,
+	r *http.Request,
+	fiscalYearID api.FiscalYearID,
+	params api.ReopenAccountingFiscalYearParams,
+) {
+	h.reopenAccountingFiscalYear(w, r, fiscalYearID, params)
+}
+
+func (h *IAMAPI) ListAccountingPeriods(
+	w http.ResponseWriter,
+	r *http.Request,
+	params api.ListAccountingPeriodsParams,
+) {
+	h.listAccountingPeriods(w, r, params)
 }
 
 func (h *IAMAPI) CreateAccountingPeriod(w http.ResponseWriter, r *http.Request, params api.CreateAccountingPeriodParams) {
 	h.createAccountingPeriod(w, r, params)
+}
+
+func (h *IAMAPI) GetAccountingPeriod(
+	w http.ResponseWriter,
+	r *http.Request,
+	periodID api.PeriodID,
+) {
+	h.getAccountingPeriod(w, r, periodID)
+}
+
+func (h *IAMAPI) ListAccountingPeriodEvents(
+	w http.ResponseWriter,
+	r *http.Request,
+	periodID api.PeriodID,
+	params api.ListAccountingPeriodEventsParams,
+) {
+	h.listAccountingPeriodEvents(w, r, periodID, params)
 }
 
 func (h *IAMAPI) TransitionAccountingPeriod(w http.ResponseWriter, r *http.Request, periodID api.PeriodID, params api.TransitionAccountingPeriodParams) {

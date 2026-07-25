@@ -185,7 +185,10 @@ func buildAnnualClosingWorkpaper(
 		))
 	}
 	if len(workpaper.Lines) == 0 {
-		return AnnualClosingWorkpaper{}, fmt.Errorf("%w: no temporary balances to close", ErrConflict)
+		return AnnualClosingWorkpaper{}, fmt.Errorf(
+			"%w: no temporary balances to close",
+			ErrAnnualCloseNotRequired,
+		)
 	}
 	workpaper.NetIncome = closingDebit.Sub(closingCredit)
 	expectedNetIncome := BuildIncomeStatement(trial).NetIncome

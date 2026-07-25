@@ -465,6 +465,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounting/settings/fiscal-calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateAccountingFiscalCalendar"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/accounts": {
         parameters: {
             query?: never;
@@ -785,6 +801,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounting/fiscal-years": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAccountingFiscalYears"];
+        put?: never;
+        post: operations["createAccountingFiscalYear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/fiscal-years/{fiscal_year_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAccountingFiscalYear"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/fiscal-years/{fiscal_year_id}/annual-close-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createFiscalYearAnnualClosingDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/fiscal-years/{fiscal_year_id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reopenAccountingFiscalYear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/periods": {
         parameters: {
             query?: never;
@@ -794,7 +874,43 @@ export interface paths {
         };
         get: operations["listAccountingPeriods"];
         put?: never;
+        /**
+         * @deprecated
+         * @description Compatibilidad para períodos heredados; la web crea ejercicios completos.
+         */
         post: operations["createAccountingPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/periods/{period_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAccountingPeriod"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/periods/{period_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAccountingPeriodEvents"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1596,6 +1712,15 @@ export interface components {
             country_code: string;
             functional_currency: components["schemas"]["CurrencyCode"];
             timezone: string;
+            fiscal_year_start_month: number;
+            /** Format: int64 */
+            version: number;
+            can_change_fiscal_year_start: boolean;
+        };
+        AccountingFiscalCalendarInput: {
+            fiscal_year_start_month: number;
+            /** Format: int64 */
+            version: number;
         };
         AccountingAccount: {
             /** Format: uuid */
@@ -1969,6 +2094,35 @@ export interface components {
         };
         /** @enum {string} */
         AccountingPeriodState: "open" | "soft_closed" | "locked";
+        /** @enum {string} */
+        AccountingFiscalYearState: "open" | "closing" | "closed";
+        /** @enum {string} */
+        AccountingAnnualCloseStatus: "not_ready" | "ready" | "draft" | "posted" | "reversed" | "not_required";
+        /** @enum {string} */
+        AccountingCloseCheckStatus: "not_evaluated" | "passed" | "warning" | "blocked";
+        AccountingCloseCheck: {
+            code: string;
+            label: string;
+            status: components["schemas"]["AccountingCloseCheckStatus"];
+            count: number;
+            detail?: string;
+            target_path?: string;
+        };
+        AccountingCloseReadiness: {
+            /** @enum {string} */
+            status: "not_evaluated" | "ready" | "warning" | "blocked";
+            blocking_count: number;
+            /** Format: date-time */
+            evaluated_at?: string | null;
+            checks: components["schemas"]["AccountingCloseCheck"][];
+        };
+        AccountingPeriodCapabilities: {
+            can_soft_close: boolean;
+            can_lock: boolean;
+            can_reopen_to_soft_closed: boolean;
+            can_reopen_to_open: boolean;
+            blockers: string[];
+        };
         AccountingPeriodInput: {
             /** Format: date */
             start_date: string;
@@ -1978,6 +2132,10 @@ export interface components {
         AccountingPeriod: {
             /** Format: uuid */
             id: string;
+            /** Format: uuid */
+            fiscal_year_id: string;
+            code: string;
+            sequence: number;
             /** Format: date */
             start_date: string;
             /** Format: date */
@@ -1985,11 +2143,137 @@ export interface components {
             state: components["schemas"]["AccountingPeriodState"];
             /** Format: int64 */
             version: number;
+            is_legacy: boolean;
             checklist?: {
                 code: string;
                 clear: boolean;
                 count?: number;
             }[];
+        };
+        AccountingPeriodList: {
+            items: components["schemas"]["AccountingPeriod"][];
+            page: components["schemas"]["PageInfo"];
+        };
+        AccountingPeriodEvent: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            period_id: string;
+            from_state: components["schemas"]["AccountingPeriodState"];
+            to_state: components["schemas"]["AccountingPeriodState"];
+            /** Format: int64 */
+            from_version?: number;
+            /** Format: int64 */
+            to_version: number;
+            actor: string;
+            reason?: string;
+            /** Format: date-time */
+            occurred_at: string;
+        };
+        AccountingPeriodEventList: {
+            items: components["schemas"]["AccountingPeriodEvent"][];
+            page: components["schemas"]["PageInfo"];
+        };
+        AccountingPeriodDetail: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            fiscal_year_id: string;
+            code: string;
+            sequence: number;
+            /** Format: date */
+            start_date: string;
+            /** Format: date */
+            end_date: string;
+            state: components["schemas"]["AccountingPeriodState"];
+            /** Format: int64 */
+            version: number;
+            is_legacy: boolean;
+            close_readiness: components["schemas"]["AccountingCloseReadiness"];
+            capabilities: components["schemas"]["AccountingPeriodCapabilities"];
+            recent_events: components["schemas"]["AccountingPeriodEvent"][];
+        };
+        AccountingFiscalYearPeriodCounts: {
+            open: number;
+            soft_closed: number;
+            locked: number;
+        };
+        AccountingFiscalYearSummary: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            /** Format: date */
+            start_date: string;
+            /** Format: date */
+            end_date: string;
+            is_legacy: boolean;
+            state: components["schemas"]["AccountingFiscalYearState"];
+            /** Format: int64 */
+            version: number;
+            period_counts: components["schemas"]["AccountingFiscalYearPeriodCounts"];
+            annual_close_status: components["schemas"]["AccountingAnnualCloseStatus"];
+            /** Format: uuid */
+            annual_closing_draft_id?: string;
+            /** Format: uuid */
+            annual_closing_entry_id?: string;
+        };
+        AccountingFiscalYearCapabilities: {
+            can_prepare_annual_close: boolean;
+            can_reopen: boolean;
+            blockers: string[];
+        };
+        AccountingFiscalYearEvent: {
+            /** Format: uuid */
+            id: string;
+            event_type: string;
+            from_status?: string;
+            to_status?: string;
+            /** Format: int64 */
+            from_version?: number;
+            /** Format: int64 */
+            to_version: number;
+            actor: string;
+            reason?: string;
+            /** Format: date-time */
+            occurred_at: string;
+        };
+        AccountingFiscalYearDetail: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            /** Format: date */
+            start_date: string;
+            /** Format: date */
+            end_date: string;
+            is_legacy: boolean;
+            state: components["schemas"]["AccountingFiscalYearState"];
+            /** Format: int64 */
+            version: number;
+            period_counts: components["schemas"]["AccountingFiscalYearPeriodCounts"];
+            annual_close_status: components["schemas"]["AccountingAnnualCloseStatus"];
+            /** Format: uuid */
+            annual_closing_draft_id?: string;
+            /** Format: uuid */
+            annual_closing_entry_id?: string;
+            periods: components["schemas"]["AccountingPeriodDetail"][];
+            capabilities: components["schemas"]["AccountingFiscalYearCapabilities"];
+            recent_events: components["schemas"]["AccountingFiscalYearEvent"][];
+        };
+        AccountingFiscalYearList: {
+            items: components["schemas"]["AccountingFiscalYearSummary"][];
+            page: components["schemas"]["PageInfo"];
+        };
+        AccountingFiscalYearInput: {
+            start_year: number;
+        };
+        AccountingFiscalYearReopenInput: {
+            /** Format: int64 */
+            version: number;
+            reason: string;
+        };
+        AccountingAnnualCloseResult: {
+            fiscal_year: components["schemas"]["AccountingFiscalYearSummary"];
+            draft?: components["schemas"]["JournalDraft"];
         };
         AnnualClosingDraftInput: {
             /** Format: int64 */
@@ -2842,6 +3126,7 @@ export interface components {
         DraftID: string;
         EntryID: string;
         PeriodID: string;
+        FiscalYearID: string;
         FinancialAccountID: string;
         StatementImportID: string;
         ReconciliationID: string;
@@ -3837,6 +4122,37 @@ export interface operations {
             503: components["responses"]["Unavailable"];
         };
     };
+    updateAccountingFiscalCalendar: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingFiscalCalendarInput"];
+            };
+        };
+        responses: {
+            /** @description Calendario fiscal contable actualizado. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
     listAccountingAccounts: {
         parameters: {
             query?: {
@@ -4631,9 +4947,171 @@ export interface operations {
             503: components["responses"]["Unavailable"];
         };
     };
-    listAccountingPeriods: {
+    listAccountingFiscalYears: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+                query?: string;
+                state?: components["schemas"]["AccountingFiscalYearState"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ejercicios fiscales de la organización activa. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingFiscalYearList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createAccountingFiscalYear: {
         parameters: {
             query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingFiscalYearInput"];
+            };
+        };
+        responses: {
+            /** @description Ejercicio creado junto con sus doce períodos mensuales. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingFiscalYearDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getAccountingFiscalYear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fiscal_year_id: components["parameters"]["FiscalYearID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ejercicio, períodos y estado de cierre anual. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingFiscalYearDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    createFiscalYearAnnualClosingDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                fiscal_year_id: components["parameters"]["FiscalYearID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnualClosingDraftInput"];
+            };
+        };
+        responses: {
+            /** @description Borrador anual completo para revisión en Diario. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingAnnualCloseResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    reopenAccountingFiscalYear: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                fiscal_year_id: components["parameters"]["FiscalYearID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingFiscalYearReopenInput"];
+            };
+        };
+        responses: {
+            /** @description Ejercicio reabierto y cierre anual revertido cuando correspondía. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingFiscalYearDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listAccountingPeriods: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+                fiscal_year_id?: string;
+                query?: string;
+                state?: components["schemas"]["AccountingPeriodState"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4646,7 +5124,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AccountingPeriod"][];
+                    "application/json": components["schemas"]["AccountingPeriodList"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -4682,6 +5160,62 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    getAccountingPeriod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period_id: components["parameters"]["PeriodID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Período, controles vivos y capacidades de transición. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingPeriodDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    listAccountingPeriodEvents: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                period_id: components["parameters"]["PeriodID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Historial inmutable del período. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingPeriodEventList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             503: components["responses"]["Unavailable"];
         };
     };

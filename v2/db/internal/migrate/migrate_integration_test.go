@@ -375,8 +375,8 @@ func assertSchemaState(t *testing.T, ctx context.Context, database *postgres.DB)
 	).Scan(&productMigrationCount); err != nil {
 		t.Fatalf("query product migrations: %v", err)
 	}
-	if productMigrationCount != 23 {
-		t.Fatalf("product migration count = %d, want 23", productMigrationCount)
+	if productMigrationCount != 24 {
+		t.Fatalf("product migration count = %d, want 24", productMigrationCount)
 	}
 
 	var iamMigrationCount int

@@ -1018,6 +1018,21 @@ func assertAccountingAndFiscalInvariants(
 	_ = tx.Rollback(ctx)
 
 	tx = beginTenantTx(t, ctx, backend, orgA, userA)
+	if _, err := tx.Exec(ctx, `
+		UPDATE accounting.drafts
+		   SET status = 'discarded',
+		       updated_by = 'integration-period-close',
+		       discarded_by = 'integration-period-close',
+		       discard_reason = 'Discarded before period close',
+		       discarded_at = now(),
+		       version = version + 1,
+		       updated_at = now()
+		 WHERE org_id = $1
+		   AND id = $2
+		   AND status = 'active'
+	`, orgA, unbalancedDraft); err != nil {
+		t.Fatalf("discard pending period draft: %v", err)
+	}
 	for _, checkKey := range []string{
 		"unposted_documents",
 		"fiscal_pending",
@@ -1025,6 +1040,7 @@ func assertAccountingAndFiscalInvariants(
 		"account_mappings",
 		"exchange_rates",
 		"unreconciled_accounts",
+		"pending_drafts",
 	} {
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO accounting.period_close_checks (
@@ -1133,6 +1149,22 @@ func assertAccountingAndFiscalInvariants(
 	tx = beginTenantTx(t, ctx, backend, orgA, userA)
 	if _, err := tx.Exec(ctx, `
 		UPDATE accounting.periods
+		   SET status = 'soft_closed',
+		       version = version + 1,
+		       status_changed_by = 'integration-test',
+		       transition_reason = 'fixture reopen',
+		       updated_at = now()
+		 WHERE org_id = $1 AND id = $2
+	`, orgA, periodID); err != nil {
+		t.Fatalf("reopen locked period to preliminary close: %v", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit period preliminary reopen: %v", err)
+	}
+
+	tx = beginTenantTx(t, ctx, backend, orgA, userA)
+	if _, err := tx.Exec(ctx, `
+		UPDATE accounting.periods
 		   SET status = 'open',
 		       version = version + 1,
 		       status_changed_by = 'integration-test',
@@ -1140,7 +1172,7 @@ func assertAccountingAndFiscalInvariants(
 		       updated_at = now()
 		 WHERE org_id = $1 AND id = $2
 	`, orgA, periodID); err != nil {
-		t.Fatalf("reopen locked period: %v", err)
+		t.Fatalf("reopen soft-closed period: %v", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatalf("commit period reopen: %v", err)
@@ -2154,6 +2186,102 @@ func assertAccountingAndFiscalInvariants(
 		orgA,
 		userA,
 	)
+	assertPeriodTransitionIdempotency(
+		t,
+		ctx,
+		backend,
+		orgA,
+		userA,
+		februaryPeriodID,
+		marchPeriodID,
+	)
+}
+
+func assertPeriodTransitionIdempotency(
+	t *testing.T,
+	ctx context.Context,
+	backend interface {
+		Begin(context.Context) (pgx.Tx, error)
+	},
+	orgID string,
+	userID string,
+	firstPeriodID string,
+	secondPeriodID string,
+) {
+	t.Helper()
+
+	const transitionKey = "integration-period-transition-idempotency"
+	tx := beginTenantTx(t, ctx, backend, orgID, userID)
+	if _, err := tx.Exec(
+		ctx,
+		"SELECT set_config('app.accounting_idempotency_key', $1, true)",
+		transitionKey,
+	); err != nil {
+		t.Fatalf("set period transition idempotency key: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE accounting.periods
+		   SET status = 'soft_closed',
+		       version = version + 1,
+		       status_changed_by = 'integration-test',
+		       updated_at = now()
+		 WHERE org_id = $1
+		   AND id = $2
+		   AND status = 'open'
+	`, orgID, firstPeriodID); err != nil {
+		t.Fatalf("apply idempotent period transition: %v", err)
+	}
+	var (
+		fromVersion int64
+		toVersion   int64
+		storedKey   string
+	)
+	if err := tx.QueryRow(ctx, `
+		SELECT from_version, to_version, idempotency_key
+		  FROM accounting.period_events
+		 WHERE org_id = $1
+		   AND period_id = $2
+		   AND idempotency_key = $3
+	`, orgID, firstPeriodID, transitionKey).Scan(
+		&fromVersion,
+		&toVersion,
+		&storedKey,
+	); err != nil {
+		t.Fatalf("read period transition audit: %v", err)
+	}
+	if toVersion != fromVersion+1 || storedKey != transitionKey {
+		t.Fatalf(
+			"period transition audit = %d -> %d, %q",
+			fromVersion,
+			toVersion,
+			storedKey,
+		)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit idempotent period transition: %v", err)
+	}
+
+	tx = beginTenantTx(t, ctx, backend, orgID, userID)
+	if _, err := tx.Exec(
+		ctx,
+		"SELECT set_config('app.accounting_idempotency_key', $1, true)",
+		transitionKey,
+	); err != nil {
+		t.Fatalf("reuse period transition idempotency key: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE accounting.periods
+		   SET status = 'soft_closed',
+		       version = version + 1,
+		       status_changed_by = 'integration-test',
+		       updated_at = now()
+		 WHERE org_id = $1
+		   AND id = $2
+		   AND status = 'open'
+	`, orgID, secondPeriodID); err == nil {
+		t.Fatal("period transition idempotency key was reused")
+	}
+	_ = tx.Rollback(ctx)
 }
 
 func assertFiscalWorkerDataBoundary(
@@ -2687,6 +2815,11 @@ func assertJournalWorkflowPrivileges(
 		{"pymes_fiscal_accounting_worker", "accounting.journal_events", "INSERT"},
 		{"pymes_fiscal_accounting_worker", "accounting.journal_events", "UPDATE"},
 		{"pymes_fiscal_accounting_worker", "accounting.journal_events", "DELETE"},
+		{"pymes_backend", "accounting.periods", "DELETE"},
+		{"pymes_backend", "accounting.fiscal_years", "DELETE"},
+		{"pymes_backend", "accounting.fiscal_year_events", "INSERT"},
+		{"pymes_backend", "accounting.fiscal_year_events", "UPDATE"},
+		{"pymes_backend", "accounting.fiscal_year_events", "DELETE"},
 	} {
 		var granted bool
 		if err := database.QueryRow(

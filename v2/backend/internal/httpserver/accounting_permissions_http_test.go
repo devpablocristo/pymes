@@ -178,6 +178,54 @@ func TestJournalWorkflowErrorsHaveStableCodes(t *testing.T) {
 			status: http.StatusConflict,
 			code:   "ACCOUNTING_ACCOUNT_PROTECTED",
 		},
+		{
+			name:   "overlapping fiscal year",
+			err:    errAccountingFiscalYearOverlap,
+			status: http.StatusConflict,
+			code:   "ACCOUNTING_FISCAL_YEAR_OVERLAP",
+		},
+		{
+			name:   "period sequence",
+			err:    errAccountingPeriodSequence,
+			status: http.StatusConflict,
+			code:   "ACCOUNTING_PERIOD_SEQUENCE_INVALID",
+		},
+		{
+			name:   "future period",
+			err:    errAccountingPeriodInFuture,
+			status: http.StatusConflict,
+			code:   "ACCOUNTING_PERIOD_FUTURE",
+		},
+		{
+			name:   "fiscal year close order",
+			err:    errAccountingFiscalYearCloseOrder,
+			status: http.StatusConflict,
+			code:   "ACCOUNTING_FISCAL_YEAR_CLOSE_ORDER",
+		},
+		{
+			name:   "fiscal year reopen order",
+			err:    errAccountingFiscalYearReopenOrder,
+			status: http.StatusConflict,
+			code:   "ACCOUNTING_FISCAL_YEAR_REOPEN_ORDER",
+		},
+		{
+			name:   "close checklist",
+			err:    errAccountingCloseChecklistBlocked,
+			status: http.StatusConflict,
+			code:   "ACCOUNTING_CLOSE_CHECKLIST_BLOCKED",
+		},
+		{
+			name:   "annual close pending",
+			err:    errAccountingAnnualClosePending,
+			status: http.StatusConflict,
+			code:   "ACCOUNTING_ANNUAL_CLOSE_PENDING",
+		},
+		{
+			name:   "annual close not required",
+			err:    errAccountingAnnualCloseNotRequired,
+			status: http.StatusConflict,
+			code:   "ACCOUNTING_ANNUAL_CLOSE_NOT_REQUIRED",
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			response := httptest.NewRecorder()

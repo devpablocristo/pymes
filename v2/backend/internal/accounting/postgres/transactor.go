@@ -123,6 +123,9 @@ func mapError(err error) error {
 	case "40001":
 		return accounting.ErrVersionConflict
 	case "23P01":
+		if strings.Contains(constraint, "fiscal_year") {
+			return accounting.ErrFiscalYearOverlap
+		}
 		return fmt.Errorf("%w: overlapping period", accounting.ErrConflict)
 	case "42501":
 		return fmt.Errorf("%w: tenant context", accounting.ErrConflict)
@@ -138,6 +141,27 @@ func mapError(err error) error {
 		case strings.Contains(constraint, "period_locked"),
 			strings.Contains(constraint, "period_soft_closed"):
 			return accounting.ErrPeriodClosed
+		case strings.Contains(constraint, "future_close"):
+			return accounting.ErrPeriodInFuture
+		case strings.Contains(constraint, "close_order"),
+			strings.Contains(constraint, "lock_order"),
+			strings.Contains(constraint, "monthly_sequence"):
+			return accounting.ErrFiscalYearCloseOrder
+		case strings.Contains(constraint, "reopen_order"):
+			return accounting.ErrFiscalYearReopenOrder
+		case strings.Contains(constraint, "reopen_reason"):
+			return accounting.ErrInvalidArgument
+		case strings.Contains(constraint, "annual_close_pending"):
+			return accounting.ErrAnnualClosePending
+		case strings.Contains(constraint, "annual_close_frozen"):
+			return accounting.ErrAnnualClosePending
+		case strings.Contains(constraint, "annual_transition"):
+			return accounting.ErrAnnualClosePending
+		case strings.Contains(constraint, "close_prerequisites"),
+			strings.Contains(constraint, "monthly_periods"),
+			strings.Contains(constraint, "close_checklist"),
+			strings.Contains(constraint, "pending_drafts"):
+			return accounting.ErrFiscalYearNotReady
 		case strings.Contains(constraint, "active_posting_account"):
 			return accounting.ErrAccountNotPostable
 		case strings.Contains(constraint, "closed_reconciliation"):

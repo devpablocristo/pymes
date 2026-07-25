@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -350,6 +351,33 @@ func TestServiceReversalLeavesOriginalByteForByteAndIsIdempotent(t *testing.T) {
 func TestServiceReversalEligibilityAndDateRules(t *testing.T) {
 	t.Parallel()
 
+	t.Run("closing entries remain non reversible through the public API", func(t *testing.T) {
+		repository, service, scope := serviceFixture(t)
+		entry := manualEntryFixture(repository)
+		entry.Kind = EntryClosing
+		entry.Source.Type = "manual_draft"
+		entry.Source.Event = "primary"
+		entry.Source.IdempotencyKey = "closing-entry"
+		draftID := entry.Source.ID
+		entry.DraftID = &draftID
+		posted, err := service.PostEntry(context.Background(), scope, entry)
+		if err != nil {
+			t.Fatalf("post closing entry fixture: %v", err)
+		}
+		if _, err := service.ReverseEntry(
+			context.Background(),
+			scope,
+			ReverseEntryCommand{
+				EntryID:        posted.ID,
+				Date:           posted.Date,
+				Reason:         "No debe permitirse por la API pública",
+				IdempotencyKey: "reverse-closing-publicly",
+			},
+		); !errors.Is(err, ErrReversalNotAllowed) {
+			t.Fatalf("public closing reversal error = %v", err)
+		}
+	})
+
 	t.Run("legacy manual entry without a source is reversible", func(t *testing.T) {
 		repository, service, scope := serviceFixture(t)
 		entry := manualEntryFixture(repository)
@@ -589,7 +617,8 @@ func TestServicePeriodCloseChecklistAndAuditedReopenRules(t *testing.T) {
 		period.Version,
 		PeriodSoftClosed,
 		"",
-	); !errors.Is(err, ErrConflict) || checklist.BlockingCount() != 1 {
+		"period-close-blocked",
+	); !errors.Is(err, ErrFiscalYearNotReady) || checklist.BlockingCount() != 1 {
 		t.Fatalf("blocked close = checklist %+v error %v", checklist, err)
 	}
 
@@ -601,6 +630,7 @@ func TestServicePeriodCloseChecklistAndAuditedReopenRules(t *testing.T) {
 		period.Version,
 		PeriodSoftClosed,
 		"",
+		"period-soft-close",
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -612,6 +642,7 @@ func TestServicePeriodCloseChecklistAndAuditedReopenRules(t *testing.T) {
 		softClosed.Version,
 		PeriodLocked,
 		"",
+		"period-lock",
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -621,25 +652,96 @@ func TestServicePeriodCloseChecklistAndAuditedReopenRules(t *testing.T) {
 		scope,
 		period.ID,
 		locked.Version,
-		PeriodOpen,
+		PeriodSoftClosed,
 		"",
+		"period-reopen-without-reason",
 	); err == nil {
 		t.Fatal("reopen without reason unexpectedly succeeded")
 	}
 	scope.CanReopenPeriods = true
-	reopened, _, err := service.TransitionPeriod(
+	unlocked, _, err := service.TransitionPeriod(
 		context.Background(),
 		scope,
 		period.ID,
 		locked.Version,
-		PeriodOpen,
+		PeriodSoftClosed,
 		"Ajuste de auditoría",
+		"period-reopen-soft",
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if reopened.ReopenedReason != "Ajuste de auditoría" || reopened.ReopenedBy != scope.ActorID {
+	reopened, _, err := service.TransitionPeriod(
+		context.Background(),
+		scope,
+		period.ID,
+		unlocked.Version,
+		PeriodOpen,
+		"Ajuste de auditoría",
+		"period-reopen-open",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reopened.TransitionReason != "Ajuste de auditoría" ||
+		reopened.StatusChangedBy != scope.ActorID {
 		t.Fatalf("reopen audit = %+v", reopened)
+	}
+}
+
+func TestServicePeriodTransitionReplaysBeforeVersionConflict(t *testing.T) {
+	t.Parallel()
+
+	repository, service, scope := serviceFixture(t)
+	period := repository.periods[repository.periodID]
+	first, _, err := service.TransitionPeriod(
+		context.Background(),
+		scope,
+		period.ID,
+		period.Version,
+		PeriodSoftClosed,
+		"",
+		"period-transition-replay",
+	)
+	if err != nil {
+		t.Fatalf("first transition: %v", err)
+	}
+	replayed, _, err := service.TransitionPeriod(
+		context.Background(),
+		scope,
+		period.ID,
+		period.Version,
+		PeriodSoftClosed,
+		"",
+		"period-transition-replay",
+	)
+	if err != nil {
+		t.Fatalf("replayed transition: %v", err)
+	}
+	if replayed.Status != first.Status || replayed.Version != first.Version {
+		t.Fatalf("replayed period = %+v, want %+v", replayed, first)
+	}
+	if _, _, err := service.TransitionPeriod(
+		context.Background(),
+		scope,
+		period.ID,
+		period.Version,
+		PeriodLocked,
+		"",
+		"period-transition-replay",
+	); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("changed replay intent error = %v", err)
+	}
+	if _, _, err := service.TransitionPeriod(
+		context.Background(),
+		scope,
+		period.ID,
+		first.Version,
+		PeriodLocked,
+		"",
+		"",
+	); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("missing idempotency key error = %v", err)
 	}
 }
 
@@ -885,34 +987,38 @@ func (transactor *serviceTransactor) WithinTenant(
 }
 
 type serviceRepository struct {
-	accounts             map[uuid.UUID]Account
-	mappings             map[string]AccountMapping
-	mappingDefinitions   map[string]AccountMappingDefinition
-	drafts               map[uuid.UUID]Draft
-	postedDraft          map[uuid.UUID]uuid.UUID
-	entries              map[uuid.UUID]JournalEntry
-	periods              map[uuid.UUID]Period
-	periodID             uuid.UUID
-	checklist            CloseChecklist
-	postCount            int
-	lastScope            Scope
-	nextNumber           int64
-	openItems            map[uuid.UUID]OpenItem
-	reconciliation       map[uuid.UUID]Reconciliation
-	workpapers           map[uuid.UUID]InflationWorkpaper
-	revaluations         map[uuid.UUID]CurrencyRevaluationWorkpaper
-	fxPositions          []CurrencyRevaluationPosition
-	reportLines          []ReportLine
-	generalLedgerPage    GeneralLedgerPage
-	lastGeneralLedger    GeneralLedgerFilter
-	generalLedgerCalls   int
-	trialBalancePage     TrialBalancePage
-	lastTrialBalance     TrialBalanceFilter
-	trialBalanceCalls    int
-	closedReconciliation bool
-	directReversalOnCall int
-	directReversalCalls  int
-	concurrentReversal   JournalEntry
+	accounts              map[uuid.UUID]Account
+	mappings              map[string]AccountMapping
+	mappingDefinitions    map[string]AccountMappingDefinition
+	drafts                map[uuid.UUID]Draft
+	postedDraft           map[uuid.UUID]uuid.UUID
+	entries               map[uuid.UUID]JournalEntry
+	periods               map[uuid.UUID]Period
+	fiscalYears           map[uuid.UUID]FiscalYearSummary
+	fiscalYearTransitions map[string]bool
+	periodTransitions     map[string]string
+	accountingDate        time.Time
+	periodID              uuid.UUID
+	checklist             CloseChecklist
+	postCount             int
+	lastScope             Scope
+	nextNumber            int64
+	openItems             map[uuid.UUID]OpenItem
+	reconciliation        map[uuid.UUID]Reconciliation
+	workpapers            map[uuid.UUID]InflationWorkpaper
+	revaluations          map[uuid.UUID]CurrencyRevaluationWorkpaper
+	fxPositions           []CurrencyRevaluationPosition
+	reportLines           []ReportLine
+	generalLedgerPage     GeneralLedgerPage
+	lastGeneralLedger     GeneralLedgerFilter
+	generalLedgerCalls    int
+	trialBalancePage      TrialBalancePage
+	lastTrialBalance      TrialBalanceFilter
+	trialBalanceCalls     int
+	closedReconciliation  bool
+	directReversalOnCall  int
+	directReversalCalls   int
+	concurrentReversal    JournalEntry
 }
 
 func newServiceRepository() *serviceRepository {
@@ -934,12 +1040,16 @@ func newServiceRepository() *serviceRepository {
 				Version:   1,
 			},
 		},
-		periodID:       periodID,
-		nextNumber:     1,
-		openItems:      make(map[uuid.UUID]OpenItem),
-		reconciliation: make(map[uuid.UUID]Reconciliation),
-		workpapers:     make(map[uuid.UUID]InflationWorkpaper),
-		revaluations:   make(map[uuid.UUID]CurrencyRevaluationWorkpaper),
+		periodID:              periodID,
+		fiscalYears:           make(map[uuid.UUID]FiscalYearSummary),
+		fiscalYearTransitions: make(map[string]bool),
+		periodTransitions:     make(map[string]string),
+		accountingDate:        dateFixture(),
+		nextNumber:            1,
+		openItems:             make(map[uuid.UUID]OpenItem),
+		reconciliation:        make(map[uuid.UUID]Reconciliation),
+		workpapers:            make(map[uuid.UUID]InflationWorkpaper),
+		revaluations:          make(map[uuid.UUID]CurrencyRevaluationWorkpaper),
 	}
 }
 
@@ -1369,7 +1479,12 @@ func (repository *serviceRepository) CreatePeriod(_ context.Context, period Peri
 	return period, nil
 }
 
-func (repository *serviceRepository) UpdatePeriod(_ context.Context, period Period, version int64) (Period, error) {
+func (repository *serviceRepository) UpdatePeriod(
+	_ context.Context,
+	period Period,
+	version int64,
+	idempotencyKey string,
+) (Period, error) {
 	current, ok := repository.periods[period.ID]
 	if !ok {
 		return Period{}, ErrNotFound
@@ -1378,11 +1493,196 @@ func (repository *serviceRepository) UpdatePeriod(_ context.Context, period Peri
 		return Period{}, ErrVersionConflict
 	}
 	repository.periods[period.ID] = period
+	if idempotencyKey != "" {
+		repository.periodTransitions[idempotencyKey] = fmt.Sprintf(
+			"%s:%s:%d",
+			period.ID,
+			period.Status,
+			version,
+		)
+	}
 	return period, nil
+}
+
+func (repository *serviceRepository) PeriodTransitionWasApplied(
+	_ context.Context,
+	periodID uuid.UUID,
+	target PeriodStatus,
+	expectedVersion int64,
+	idempotencyKey string,
+) (bool, error) {
+	intent, ok := repository.periodTransitions[idempotencyKey]
+	if !ok {
+		return false, nil
+	}
+	expected := fmt.Sprintf(
+		"%s:%s:%d",
+		periodID,
+		target,
+		expectedVersion,
+	)
+	if intent != expected {
+		return false, ErrIdempotencyConflict
+	}
+	return true, nil
+}
+
+func (repository *serviceRepository) AccountingLocalDate(
+	context.Context,
+) (time.Time, error) {
+	return repository.accountingDate, nil
 }
 
 func (repository *serviceRepository) CloseChecklist(context.Context, uuid.UUID) (CloseChecklist, error) {
 	return repository.checklist, nil
+}
+
+func (repository *serviceRepository) PreviewCloseChecklist(context.Context, uuid.UUID) (CloseChecklist, error) {
+	return repository.checklist, nil
+}
+
+func (repository *serviceRepository) FiscalYearStartMonth(context.Context) (time.Month, error) {
+	return time.January, nil
+}
+
+func (repository *serviceRepository) ListFiscalYears(
+	_ context.Context,
+	filter FiscalYearFilter,
+) (FiscalYearPage, error) {
+	page := FiscalYearPage{}
+	for _, year := range repository.fiscalYears {
+		if filter.State != "" && year.State != filter.State {
+			continue
+		}
+		page.Items = append(page.Items, year)
+	}
+	page.Total = len(page.Items)
+	return page, nil
+}
+
+func (repository *serviceRepository) GetFiscalYear(
+	_ context.Context,
+	id uuid.UUID,
+	_ bool,
+) (FiscalYearSummary, error) {
+	year, ok := repository.fiscalYears[id]
+	if !ok {
+		return FiscalYearSummary{}, ErrNotFound
+	}
+	return year, nil
+}
+
+func (repository *serviceRepository) CreateFiscalYear(
+	_ context.Context,
+	year FiscalYearSummary,
+	periods []Period,
+) (FiscalYearSummary, error) {
+	for _, existing := range repository.fiscalYears {
+		if existing.IdempotencyKey == year.IdempotencyKey {
+			if !existing.StartDate.Equal(year.StartDate) {
+				return FiscalYearSummary{}, ErrIdempotencyConflict
+			}
+			return existing, nil
+		}
+	}
+	repository.fiscalYears[year.ID] = year
+	for _, period := range periods {
+		repository.periods[period.ID] = period
+	}
+	return year, nil
+}
+
+func (repository *serviceRepository) ListFiscalYearPeriods(
+	_ context.Context,
+	id uuid.UUID,
+	_ bool,
+) ([]Period, error) {
+	periods := make([]Period, 0, 12)
+	for _, period := range repository.periods {
+		if period.FiscalYearID != nil && *period.FiscalYearID == id {
+			periods = append(periods, period)
+		}
+	}
+	for index := 0; index < len(periods); index++ {
+		for following := index + 1; following < len(periods); following++ {
+			if periods[following].SequenceNo < periods[index].SequenceNo {
+				periods[index], periods[following] = periods[following], periods[index]
+			}
+		}
+	}
+	return periods, nil
+}
+
+func (repository *serviceRepository) ListFiscalYearEvents(
+	context.Context,
+	uuid.UUID,
+	int,
+) ([]FiscalYearEvent, error) {
+	return nil, nil
+}
+
+func (repository *serviceRepository) ListPeriodEvents(
+	context.Context,
+	uuid.UUID,
+	int,
+) ([]PeriodAudit, error) {
+	return nil, nil
+}
+
+func (repository *serviceRepository) UpdateFiscalYearAnnualClose(
+	_ context.Context,
+	update FiscalYearAnnualCloseUpdate,
+) (FiscalYearSummary, error) {
+	year, ok := repository.fiscalYears[update.FiscalYearID]
+	if !ok {
+		return FiscalYearSummary{}, ErrNotFound
+	}
+	if year.Version != update.ExpectedVersion {
+		return FiscalYearSummary{}, ErrVersionConflict
+	}
+	year.AnnualCloseStatus = update.Status
+	year.AnnualCloseDraftID = update.DraftID
+	if update.EntryID != nil {
+		year.AnnualCloseEntryID = update.EntryID
+	}
+	if update.ReversalEntryID != nil {
+		year.AnnualCloseReversalEntryID = update.ReversalEntryID
+	}
+	year.Version++
+	year.State = DeriveFiscalYearState(year.PeriodCounts, year.AnnualCloseStatus)
+	repository.fiscalYears[year.ID] = year
+	if update.IdempotencyKey != "" {
+		key := year.ID.String() + ":" + string(update.Status) + ":" + update.IdempotencyKey
+		repository.fiscalYearTransitions[key] = true
+	}
+	return year, nil
+}
+
+func (repository *serviceRepository) FiscalYearTransitionWasApplied(
+	_ context.Context,
+	fiscalYearID uuid.UUID,
+	status AnnualCloseStatus,
+	idempotencyKey string,
+) (bool, error) {
+	key := fiscalYearID.String() + ":" + string(status) + ":" + idempotencyKey
+	return repository.fiscalYearTransitions[key], nil
+}
+
+func (repository *serviceRepository) LatestClosedFiscalYear(
+	_ context.Context,
+	_ bool,
+) (FiscalYearSummary, error) {
+	var latest FiscalYearSummary
+	for _, year := range repository.fiscalYears {
+		if year.State == FiscalYearClosed &&
+			(latest.ID == uuid.Nil || year.StartDate.After(latest.StartDate)) {
+			latest = year
+		}
+	}
+	if latest.ID == uuid.Nil {
+		return FiscalYearSummary{}, ErrNotFound
+	}
+	return latest, nil
 }
 
 func (repository *serviceRepository) CreateStatementImport(_ context.Context, statement StatementImport) (StatementImport, error) {

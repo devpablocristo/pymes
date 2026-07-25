@@ -108,7 +108,9 @@ func TestPostgresProvisioningFinalizationIsIdempotent(t *testing.T) {
 		invitationStatus     string
 		templateCode         string
 		accountCount         int
+		fiscalYearCount      int
 		periodCount          int
+		validMonthlyPeriods  int
 	)
 	if err := database.QueryRow(ctx, `
 		SELECT status
@@ -149,9 +151,28 @@ func TestPostgresProvisioningFinalizationIsIdempotent(t *testing.T) {
 	}
 	if err := database.QueryRow(ctx, `
 		SELECT count(*)
+		  FROM accounting.fiscal_years
+		 WHERE org_id = $1::uuid
+	`, result.OrganizationID).Scan(&fiscalYearCount); err != nil {
+		t.Fatalf("load initial accounting fiscal year: %v", err)
+	}
+	if err := database.QueryRow(ctx, `
+		SELECT
+			count(*),
+			count(*) FILTER (
+				WHERE fiscal_year_id IS NOT NULL
+				  AND period_no BETWEEN 1 AND 12
+				  AND NOT is_legacy
+				  AND start_date = date_trunc('month', start_date)::date
+				  AND end_date =
+				      (start_date + interval '1 month - 1 day')::date
+			)
 		  FROM accounting.periods
 		 WHERE org_id = $1::uuid
-	`, result.OrganizationID).Scan(&periodCount); err != nil {
+	`, result.OrganizationID).Scan(
+		&periodCount,
+		&validMonthlyPeriods,
+	); err != nil {
 		t.Fatalf("load initial accounting period: %v", err)
 	}
 	if requestStatus != "provisioned" ||
@@ -162,9 +183,11 @@ func TestPostgresProvisioningFinalizationIsIdempotent(t *testing.T) {
 		invitationStatus != "pending" ||
 		templateCode != "ar-pyme" ||
 		accountCount == 0 ||
-		periodCount != 1 {
+		fiscalYearCount != 1 ||
+		periodCount != 12 ||
+		validMonthlyPeriods != 12 {
 		t.Fatalf(
-			"final state = request:%q org:%q invitations:%d/%q/%q/%q chart:%q/%d periods:%d",
+			"final state = request:%q org:%q invitations:%d/%q/%q/%q chart:%q/%d fiscal-years:%d periods:%d/%d-valid",
 			requestStatus,
 			externalOrganization,
 			invitationCount,
@@ -173,7 +196,9 @@ func TestPostgresProvisioningFinalizationIsIdempotent(t *testing.T) {
 			invitationStatus,
 			templateCode,
 			accountCount,
+			fiscalYearCount,
 			periodCount,
+			validMonthlyPeriods,
 		)
 	}
 }
@@ -324,8 +349,43 @@ func cleanupWorkerFixture(t *testing.T, database *postgres.DB, result provisioni
 			args: []any{result.OrganizationID},
 		},
 		{
+			sql: "ALTER TABLE accounting.periods " +
+				"DISABLE TRIGGER accounting_periods_no_delete",
+		},
+		{
+			sql: "ALTER TABLE accounting.fiscal_year_events " +
+				"DISABLE TRIGGER accounting_fiscal_year_events_immutable",
+		},
+		{
+			sql: "ALTER TABLE accounting.fiscal_years " +
+				"DISABLE TRIGGER accounting_fiscal_years_no_delete",
+		},
+		{
 			sql:  "DELETE FROM accounting.periods WHERE org_id = $1::uuid",
 			args: []any{result.OrganizationID},
+		},
+		{
+			sql:  "DELETE FROM accounting.fiscal_year_events WHERE org_id = $1::uuid",
+			args: []any{result.OrganizationID},
+		},
+		{
+			sql:  "DELETE FROM accounting.fiscal_years WHERE org_id = $1::uuid",
+			args: []any{result.OrganizationID},
+		},
+		{
+			sql: "SET CONSTRAINTS ALL IMMEDIATE",
+		},
+		{
+			sql: "ALTER TABLE accounting.periods " +
+				"ENABLE TRIGGER accounting_periods_no_delete",
+		},
+		{
+			sql: "ALTER TABLE accounting.fiscal_year_events " +
+				"ENABLE TRIGGER accounting_fiscal_year_events_immutable",
+		},
+		{
+			sql: "ALTER TABLE accounting.fiscal_years " +
+				"ENABLE TRIGGER accounting_fiscal_years_no_delete",
 		},
 		{
 			sql: "ALTER TABLE accounting.account_events " +

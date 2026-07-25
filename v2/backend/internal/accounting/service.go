@@ -500,17 +500,76 @@ func (s *Service) DiscardDraft(
 	id uuid.UUID,
 	expectedVersion int64,
 	reason string,
+	idempotencyKey string,
 ) error {
-	if id == uuid.Nil || expectedVersion <= 0 {
-		return fmt.Errorf("%w: draft id and version are required", ErrInvalidArgument)
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	if id == uuid.Nil || expectedVersion <= 0 || idempotencyKey == "" {
+		return fmt.Errorf(
+			"%w: draft id, version and idempotency key are required",
+			ErrInvalidArgument,
+		)
 	}
 	reason = strings.TrimSpace(reason)
 	if len(reason) > 500 {
 		return fmt.Errorf("%w: discard reason must not exceed 500 characters", ErrInvalidArgument)
 	}
 	return s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
-		return repos.DiscardDraft(ctx, id, expectedVersion, scope.ActorID, reason)
+		draft, err := repos.GetDraft(ctx, id, true)
+		if err != nil {
+			return err
+		}
+		if draft.Version != expectedVersion {
+			return ErrVersionConflict
+		}
+
+		var annualCloseYear FiscalYearSummary
+		if draft.SourceType == "annual_closing" {
+			fiscalYearID, parseErr := uuid.Parse(strings.TrimSpace(draft.SourceID))
+			if parseErr == nil {
+				annualCloseYear, err = repos.GetFiscalYear(ctx, fiscalYearID, true)
+				if err != nil {
+					return err
+				}
+				if annualCloseYear.AnnualCloseStatus != AnnualCloseDraft ||
+					annualCloseYear.AnnualCloseDraftID == nil ||
+					*annualCloseYear.AnnualCloseDraftID != draft.ID {
+					return ErrAnnualClosePending
+				}
+			}
+		}
+
+		if err := repos.DiscardDraft(
+			ctx,
+			id,
+			expectedVersion,
+			scope.ActorID,
+			reason,
+		); err != nil {
+			return err
+		}
+		if annualCloseYear.ID == uuid.Nil {
+			return nil
+		}
+		_, err = repos.UpdateFiscalYearAnnualClose(
+			ctx,
+			FiscalYearAnnualCloseUpdate{
+				FiscalYearID:    annualCloseYear.ID,
+				ExpectedVersion: annualCloseYear.Version,
+				Status:          AnnualCloseReady,
+				Reason:          annualCloseDraftDiscardReason(reason),
+				IdempotencyKey:  idempotencyKey,
+			},
+		)
+		return err
 	})
+}
+
+func annualCloseDraftDiscardReason(reason string) string {
+	const prefix = "annual closing draft discarded"
+	if reason == "" {
+		return prefix
+	}
+	return prefix + ": " + reason
 }
 
 func (s *Service) PostDraft(
@@ -538,7 +597,16 @@ func (s *Service) PostDraft(
 				return ErrIdempotencyConflict
 			}
 			posted = existing
-			return nil
+			draft, draftErr := repos.GetDraft(ctx, id, false)
+			if draftErr != nil {
+				return draftErr
+			}
+			return s.syncFiscalYearAnnualClosePosted(
+				ctx,
+				repos,
+				draft,
+				existing,
+			)
 		}
 		if !errors.Is(findErr, ErrNotFound) {
 			return findErr
@@ -556,7 +624,10 @@ func (s *Service) PostDraft(
 		if err != nil {
 			return err
 		}
-		return repos.MarkDraftPosted(ctx, id, expectedVersion, posted.ID)
+		if err := repos.MarkDraftPosted(ctx, id, expectedVersion, posted.ID); err != nil {
+			return err
+		}
+		return s.syncFiscalYearAnnualClosePosted(ctx, repos, draft, posted)
 	})
 	return posted, err
 }
@@ -740,78 +811,151 @@ func (s *Service) ReverseEntry(
 	}
 	var posted JournalEntry
 	err := s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
-		original, err := repos.GetEntry(ctx, command.EntryID)
-		if err != nil {
-			return err
-		}
-		if command.Date.Before(original.Date) {
-			return fmt.Errorf(
-				"%w: reversal date cannot precede the original entry date",
-				ErrInvalidArgument,
-			)
-		}
-		if !isSafelyReversibleEntry(original) {
-			return ErrReversalNotAllowed
-		}
-		hasOpenItemEffects, err := repos.EntryHasOpenItemEffects(ctx, original.ID)
-		if err != nil {
-			return err
-		}
-		if hasOpenItemEffects {
-			return ErrReversalNotAllowed
-		}
-		if existing, findErr := repos.FindDirectReversal(ctx, command.EntryID); findErr == nil {
-			posted = existing
-			if existing.Source.IdempotencyKey == command.IdempotencyKey {
-				return nil
-			}
-			return ErrAlreadyReversed
-		} else if !errors.Is(findErr, ErrNotFound) {
-			return findErr
-		}
-		reversal := JournalEntry{
-			Date:               command.Date,
-			Kind:               EntryReversal,
-			PostingKind:        "reversal",
-			FunctionalCurrency: original.FunctionalCurrency,
-			Currency:           original.Currency,
-			ExchangeRate:       original.ExchangeRate,
-			ExchangeRateDate:   original.ExchangeRateDate,
-			ExchangeRateSource: original.ExchangeRateSource,
-			Source: EntrySource{
-				Type:           "journal_entry",
-				ID:             original.ID,
-				Event:          "reversal",
-				IdempotencyKey: command.IdempotencyKey,
-			},
-			Description:     "Reversa: " + original.Description,
-			CreatedBy:       scope.ActorID,
-			ReversesEntryID: &original.ID,
-			ReversalReason:  strings.TrimSpace(command.Reason),
-			IsAdjustment:    true,
-			Lines:           make([]JournalLine, 0, len(original.Lines)),
-		}
-		reversal.ReversesEntryNumber = &original.Number
-		for index, line := range original.Lines {
-			reversal.Lines = append(reversal.Lines, JournalLine{
-				AccountID:          line.AccountID,
-				Debit:              line.Credit,
-				Credit:             line.Debit,
-				TransactionDebit:   line.TransactionCredit,
-				TransactionCredit:  line.TransactionDebit,
-				Currency:           line.Currency,
-				ExchangeRate:       line.ExchangeRate,
-				ExchangeRateDate:   line.ExchangeRateDate,
-				ExchangeRateSource: line.ExchangeRateSource,
-				PartyID:            line.PartyID,
-				Memo:               "Reversa: " + line.Memo,
-				LineNo:             index + 1,
-			})
-		}
-		posted, err = s.postEntryInTx(ctx, repos, scope, reversal)
+		var err error
+		posted, err = s.reverseEntryInTx(ctx, repos, scope, command)
 		return err
 	})
 	return posted, err
+}
+
+func (s *Service) reverseEntryInTx(
+	ctx context.Context,
+	repos Repositories,
+	scope Scope,
+	command ReverseEntryCommand,
+) (JournalEntry, error) {
+	original, err := repos.GetEntry(ctx, command.EntryID)
+	if err != nil {
+		return JournalEntry{}, err
+	}
+	if command.Date.Before(original.Date) {
+		return JournalEntry{}, fmt.Errorf(
+			"%w: reversal date cannot precede the original entry date",
+			ErrInvalidArgument,
+		)
+	}
+	if !isSafelyReversibleEntry(original) {
+		return JournalEntry{}, ErrReversalNotAllowed
+	}
+	return s.reverseLoadedEntryInTx(
+		ctx,
+		repos,
+		scope,
+		original,
+		command,
+		postingAuthorization{},
+	)
+}
+
+func (s *Service) reverseAnnualClosingEntryInTx(
+	ctx context.Context,
+	repos Repositories,
+	scope Scope,
+	year FiscalYearSummary,
+	command ReverseEntryCommand,
+) (JournalEntry, error) {
+	if year.AnnualCloseStatus != AnnualClosePosted ||
+		year.AnnualCloseEntryID == nil ||
+		*year.AnnualCloseEntryID != command.EntryID ||
+		year.AnnualCloseDraftID == nil {
+		return JournalEntry{}, ErrReversalNotAllowed
+	}
+	original, err := repos.GetEntry(ctx, command.EntryID)
+	if err != nil {
+		return JournalEntry{}, err
+	}
+	if original.Kind != EntryClosing ||
+		original.DraftID == nil ||
+		*original.DraftID != *year.AnnualCloseDraftID ||
+		original.Source.Type != "manual_draft" ||
+		original.Source.ID != *year.AnnualCloseDraftID {
+		return JournalEntry{}, ErrReversalNotAllowed
+	}
+	return s.reverseLoadedEntryInTx(
+		ctx,
+		repos,
+		scope,
+		original,
+		command,
+		postingAuthorization{annualCloseReversalFiscalYearID: year.ID},
+	)
+}
+
+func (s *Service) reverseLoadedEntryInTx(
+	ctx context.Context,
+	repos Repositories,
+	scope Scope,
+	original JournalEntry,
+	command ReverseEntryCommand,
+	authorization postingAuthorization,
+) (JournalEntry, error) {
+	if command.Date.Before(original.Date) {
+		return JournalEntry{}, fmt.Errorf(
+			"%w: reversal date cannot precede the original entry date",
+			ErrInvalidArgument,
+		)
+	}
+	hasOpenItemEffects, err := repos.EntryHasOpenItemEffects(ctx, original.ID)
+	if err != nil {
+		return JournalEntry{}, err
+	}
+	if hasOpenItemEffects {
+		return JournalEntry{}, ErrReversalNotAllowed
+	}
+	if existing, findErr := repos.FindDirectReversal(ctx, command.EntryID); findErr == nil {
+		if existing.Source.IdempotencyKey == command.IdempotencyKey {
+			return existing, nil
+		}
+		return JournalEntry{}, ErrAlreadyReversed
+	} else if !errors.Is(findErr, ErrNotFound) {
+		return JournalEntry{}, findErr
+	}
+	reversal := JournalEntry{
+		Date:               command.Date,
+		Kind:               EntryReversal,
+		PostingKind:        "reversal",
+		FunctionalCurrency: original.FunctionalCurrency,
+		Currency:           original.Currency,
+		ExchangeRate:       original.ExchangeRate,
+		ExchangeRateDate:   original.ExchangeRateDate,
+		ExchangeRateSource: original.ExchangeRateSource,
+		Source: EntrySource{
+			Type:           "journal_entry",
+			ID:             original.ID,
+			Event:          "reversal",
+			IdempotencyKey: command.IdempotencyKey,
+		},
+		Description:     "Reversa: " + original.Description,
+		CreatedBy:       scope.ActorID,
+		ReversesEntryID: &original.ID,
+		ReversalReason:  strings.TrimSpace(command.Reason),
+		IsAdjustment:    true,
+		Lines:           make([]JournalLine, 0, len(original.Lines)),
+	}
+	reversal.ReversesEntryNumber = &original.Number
+	for index, line := range original.Lines {
+		reversal.Lines = append(reversal.Lines, JournalLine{
+			AccountID:          line.AccountID,
+			Debit:              line.Credit,
+			Credit:             line.Debit,
+			TransactionDebit:   line.TransactionCredit,
+			TransactionCredit:  line.TransactionDebit,
+			Currency:           line.Currency,
+			ExchangeRate:       line.ExchangeRate,
+			ExchangeRateDate:   line.ExchangeRateDate,
+			ExchangeRateSource: line.ExchangeRateSource,
+			PartyID:            line.PartyID,
+			Memo:               "Reversa: " + line.Memo,
+			LineNo:             index + 1,
+		})
+	}
+	return s.postEntryAuthorizedInTx(
+		ctx,
+		repos,
+		scope,
+		reversal,
+		authorization,
+	)
 }
 
 func isSafelyReversibleEntry(entry JournalEntry) bool {
@@ -878,8 +1022,11 @@ func (s *Service) TransitionPeriod(
 	expectedVersion int64,
 	target PeriodStatus,
 	reason string,
+	idempotencyKey string,
 ) (Period, CloseChecklist, error) {
-	if periodID == uuid.Nil || expectedVersion <= 0 || !target.Valid() {
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	if periodID == uuid.Nil || expectedVersion <= 0 || !target.Valid() ||
+		idempotencyKey == "" {
 		return Period{}, CloseChecklist{}, fmt.Errorf("%w: invalid period transition", ErrInvalidArgument)
 	}
 	var (
@@ -887,7 +1034,41 @@ func (s *Service) TransitionPeriod(
 		checklist CloseChecklist
 	)
 	err := s.withTenant(ctx, scope, func(ctx context.Context, repos Repositories) error {
-		period, err := repos.GetPeriod(ctx, periodID, true)
+		applied, err := repos.PeriodTransitionWasApplied(
+			ctx,
+			periodID,
+			target,
+			expectedVersion,
+			idempotencyKey,
+		)
+		if err != nil {
+			return err
+		}
+		if applied {
+			updated, err = repos.GetPeriod(ctx, periodID, false)
+			if err != nil {
+				return err
+			}
+			checklist, err = repos.PreviewCloseChecklist(ctx, periodID)
+			return err
+		}
+
+		period, err := repos.GetPeriod(ctx, periodID, false)
+		if err != nil {
+			return err
+		}
+		var fiscalYear FiscalYearSummary
+		if period.FiscalYearID != nil {
+			fiscalYear, err = repos.GetFiscalYear(
+				ctx,
+				*period.FiscalYearID,
+				true,
+			)
+			if err != nil {
+				return err
+			}
+		}
+		period, err = repos.GetPeriod(ctx, periodID, true)
 		if err != nil {
 			return err
 		}
@@ -897,32 +1078,91 @@ func (s *Service) TransitionPeriod(
 		if err := validatePeriodTransition(period.Status, target); err != nil {
 			return err
 		}
-		if target == PeriodSoftClosed || target == PeriodLocked {
+		var (
+			periods []Period
+		)
+		if period.FiscalYearID != nil {
+			periods, err = repos.ListFiscalYearPeriods(
+				ctx,
+				*period.FiscalYearID,
+				true,
+			)
+			if err != nil {
+				return err
+			}
+			localDate, localDateErr := repos.AccountingLocalDate(ctx)
+			if localDateErr != nil {
+				return localDateErr
+			}
+			if err := validateStructuredPeriodTransition(
+				period,
+				target,
+				periods,
+				fiscalYear,
+				localDate,
+			); err != nil {
+				return err
+			}
+		}
+		isClosing := (period.Status == PeriodOpen && target == PeriodSoftClosed) ||
+			(period.Status == PeriodSoftClosed && target == PeriodLocked)
+		if isClosing {
 			checklist, err = repos.CloseChecklist(ctx, periodID)
 			if err != nil {
 				return err
 			}
 			if checklist.BlockingCount() != 0 {
-				return fmt.Errorf("%w: close checklist has %d blocking items", ErrConflict, checklist.BlockingCount())
+				return fmt.Errorf(
+					"%w: close checklist has %d blocking items",
+					ErrFiscalYearNotReady,
+					checklist.BlockingCount(),
+				)
 			}
 		}
-		if target == PeriodOpen && period.Status != PeriodOpen {
+		isReopening := (period.Status == PeriodSoftClosed && target == PeriodOpen) ||
+			(period.Status == PeriodLocked && target == PeriodSoftClosed)
+		if isReopening {
 			if !scope.CanReopenPeriods {
 				return fmt.Errorf("%w: period reopen permission is required", ErrConflict)
 			}
 			if strings.TrimSpace(reason) == "" {
 				return fmt.Errorf("%w: reopening reason is required", ErrInvalidArgument)
 			}
-			now := s.clock.Now()
-			period.ReopenedAt = &now
-			period.ReopenedBy = scope.ActorID
-			period.ReopenedReason = strings.TrimSpace(reason)
 		}
 		period.Status = target
 		period.StatusChangedBy = scope.ActorID
 		period.TransitionReason = strings.TrimSpace(reason)
 		period.Version++
-		updated, err = repos.UpdatePeriod(ctx, period, expectedVersion)
+		updated, err = repos.UpdatePeriod(
+			ctx,
+			period,
+			expectedVersion,
+			idempotencyKey,
+		)
+		if err != nil {
+			return err
+		}
+		for index := range periods {
+			if periods[index].ID == updated.ID {
+				periods[index] = updated
+				break
+			}
+		}
+		if fiscalYear.ID != uuid.Nil &&
+			annualCloseSequenceReady(periods) &&
+			(fiscalYear.AnnualCloseStatus == AnnualCloseNotReady ||
+				fiscalYear.AnnualCloseStatus == AnnualCloseReversed) {
+			_, err = repos.UpdateFiscalYearAnnualClose(
+				ctx,
+				FiscalYearAnnualCloseUpdate{
+					FiscalYearID:    fiscalYear.ID,
+					ExpectedVersion: fiscalYear.Version,
+					Status:          AnnualCloseReady,
+					Reason:          "final period is ready for annual closing",
+					IdempotencyKey:  idempotencyKey + ":annual-ready",
+				},
+			)
+		}
 		return err
 	})
 	return updated, checklist, err
@@ -1188,11 +1428,48 @@ func (s *Service) postEntryInTx(
 	return posted, err
 }
 
+type postingAuthorization struct {
+	annualCloseReversalFiscalYearID uuid.UUID
+}
+
+func (s *Service) postEntryAuthorizedInTx(
+	ctx context.Context,
+	repos Repositories,
+	scope Scope,
+	entry JournalEntry,
+	authorization postingAuthorization,
+) (JournalEntry, error) {
+	posted, _, err := s.postEntryWithAuthorizationInTx(
+		ctx,
+		repos,
+		scope,
+		entry,
+		authorization,
+	)
+	return posted, err
+}
+
 func (s *Service) postEntryWithStatusInTx(
 	ctx context.Context,
 	repos Repositories,
 	scope Scope,
 	entry JournalEntry,
+) (JournalEntry, bool, error) {
+	return s.postEntryWithAuthorizationInTx(
+		ctx,
+		repos,
+		scope,
+		entry,
+		postingAuthorization{},
+	)
+}
+
+func (s *Service) postEntryWithAuthorizationInTx(
+	ctx context.Context,
+	repos Repositories,
+	scope Scope,
+	entry JournalEntry,
+	authorization postingAuthorization,
 ) (JournalEntry, bool, error) {
 	entry.CreatedBy = scope.ActorID
 	entry.Reference = strings.TrimSpace(entry.Reference)
@@ -1213,12 +1490,31 @@ func (s *Service) postEntryWithStatusInTx(
 	if !errors.Is(err, ErrNotFound) {
 		return JournalEntry{}, false, err
 	}
-	period, err := repos.FindPeriodForDate(ctx, entry.Date, true)
+	period, err := repos.FindPeriodForDate(ctx, entry.Date, false)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return JournalEntry{}, false, ErrPeriodClosed
 		}
 		return JournalEntry{}, false, err
+	}
+	if period.FiscalYearID != nil {
+		if _, err := repos.GetFiscalYear(
+			ctx,
+			*period.FiscalYearID,
+			true,
+		); err != nil {
+			return JournalEntry{}, false, err
+		}
+	}
+	period, err = repos.GetPeriod(ctx, period.ID, true)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return JournalEntry{}, false, ErrPeriodClosed
+		}
+		return JournalEntry{}, false, err
+	}
+	if entry.Date.Before(period.StartDate) || entry.Date.After(period.EndDate) {
+		return JournalEntry{}, false, ErrPeriodClosed
 	}
 	// The period row serializes normal posting for a date. Recheck after taking
 	// the lock so concurrent replays return the first committed entry.
@@ -1253,6 +1549,15 @@ func (s *Service) postEntryWithStatusInTx(
 		(period.Status == PeriodSoftClosed &&
 			(!isAdjustingEntryKind(entry.Kind) || !scope.CanPostAdjustments)) {
 		return JournalEntry{}, false, ErrPeriodClosed
+	}
+	if err := validateAnnualClosePostingFreeze(
+		ctx,
+		repos,
+		period,
+		entry,
+		authorization,
+	); err != nil {
+		return JournalEntry{}, false, err
 	}
 	seen := make(map[uuid.UUID]struct{}, len(entry.Lines))
 	accountIDs := make([]uuid.UUID, 0, len(entry.Lines))
@@ -1289,6 +1594,50 @@ func (s *Service) postEntryWithStatusInTx(
 	}
 	posted, err := repos.PostEntry(ctx, entry)
 	return posted, err == nil, err
+}
+
+func validateAnnualClosePostingFreeze(
+	ctx context.Context,
+	repos Repositories,
+	period Period,
+	entry JournalEntry,
+	authorization postingAuthorization,
+) error {
+	if period.FiscalYearID == nil {
+		return nil
+	}
+	year, err := repos.GetFiscalYear(ctx, *period.FiscalYearID, true)
+	if err != nil {
+		return err
+	}
+	if !period.EndDate.Equal(year.EndDate) {
+		return nil
+	}
+	switch year.AnnualCloseStatus {
+	case AnnualCloseDraft:
+		if year.AnnualCloseDraftID != nil &&
+			entry.DraftID != nil &&
+			*entry.DraftID == *year.AnnualCloseDraftID &&
+			entry.Kind == EntryClosing &&
+			entry.Source.Type == "manual_draft" &&
+			entry.Source.ID == *year.AnnualCloseDraftID {
+			return nil
+		}
+		return ErrAnnualClosePending
+	case AnnualClosePosted:
+		if authorization.annualCloseReversalFiscalYearID == year.ID &&
+			year.AnnualCloseEntryID != nil &&
+			entry.Kind == EntryReversal &&
+			entry.ReversesEntryID != nil &&
+			*entry.ReversesEntryID == *year.AnnualCloseEntryID {
+			return nil
+		}
+		return ErrAnnualClosePending
+	case AnnualCloseNotRequired:
+		return ErrAnnualClosePending
+	default:
+		return nil
+	}
 }
 
 func isAdjustingEntryKind(kind EntryKind) bool {
@@ -1335,7 +1684,7 @@ func validatePeriodTransition(from, to PeriodStatus) error {
 			return nil
 		}
 	case PeriodLocked:
-		if to == PeriodOpen {
+		if to == PeriodSoftClosed {
 			return nil
 		}
 	}

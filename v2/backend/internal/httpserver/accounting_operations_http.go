@@ -26,10 +26,13 @@ const maximumStatementBytes = 10 << 20
 func (h *IAMAPI) createAccountingPeriod(
 	w http.ResponseWriter,
 	r *http.Request,
-	_ api.CreateAccountingPeriodParams,
+	params api.CreateAccountingPeriodParams,
 ) {
 	var input api.AccountingPeriodInput
 	if !decodeBusinessBody(w, r, &input) {
+		return
+	}
+	if _, valid := validateIdempotencyKey(w, params.IdempotencyKey); !valid {
 		return
 	}
 	if input.StartDate.Time.IsZero() || input.EndDate.Time.Before(input.StartDate.Time) {
@@ -121,6 +124,10 @@ func (h *IAMAPI) createAnnualClosingDraft(
 	if !decodeBusinessBody(w, r, &input) {
 		return
 	}
+	idempotencyKey, valid := validateIdempotencyKey(w, params.IdempotencyKey)
+	if !valid {
+		return
+	}
 	var response api.JournalDraft
 	if !h.withAccountingService(
 		w,
@@ -133,46 +140,72 @@ func (h *IAMAPI) createAnnualClosingDraft(
 			tx pgx.Tx,
 		) error {
 			var (
-				from    time.Time
-				to      time.Time
-				state   string
-				version int64
+				fiscalYearID      uuid.UUID
+				fiscalYearVersion int64
+				periodVersion     int64
+				isLastPeriod      bool
 			)
 			if err := tx.QueryRow(ctx, `
-				SELECT start_date, end_date, status, version
-				  FROM accounting.periods
-				 WHERE id = $1
-				 FOR UPDATE
-			`, periodID).Scan(&from, &to, &state, &version); err != nil {
+				SELECT
+					period.fiscal_year_id,
+					fiscal_year.version,
+					period.version,
+					NOT EXISTS (
+						SELECT 1
+						  FROM accounting.periods AS later
+						 WHERE later.fiscal_year_id = period.fiscal_year_id
+						   AND (
+								later.start_date > period.start_date
+								OR (
+									later.start_date = period.start_date
+									AND later.id > period.id
+								)
+						   )
+					)
+				  FROM accounting.periods AS period
+				  JOIN accounting.fiscal_years AS fiscal_year
+				    ON fiscal_year.org_id = period.org_id
+				   AND fiscal_year.id = period.fiscal_year_id
+				 WHERE period.id = $1
+				 FOR UPDATE OF period, fiscal_year
+			`, periodID).Scan(
+				&fiscalYearID,
+				&fiscalYearVersion,
+				&periodVersion,
+				&isLastPeriod,
+			); err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					return errBusinessNotFound
 				}
 				return fmt.Errorf("load annual closing period: %w", err)
 			}
-			if version != input.Version {
+			if periodVersion != input.Version {
 				return accounting.ErrVersionConflict
 			}
-			if state == string(accounting.PeriodLocked) {
-				return accounting.ErrPeriodClosed
+			if !isLastPeriod {
+				return accounting.ErrFiscalYearCloseOrder
 			}
 			currency, err := loadFunctionalCurrency(ctx, tx)
 			if err != nil {
 				return err
 			}
-			draft, err := service.CreateAnnualClosingDraft(
+			result, err := service.PrepareFiscalYearAnnualClose(
 				ctx,
 				scope,
-				accounting.AnnualClosingCommand{
-					From:               from,
-					To:                 to,
+				accounting.FiscalYearAnnualClosingCommand{
+					FiscalYearID:       fiscalYearID,
+					ExpectedVersion:    fiscalYearVersion,
 					FunctionalCurrency: currency,
-					IdempotencyKey:     string(params.IdempotencyKey),
+					IdempotencyKey:     idempotencyKey,
 				},
 			)
 			if err != nil {
 				return err
 			}
-			response = apiDraft(draft)
+			if result.Draft == nil {
+				return accounting.ErrAnnualCloseNotRequired
+			}
+			response = apiDraft(*result.Draft)
 			return nil
 		},
 	) {

@@ -3,6 +3,7 @@ import {
   type HttpClient,
 } from "@devpablocristo/platform-http";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -145,6 +146,93 @@ function trialBalanceFixture(overrides: Record<string, unknown> = {}) {
     page: { total: 1, next_cursor: null },
     ...overrides,
   };
+}
+
+function fiscalYearPeriodsFixture(
+  states: Array<"open" | "soft_closed" | "locked"> = Array(12).fill("open"),
+) {
+  return states.map((state, index) => {
+    const start = new Date(Date.UTC(2026, index, 1));
+    const end = new Date(Date.UTC(2026, index + 1, 0));
+    return {
+      id: `${String(index + 1).padStart(8, "0")}-0000-4000-8000-000000000000`,
+      code: `2026-${String(index + 1).padStart(2, "0")}`,
+      sequence: index + 1,
+      start_date: start.toISOString().slice(0, 10),
+      end_date: end.toISOString().slice(0, 10),
+      state,
+      version: 1,
+      is_legacy: false,
+      close_readiness: {
+        status: index === 0 ? "ready" : "not_evaluated",
+        blocking_count: 0,
+        evaluated_at:
+          index === 0 ? "2026-02-01T13:30:00.000Z" : null,
+        checks:
+          index === 0
+            ? [
+                {
+                  code: "unposted_documents",
+                  label: "Documentos sin asiento",
+                  status: "passed",
+                  count: 0,
+                },
+              ]
+            : [],
+      },
+      capabilities: {
+        can_soft_close: state === "open",
+        can_lock: state === "soft_closed",
+        can_reopen_to_soft_closed: state === "locked",
+        can_reopen_to_open: state === "soft_closed",
+        blockers: [],
+      },
+    };
+  });
+}
+
+function fiscalYearFixture<T extends Record<string, unknown>>(
+  overrides: T = {} as T,
+) {
+  return {
+    id: "f0000000-0000-4000-8000-000000000001",
+    code: "2026",
+    start_date: "2026-01-01",
+    end_date: "2026-12-31",
+    is_legacy: false,
+    state: "open" as const,
+    version: 1,
+    period_counts: { open: 12, soft_closed: 0, locked: 0 },
+    annual_close_status: "not_started" as const,
+    annual_closing_draft_id: null,
+    annual_closing_entry_id: null,
+    ...overrides,
+  };
+}
+
+function fiscalYearDetailFixture<T extends Record<string, unknown>>(
+  overrides: T = {} as T,
+) {
+  return fiscalYearFixture({
+    periods: fiscalYearPeriodsFixture(),
+    recent_events: [
+      {
+        id: "e0000000-0000-4000-8000-000000000001",
+        event_type: "period_transition",
+        from_status: "open",
+        to_status: "soft_closed",
+        actor: "Ana Pérez",
+        reason: "Cierre de control",
+        occurred_at: "2026-02-01T13:30:00.000Z",
+      },
+    ],
+    capabilities: {
+      can_prepare_annual_close: false,
+      can_reopen: false,
+      blockers: ["previous_period_not_locked"],
+    },
+    ...overrides,
+  });
 }
 
 function renderAccounting(
@@ -1589,6 +1677,118 @@ test("opens a draft as read-only for users without accounting management", async
   );
 });
 
+test("opens the exact journal draft referenced by draft_id", async () => {
+  const draftID = "71600000-0000-4000-8000-000000000000";
+  const detail = {
+    id: draftID,
+    accounting_date: "2026-12-31",
+    reference: "CIERRE-2026",
+    description: "Cierre anual enlazado",
+    currency: "ARS",
+    functional_currency: "ARS",
+    line_count: 0,
+    lines: [],
+    total_debit: "0",
+    total_credit: "0",
+    posting_status: {
+      state: "incomplete",
+      difference: "0",
+      issues: ["minimum_lines", "zero_total"],
+    },
+    updated_at: "2026-12-31T23:00:00Z",
+    version: 1,
+  };
+  const { request } = renderAccounting(
+    `/accounting/journal?draft_id=${draftID}`,
+    async (path) => {
+      if (path === "/api/v1/session") {
+        return session(["accounting:view", "accounting:manage"]);
+      }
+      if (path === "/api/v1/accounting/settings") {
+        return {
+          country_code: "AR",
+          functional_currency: "ARS",
+          timezone: "America/Argentina/Buenos_Aires",
+        };
+      }
+      if (path.startsWith("/api/v1/accounting/journal-entries?")) {
+        return { items: [], page: { total: 0 } };
+      }
+      if (path.startsWith("/api/v1/accounting/drafts?")) {
+        return { items: [], page: { total: 0 } };
+      }
+      if (path.startsWith("/api/v1/accounting/accounts?")) {
+        return { items: [], page: { total: 0 } };
+      }
+      if (path === `/api/v1/accounting/drafts/${draftID}`) return detail;
+      throw new Error(`unexpected request ${path}`);
+    },
+  );
+
+  expect(await screen.findByDisplayValue("Cierre anual enlazado")).toBeInTheDocument();
+  expect(screen.getByRole("tab", { name: /Borradores/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  expect(request).toHaveBeenCalledWith(
+    `/api/v1/accounting/drafts/${draftID}`,
+    expect.objectContaining({ skipJSONContentType: true }),
+  );
+});
+
+test("opens the exact posted entry referenced by entry_id", async () => {
+  const entryID = "71700000-0000-4000-8000-000000000000";
+  const entry = {
+    id: entryID,
+    entry_number: 98,
+    accounting_date: "2026-12-31",
+    reference: "CIERRE-2026",
+    description: "Asiento de cierre enlazado",
+    currency: "ARS",
+    functional_currency: "ARS",
+    source_type: "annual_closing",
+    lines: [],
+    total_debit: "500",
+    total_credit: "500",
+    created_at: "2026-12-31T23:30:00Z",
+  };
+  const { request } = renderAccounting(
+    `/accounting/journal?entry_id=${entryID}`,
+    async (path) => {
+      if (path === "/api/v1/session") return session(["accounting:view"]);
+      if (path === "/api/v1/accounting/settings") {
+        return {
+          country_code: "AR",
+          functional_currency: "ARS",
+          timezone: "America/Argentina/Buenos_Aires",
+        };
+      }
+      if (path.startsWith("/api/v1/accounting/journal-entries?")) {
+        return { items: [], page: { total: 0 } };
+      }
+      if (path.startsWith("/api/v1/accounting/drafts?")) {
+        return { items: [], page: { total: 0 } };
+      }
+      if (path.startsWith("/api/v1/accounting/accounts?")) {
+        return { items: [], page: { total: 0 } };
+      }
+      if (path === `/api/v1/accounting/journal-entries/${entryID}`) {
+        return entry;
+      }
+      throw new Error(`unexpected request ${path}`);
+    },
+  );
+
+  expect(
+    await screen.findByRole("dialog", { name: "Asiento de cierre enlazado" }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("Asiento Nº 98")).toBeInTheDocument();
+  expect(request).toHaveBeenCalledWith(
+    `/api/v1/accounting/journal-entries/${entryID}`,
+    expect.objectContaining({ skipJSONContentType: true }),
+  );
+});
+
 test("resolves a draft version conflict by reloading or saving a copy", async () => {
   const user = userEvent.setup();
   const draftID = "72000000-0000-4000-8000-000000000000";
@@ -2980,7 +3180,7 @@ test("shows a focused Libro Mayor and opens the exact journal entry", async () =
   expect(screen.getByText("Asiento Nº 42")).toBeInTheDocument();
 });
 
-test("keeps Mayor and Sumas y saldos out of Informes and places them after Diario", async () => {
+test("keeps Mayor and Sumas y saldos out of Informes and places Ejercicios fifth", async () => {
   renderAccounting("/accounting/reports", async (path) => {
     if (path === "/api/v1/session") return session(["accounting:view"]);
     if (path.startsWith("/api/v1/accounting/financial-accounts?")) return [];
@@ -3010,10 +3210,10 @@ test("keeps Mayor and Sumas y saldos out of Informes and places them after Diari
     "Diario",
     "Mayor",
     "Sumas y saldos",
+    "Ejercicios",
     "Cobros y pagos",
     "Informes",
     "Conciliación",
-    "Cierre",
     "Inflación",
   ]);
   expect(await screen.findByLabelText("Informe")).toBeInTheDocument();
@@ -3024,6 +3224,554 @@ test("keeps Mayor and Sumas y saldos out of Informes and places them after Diari
     screen.queryByRole("option", { name: "Balance de comprobación" }),
   ).not.toBeInTheDocument();
   expect(screen.getByLabelText("Informe")).toHaveValue("journal");
+});
+
+test("shows Ejercicios as a searchable table and expands its periods independently", async () => {
+  const user = userEvent.setup();
+  const summary = fiscalYearFixture();
+  const detail = fiscalYearDetailFixture();
+  const { request } = renderAccounting(
+    "/accounting/fiscal-years",
+    async (path) => {
+      if (path === "/api/v1/session") return session(["accounting:view"]);
+      if (path === "/api/v1/accounting/settings") {
+        return {
+          country_code: "AR",
+          functional_currency: "ARS",
+          timezone: "America/Argentina/Buenos_Aires",
+          fiscal_year_start_month: 1,
+          version: 1,
+          can_change_fiscal_year_start: true,
+        };
+      }
+      if (path.startsWith("/api/v1/accounting/fiscal-years?")) {
+        return {
+          items: [summary],
+          page: { total: 1, next_cursor: null },
+        };
+      }
+      if (path === `/api/v1/accounting/fiscal-years/${summary.id}`) {
+        return detail;
+      }
+      throw new Error(`unexpected request ${path}`);
+    },
+  );
+
+  expect(
+    await screen.findByRole("heading", {
+      name: "Ejercicios y períodos contables",
+    }),
+  ).toBeInTheDocument();
+  const navigation = screen.getByRole("navigation", {
+    name: "Secciones contables",
+  });
+  expect(
+    within(navigation)
+      .getAllByRole("link")
+      .map((link) => link.textContent)
+      .slice(0, 5),
+  ).toEqual([
+    "Plan de cuentas",
+    "Diario",
+    "Mayor",
+    "Sumas y saldos",
+    "Ejercicios",
+  ]);
+  expect(
+    screen.getByRole("img", {
+      name: /Calendario del ejercicio 2026: 0 bloqueados, 0 en cierre y 12 abiertos/,
+    }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("1 ejercicios")).toBeInTheDocument();
+
+  await user.click(
+    screen.getByRole("button", {
+      name: "Desplegar períodos de 2026",
+    }),
+  );
+  expect(await screen.findByText("Doce períodos")).toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+  await user.click(
+    screen.getByRole("row", { name: "Abrir ejercicio 2026" }),
+  );
+  const drawer = await screen.findByRole("dialog", { name: "2026" });
+  expect(within(drawer).getByText("Historial reciente")).toBeInTheDocument();
+  expect(within(drawer).getByText("Cierre de control")).toBeInTheDocument();
+  expect(within(drawer).getAllByText("Sin evaluar").length).toBeGreaterThan(0);
+  expect(
+    within(drawer).queryByRole("button", {
+      name: "Iniciar cierre preliminar",
+    }),
+  ).not.toBeInTheDocument();
+
+  await user.click(
+    screen.getByRole("button", { name: "Cerrar ficha del ejercicio" }),
+  );
+  await user.click(
+    screen.getByRole("button", { name: "En cierre" }),
+  );
+  await waitFor(() => {
+    expect(
+      request.mock.calls.some(
+        ([path]) =>
+          String(path).startsWith("/api/v1/accounting/fiscal-years?") &&
+          String(path).includes("state=closing"),
+      ),
+    ).toBe(true);
+  });
+});
+
+test("does not let an old fiscal-year cursor response overwrite new filters", async () => {
+  const user = userEvent.setup();
+  const firstPage = fiscalYearFixture({ code: "2026" });
+  const stalePage = fiscalYearFixture({
+    id: "f0000000-0000-4000-8000-000000000002",
+    code: "2025",
+  });
+  const filteredPage = fiscalYearFixture({
+    id: "f0000000-0000-4000-8000-000000000003",
+    code: "2024",
+    state: "closing",
+    period_counts: { open: 0, soft_closed: 12, locked: 0 },
+  });
+  let resolveStale:
+    | ((value: {
+        items: ReturnType<typeof fiscalYearFixture>[];
+        page: { total: number; next_cursor: null };
+      }) => void)
+    | undefined;
+
+  const { request } = renderAccounting(
+    "/accounting/fiscal-years",
+    async (path) => {
+      if (path === "/api/v1/session") return session(["accounting:view"]);
+      if (path === "/api/v1/accounting/settings") {
+        return {
+          country_code: "AR",
+          functional_currency: "ARS",
+          timezone: "America/Argentina/Buenos_Aires",
+          fiscal_year_start_month: 1,
+        };
+      }
+      if (path.startsWith("/api/v1/accounting/fiscal-years?")) {
+        const search = new URL(path, "http://pymes.test").searchParams;
+        if (search.get("cursor") === "older") {
+          return new Promise((resolve) => {
+            resolveStale = resolve;
+          });
+        }
+        if (search.get("state") === "closing") {
+          return {
+            items: [filteredPage],
+            page: { total: 1, next_cursor: null },
+          };
+        }
+        return {
+          items: [firstPage],
+          page: { total: 2, next_cursor: "older" },
+        };
+      }
+      throw new Error(`unexpected request ${path}`);
+    },
+  );
+
+  expect(
+    await screen.findByRole("row", { name: "Abrir ejercicio 2026" }),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Siguiente" }));
+  await waitFor(() => expect(resolveStale).toBeDefined());
+  await user.click(screen.getByRole("button", { name: "En cierre" }));
+  expect(
+    await screen.findByRole("row", { name: "Abrir ejercicio 2024" }),
+  ).toBeInTheDocument();
+
+  await act(async () => {
+    resolveStale?.({
+      items: [stalePage],
+      page: { total: 1, next_cursor: null },
+    });
+    await Promise.resolve();
+  });
+
+  expect(
+    screen.getByRole("row", { name: "Abrir ejercicio 2024" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("row", { name: "Abrir ejercicio 2025" }),
+  ).not.toBeInTheDocument();
+  const filteredRequest = request.mock.calls
+    .map(([path]) => String(path))
+    .find((path) => path.includes("state=closing"));
+  expect(filteredRequest).toBeDefined();
+  expect(filteredRequest).not.toContain("cursor=");
+});
+
+test("keeps fiscal calendar mutations disabled when settings cannot load", async () => {
+  renderAccounting("/accounting/fiscal-years", async (path) => {
+    if (path === "/api/v1/session") {
+      return session(["accounting:view", "accounting:manage"]);
+    }
+    if (path === "/api/v1/accounting/settings") {
+      throw new Error("settings unavailable");
+    }
+    if (path.startsWith("/api/v1/accounting/fiscal-years?")) {
+      return { items: [], page: { total: 0, next_cursor: null } };
+    }
+    throw new Error(`unexpected request ${path}`);
+  });
+
+  expect(
+    await screen.findByText(/Las altas y los cambios de calendario quedan deshabilitados/i),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "+ Nuevo ejercicio" }),
+  ).toBeDisabled();
+  expect(
+    screen.queryByRole("button", { name: "Configurar" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByText(/Inicio fiscal · No disponible/i)).toBeInTheDocument();
+});
+
+test("presents legacy periods, checklist links and nested dialogs accessibly", async () => {
+  const user = userEvent.setup();
+  const legacyPeriod = {
+    ...fiscalYearPeriodsFixture()[0],
+    code: "LEGACY-2026",
+    end_date: "2026-12-31",
+    is_legacy: true,
+    close_readiness: {
+      status: "ready" as const,
+      blocking_count: 0,
+      evaluated_at: "2027-01-02T12:00:00Z",
+      checks: [
+        {
+          code: "pending_drafts",
+          label: "Borradores contables pendientes",
+          status: "warning" as const,
+          count: 2,
+          target_path: "/accounting/journal?status=drafts",
+        },
+      ],
+    },
+  };
+  const detail = fiscalYearDetailFixture({
+    is_legacy: true,
+    period_counts: { open: 1, soft_closed: 0, locked: 0 },
+    annual_close_status: "not_ready",
+    periods: [legacyPeriod],
+    recent_events: [
+      {
+        id: "e0000000-0000-4000-8000-000000000009",
+        event_type: "annual_close_draft",
+        from_status: "ready",
+        to_status: "draft",
+        actor: "Ana Pérez",
+        occurred_at: "2027-01-02T12:00:00Z",
+      },
+    ],
+  });
+
+  renderAccounting(
+    "/accounting/fiscal-years",
+    async (path) => {
+      if (path === "/api/v1/session") {
+        return session(["accounting:view", "accounting:manage"]);
+      }
+      if (path === "/api/v1/accounting/settings") {
+        return {
+          country_code: "AR",
+          functional_currency: "ARS",
+          timezone: "America/Argentina/Buenos_Aires",
+          fiscal_year_start_month: 1,
+        };
+      }
+      if (path.startsWith("/api/v1/accounting/fiscal-years?")) {
+        return {
+          items: [detail],
+          page: { total: 1, next_cursor: null },
+        };
+      }
+      if (path === `/api/v1/accounting/fiscal-years/${detail.id}`) {
+        return detail;
+      }
+      throw new Error(`unexpected request ${path}`);
+    },
+  );
+
+  expect(await screen.findByText("Heredado")).toBeInTheDocument();
+  const expand = screen.getByRole("button", {
+    name: "Desplegar períodos de 2026",
+  });
+  expand.focus();
+  await user.keyboard("{Enter}");
+  expect(await screen.findByText("Período heredado")).toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+  await user.click(
+    screen.getByRole("row", { name: "Abrir ejercicio 2026" }),
+  );
+  const drawer = await screen.findByRole("dialog", { name: "2026" });
+  expect(within(drawer).getByText("Calendario heredado")).toBeInTheDocument();
+  expect(
+    within(drawer).getByText(
+      "Cierre anual listo → Borrador de cierre preparado",
+    ),
+  ).toBeInTheDocument();
+  await user.click(
+    within(drawer).getByRole("button", {
+      name: "Mostrar controles de Enero 2026",
+    }),
+  );
+  expect(
+    within(drawer).getByRole("link", {
+      name: "Borradores contables pendientes: revisar",
+    }),
+  ).toHaveAttribute("href", "/accounting/journal?status=drafts");
+
+  await user.click(
+    within(drawer).getByRole("button", {
+      name: "Iniciar cierre preliminar",
+    }),
+  );
+  expect(
+    await screen.findByRole("dialog", {
+      name: "Iniciar cierre de Enero 2026",
+    }),
+  ).toBeInTheDocument();
+  await user.keyboard("{Escape}");
+  expect(
+    screen.queryByRole("dialog", {
+      name: "Iniciar cierre de Enero 2026",
+    }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("dialog", { name: "2026" })).toBeInTheDocument();
+});
+
+test("previews twelve monthly periods before creating an exercise", async () => {
+  const user = userEvent.setup();
+  const detail = fiscalYearDetailFixture();
+  const { request } = renderAccounting(
+    "/accounting/fiscal-years",
+    async (path, options) => {
+      if (path === "/api/v1/session") {
+        return session(["accounting:view", "accounting:manage"]);
+      }
+      if (path === "/api/v1/accounting/settings") {
+        return {
+          country_code: "AR",
+          functional_currency: "ARS",
+          timezone: "America/Argentina/Buenos_Aires",
+          fiscal_year_start_month: 4,
+          version: 2,
+          can_change_fiscal_year_start: true,
+        };
+      }
+      if (path.startsWith("/api/v1/accounting/fiscal-years?")) {
+        return { items: [], page: { total: 0, next_cursor: null } };
+      }
+      if (
+        path === "/api/v1/accounting/fiscal-years" &&
+        options?.method === "POST"
+      ) {
+        return detail;
+      }
+      throw new Error(`unexpected request ${path}`);
+    },
+  );
+
+  await user.click(
+    await screen.findByRole("button", { name: "+ Nuevo ejercicio" }),
+  );
+  await user.clear(screen.getByLabelText("Año de inicio"));
+  await user.type(screen.getByLabelText("Año de inicio"), "2027");
+
+  const preview = screen.getByLabelText("Vista previa de los doce períodos");
+  expect(preview.children).toHaveLength(12);
+  expect(screen.getByText("2027/2028")).toBeInTheDocument();
+  expect(within(preview).getByText("ABR")).toBeInTheDocument();
+  expect(within(preview).getByText("MAR")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Crear ejercicio" }));
+  await waitFor(() => {
+    const createCall = request.mock.calls.find(
+      ([path, options]) =>
+        path === "/api/v1/accounting/fiscal-years" &&
+        options?.method === "POST",
+    );
+    expect(createCall).toBeDefined();
+    expect(JSON.parse(String(createCall?.[1]?.body))).toEqual({
+      start_year: 2027,
+    });
+  });
+  expect(
+    await screen.findByText(
+      "El ejercicio y sus doce períodos quedaron preparados.",
+    ),
+  ).toBeInTheDocument();
+});
+
+test("changes a period state through an accessible audited dialog", async () => {
+  const user = userEvent.setup();
+  const summary = fiscalYearFixture();
+  const detail = fiscalYearDetailFixture();
+  const prompt = vi.spyOn(window, "prompt");
+  const { request } = renderAccounting(
+    "/accounting/fiscal-years",
+    async (path, options) => {
+      if (path === "/api/v1/session") {
+        return session(["accounting:view", "accounting:manage"]);
+      }
+      if (path === "/api/v1/accounting/settings") {
+        return {
+          country_code: "AR",
+          functional_currency: "ARS",
+          timezone: "America/Argentina/Buenos_Aires",
+          fiscal_year_start_month: 1,
+        };
+      }
+      if (path.startsWith("/api/v1/accounting/fiscal-years?")) {
+        return {
+          items: [summary],
+          page: { total: 1, next_cursor: null },
+        };
+      }
+      if (path === `/api/v1/accounting/fiscal-years/${summary.id}`) {
+        return detail;
+      }
+      if (
+        path ===
+          `/api/v1/accounting/periods/${detail.periods[0].id}/transition` &&
+        options?.method === "POST"
+      ) {
+        return {
+          ...detail.periods[0],
+          state: "soft_closed",
+          version: 2,
+        };
+      }
+      throw new Error(`unexpected request ${path}`);
+    },
+  );
+
+  await user.click(
+    await screen.findByRole("row", { name: "Abrir ejercicio 2026" }),
+  );
+  await user.click(
+    screen.getByRole("button", {
+      name: "Mostrar controles de Enero 2026",
+    }),
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Iniciar cierre preliminar" }),
+  );
+
+  const dialog = await screen.findByRole("dialog", {
+    name: "Iniciar cierre de Enero 2026",
+  });
+  expect(prompt).not.toHaveBeenCalled();
+  expect(
+    within(dialog).getByText(/sólo podrán contabilizarse ajustes autorizados/i),
+  ).toBeInTheDocument();
+  await user.type(within(dialog).getByLabelText("Motivo"), "Cierre mensual");
+  await user.click(
+    within(dialog).getByRole("button", { name: "Confirmar cambio" }),
+  );
+
+  await waitFor(() => {
+    const transitionCall = request.mock.calls.find(
+      ([path, options]) =>
+        path ===
+          `/api/v1/accounting/periods/${detail.periods[0].id}/transition` &&
+        options?.method === "POST",
+    );
+    expect(transitionCall).toBeDefined();
+    expect(JSON.parse(String(transitionCall?.[1]?.body))).toEqual({
+      desired_state: "soft_closed",
+      version: 1,
+      reason: "Cierre mensual",
+    });
+  });
+});
+
+test("handles an annual close that does not require a journal entry", async () => {
+  const user = userEvent.setup();
+  const periods = fiscalYearPeriodsFixture([
+    ...Array(11).fill("locked"),
+    "soft_closed",
+  ]);
+  const detail = fiscalYearDetailFixture({
+    state: "closing",
+    period_counts: { open: 0, soft_closed: 1, locked: 11 },
+    annual_close_status: "ready",
+    periods,
+    capabilities: {
+      can_prepare_annual_close: true,
+      can_reopen: false,
+      blockers: [],
+    },
+  });
+
+  renderAccounting(
+    "/accounting/fiscal-years",
+    async (path, options) => {
+      if (path === "/api/v1/session") {
+        return session(["accounting:view", "accounting:manage"]);
+      }
+      if (path === "/api/v1/accounting/settings") {
+        return {
+          country_code: "AR",
+          functional_currency: "ARS",
+          timezone: "America/Argentina/Buenos_Aires",
+          fiscal_year_start_month: 1,
+        };
+      }
+      if (path.startsWith("/api/v1/accounting/fiscal-years?")) {
+        return {
+          items: [detail],
+          page: { total: 1, next_cursor: null },
+        };
+      }
+      if (path === `/api/v1/accounting/fiscal-years/${detail.id}`) {
+        return detail;
+      }
+      if (
+        path ===
+          `/api/v1/accounting/fiscal-years/${detail.id}/annual-close-draft` &&
+        options?.method === "POST"
+      ) {
+        return {
+          fiscal_year: {
+            ...detail,
+            annual_close_status: "not_required",
+          },
+        };
+      }
+      throw new Error(`unexpected request ${path}`);
+    },
+  );
+
+  await user.click(
+    await screen.findByRole("row", { name: "Abrir ejercicio 2026" }),
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Preparar cierre anual" }),
+  );
+  const dialog = await screen.findByRole("dialog", {
+    name: "Preparar cierre 2026",
+  });
+  await user.click(
+    within(dialog).getByRole("button", { name: "Generar borrador" }),
+  );
+
+  expect(
+    await screen.findByText(
+      "El ejercicio no tiene saldos temporales: no se requiere asiento de cierre.",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("link", { name: "Abrir en Diario" }),
+  ).not.toBeInTheDocument();
 });
 
 test("filters, paginates and exports the selected Libro Mayor", async () => {

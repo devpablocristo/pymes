@@ -32,6 +32,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: devpablocristo/open-accounting
+          ref: 9225fbaa7b48398e1ec4601e3cdacd4937ceb7b4
           path: .deps/open-accounting
 
       - name: Set up Go

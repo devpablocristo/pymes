@@ -2,11 +2,11 @@
 
 ## Frontera generacional
 
-- `v1/` es un archivo inmutable. No modificar, formatear, actualizar ni ejecutar
-  migraciones desde ese árbol.
-- Todo código de producto nuevo vive bajo `v2/`.
-- No copiar código de v1 por defecto: recuperar comportamientos mediante casos
-  de aceptación y reconstruirlos con los contratos de v2.
+- `v1/` y `v2/` son referencias inmutables. No modificar, formatear, actualizar
+  ni ejecutar migraciones desde esos árboles.
+- Todo código de producto nuevo vive bajo `v3/`.
+- No copiar código de v1/v2 por defecto: recuperar comportamientos mediante
+  casos de aceptación y reconstruirlos con los contratos de v3.
 
 ## Platform
 
@@ -18,11 +18,12 @@
 - Marca, copy, rutas y reglas privadas del producto nunca pertenecen a
   `platform`.
 
-## V2
+## V3
 
-- API pública bajo `/api/v1`; OpenAPI es la fuente de verdad.
+- API pública bajo `/api/v1`; OpenAPI es la fuente de verdad aunque la
+  generación interna sea v3.
 - Importes monetarios se serializan como strings decimales, nunca JSON float.
 - Toda persistencia tenant incluye `org_id`, contexto transaccional y RLS.
 - Los comandos sensibles deben ser transaccionales e idempotentes.
-- Backend, web y migraciones tienen dependencias y checks propios dentro de
-  `v2/`.
+- Backend, adaptador fiscal mock, contratos y migraciones tienen dependencias
+  y checks propios dentro de `v3/`. No existe runtime activo fuera de `v3/`.

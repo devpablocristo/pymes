@@ -1,0 +1,64 @@
+name: Pymes V3 CI
+
+on:
+  pull_request:
+    paths:
+      - "v3/**"
+      - "AGENTS.md"
+      - ".github/workflows/v3-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "v3/**"
+      - "AGENTS.md"
+      - ".github/workflows/v3-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pymes-v3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Pymes
+        uses: actions/checkout@v4
+
+      - name: Checkout Open Accounting fork
+        uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/open-accounting
+          ref: 9225fbaa7b48398e1ec4601e3cdacd4937ceb7b4
+          path: .deps/open-accounting
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.5"
+          cache-dependency-path: |
+            v3/backend/go.sum
+            .deps/open-accounting/go.sum
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: v3/fiscal-adapter/package-lock.json
+
+      - name: Run V3 CI
+        working-directory: v3
+        env:
+          ACCOUNTING_BUILD_CONTEXT: ${{ github.workspace }}/.deps/open-accounting
+        run: make ci
+
+      - name: Stop stack
+        if: always()
+        working-directory: v3
+        env:
+          ACCOUNTING_BUILD_CONTEXT: ${{ github.workspace }}/.deps/open-accounting
+        run: docker compose down

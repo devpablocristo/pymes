@@ -1,0 +1,334 @@
+openapi: 3.1.0
+info:
+  title: Pymes Accounting Internal API
+  version: 0.1.0-draft
+  description: >-
+    Contrato privado entre workers de Pymes v3 y el servicio contable.
+    Importes son strings decimales sin float. Ningún endpoint es público.
+servers:
+  - url: https://accounting.internal
+security:
+  - internalBearer: []
+paths:
+  /healthz:
+    get:
+      security: []
+      operationId: accountingHealth
+      responses:
+        '200': { description: Process healthy }
+  /readyz:
+    get:
+      security: []
+      operationId: accountingReadiness
+      responses:
+        '200': { description: PostgreSQL ready }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /internal/v1/organizations/{organizationId}:
+    put:
+      operationId: provisionOrganization
+      summary: Crea de forma idempotente el schema contable de una organización.
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organization_id, display_name]
+              properties:
+                organization_id: { type: string }
+                display_name: { type: string }
+      responses:
+        '201': { description: Schema provisionado }
+        '200': { description: Provisionamiento ya completado }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /internal/v1/organizations/{organizationId}/posting-commands:
+    post:
+      operationId: submitPostingCommand
+      summary: Postea un hecho económico inmutable e idempotente.
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PostingCommand' }
+      responses:
+        '201': { description: Posteado, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
+        '200': { description: Duplicado semánticamente idéntico, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/DomainError' }
+  /internal/v1/organizations/{organizationId}/reversals:
+    post:
+      operationId: reverseJournalEntry
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command_id, original_journal_entry_id, effective_at, reason]
+              properties:
+                command_id: { $ref: '#/components/schemas/UUID' }
+                original_journal_entry_id: { $ref: '#/components/schemas/UUID' }
+                effective_at: { type: string, format: date-time }
+                reason: { type: string, minLength: 1, maxLength: 500 }
+                source_document_ref: { $ref: '#/components/schemas/SourceRef' }
+      responses:
+        '201': { description: Reversa creada, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
+        '200': { description: Duplicado, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
+        '422': { $ref: '#/components/responses/DomainError' }
+  /internal/v1/organizations/{organizationId}/open-item-applications:
+    post:
+      operationId: applyOpenItem
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command_id, debit_open_item_id, credit_open_item_id, amount, applied_at]
+              properties:
+                command_id: { $ref: '#/components/schemas/UUID' }
+                debit_open_item_id: { $ref: '#/components/schemas/UUID' }
+                credit_open_item_id: { $ref: '#/components/schemas/UUID' }
+                amount: { $ref: '#/components/schemas/Money' }
+                applied_at: { type: string, format: date-time }
+                source_document_ref: { $ref: '#/components/schemas/SourceRef' }
+      responses:
+        '201': { description: Aplicación creada, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
+        '200': { description: Duplicado, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
+        '422': { $ref: '#/components/responses/DomainError' }
+  /internal/v1/organizations/{organizationId}/open-item-application-reversals:
+    post:
+      operationId: reverseOpenItemApplication
+      summary: Desaplica de forma inmutable una aplicación antes de revertir su documento.
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command_id, application_id, reversed_at, reason]
+              properties:
+                command_id: { $ref: '#/components/schemas/UUID' }
+                application_id: { $ref: '#/components/schemas/UUID' }
+                reversed_at: { type: string, format: date-time }
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '201': { description: Aplicación revertida, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
+        '200': { description: Duplicado, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/DomainError' }
+  /internal/v1/organizations/{organizationId}/accounts:
+    get:
+      operationId: listAccounts
+      parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+      responses:
+        '200':
+          description: Plan de cuentas activo.
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Account' } } } }
+  /internal/v1/organizations/{organizationId}/periods:
+    get:
+      operationId: listPeriods
+      parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+      responses:
+        '200': { description: Períodos del ejercicio, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Period' } } } } }
+    post:
+      operationId: createPeriod
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PeriodInput' } } }
+      responses:
+        '201': { description: Período abierto, content: { application/json: { schema: { $ref: '#/components/schemas/Period' } } } }
+  /internal/v1/organizations/{organizationId}/periods/{periodId}/transitions:
+    post:
+      operationId: transitionPeriod
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - name: periodId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_status]
+              properties: { target_status: { type: string, enum: [soft_closed, locked] } }
+      responses:
+        '200': { description: Período actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/Period' } } } }
+        '422': { $ref: '#/components/responses/DomainError' }
+  /internal/v1/organizations/{organizationId}/reports/{report}:
+    get:
+      operationId: getReport
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - name: report
+          in: path
+          required: true
+          schema: { type: string, enum: [trial_balance, general_ledger, aging_receivables, aging_payables] }
+        - name: as_of
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: Reporte versionado, content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+components:
+  securitySchemes:
+    internalBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT de servicio corto, con aud=accounting y org_id coincidente.
+  parameters:
+    OrganizationId:
+      name: organizationId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^org_[A-Za-z0-9_-]+$' }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 16, maxLength: 128 }
+  responses:
+    Conflict:
+      description: La clave existe con distinto payload o la fuente ya fue posteada.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Error' } } }
+    DomainError:
+      description: Regla contable inválida o período bloqueado.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Unauthorized:
+      description: Credencial interna ausente, inválida o de otra organización.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Error' } } }
+    ServiceUnavailable:
+      description: Dependencia durable no disponible.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Error' } } }
+  schemas:
+    UUID: { type: string, format: uuid }
+    InternalCredential:
+      type: object
+      description: Claims verificadas del JWT de servicio; el token no se envía en JSON.
+      required: [iss, aud, sub, org_id, request_id, jti, iat, exp]
+      properties:
+        iss: { type: string, const: pymes-v3 }
+        aud: { type: string, const: accounting }
+        sub: { type: string, example: 'worker:accounting-posting' }
+        org_id: { type: string }
+        actor_id: { type: string, description: Sólo trazabilidad. }
+        roles: { type: array, items: { type: string } }
+        request_id: { type: string }
+        jti: { type: string }
+        iat: { type: integer }
+        exp: { type: integer }
+        kid: { type: string }
+    Decimal:
+      type: string
+      pattern: '^-?[0-9]+(\\.[0-9]+)?$'
+      description: Decimal base diez exacto; no JSON number.
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount: { $ref: '#/components/schemas/Decimal' }
+        currency: { type: string, pattern: '^[A-Z]{3}$', example: ARS }
+    SourceRef:
+      type: object
+      required: [type, id, version]
+      properties:
+        type: { type: string, example: sales_invoice }
+        id: { type: string, example: inv_01H... }
+        version: { type: integer, minimum: 1 }
+        digest: { type: string, description: SHA-256 del snapshot fuente }
+    PostingLine:
+      type: object
+      required: [account_code, debit, credit, currency]
+      properties:
+        account_code: { type: string, minLength: 1 }
+        debit: { $ref: '#/components/schemas/Decimal' }
+        credit: { $ref: '#/components/schemas/Decimal' }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        functional_amount: { $ref: '#/components/schemas/Decimal' }
+        memo: { type: string, maxLength: 500 }
+        open_item: { type: boolean, default: false }
+        party_ref: { type: string, description: Referencia opaca de Pymes }
+    PostingCommand:
+      type: object
+      required: [command_id, organization_id, source, effective_at, description, lines]
+      properties:
+        command_id: { $ref: '#/components/schemas/UUID' }
+        organization_id: { type: string }
+        source: { $ref: '#/components/schemas/SourceRef' }
+        effective_at: { type: string, format: date-time }
+        description: { type: string, minLength: 1, maxLength: 500 }
+        journal: { type: string, default: general }
+        exchange_rate: { $ref: '#/components/schemas/Decimal' }
+        lines:
+          type: array
+          minItems: 2
+          items: { $ref: '#/components/schemas/PostingLine' }
+    AccountingEvent:
+      type: object
+      required: [event_id, command_id, status, organization_id, occurred_at]
+      properties:
+        event_id: { $ref: '#/components/schemas/UUID' }
+        command_id: { $ref: '#/components/schemas/UUID' }
+        organization_id: { type: string }
+        status: { type: string, enum: [posted, duplicate, rejected, reversed, applied] }
+        journal_entry_id: { $ref: '#/components/schemas/UUID' }
+        open_item_ids:
+          type: array
+          items: { $ref: '#/components/schemas/UUID' }
+        application_id: { $ref: '#/components/schemas/UUID' }
+        source: { $ref: '#/components/schemas/SourceRef' }
+        occurred_at: { type: string, format: date-time }
+        correlation_id: { type: string }
+    Account:
+      type: object
+      required: [code, name, active]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        active: { type: boolean }
+        normal_side: { type: string, enum: [debit, credit] }
+    PeriodInput:
+      type: object
+      required: [starts_on, ends_on]
+      properties:
+        starts_on: { type: string, format: date }
+        ends_on: { type: string, format: date }
+    Period:
+      allOf:
+        - { $ref: '#/components/schemas/PeriodInput' }
+        - type: object
+          required: [id, status]
+          properties:
+            id: { $ref: '#/components/schemas/UUID' }
+            status: { type: string, enum: [open, soft_closed, locked] }
+    Error:
+      type: object
+      required: [code, title, correlation_id]
+      properties:
+        code: { type: string, enum: [ORG_NOT_PROVISIONED, UNAUTHORIZED_SERVICE, IDEMPOTENCY_KEY_REUSED, UNBALANCED_POSTING, ACCOUNT_INACTIVE, PERIOD_LOCKED, PERIOD_OVERLAP, SOURCE_ALREADY_POSTED, OPEN_ITEM_NOT_FOUND, OPEN_ITEM_CURRENCY_MISMATCH, OPEN_ITEM_AMOUNT_EXCEEDED, VALIDATION_ERROR, SERVICE_UNAVAILABLE, INTERNAL_ERROR] }
+        title: { type: string }
+        detail: { type: string }
+        correlation_id: { type: string }

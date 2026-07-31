@@ -1,0 +1,153 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pymes
+      POSTGRES_PASSWORD: pymes
+      POSTGRES_DB: pymes_v3
+    ports: ["55434:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql/data", "./db/migrations:/migrations:ro"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pymes -d pymes_v3"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  migrate:
+    image: postgres:16-alpine
+    environment:
+      DATABASE_URL: postgres://pymes:pymes@postgres:5432/pymes_v3?sslmode=disable
+    volumes: ["./db/migrations:/migrations:ro"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    command: ["sh", "-c", "for file in /migrations/*.sql; do psql \"$$DATABASE_URL\" -v ON_ERROR_STOP=1 -f \"$$file\"; done"]
+    restart: "no"
+  fiscal-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: fiscal
+      POSTGRES_PASSWORD: fiscal
+      POSTGRES_DB: pymes_fiscal
+    ports: ["55435:5432"]
+    volumes: ["fiscal-postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fiscal -d pymes_fiscal"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  fiscal-migrate:
+    image: postgres:16-alpine
+    environment:
+      DATABASE_URL: postgres://fiscal:fiscal@fiscal-postgres:5432/pymes_fiscal?sslmode=disable
+    volumes: ["./fiscal-adapter/migrations:/migrations:ro"]
+    depends_on:
+      fiscal-postgres: { condition: service_healthy }
+    command: ["sh", "-c", "for file in /migrations/*.sql; do psql \"$$DATABASE_URL\" -v ON_ERROR_STOP=1 -f \"$$file\"; done"]
+    restart: "no"
+  accounting-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: accounting
+      POSTGRES_PASSWORD: accounting
+      POSTGRES_DB: pymes_accounting
+    ports: ["55436:5432"]
+    volumes: ["accounting-postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U accounting -d pymes_accounting"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  accounting-migrate:
+    build:
+      context: ${ACCOUNTING_BUILD_CONTEXT:-../../open-accounting}
+      target: pymes-accounting-migrate
+    environment:
+      DATABASE_URL: postgres://accounting:accounting@accounting-postgres:5432/pymes_accounting?sslmode=disable
+    depends_on:
+      accounting-postgres: { condition: service_healthy }
+    restart: "no"
+  accounting:
+    build:
+      context: ${ACCOUNTING_BUILD_CONTEXT:-../../open-accounting}
+      target: pymes-accounting
+    environment:
+      ACCOUNTING_DATABASE_URL: postgres://accounting:accounting@accounting-postgres:5432/pymes_accounting?sslmode=disable
+      PYMES_INTERNAL_ISSUER: pymes-v3
+      PYMES_INTERNAL_PUBLIC_KEY_B64: ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=
+      PORT: "8080"
+    depends_on:
+      accounting-migrate: { condition: service_completed_successfully }
+    ports: ["18082:8080"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  api:
+    build: { context: ., target: api }
+    environment:
+      PYMES_DATABASE_URL: postgres://pymes:pymes@postgres:5432/pymes_v3?sslmode=disable
+      PYMES_ENVIRONMENT: development
+      PYMES_CLERK_SECRET_KEY: ${PYMES_CLERK_SECRET_KEY:-sk_test_local}
+      PYMES_CLERK_ISSUER: ${PYMES_CLERK_ISSUER:-https://clerk.local}
+      PYMES_CLERK_AUDIENCE: ${PYMES_CLERK_AUDIENCE:-pymes-v3}
+      PYMES_CLERK_AUTHORIZED_PARTIES: ${PYMES_CLERK_AUTHORIZED_PARTIES:-http://localhost:18080}
+      PYMES_CLERK_WEBHOOK_SECRET: ${PYMES_CLERK_WEBHOOK_SECRET:-whsec_dGVzdHRlc3R0ZXN0dGVzdHRlc3R0ZXN0dGVzdA==}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    ports: ["18080:8080"]
+    healthcheck:
+      test: ["CMD", "/healthcheck", "http://127.0.0.1:8080/readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  worker:
+    build: { context: ., target: worker }
+    environment:
+      PYMES_DATABASE_URL: postgres://pymes:pymes@postgres:5432/pymes_v3?sslmode=disable
+      FISCAL_ADAPTER_URL: http://fiscal-fake:8080
+      ACCOUNTING_URL: http://accounting:8080
+      PYMES_INTERNAL_SIGNING_SEED_B64: AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=
+      PYMES_INTERNAL_ISSUER: pymes-v3
+      PYMES_INTERNAL_KEY_ID: local-dev-1
+      PYMES_WORKER_INTERVAL_MS: "250"
+      PYMES_WORKER_HTTP_ADDR: :8080
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      fiscal-fake: { condition: service_healthy }
+      accounting: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "/healthcheck", "http://127.0.0.1:8080/readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  fiscal-fake:
+    build: { context: ., target: fiscal-adapter }
+    environment:
+      FISCAL_ADAPTER_MODE: mock
+      FISCAL_MOCK_SCENARIO: authorized
+      FISCAL_DATABASE_URL: postgres://fiscal:fiscal@fiscal-postgres:5432/pymes_fiscal?sslmode=disable
+      PYMES_INTERNAL_ISSUER: pymes-v3
+      PYMES_INTERNAL_PUBLIC_KEY_B64: ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=
+      PORT: "8080"
+    depends_on:
+      fiscal-migrate: { condition: service_completed_successfully }
+    ports: ["18081:8080"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  accounting-fake:
+    profiles: ["fakes"]
+    build: { context: ., target: fake-service }
+    environment: { FAKE_KIND: accounting }
+    ports: ["18083:8080"]
+    healthcheck:
+      test: ["CMD", "/healthcheck", "http://127.0.0.1:8080/readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+volumes:
+  postgres-data: {}
+  fiscal-postgres-data: {}
+  accounting-postgres-data: {}

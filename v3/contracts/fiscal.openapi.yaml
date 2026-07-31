@@ -1,0 +1,205 @@
+openapi: 3.1.0
+info:
+  title: Pymes Fiscal ARCA Internal API
+  version: 0.1.0-draft
+  description: >-
+    Contrato privado para autorización y consulta. Pymes proporciona la
+    numeración; el servicio fiscal no crea comprobantes comerciales. La
+    implementación activa usa una autoridad mock; la conexión ARCA real está
+    diferida y deberá implementar el mismo puerto.
+servers:
+  - url: https://fiscal.internal
+security:
+  - internalBearer: []
+paths:
+  /internal/v1/organizations/{organizationId}/authorizations:
+    post:
+      operationId: requestAuthorization
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FiscalRequest' }
+      responses:
+        '201': { description: Resultado definitivo, content: { application/json: { schema: { $ref: '#/components/schemas/FiscalResult' } } } }
+        '202': { description: Resultado incierto, debe consultarse con el mismo número, content: { application/json: { schema: { $ref: '#/components/schemas/FiscalResult' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503': { $ref: '#/components/responses/AuthorityUnavailable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /internal/v1/organizations/{organizationId}/authorizations/{requestId}/consult:
+    post:
+      operationId: consultAuthorization
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        description: >-
+          Snapshot original opcional. Si se omite, el adaptador durable lo
+          recupera por organización y requestId.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FiscalRequest' }
+      responses:
+        '200': { description: Estado consultado en la autoridad fiscal, incluido not_found, content: { application/json: { schema: { $ref: '#/components/schemas/FiscalResult' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503': { $ref: '#/components/responses/AuthorityUnavailable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /internal/v1/catalogs/document-types:
+    get:
+      operationId: listDocumentTypes
+      responses:
+        '200':
+          description: Catálogo fiscal implementado por el adaptador.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [code, letter, kind]
+                  properties:
+                    code: { type: string, enum: [FA, NDA, NCA, FB, NDB, NCB, FC, NDC, NCC] }
+                    letter: { type: string, enum: [A, B, C] }
+                    kind: { type: string, enum: [invoice, credit_note, debit_note] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalError' }
+components:
+  securitySchemes:
+    internalBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Ed25519 de servicio de hasta cinco minutos, aud=fiscal, org_id coincidente y rol service.
+  parameters:
+    OrganizationId:
+      name: organizationId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^org_[A-Za-z0-9_-]+$' }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+  responses:
+    Unauthorized:
+      description: Credencial interna ausente, inválida o destinada a otra organización.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Conflict:
+      description: Solicitud duplicada con contenido distinto.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Error' } } }
+    DomainError:
+      description: Rechazo ARCA o precondición fiscal incumplida.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Error' } } }
+    AuthorityUnavailable:
+      description: Timeout antes de que la autoridad procese la solicitud.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Error' } } }
+    InternalError:
+      description: Fallo interno no atribuible a la solicitud.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Error' } } }
+  schemas:
+    Decimal:
+      type: string
+      pattern: '^[0-9]+(\.[0-9]+)?$'
+    InternalCredential:
+      type: object
+      description: Claims verificadas del JWT de servicio; el token no se envía en JSON.
+      required: [iss, aud, sub, org_id, roles, request_id, jti, iat, exp, kid]
+      properties:
+        iss: { type: string, const: pymes-v3 }
+        aud: { type: string, const: fiscal }
+        sub: { type: string, example: 'worker:fiscal' }
+        org_id: { type: string }
+        actor_id: { type: string, description: Sólo trazabilidad. }
+        roles: { type: array, items: { type: string } }
+        request_id: { type: string }
+        jti: { type: string }
+        iat: { type: integer }
+        exp: { type: integer }
+        kid: { type: string }
+    FiscalRequest:
+      type: object
+      required: [request_id, organization_id, credential_ref, environment, point_of_sale, document_type, voucher_number, issue_date, currency, totals, recipient, lines, snapshot_digest]
+      properties:
+        request_id: { type: string }
+        organization_id: { type: string }
+        credential_ref: { type: string, description: Referencia KMS/secret; jamás certificado o clave. }
+        environment: { type: string, enum: [homologation, production] }
+        point_of_sale: { type: integer, minimum: 1 }
+        document_type: { type: string, enum: [FA, NDA, NCA, FB, NDB, NCB, FC, NDC, NCC] }
+        voucher_number: { type: integer, minimum: 1, description: Reservado por Pymes. }
+        issue_date: { type: string, format: date }
+        currency: { type: string, enum: [ARS, USD, EUR] }
+        exchange_rate: { $ref: '#/components/schemas/Decimal' }
+        totals:
+          type: object
+          required: [net, vat, exempt, total]
+          properties:
+            net: { $ref: '#/components/schemas/Decimal' }
+            vat: { $ref: '#/components/schemas/Decimal' }
+            exempt: { $ref: '#/components/schemas/Decimal' }
+            total: { $ref: '#/components/schemas/Decimal' }
+        recipient:
+          type: object
+          required: [document_type, document_number, vat_condition]
+          properties:
+            document_type: { type: string }
+            document_number: { type: string }
+            vat_condition: { type: string }
+        associated_voucher:
+          type: object
+          required: [point_of_sale, document_type, voucher_number, issue_date]
+          properties:
+            point_of_sale: { type: integer, minimum: 1 }
+            document_type: { type: string, enum: [FA, FB, FC] }
+            voucher_number: { type: integer, minimum: 1 }
+            issue_date: { type: string, format: date }
+        lines:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [description, quantity, unit_price, vat_rate, net]
+            properties:
+              description: { type: string }
+              quantity: { $ref: '#/components/schemas/Decimal' }
+              unit_price: { $ref: '#/components/schemas/Decimal' }
+              vat_rate: { $ref: '#/components/schemas/Decimal' }
+              net: { $ref: '#/components/schemas/Decimal' }
+        snapshot_digest: { type: string, description: SHA-256 del documento congelado. }
+    FiscalResult:
+      type: object
+      required: [request_id, organization_id, status, snapshot_digest, observed_at, correlation_id]
+      properties:
+        request_id: { type: string }
+        organization_id: { type: string }
+        status: { type: string, enum: [authorized, rejected, uncertain, not_found] }
+        cae: { type: string }
+        cae_expires_on: { type: string, format: date }
+        authority_result_code: { type: string }
+        authority_messages: { type: array, items: { type: string } }
+        artifact_ref: { type: string, description: Referencia privada al XML cifrado, no XML. }
+        snapshot_digest: { type: string }
+        observed_at: { type: string, format: date-time }
+        correlation_id: { type: string }
+    Error:
+      type: object
+      required: [code, title, correlation_id]
+      properties:
+        code: { type: string, enum: [ORG_NOT_PROVISIONED, UNAUTHORIZED_SERVICE, IDEMPOTENCY_KEY_REUSED, FISCAL_UNCERTAIN, FISCAL_REJECTED, AUTHORITY_TIMEOUT, CERTIFICATE_UNAVAILABLE, VALIDATION_ERROR, INTERNAL_ERROR] }
+        title: { type: string }
+        detail: { type: string }
+        correlation_id: { type: string }

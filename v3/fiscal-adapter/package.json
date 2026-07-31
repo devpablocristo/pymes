@@ -1,0 +1,22 @@
+{
+  "name": "@devpablocristo/pymes-fiscal-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test dist/test/fiscal/*.test.js",
+    "test:postgres": "npm run build && node --test dist/test/integration/postgres.test.js",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
+    "start": "node dist/src/cmd/api.js",
+    "ci": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.20.0",
+    "typescript": "^5.9.0"
+  },
+  "dependencies": {
+    "pg": "^8.22.0"
+  }
+}

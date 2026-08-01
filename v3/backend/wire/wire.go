@@ -347,6 +347,9 @@ func InitializeWorker(
 				nil,
 				cfg.PerGo.Timeout,
 			),
+			notifications.ProjectSchedulingNotification{
+				Repository: notificationStore,
+			},
 		)
 		notificationDispatcher.LeaseFor = cfg.LeaseDuration
 		dispatchers = append(dispatchers, notificationDispatcher)

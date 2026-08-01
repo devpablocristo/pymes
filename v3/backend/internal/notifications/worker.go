@@ -9,6 +9,7 @@ import (
 
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/notifications/usecases/domain"
 	workerhelpers "github.com/devpablocristo/pymes/v3/backend/internal/notifications/worker/helpers"
+	workermodels "github.com/devpablocristo/pymes/v3/backend/internal/notifications/worker/models"
 )
 
 const NotificationRequestedTopic = "NotificationRequested"
@@ -36,9 +37,18 @@ type NotificationRelayStore interface {
 	MarkNotificationPublished(context.Context, domain.OutboxEvent) error
 }
 
+type SchedulingProjection interface {
+	Execute(
+		context.Context,
+		ProjectionMetadata,
+		SchedulingNotification,
+	) (domain.Intent, bool, error)
+}
+
 type Worker struct {
 	Store       NotificationRelayStore
 	Provider    DeliveryProvider
+	Projection  SchedulingProjection
 	LeaseFor    time.Duration
 	MaxAttempts int
 }
@@ -46,8 +56,11 @@ type Worker struct {
 func NewWorker(
 	store NotificationRelayStore,
 	provider DeliveryProvider,
+	projection SchedulingProjection,
 ) Worker {
-	return Worker{Store: store, Provider: provider}
+	return Worker{
+		Store: store, Provider: provider, Projection: projection,
+	}
 }
 
 func (worker Worker) DispatchOnce(ctx context.Context) error {
@@ -117,13 +130,12 @@ func (worker Worker) dispatch(
 	if err != nil {
 		return fmt.Errorf("decode notification request: %w", err)
 	}
-	intent, err := worker.Store.Get(
-		ctx,
-		outboxEvent.OrganizationID,
-		event.NotificationID,
-	)
+	intent, deliver, err := worker.resolveIntent(ctx, outboxEvent, event)
 	if err != nil {
 		return err
+	}
+	if !deliver {
+		return nil
 	}
 	if intent.OrganizationID != outboxEvent.OrganizationID {
 		return fmt.Errorf("notification organization mismatch")
@@ -165,4 +177,57 @@ func (worker Worker) dispatch(
 		return markErr
 	}
 	return nil
+}
+
+func (worker Worker) resolveIntent(
+	ctx context.Context,
+	outboxEvent domain.OutboxEvent,
+	event workermodels.Requested,
+) (domain.Intent, bool, error) {
+	if event.Delivery != nil {
+		intent, err := worker.Store.Get(
+			ctx,
+			outboxEvent.OrganizationID,
+			event.Delivery.NotificationID,
+		)
+		return intent, true, err
+	}
+	if event.Scheduling == nil {
+		return domain.Intent{}, false, fmt.Errorf(
+			"notification request has no supported payload",
+		)
+	}
+	if worker.Projection == nil {
+		return domain.Intent{}, false, fmt.Errorf(
+			"scheduling notification projection is not configured",
+		)
+	}
+	projected := event.Scheduling
+	return worker.Projection.Execute(
+		ctx,
+		ProjectionMetadata{
+			EventID:        outboxEvent.ID,
+			OrganizationID: outboxEvent.OrganizationID,
+			IdempotencyKey: outboxEvent.IdempotencyKey,
+			CorrelationID:  outboxEvent.CorrelationID,
+			RequestID:      outboxEvent.RequestID,
+			ActorRef:       outboxEvent.ActorRef,
+			SourceVersion:  outboxEvent.SourceVersion,
+		},
+		SchedulingNotification{
+			Trigger:       projected.Trigger,
+			AggregateType: projected.AggregateType,
+			AggregateID:   projected.AggregateID,
+			RecipientE164: projected.RecipientE164,
+			CustomerName:  projected.CustomerName,
+			ServiceName:   projected.ServiceName,
+			StartAt:       projected.StartAt,
+			EndAt:         projected.EndAt,
+			Timezone:      projected.Timezone,
+			Reason:        projected.Reason,
+			ActionToken:   projected.ActionToken,
+			ActionTokens:  projected.ActionTokens,
+			ExpiresAt:     projected.ExpiresAt,
+		},
+	)
 }

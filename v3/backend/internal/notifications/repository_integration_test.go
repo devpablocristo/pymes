@@ -222,6 +222,93 @@ func TestPostgresNotificationConcurrentReplayCreatesOneIntentAndOutbox(
 	}
 }
 
+func TestPostgresSchedulingProjectionIsIdempotentWithoutASecondOutbox(
+	t *testing.T,
+) {
+	pool := notificationTestPool(t)
+	organizationID := "notification-org-projection-" + uuid.NewString()
+	enableNotifications(t, pool, organizationID)
+	repository := NewPostgres(pool)
+	now := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
+	project := ProjectSchedulingNotification{
+		Repository: repository,
+		Clock:      func() time.Time { return now },
+	}
+	metadata := ProjectionMetadata{
+		EventID:        uuid.NewString(),
+		OrganizationID: organizationID,
+		IdempotencyKey: "scheduling:NotificationRequested:booking-1:source-1:1",
+		CorrelationID:  "correlation-projection",
+		RequestID:      "request-projection",
+		ActorRef:       "system:scheduling",
+		SourceVersion:  1,
+	}
+	input := SchedulingNotification{
+		Trigger: "BookingConfirmed", AggregateType: "booking",
+		AggregateID: "booking-1", RecipientE164: "+5491112345678",
+		CustomerName: "Ada", ServiceName: "Consulta",
+		StartAt: now.Add(24 * time.Hour), EndAt: now.Add(25 * time.Hour),
+		Timezone: "America/Argentina/Buenos_Aires",
+	}
+	first, deliver, err := project.Execute(
+		context.Background(), metadata, input,
+	)
+	if err != nil || !deliver {
+		t.Fatalf("first projection deliver=%v err=%v", deliver, err)
+	}
+	replayed, deliver, err := project.Execute(
+		context.Background(), metadata, input,
+	)
+	if err != nil || !deliver || replayed.ID != first.ID {
+		t.Fatalf(
+			"replay projection=%+v first=%+v deliver=%v err=%v",
+			replayed,
+			first,
+			deliver,
+			err,
+		)
+	}
+	tx, err := pool.BeginTx(context.Background(), pgx.TxOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	if _, err = tx.Exec(
+		context.Background(),
+		"SELECT set_config('app.org_id',$1,true)",
+		organizationID,
+	); err != nil {
+		t.Fatal(err)
+	}
+	var intents, selfQueued int
+	if err = tx.QueryRow(context.Background(), `
+		SELECT count(*) FROM app.notifications
+		WHERE org_id=$1 AND idempotency_key=$2`,
+		organizationID,
+		metadata.IdempotencyKey,
+	).Scan(&intents); err != nil {
+		t.Fatal(err)
+	}
+	if err = tx.QueryRow(context.Background(), `
+		SELECT count(*) FROM app.outbox
+		WHERE org_id=$1 AND topic='NotificationRequested'
+		  AND idempotency_key=$2`,
+		organizationID,
+		metadata.IdempotencyKey,
+	).Scan(&selfQueued); err != nil {
+		t.Fatal(err)
+	}
+	if intents != 1 || selfQueued != 0 {
+		t.Fatalf("intents=%d self_queued=%d", intents, selfQueued)
+	}
+
+	input.CustomerName = "Grace"
+	_, _, err = project.Execute(context.Background(), metadata, input)
+	if !errors.Is(err, domain.ErrIdempotencyKeyReused) {
+		t.Fatalf("changed replay error=%v", err)
+	}
+}
+
 func TestPostgresNotificationLeaseCannotStealAnotherContextEvent(
 	t *testing.T,
 ) {

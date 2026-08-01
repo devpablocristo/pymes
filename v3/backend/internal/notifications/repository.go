@@ -39,6 +39,21 @@ func (repository *Postgres) Create(
 	ctx context.Context,
 	intent domain.Intent,
 ) (domain.Intent, error) {
+	return repository.create(ctx, intent, true)
+}
+
+func (repository *Postgres) Project(
+	ctx context.Context,
+	intent domain.Intent,
+) (domain.Intent, error) {
+	return repository.create(ctx, intent, false)
+}
+
+func (repository *Postgres) create(
+	ctx context.Context,
+	intent domain.Intent,
+	enqueue bool,
+) (domain.Intent, error) {
 	if repository == nil || repository.pool == nil {
 		return domain.Intent{}, errors.New("notification database is required")
 	}
@@ -103,6 +118,12 @@ func (repository *Postgres) Create(
 	}
 	if scanErr != nil {
 		return domain.Intent{}, scanErr
+	}
+	if !enqueue {
+		if err = tx.Commit(ctx); err != nil {
+			return domain.Intent{}, err
+		}
+		return stored, nil
 	}
 	payload, err := json.Marshal(map[string]string{"notification_id": stored.ID})
 	if err != nil {

@@ -692,7 +692,15 @@ func (r *PostgresRepository) ExpireHolds(
 				"version":    booking.Version,
 			}
 			events := lifecycleAndProjectionEvents(
-				metadata, id.String(), domain.EventBookingCancelled, payload,
+				metadata,
+				id.String(),
+				domain.EventBookingCancelled,
+				payload,
+				bookingNotificationPayload(
+					booking,
+					domain.EventBookingCancelled,
+					map[string]any{"reason": "hold_expired"},
+				),
 			)
 			if err := insertEvents(ctx, tx, events); err != nil {
 				_ = tx.Rollback(ctx)
@@ -729,7 +737,10 @@ func (r *PostgresRepository) ClaimReminders(
 			return nil, err
 		}
 		rows, err := tx.Query(ctx, `
-			SELECT b.id,b.starts_at
+			SELECT
+			  b.id,b.starts_at,b.ends_at,b.service_name_snapshot,
+			  b.timezone_snapshot,b.customer_name_snapshot,
+			  b.customer_phone_snapshot
 			FROM app.scheduling_bookings b
 			WHERE b.org_id=$1 AND b.status='confirmed'
 			  AND b.starts_at>=$2 AND b.starts_at<$3
@@ -747,13 +758,26 @@ func (r *PostgresRepository) ClaimReminders(
 			return nil, repositoryhelpers.MapError(err)
 		}
 		type due struct {
-			id uuid.UUID
-			at time.Time
+			id            uuid.UUID
+			at            time.Time
+			endsAt        time.Time
+			serviceName   string
+			timezone      string
+			customerName  string
+			customerPhone string
 		}
 		values := make([]due, 0)
 		for rows.Next() {
 			var value due
-			if err := rows.Scan(&value.id, &value.at); err != nil {
+			if err := rows.Scan(
+				&value.id,
+				&value.at,
+				&value.endsAt,
+				&value.serviceName,
+				&value.timezone,
+				&value.customerName,
+				&value.customerPhone,
+			); err != nil {
 				rows.Close()
 				_ = tx.Rollback(ctx)
 				return nil, err
@@ -789,7 +813,17 @@ func (r *PostgresRepository) ClaimReminders(
 				value.id.String(),
 				domain.EventNotificationRequested,
 				domain.EventReminderDue,
-				map[string]any{"booking_id": value.id, "start_at": value.at},
+				map[string]any{
+					"aggregate_type": "booking",
+					"aggregate_id":   value.id,
+					"booking_id":     value.id,
+					"recipient_e164": value.customerPhone,
+					"customer_name":  value.customerName,
+					"service_name":   value.serviceName,
+					"start_at":       value.at,
+					"end_at":         value.endsAt,
+					"timezone":       value.timezone,
+				},
 			)
 			notification.AvailableAt = from
 			if err := insertEvents(ctx, tx, []domain.Event{event, notification}); err != nil {

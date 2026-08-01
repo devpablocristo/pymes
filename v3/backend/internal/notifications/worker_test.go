@@ -113,6 +113,79 @@ func requestedEvent() domain.OutboxEvent {
 	}
 }
 
+type schedulingProjectionFake struct {
+	intent domain.Intent
+	calls  int
+}
+
+func (projection *schedulingProjectionFake) Execute(
+	_ context.Context,
+	metadata ProjectionMetadata,
+	input SchedulingNotification,
+) (domain.Intent, bool, error) {
+	projection.calls++
+	if metadata.OrganizationID == "" || input.AggregateID == "" {
+		return domain.Intent{}, false, errors.New("projection metadata is incomplete")
+	}
+	return projection.intent, true, nil
+}
+
+func TestWorkerProjectsSchedulingRequestBeforePerGoDelivery(t *testing.T) {
+	store := &workerStore{
+		event: domain.OutboxEvent{
+			ID: "outbox-scheduling", OrganizationID: "org-1",
+			Topic: NotificationRequestedTopic,
+			Payload: json.RawMessage(`{
+				"trigger":"BookingConfirmed",
+				"aggregate_type":"booking",
+				"aggregate_id":"booking-1",
+				"booking_id":"booking-1",
+				"recipient_e164":"+5491112345678",
+				"customer_name":"Ada",
+				"service_name":"Consulta",
+				"start_at":"2026-08-03T15:00:00Z",
+				"end_at":"2026-08-03T16:00:00Z",
+				"timezone":"America/Argentina/Buenos_Aires"
+			}`),
+			IdempotencyKey: "scheduling:notification:booking-1:1",
+			CorrelationID:  "correlation-1",
+			RequestID:      "request-1",
+			ActorRef:       "user-1",
+			SourceVersion:  1,
+		},
+	}
+	projection := &schedulingProjectionFake{intent: domain.Intent{
+		ID: "scheduling:outbox-scheduling", OrganizationID: "org-1",
+		Status: domain.StatusPending,
+	}}
+	sends := 0
+	worker := Worker{
+		Store:      store,
+		Projection: projection,
+		Provider: deliveryProvider(func(
+			_ context.Context,
+			intent domain.Intent,
+		) (DeliveryReceipt, error) {
+			sends++
+			if intent.ID != projection.intent.ID {
+				t.Fatalf("unexpected projected intent: %+v", intent)
+			}
+			return DeliveryReceipt{ExternalMessageID: "pergo-1"}, nil
+		}),
+	}
+	if err := worker.DispatchOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if projection.calls != 1 || sends != 1 || !store.published {
+		t.Fatalf(
+			"projection_calls=%d sends=%d published=%v",
+			projection.calls,
+			sends,
+			store.published,
+		)
+	}
+}
+
 func TestWorkerRetriesTimeoutBeforeProcessingAndConverges(t *testing.T) {
 	store := &workerStore{
 		intent: pendingIntent(),

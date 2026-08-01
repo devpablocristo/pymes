@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { InMemoryFiscalLedger } from "../../src/fiscal/companion/in-memory-ledger.js";
-import { MockFiscalAuthority } from "../../src/fiscal/companion/mock-authority.js";
-import { FiscalError, type FiscalRequest } from "../../src/fiscal/domain/fiscal.js";
-import { FiscalService } from "../../src/fiscal/usecases/fiscal-service.js";
+import { InMemoryFiscalLedger } from "../../src/fiscal/in_memory_ledger.js";
+import { MockFiscalAuthority } from "../../src/fiscal/mock_authority.js";
+import {
+  FiscalError,
+  type FiscalRequest,
+} from "../../src/fiscal/usecases/domain/fiscal.js";
+import { FiscalService } from "../../src/fiscal/usecases.js";
 
 const request: FiscalRequest = {
   request_id: "fiscal:sale-1:1",
@@ -17,6 +20,7 @@ const request: FiscalRequest = {
   document_type: "FA",
   voucher_number: 42,
   issue_date: "2026-07-30",
+  concept: "products",
   currency: "ARS",
   totals: { net: "100", vat: "21", exempt: "0", total: "121.00" },
   recipient: { document_type: "CUIT", document_number: "20123456789", vat_condition: "registered" },

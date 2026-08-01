@@ -99,6 +99,7 @@ services:
       PYMES_ENVIRONMENT: development
       PYMES_INTERNAL_ISSUER: pymes-v3
       PYMES_INTERNAL_JWKS_JSON: '{"keys":[{"kty":"OKP","crv":"Ed25519","alg":"EdDSA","use":"sig","key_ops":["verify"],"kid":"local-dev-1","x":"ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"}]}'
+      FISCAL_LOCAL_KMS_KEY_B64: BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=
       PORT: "8080"
     depends_on:
       accounting-grants: { condition: service_completed_successfully }

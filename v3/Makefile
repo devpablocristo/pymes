@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help build migration-image-check test fiscal-test accounting-test quality security fiscal-e2e accounting-e2e commercial-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate architecture-check db-integration backup-restore-smoke e2e ci up down backup restore
+.PHONY: help build migration-image-check test fiscal-test fiscal-real-contract accounting-test quality security fiscal-e2e accounting-e2e commercial-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate architecture-check db-integration backup-restore-smoke e2e ci up down backup restore
 
 ACCOUNTING_BUILD_CONTEXT ?= ../../open-accounting
 
@@ -9,6 +9,7 @@ help:
 	@echo "  make migration-image-check  Construye las imágenes de migración Cloud Run"
 	@echo "  make test            Ejecuta pruebas Go y del fiscal adapter mock"
 	@echo "  make fiscal-test     Ejecuta typecheck y pruebas TypeScript fiscales"
+	@echo "  make fiscal-real-contract  Prueba onboarding, KMS, WSAA y WSFE real con fakes"
 	@echo "  make accounting-test Ejecuta las suites del runtime contable headless"
 	@echo "  make quality         Ejecuta vet y valida Compose"
 	@echo "  make security        Verifica vulnerabilidades alcanzables en los tres runtimes"
@@ -45,6 +46,9 @@ test:
 
 fiscal-test:
 	cd fiscal-adapter && npm ci --ignore-scripts && npm run ci
+
+fiscal-real-contract:
+	cd fiscal-adapter && npm ci --ignore-scripts && npm run test:real
 
 accounting-test:
 	cd "$(ACCOUNTING_BUILD_CONTEXT)" && go test ./internal/accounting ./internal/tenant ./internal/pymesaccounting ./internal/database/pymesaccounting ./internal/database/pymesaccountingadmin ./internal/pymesaccountingadminhttp ./cmd/pymes-accounting ./cmd/pymes-accounting-admin
@@ -135,6 +139,7 @@ ci:
 	$(MAKE) quality
 	$(MAKE) security
 	$(MAKE) test
+	$(MAKE) fiscal-real-contract
 	$(MAKE) build
 	$(MAKE) migration-image-check
 	$(MAKE) e2e

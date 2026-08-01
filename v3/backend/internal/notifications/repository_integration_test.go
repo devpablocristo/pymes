@@ -57,10 +57,15 @@ func enableNotifications(
 		t.Fatal(err)
 	}
 	if _, err = tx.Exec(ctx, `
-		INSERT INTO app.notification_settings(org_id,whatsapp_enabled)
-		VALUES($1,true)
-		ON CONFLICT (org_id) DO UPDATE SET whatsapp_enabled=true`,
-		organizationID,
+		INSERT INTO app.notification_settings(
+			org_id,whatsapp_enabled,pergo_channel,pergo_sender_identity
+		)
+		VALUES($1,true,'whatsapp_mock',$2)
+		ON CONFLICT (org_id) DO UPDATE
+		SET whatsapp_enabled=true,
+		    pergo_channel=EXCLUDED.pergo_channel,
+		    pergo_sender_identity=EXCLUDED.pergo_sender_identity`,
+		organizationID, "mock:"+organizationID,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +103,9 @@ func TestPostgresNotificationIdempotencyRLSAndWebhookInbox(
 	enableNotifications(t, pool, organizationA)
 	enableNotifications(t, pool, organizationB)
 	repository := NewPostgres(pool)
-	request := RequestNotification{Repository: repository}
+	request := RequestNotification{
+		Repository: repository, Routes: repository,
+	}
 	ctx := context.Background()
 	intentA := integrationIntent(
 		organizationA, "shared-notification", "confirmation-1",
@@ -106,6 +113,10 @@ func TestPostgresNotificationIdempotencyRLSAndWebhookInbox(
 	first, err := request.Execute(ctx, intentA)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if first.DeliveryChannel != "whatsapp_mock" ||
+		first.SenderIdentity != "mock:"+organizationA {
+		t.Fatalf("tenant delivery route was not snapshotted: %+v", first)
 	}
 	replay, err := request.Execute(ctx, intentA)
 	if err != nil || replay.ID != first.ID {
@@ -165,7 +176,9 @@ func TestPostgresNotificationConcurrentReplayCreatesOneIntentAndOutbox(
 	organizationID := "notification-org-concurrent-" + uuid.NewString()
 	enableNotifications(t, pool, organizationID)
 	repository := NewPostgres(pool)
-	request := RequestNotification{Repository: repository}
+	request := RequestNotification{
+		Repository: repository, Routes: repository,
+	}
 	intent := integrationIntent(
 		organizationID, "notification-concurrent", "confirmation-concurrent",
 	)
@@ -232,6 +245,7 @@ func TestPostgresSchedulingProjectionIsIdempotentWithoutASecondOutbox(
 	now := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
 	project := ProjectSchedulingNotification{
 		Repository: repository,
+		Routes:     repository,
 		Clock:      func() time.Time { return now },
 	}
 	metadata := ProjectionMetadata{
@@ -256,10 +270,38 @@ func TestPostgresSchedulingProjectionIsIdempotentWithoutASecondOutbox(
 	if err != nil || !deliver {
 		t.Fatalf("first projection deliver=%v err=%v", deliver, err)
 	}
+	tx, err := pool.BeginTx(context.Background(), pgx.TxOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(
+		context.Background(),
+		"SELECT set_config('app.org_id',$1,true)",
+		organizationID,
+	); err != nil {
+		_ = tx.Rollback(context.Background())
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(context.Background(), `
+		UPDATE app.notification_settings
+		SET pergo_sender_identity='mock:changed-route'
+		WHERE org_id=$1`,
+		organizationID,
+	); err != nil {
+		_ = tx.Rollback(context.Background())
+		t.Fatal(err)
+	}
+	if err = tx.Commit(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	project.Clock = func() time.Time { return now.Add(time.Hour) }
 	replayed, deliver, err := project.Execute(
 		context.Background(), metadata, input,
 	)
-	if err != nil || !deliver || replayed.ID != first.ID {
+	if err != nil || !deliver || replayed.ID != first.ID ||
+		replayed.SnapshotDigest != first.SnapshotDigest ||
+		replayed.SenderIdentity != "mock:"+organizationID ||
+		replayed.SendAt != first.SendAt {
 		t.Fatalf(
 			"replay projection=%+v first=%+v deliver=%v err=%v",
 			replayed,
@@ -268,7 +310,7 @@ func TestPostgresSchedulingProjectionIsIdempotentWithoutASecondOutbox(
 			err,
 		)
 	}
-	tx, err := pool.BeginTx(context.Background(), pgx.TxOptions{})
+	tx, err = pool.BeginTx(context.Background(), pgx.TxOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +366,9 @@ func TestPostgresNotificationLeaseCannotStealAnotherContextEvent(
 		"confirmation-lease",
 	)
 	intent.SendAt = now.Add(-time.Minute)
-	if _, err := (RequestNotification{Repository: repository}).Execute(
+	if _, err := (RequestNotification{
+		Repository: repository, Routes: repository,
+	}).Execute(
 		context.Background(),
 		intent,
 	); err != nil {

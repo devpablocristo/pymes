@@ -5,6 +5,7 @@ import "time"
 
 type MessageRequest struct {
 	To           string              `json:"to"`
+	From         string              `json:"from,omitempty"`
 	Channel      string              `json:"channel"`
 	Body         string              `json:"body"`
 	Metadata     map[string]string   `json:"metadata,omitempty"`

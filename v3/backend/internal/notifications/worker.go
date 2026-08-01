@@ -213,6 +213,7 @@ func (worker Worker) resolveIntent(
 			RequestID:      outboxEvent.RequestID,
 			ActorRef:       outboxEvent.ActorRef,
 			SourceVersion:  outboxEvent.SourceVersion,
+			OccurredAt:     outboxEvent.CreatedAt,
 		},
 		SchedulingNotification{
 			Trigger:       projected.Trigger,

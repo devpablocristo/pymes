@@ -20,6 +20,7 @@ type OutboxEvent struct {
 	SnapshotDigest string
 	CorrelationID  string
 	AvailableAt    time.Time
+	CreatedAt      time.Time
 	Attempts       int
 	LeaseToken     string
 	LeaseExpiresAt time.Time
@@ -33,7 +34,8 @@ func (event OutboxEvent) Domain() domain.OutboxEvent {
 		RequestID: event.RequestID, ActorRef: event.ActorRef,
 		SourceVersion: event.SourceVersion, SnapshotDigest: event.SnapshotDigest,
 		CorrelationID: event.CorrelationID, AvailableAt: event.AvailableAt,
-		Attempts: event.Attempts, LeaseToken: event.LeaseToken,
+		CreatedAt: event.CreatedAt, Attempts: event.Attempts,
+		LeaseToken:     event.LeaseToken,
 		LeaseExpiresAt: event.LeaseExpiresAt,
 	}
 }

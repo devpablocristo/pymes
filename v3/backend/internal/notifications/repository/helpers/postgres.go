@@ -28,6 +28,7 @@ func ScanIntent(scanner pgx.Row) (domain.Intent, error) {
 		&row.ID, &row.OrganizationID, &row.Kind, &row.AggregateType,
 		&row.AggregateID, &row.RecipientE164, &row.TemplateName,
 		&row.TemplateVersion, &row.Locale, &row.VariablesJSON, &row.Body,
+		&row.DeliveryChannel, &row.SenderIdentity,
 		&row.SendAt, &row.Status, &row.ExternalMessageID,
 		&row.IdempotencyKey, &row.CorrelationID, &row.RequestID,
 		&row.ActorRef, &row.SourceVersion, &row.SnapshotDigest,
@@ -45,7 +46,7 @@ func ScanOutboxEvent(scanner pgx.Row) (domain.OutboxEvent, error) {
 		&row.ID, &row.OrganizationID, &row.Topic, &row.Payload,
 		&row.PayloadHash, &row.IdempotencyKey, &row.RequestID,
 		&row.ActorRef, &row.SourceVersion, &row.SnapshotDigest,
-		&row.CorrelationID, &row.AvailableAt, &row.Attempts,
+		&row.CorrelationID, &row.AvailableAt, &row.CreatedAt, &row.Attempts,
 		&row.LeaseToken, &row.LeaseExpiresAt,
 	)
 	if err != nil {

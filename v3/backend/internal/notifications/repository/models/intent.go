@@ -21,6 +21,8 @@ type IntentRow struct {
 	Locale            string
 	VariablesJSON     []byte
 	Body              string
+	DeliveryChannel   string
+	SenderIdentity    string
 	SendAt            time.Time
 	Status            string
 	ExternalMessageID string
@@ -46,7 +48,9 @@ func (row IntentRow) Domain() (domain.Intent, error) {
 		AggregateID: row.AggregateID, RecipientE164: row.RecipientE164,
 		TemplateName: row.TemplateName, TemplateVersion: row.TemplateVersion,
 		Locale: row.Locale, Variables: variables, Body: row.Body,
-		SendAt: row.SendAt, Status: domain.Status(row.Status),
+		DeliveryChannel: row.DeliveryChannel,
+		SenderIdentity:  row.SenderIdentity,
+		SendAt:          row.SendAt, Status: domain.Status(row.Status),
 		ExternalMessageID: row.ExternalMessageID,
 		IdempotencyKey:    row.IdempotencyKey, CorrelationID: row.CorrelationID,
 		RequestID: row.RequestID, ActorRef: row.ActorRef,

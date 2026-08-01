@@ -26,7 +26,9 @@ paths:
         - name: Idempotency-Key
           in: header
           required: true
-          description: Compatibilidad hacia adelante; la identidad durable actual es X-Trace-ID.
+          description: >-
+            Ledger durable de PerGo por workspace; replay idéntico devuelve el
+            mismo receipt y payload distinto devuelve idempotency_key_reused.
           schema: { type: string, minLength: 1, maxLength: 255 }
       requestBody:
         required: true
@@ -42,6 +44,7 @@ paths:
         '400': { description: Payload inválido. }
         '401': { description: API key de workspace inválida. }
         '409': { description: Identidad reutilizada con otro payload. }
+        '425': { description: Una entrega idéntica concurrente sigue en proceso. }
         '422': { description: Ruta o canal no disponible. }
         '429': { description: Backpressure o rate limit. }
         '500': { description: Fallo transitorio. }
@@ -59,6 +62,11 @@ components:
         to:
           type: string
           pattern: '^[1-9][0-9]{7,14}$'
+        from:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Identidad no secreta de la conexión PerGo elegida por la organización.
         channel:
           type: string
           enum: [whatsapp, whatsapp_cloud, whatsapp_mock]

@@ -21,6 +21,12 @@ intención, template versionado, momento, idempotencia y proyección de estado.
 PerGo se usa como servicio privado y es dueño de credenciales, proveedor,
 transporte y entrega.
 
+Pymes también conserva por organización la ruta no secreta
+`channel + sender_identity`, y la congela en cada intención. Esa identidad
+referencia una conexión administrada por PerGo; tokens y credenciales del
+proveedor nunca se guardan en la base de Pymes. La API key técnica del worker se
+inyecta desde Secret Manager y no es configuración tenant.
+
 La integración vive exclusivamente en `notifications/pergo.go`, con modelos y
 helpers propios. Scheduling comunica la intención mediante el outbox; no llama
 al adapter. El dispatcher autónomo de Notifications conserva leases, backoff,
@@ -34,6 +40,16 @@ organización e intención desde esa identidad sólo después de verificar HMAC,
 timestamp y workspace. Se usa un callback global y no un `org_id` suministrado
 en el path.
 
+La identidad durable de ingreso es `Idempotency-Key` dentro del workspace de
+PerGo. PerGo persiste hash de payload y receipt antes de responder: un replay
+idéntico devuelve el mismo receipt, uno diferente devuelve conflicto y un
+reinicio no borra la decisión. `X-Trace-ID` se usa para correlación. El fallback
+global de canal queda deshabilitado por defecto y sólo se admite de manera
+explícita en el fake o en un piloto controlado.
+El adapter deriva la clave externa con un hash de organización más clave
+tenant-local para impedir colisiones entre organizaciones del workspace
+compartido.
+
 ## Alternativas descartadas
 
 - Enviar desde la transacción del turno: introduce fallo parcial y latencia.
@@ -43,6 +59,8 @@ en el path.
   metadata de Pymes y el path sería una entrada tenant no autenticada.
 - Crear un microservicio Go de Notifications: agrega operación sin una frontera
   de datos o escalado que lo justifique.
+- Guardar tokens o credenciales de cada remitente en Pymes: duplica el vault y
+  viola el ownership de PerGo.
 
 ## Consecuencias
 

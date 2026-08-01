@@ -63,7 +63,7 @@ PYMES_DEPLOY_ENV=prd PYMES_MONITORING_DRY_RUN=true \
 | DLQ no vacía | `failure_code`, tópico, intentos, sin leer payload | Corregir causa, registrar cambio y usar replay explícito. |
 | Fiscal uncertain | Estado del Fiscal mock y consulta exacta | Dejar actuar al reconciliador; nunca volver a autorizar. |
 | Circuito abierto | Servicio indicado y su base | Recuperar servicio; el circuito se cierra después del cooldown y una respuesta válida. |
-| Notificación incierta / backlog | Probe privado de PerGo, leases y último código estable | Recuperar PerGo; reenviar únicamente el mismo outbox y trace ID. |
+| Notificación incierta / backlog | Probe privado de PerGo, leases y último código estable | Recuperar PerGo; reenviar únicamente el mismo outbox, Idempotency-Key, payload y trace ID. |
 
 ## Identidad interna KMS
 
@@ -189,7 +189,7 @@ make replay-smoke
 | Cloud KMS interno | La revisión nueva no arranca o fallan entregas privadas; outbox crece | Restaurar API/permisos de la versión fijada; nunca usar semilla ni cambiar de versión sin overlap. |
 | Fiscal | Circuito abre; autorización queda pendiente o incierta | Recuperar servicio/base; reintento o consulta exacta, nunca nuevo número. |
 | Accounting | CAE puede estar persistido y posting queda pendiente | Recuperar servicio/base; reenviar mismo comando idempotente. |
-| PerGo | El turno queda confirmado y la intención pendiente o incierta | Recuperar PerGo; el lease vence y se reintenta con el mismo trace ID. Un webhook adelantado impide duplicar. |
+| PerGo | El turno queda confirmado y la intención pendiente o incierta | Recuperar PerGo; el lease vence y se reintenta con el mismo Idempotency-Key, payload y trace ID. El ledger de ingreso devuelve el receipt original y un webhook adelantado evita regresiones de estado. |
 | PostgreSQL Pymes | API y worker no ready; no hay escrituras parciales | Recuperar Cloud SQL o restaurar base nueva; luego reconciliar ambos downstreams. |
 | PostgreSQL Fiscal | Fiscal no ready; worker reintenta | Restaurar sólo Fiscal; consultar solicitudes exactas desde Pymes. |
 | PostgreSQL Accounting | Accounting no ready; postings quedan en outbox | Restaurar sólo Accounting; reintentar comandos desde Pymes. |

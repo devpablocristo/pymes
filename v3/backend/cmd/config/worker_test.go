@@ -145,6 +145,7 @@ func TestLoadWorkerFromValidatesPerGoOnlyWhenEnabled(t *testing.T) {
 		"PERGO_API_KEY":                        "secret",
 		"PERGO_WORKSPACE_ID":                   "workspace-1",
 		"PERGO_CHANNEL":                        "whatsapp_mock",
+		"PERGO_ALLOW_GLOBAL_ROUTE_FALLBACK":    "true",
 		"PERGO_TIMEOUT":                        "750ms",
 	}
 	cfg, err := LoadWorkerFrom(func(key string) string { return values[key] })
@@ -152,7 +153,8 @@ func TestLoadWorkerFromValidatesPerGoOnlyWhenEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !cfg.PerGo.Enabled || cfg.PerGo.BaseURL != "http://pergo" ||
-		cfg.PerGo.Timeout != 750*time.Millisecond {
+		cfg.PerGo.Timeout != 750*time.Millisecond ||
+		!cfg.PerGo.AllowGlobalRouteFallback {
 		t.Fatalf("PerGo config = %+v", cfg.PerGo)
 	}
 	delete(values, "PERGO_API_KEY")

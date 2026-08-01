@@ -48,7 +48,31 @@ var (
 	identifierShape = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9:_./-]*$`)
 	templateShape   = regexp.MustCompile(`^[a-z][a-z0-9_.-]*$`)
 	localeShape     = regexp.MustCompile(`^[a-z]{2}(?:_[A-Z]{2})?$`)
+	senderShape     = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9:+@._/-]{0,254}$`)
 )
+
+type DeliveryRoute struct {
+	Channel        string
+	SenderIdentity string
+}
+
+func (route DeliveryRoute) Validate() error {
+	if route.Channel == "" && route.SenderIdentity == "" {
+		return nil
+	}
+	if route.Channel == "" || route.SenderIdentity == "" {
+		return invalid("delivery_route")
+	}
+	switch route.Channel {
+	case "whatsapp", "whatsapp_cloud", "whatsapp_mock":
+	default:
+		return invalid("delivery_channel")
+	}
+	if !senderShape.MatchString(route.SenderIdentity) {
+		return invalid("sender_identity")
+	}
+	return nil
+}
 
 // Intent is Pymes' source of truth. Provider credentials and transport remain
 // PerGo responsibilities; external identifiers are only delivery projections.
@@ -64,6 +88,8 @@ type Intent struct {
 	Locale            string            `json:"locale"`
 	Variables         map[string]string `json:"-"`
 	Body              string            `json:"-"`
+	DeliveryChannel   string            `json:"-"`
+	SenderIdentity    string            `json:"-"`
 	SendAt            time.Time         `json:"send_at"`
 	Status            Status            `json:"status"`
 	ExternalMessageID string            `json:"external_message_id,omitempty"`
@@ -102,6 +128,7 @@ type OutboxEvent struct {
 	SnapshotDigest string
 	CorrelationID  string
 	AvailableAt    time.Time
+	CreatedAt      time.Time
 	Attempts       int
 	LeaseToken     string
 	LeaseExpiresAt time.Time
@@ -141,6 +168,11 @@ func (i Intent) Validate() error {
 	if len(i.Body) < 1 || len(i.Body) > 4096 {
 		return invalid("body")
 	}
+	if err := (DeliveryRoute{
+		Channel: i.DeliveryChannel, SenderIdentity: i.SenderIdentity,
+	}).Validate(); err != nil {
+		return err
+	}
 	if len(i.Variables) > 50 {
 		return invalid("variables")
 	}
@@ -165,6 +197,8 @@ func (i Intent) Digest() (string, error) {
 		Locale          string            `json:"locale"`
 		Variables       map[string]string `json:"variables"`
 		Body            string            `json:"body"`
+		DeliveryChannel string            `json:"delivery_channel,omitempty"`
+		SenderIdentity  string            `json:"sender_identity,omitempty"`
 		SendAt          string            `json:"send_at"`
 		IdempotencyKey  string            `json:"idempotency_key"`
 		CorrelationID   string            `json:"correlation_id"`
@@ -178,8 +212,10 @@ func (i Intent) Digest() (string, error) {
 		RecipientE164: i.RecipientE164, TemplateName: i.TemplateName,
 		TemplateVersion: i.TemplateVersion, Locale: i.Locale,
 		Variables: i.Variables, Body: i.Body,
-		SendAt:         i.SendAt.UTC().Format(time.RFC3339Nano),
-		IdempotencyKey: i.IdempotencyKey, CorrelationID: i.CorrelationID,
+		DeliveryChannel: i.DeliveryChannel,
+		SenderIdentity:  i.SenderIdentity,
+		SendAt:          i.SendAt.UTC().Format(time.RFC3339Nano),
+		IdempotencyKey:  i.IdempotencyKey, CorrelationID: i.CorrelationID,
 		RequestID: i.RequestID, ActorRef: i.ActorRef,
 		SourceVersion: i.SourceVersion,
 	})

@@ -11,6 +11,7 @@ modifica el turno: esa transacción persiste la intención y
 |---|---|
 | organización, destinatario, tipo de mensaje y momento | Pymes |
 | template, versión, variables y estado comercial | Pymes |
+| canal lógico e identidad no secreta del remitente por organización | Pymes |
 | API key, proveedor WhatsApp y credenciales del canal | PerGo |
 | cola del proveedor, external message ID y entrega | PerGo |
 | estado proyectado `queued/sent/delivered/read/failed` | Pymes |
@@ -21,11 +22,13 @@ No recibe teléfono, cuerpo ni variables y nunca llama directamente a PerGo.
 
 ## Flujo durable
 
-1. El caso de uso de Scheduling crea una intención con identidad e idempotency
-   key estables.
-2. `notifications.Postgres.Create` comprueba el feature flag tenant,
-   persiste `app.notifications` y agrega `NotificationRequested` al outbox en
-   una sola transacción.
+1. Scheduling agrega `NotificationRequested` a su outbox dentro de la
+   transacción del turno.
+2. El consumidor de Notifications proyecta el snapshot recibido, resuelve la
+   ruta no secreta de la organización y persiste idempotentemente una intención
+   propia. No accede al repository de Scheduling ni crea un segundo outbox.
+   Los casos de uso que originan directamente una notificación conservan la
+   variante transaccional que persiste intención y evento juntos.
 3. El dispatcher de Notifications toma un lease exclusivamente sobre
    `NotificationRequested`. Commerce, Scheduling y Calendars tienen
    dispatchers y allowlists independientes, por lo que ningún contexto puede
@@ -53,16 +56,27 @@ adapter; no ingresan al dominio.
 
 ## Idempotencia y pérdida de respuesta
 
-PerGo usa `X-Trace-ID` como identidad de despacho. Pymes también envía
-`Idempotency-Key`, correlation ID, versión de template, tipo y organización
-dentro de metadata. Una repetición idéntica obtiene el mismo mensaje; una
-repetición con payload distinto es `PERGO_IDEMPOTENCY_CONFLICT`.
+PerGo usa un ledger PostgreSQL durable por
+`(workspace_id, Idempotency-Key)`. Pymes reenvía la misma clave y el mismo
+payload; una repetición aceptada obtiene exactamente el mismo `message_id`,
+`queued_at` y trace ID sin volver a publicar en la cola. Reutilizar la clave con
+otro payload devuelve el conflicto estable `idempotency_key_reused`.
+`X-Trace-ID` queda como correlación tenant-aware y no sustituye al ledger.
+Como las claves del dominio Pymes son tenant-locales y varias organizaciones
+comparten el workspace, el adapter deriva el header mediante SHA-256 de
+`organization_id + idempotency_key`; así dos tenants no colisionan y ningún
+identificador sensible aparece en la clave externa.
 
 Un timeout puede haber ocurrido antes o después de que PerGo aceptara el
 mensaje. Pymes marca la intención `uncertain`, conserva el mismo evento del
-outbox y reintenta con las mismas identidades. Si el webhook llegó primero y
-marcó `sent`, una respuesta tardía o perdida no degrada el estado y el siguiente
-reintento no vuelve a enviar.
+outbox y reintenta con las mismas identidades. El ledger cubre respuesta perdida,
+reinicio y concurrencia en el ingreso a PerGo. Si el webhook llegó primero y
+marcó `sent`, una respuesta tardía o perdida tampoco degrada el estado.
+
+La garantía termina en la cola interna de PerGo: una caída situada exactamente
+después de que el proveedor externo aceptó el mensaje y antes de que PerGo
+persistiera el resultado todavía requiere reconciliación con ese proveedor. No
+se documenta como exactly-once de punta a punta.
 
 Los cambios de estado son monotónicos:
 
@@ -87,6 +101,28 @@ Las tres tablas tienen `org_id`, RLS habilitada y forzada. Las identidades
 durables son compuestas por tenant y la configuración `whatsapp_enabled`
 falla cerrada. El inbox no admite `UPDATE`, `DELETE` ni `TRUNCATE`.
 
+`017_notifications_pergo_routes.sql` agrega:
+
+- `pergo_channel` y `pergo_sender_identity` a la configuración tenant;
+- el snapshot inmutable `delivery_channel` y `sender_identity` a cada intención.
+
+## Routing por organización
+
+`pergo_sender_identity` identifica una conexión o remitente que ya existe en
+PerGo; no contiene token, API key ni secreto del proveedor. La resolución ocurre
+antes de calcular el digest de la intención, por lo que un cambio posterior de
+configuración sólo afecta mensajes nuevos. El adapter envía ese valor en
+`from`.
+
+Pymes no almacena credenciales de canales PerGo en su base. La única API key que
+usa el worker es una credencial técnica del workload, inyectada desde Secret
+Manager; las conexiones, tokens y secretos WhatsApp permanecen exclusivamente
+en PerGo.
+
+La ausencia de ruta falla cerrada con `PERGO_ROUTE_NOT_CONFIGURED`. Existe un
+fallback global exclusivamente para el fake de Compose o un piloto controlado,
+y requiere habilitarlo de forma explícita. No debe utilizarse como modelo SaaS.
+
 Teléfono, cuerpo y variables son datos operativos privados: no se incluyen en
 logs, métricas, errores ni respuestas públicas. Backups y acceso SQL deben
 seguir las mismas reglas de PII que `parties`.
@@ -108,19 +144,24 @@ PYMES_PERGO_ENABLED=true
 PERGO_URL=<URL privada de PerGo>
 PERGO_API_KEY=<Secret Manager>
 PERGO_WORKSPACE_ID=<workspace esperado>
-PERGO_CHANNEL=whatsapp
+PERGO_CHANNEL=whatsapp_mock
+PERGO_ALLOW_GLOBAL_ROUTE_FALLBACK=false
 PERGO_TIMEOUT=5s
 ```
 
 `PERGO_API_KEY` y los secretos de webhook son credenciales distintas. En STG y
 PRD deben existir como versiones separadas de Secret Manager y estar accesibles
 únicamente por las service accounts de worker y API, respectivamente.
+`PERGO_CHANNEL` sólo se consulta cuando el fallback explícito está habilitado;
+la ruta normal proviene del snapshot tenant.
 
 ## Validación y recuperación
 
 `make notifications-e2e` usa el fake contractual de Compose y cubre:
 
 - envío exitoso;
+- proyección consumer-owned de Scheduling y routing tenant hasta `from`;
+- replay del fake con receipt estable y conflicto ante payload distinto;
 - timeout después de procesar sin segundo mensaje;
 - indisponibilidad y recuperación;
 - timeout antes de procesar;

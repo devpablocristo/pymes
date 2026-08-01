@@ -2,6 +2,7 @@
 package helpers
 
 import (
+	"errors"
 	"sort"
 	"strings"
 
@@ -9,7 +10,40 @@ import (
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/notifications/usecases/domain"
 )
 
-func MessageRequest(intent domain.Intent, channel string) pergomodels.MessageRequest {
+var ErrRouteNotConfigured = errors.New("PerGo delivery route is not configured")
+
+func DeliveryRoute(
+	intent domain.Intent,
+	fallbackChannel string,
+	allowGlobalFallback bool,
+) (string, string, error) {
+	route := domain.DeliveryRoute{
+		Channel:        strings.TrimSpace(intent.DeliveryChannel),
+		SenderIdentity: strings.TrimSpace(intent.SenderIdentity),
+	}
+	if err := route.Validate(); err != nil {
+		return "", "", err
+	}
+	if route.Channel != "" {
+		return route.Channel, route.SenderIdentity, nil
+	}
+	if !allowGlobalFallback {
+		return "", "", ErrRouteNotConfigured
+	}
+	channel := strings.TrimSpace(fallbackChannel)
+	switch channel {
+	case "whatsapp", "whatsapp_cloud", "whatsapp_mock":
+		return channel, "", nil
+	default:
+		return "", "", ErrRouteNotConfigured
+	}
+}
+
+func MessageRequest(
+	intent domain.Intent,
+	channel string,
+	senderIdentity string,
+) pergomodels.MessageRequest {
 	metadata := map[string]string{
 		"pymes_org_id":            intent.OrganizationID,
 		"pymes_message_id":        intent.ID,
@@ -20,6 +54,7 @@ func MessageRequest(intent domain.Intent, channel string) pergomodels.MessageReq
 	}
 	request := pergomodels.MessageRequest{
 		To:      strings.TrimPrefix(intent.RecipientE164, "+"),
+		From:    strings.TrimSpace(senderIdentity),
 		Channel: channel, Body: intent.Body, Metadata: metadata,
 	}
 	if channel == "whatsapp_cloud" {

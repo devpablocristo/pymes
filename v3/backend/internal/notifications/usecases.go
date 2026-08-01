@@ -20,10 +20,23 @@ type IntentRepository interface {
 
 type ProjectedIntentRepository interface {
 	Project(context.Context, domain.Intent) (domain.Intent, error)
+	FindProjected(
+		context.Context,
+		string,
+		string,
+	) (domain.Intent, error)
+}
+
+type DeliveryRouteResolver interface {
+	ResolveDeliveryRoute(
+		context.Context,
+		string,
+	) (domain.DeliveryRoute, error)
 }
 
 type RequestNotification struct {
 	Repository IntentRepository
+	Routes     DeliveryRouteResolver
 	Clock      func() time.Time
 }
 
@@ -37,6 +50,11 @@ func (usecase RequestNotification) Execute(
 	if usecase.Repository == nil {
 		return domain.Intent{}, fmt.Errorf("request notification: repository is required")
 	}
+	if usecase.Routes == nil {
+		return domain.Intent{}, fmt.Errorf(
+			"request notification: route resolver is required",
+		)
+	}
 	now := time.Now
 	if usecase.Clock != nil {
 		now = usecase.Clock
@@ -49,6 +67,14 @@ func (usecase RequestNotification) Execute(
 	} else {
 		intent.SendAt = intent.SendAt.UTC()
 	}
+	route, err := usecase.Routes.ResolveDeliveryRoute(
+		ctx, intent.OrganizationID,
+	)
+	if err != nil {
+		return domain.Intent{}, err
+	}
+	intent.DeliveryChannel = route.Channel
+	intent.SenderIdentity = route.SenderIdentity
 	if err := intent.Validate(); err != nil {
 		return domain.Intent{}, err
 	}
@@ -68,6 +94,7 @@ type ProjectionMetadata struct {
 	RequestID      string
 	ActorRef       string
 	SourceVersion  int
+	OccurredAt     time.Time
 }
 
 type SchedulingNotification struct {
@@ -88,6 +115,7 @@ type SchedulingNotification struct {
 
 type ProjectSchedulingNotification struct {
 	Repository ProjectedIntentRepository
+	Routes     DeliveryRouteResolver
 	Clock      func() time.Time
 }
 
@@ -106,16 +134,52 @@ func (usecase ProjectSchedulingNotification) Execute(
 			"project scheduling notification: repository is required",
 		)
 	}
+	if usecase.Routes == nil {
+		return domain.Intent{}, false, fmt.Errorf(
+			"project scheduling notification: route resolver is required",
+		)
+	}
 	kind, template, supported := schedulingTemplate(input.Trigger)
 	recipient := strings.TrimSpace(input.RecipientE164)
 	if !supported || recipient == "" {
 		return domain.Intent{}, false, nil
 	}
-	now := time.Now
-	if usecase.Clock != nil {
-		now = usecase.Clock
-	}
 	variables := schedulingVariables(input)
+	existing, findErr := usecase.Repository.FindProjected(
+		ctx,
+		metadata.OrganizationID,
+		metadata.IdempotencyKey,
+	)
+	if findErr != nil && !errors.Is(findErr, domain.ErrNotFound) {
+		return domain.Intent{}, false, findErr
+	}
+	var route domain.DeliveryRoute
+	sendAt := metadata.OccurredAt.UTC()
+	if findErr == nil {
+		route = domain.DeliveryRoute{
+			Channel:        existing.DeliveryChannel,
+			SenderIdentity: existing.SenderIdentity,
+		}
+		sendAt = existing.SendAt
+	} else {
+		var err error
+		route, err = usecase.Routes.ResolveDeliveryRoute(
+			ctx, metadata.OrganizationID,
+		)
+		if errors.Is(err, domain.ErrDisabled) {
+			return domain.Intent{}, false, nil
+		}
+		if err != nil {
+			return domain.Intent{}, false, err
+		}
+		if sendAt.IsZero() {
+			now := time.Now
+			if usecase.Clock != nil {
+				now = usecase.Clock
+			}
+			sendAt = now().UTC()
+		}
+	}
 	intent := domain.Intent{
 		ID:                "scheduling:" + metadata.EventID,
 		OrganizationID:    metadata.OrganizationID,
@@ -128,7 +192,9 @@ func (usecase ProjectSchedulingNotification) Execute(
 		Locale:            "es_AR",
 		Variables:         variables,
 		Body:              schedulingBody(kind, variables),
-		SendAt:            now().UTC(),
+		DeliveryChannel:   route.Channel,
+		SenderIdentity:    route.SenderIdentity,
+		SendAt:            sendAt,
 		Status:            domain.StatusPending,
 		IdempotencyKey:    metadata.IdempotencyKey,
 		CorrelationID:     metadata.CorrelationID,
@@ -146,6 +212,12 @@ func (usecase ProjectSchedulingNotification) Execute(
 		return domain.Intent{}, false, err
 	}
 	intent.SnapshotDigest = digest
+	if findErr == nil {
+		if existing.SnapshotDigest != intent.SnapshotDigest {
+			return domain.Intent{}, false, domain.ErrIdempotencyKeyReused
+		}
+		return existing, true, nil
+	}
 	stored, err := usecase.Repository.Project(ctx, intent)
 	if errors.Is(err, domain.ErrDisabled) {
 		return domain.Intent{}, false, nil

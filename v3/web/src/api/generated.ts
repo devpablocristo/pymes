@@ -4,12 +4,266 @@
  */
 
 export interface paths {
+    "/healthz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getHealthz"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readyz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getReadyz"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resuelve la sesión Clerk activa a la identidad local de Pymes.
+         * @description El BFF valida el JWT de Clerk y proyecta la organización externa sobre el identificador tenant local. Los clientes nunca deben usar el identificador de organización de Clerk para construir rutas tenant.
+         */
+        get: operations["getCurrentSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/clerk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recibe eventos Clerk firmados para sincronizar identidad y organizaciones.
+         * @description Endpoint público exclusivamente para Clerk. La firma Svix se verifica sobre el cuerpo crudo antes de persistir el evento en el inbox IAM. Esta operación queda excluida del servidor comercial generado y se monta con su handler especializado.
+         */
+        post: operations["clerkWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/sales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createSale"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/parties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createParty"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/parties/{partyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getParty"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/purchases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createPurchase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/purchases/{purchaseId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPurchase"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/payments/{paymentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPayment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/reversals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Revierte compras o pagos. Las ventas fiscales se corrigen creando NC/ND asociadas. */
+        post: operations["createAccountingReversal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/accounting-failures/{failureId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Consulta un PERIOD_LOCKED recuperable de la organización. */
+        get: operations["getAccountingFailure"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/accounting-failures/{failureId}/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Solicita explícitamente contabilizar en un período abierto autorizado.
+         * @description Sólo owner/admin. No cambia el documento fuente ni un asiento existente: crea un nuevo comando contable idempotente que conserva el snapshot original y reemplaza únicamente la fecha efectiva.
+         */
+        post: operations["createAccountingAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/sales/{saleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSale"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations/{organizationId}/scheduling/branches": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -27,7 +281,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -45,7 +299,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -63,7 +317,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -81,7 +335,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -99,7 +353,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -116,11 +370,11 @@ export interface paths {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                "X-Source-Version"?: components["parameters"]["SourceVersion"];
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
             };
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -138,7 +392,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -156,7 +410,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
                 bookingId: components["parameters"]["BookingId"];
             };
             cookie?: never;
@@ -174,11 +428,11 @@ export interface paths {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                "X-Source-Version"?: components["parameters"]["SourceVersion"];
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
             };
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
                 bookingId: components["parameters"]["BookingId"];
             };
             cookie?: never;
@@ -196,11 +450,11 @@ export interface paths {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                "X-Source-Version"?: components["parameters"]["SourceVersion"];
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
             };
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
                 bookingId: components["parameters"]["BookingId"];
                 action: "confirm" | "cancel" | "check-in" | "complete" | "no-show";
             };
@@ -220,7 +474,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -238,7 +492,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -255,11 +509,11 @@ export interface paths {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                "X-Source-Version"?: components["parameters"]["SourceVersion"];
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
             };
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
                 ticketId: string;
             };
             cookie?: never;
@@ -357,17 +611,227 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        CurrentSession: {
+            actor_id: string;
+            organization: {
+                id: string;
+                name: string;
+                slug: string;
+                /** @enum {string} */
+                status: "pending" | "ready" | "failed" | "suspended";
+            };
+            /** @enum {string} */
+            role: "owner" | "admin" | "member" | "viewer";
+            permissions: string[];
+        };
         Error: {
             /** @enum {string} */
-            code: "VALIDATION_ERROR" | "NOT_FOUND" | "SLOT_CONFLICT" | "RESOURCE_CONFLICT" | "CAPACITY_EXCEEDED" | "BOOKING_VERSION_CONFLICT" | "HOLD_EXPIRED" | "ACTION_TOKEN_INVALID" | "ACTION_TOKEN_EXPIRED" | "BOOKING_STATE_INVALID" | "IDEMPOTENCY_KEY_REUSED" | "FORBIDDEN";
-            message?: string;
+            code: "AUTH_NOT_CONFIGURED" | "FORBIDDEN" | "ORG_NOT_PROVISIONED" | "NOT_FOUND" | "IDEMPOTENCY_KEY_REQUIRED" | "SOURCE_VERSION_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "DOCUMENT_NOT_REVERSIBLE" | "INVALID_APPLICATION_DOCUMENT" | "INVALID_SOURCE_DOCUMENT" | "OPEN_ITEM_AMOUNT_EXCEEDED" | "PERIOD_LOCKED" | "ACCOUNTING_ADJUSTMENT_NOT_ALLOWED" | "VALIDATION_ERROR" | "COMMAND_REJECTED";
         };
-        Allocation: {
+        AccountingFailureRef: {
             /** Format: uuid */
-            resource_id: string;
+            id: string;
+            /** @constant */
+            code: "PERIOD_LOCKED";
+        };
+        AccountingFailure: {
+            /** Format: uuid */
+            id: string;
+            organization_id: string;
             /** @enum {string} */
-            mode: "capacity" | "exclusive";
-            units: number;
+            source_kind: "sale" | "purchase" | "payment" | "accounting_application" | "accounting_reversal";
+            source_id: string;
+            /** Format: date-time */
+            failed_effective_at: string;
+            /** @enum {string} */
+            status: "awaiting_adjustment" | "adjustment_pending" | "resolved";
+            /** @constant */
+            failure_code: "PERIOD_LOCKED";
+            correlation_id: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        AccountingAdjustmentInput: {
+            id: string;
+            /**
+             * Format: date-time
+             * @description Fecha elegida por owner/admin dentro de un período contable abierto.
+             */
+            effective_at: string;
+            reason: string;
+        };
+        AccountingAdjustment: components["schemas"]["AccountingAdjustmentInput"] & {
+            organization_id: string;
+            /** Format: uuid */
+            failure_id: string;
+            /** @enum {string} */
+            status: "pending" | "period_locked" | "posted";
+            correlation_id: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        Money: {
+            amount: string;
+            currency: string;
+        };
+        /** @description Decimal base diez exacto, sin exponente ni JSON number. */
+        NonNegativeDecimal: string;
+        /** @description Decimal base diez exacto estrictamente mayor que cero. */
+        PositiveDecimal: string;
+        VatBreakdownItem: {
+            /**
+             * @description Alícuota IVA expresada como string exacta.
+             * @enum {string}
+             */
+            rate: "0" | "2.5" | "5" | "10.5" | "21" | "27";
+            base_amount: components["schemas"]["NonNegativeDecimal"];
+            tax_amount: components["schemas"]["NonNegativeDecimal"];
+        };
+        SaleInput: {
+            id: string;
+            recipient_ref: string;
+            point_of_sale: number;
+            /** @enum {string} */
+            document_type: "FA" | "NDA" | "NCA" | "FB" | "NDB" | "NCB" | "FC" | "NDC" | "NCC";
+            amount: string;
+            currency: string;
+            /** @description Obligatorio para USD/EUR; cotización contra ARS con hasta seis decimales. */
+            exchange_rate?: components["schemas"]["PositiveDecimal"];
+            credential_ref: string;
+            /** @description Obligatorio para NC/ND; referencia al documento Pymes original. */
+            source_document_id?: string;
+            /** @description Snapshot fiscal inmutable; Pymes agrega identidad, numeración y digest antes de llamar al adaptador. */
+            fiscal: {
+                /** @enum {string} */
+                environment: "homologation" | "production";
+                /** Format: date */
+                issue_date: string;
+                totals: Record<string, never>;
+                recipient: Record<string, never>;
+                lines: Record<string, never>[];
+            };
+        } & unknown;
+        Sale: {
+            id: string;
+            organization_id: string;
+            recipient_ref: string;
+            voucher: {
+                point_of_sale: number;
+                /** @enum {string} */
+                document_type: "FA" | "NDA" | "NCA" | "FB" | "NDB" | "NCB" | "FC" | "NDC" | "NCC";
+                /** @description Número reservado atómicamente por Pymes. */
+                readonly voucher_number: number;
+            };
+            /** @enum {string} */
+            fiscal_environment: "homologation" | "production";
+            total: components["schemas"]["Money"];
+            /** @enum {string} */
+            status: "fiscal_pending" | "fiscal_uncertain" | "fiscal_rejected" | "authorized_pending_posting" | "accounting_adjustment_required" | "accounting_adjustment_pending" | "posted" | "partially_paid" | "paid" | "reversed";
+            snapshot_digest: string;
+            source_document_id?: string;
+            readonly cae?: string;
+            readonly journal_entry_id?: string;
+            readonly open_item_id?: string;
+            accounting_failure?: components["schemas"]["AccountingFailureRef"];
+        };
+        PartyInput: {
+            id: string;
+            /** @enum {string} */
+            kind: "customer" | "supplier" | "both";
+            display_name: string;
+            tax_identifier?: string;
+        };
+        Party: components["schemas"]["PartyInput"] & {
+            organization_id: string;
+        };
+        /** @description amount es el total del comprobante. Debe ser igual a net_amount + exempt_amount + la suma de vat_breakdown.tax_amount. exchange_rate es obligatorio y debe ser mayor que cero cuando currency no es ARS. */
+        PurchaseInput: {
+            id: string;
+            supplier_ref: string;
+            external_document_ref: string;
+            /**
+             * Format: date
+             * @description Fecha contable del comprobante; determina el período del asiento.
+             */
+            issue_date: string;
+            amount: components["schemas"]["NonNegativeDecimal"];
+            currency: string;
+            net_amount: components["schemas"]["NonNegativeDecimal"];
+            exempt_amount: components["schemas"]["NonNegativeDecimal"];
+            vat_breakdown: components["schemas"]["VatBreakdownItem"][];
+            exchange_rate?: components["schemas"]["PositiveDecimal"];
+        } & unknown;
+        /** @description total conserva el importe y moneda originales. exchange_rate es obligatorio cuando total.currency no es ARS. */
+        Purchase: {
+            id: string;
+            organization_id: string;
+            supplier_ref: string;
+            external_document_ref: string;
+            /**
+             * Format: date
+             * @description Fecha contable persistida del comprobante.
+             */
+            issue_date: string;
+            total: components["schemas"]["Money"];
+            net_amount: components["schemas"]["NonNegativeDecimal"];
+            exempt_amount: components["schemas"]["NonNegativeDecimal"];
+            vat_breakdown: components["schemas"]["VatBreakdownItem"][];
+            exchange_rate?: components["schemas"]["PositiveDecimal"];
+            /** @enum {string} */
+            status: "confirmed" | "accounting_adjustment_required" | "accounting_adjustment_pending" | "posted" | "partially_paid" | "paid" | "reversed";
+            snapshot_digest: string;
+            readonly journal_entry_id?: string;
+            readonly open_item_id?: string;
+            accounting_failure?: components["schemas"]["AccountingFailureRef"];
+        } & unknown;
+        PaymentInput: {
+            id: string;
+            /** @enum {string} */
+            direction: "receipt" | "disbursement";
+            party_ref: string;
+            amount: string;
+            currency: string;
+            applications: {
+                id: string;
+                /** @enum {string} */
+                document_kind: "sale" | "purchase";
+                document_id: string;
+                amount: string;
+            }[];
+        };
+        Payment: {
+            id: string;
+            organization_id: string;
+            /** @enum {string} */
+            direction: "receipt" | "disbursement";
+            party_ref: string;
+            total: components["schemas"]["Money"];
+            /** @enum {string} */
+            status: "confirmed" | "accounting_adjustment_required" | "accounting_adjustment_pending" | "posted" | "reversed";
+            readonly journal_entry_id?: string;
+            readonly open_item_id?: string;
+            accounting_failure?: components["schemas"]["AccountingFailureRef"];
+        };
+        ReversalInput: {
+            id: string;
+            /** @enum {string} */
+            document_kind: "purchase" | "payment";
+            document_id: string;
+            /** Format: date-time */
+            effective_at: string;
+            reason: string;
+        };
+        Reversal: components["schemas"]["ReversalInput"] & {
+            organization_id: string;
+            /** @enum {string} */
+            status: "requested" | "accounting_adjustment_required" | "accounting_adjustment_pending" | "reversed";
+            original_journal_entry_id: string;
+            readonly reversal_journal_entry_id?: string;
+            accounting_failure?: components["schemas"]["AccountingFailureRef"];
         };
         BranchInput: {
             /** Format: uuid */
@@ -390,6 +854,13 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        "schemas-Error": {
+            /** @enum {string} */
+            code: "VALIDATION_ERROR" | "NOT_FOUND" | "SLOT_CONFLICT" | "RESOURCE_CONFLICT" | "CAPACITY_EXCEEDED" | "BOOKING_VERSION_CONFLICT" | "HOLD_EXPIRED" | "ACTION_TOKEN_INVALID" | "ACTION_TOKEN_EXPIRED" | "BOOKING_STATE_INVALID" | "IDEMPOTENCY_KEY_REUSED" | "FORBIDDEN";
+            message?: string;
+        };
+        /** @enum {string} */
+        ResourceKind: "professional" | "room" | "machine" | "vehicle" | "equipment" | "generic";
         ResourceRequirement: {
             /** Format: uuid */
             id?: string;
@@ -433,8 +904,6 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
-        /** @enum {string} */
-        ResourceKind: "professional" | "room" | "machine" | "vehicle" | "equipment" | "generic";
         ResourceInput: {
             /** Format: uuid */
             id?: string;
@@ -457,6 +926,39 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             updated_at: string;
+        };
+        Allocation: {
+            /** Format: uuid */
+            resource_id: string;
+            /** @enum {string} */
+            mode: "capacity" | "exclusive";
+            units: number;
+        };
+        AvailabilityQuery: {
+            /** Format: uuid */
+            branch_id: string;
+            /** Format: uuid */
+            service_id: string;
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            until: string;
+            participants: number;
+            /** @description Recursos elegidos. Puede omitirse para que Pymes devuelva combinaciones elegibles, incluido cualquier profesional. */
+            allocations?: components["schemas"]["Allocation"][];
+        };
+        Slot: {
+            /** Format: date-time */
+            start_at: string;
+            /** Format: date-time */
+            end_at: string;
+            /** Format: date-time */
+            occupies_from: string;
+            /** Format: date-time */
+            occupies_until: string;
+            timezone: string;
+            allocations: components["schemas"]["Allocation"][];
+            remaining: number;
         };
         AvailabilityRuleInput: {
             /** Format: uuid */
@@ -503,23 +1005,175 @@ export interface components {
             id: string;
             organization_id: string;
         };
-        AvailabilityQuery: {
+        GroupSessionInput: {
+            /** Format: uuid */
+            id?: string;
             /** Format: uuid */
             branch_id: string;
             /** Format: uuid */
             service_id: string;
             /** Format: date-time */
-            from: string;
-            /** Format: date-time */
-            until: string;
+            start_at: string;
+            capacity: number;
+            allocations: components["schemas"]["Allocation"][];
+        };
+        GroupSession: components["schemas"]["GroupSessionInput"] & {
+            /** Format: uuid */
+            id: string;
+            booked: number;
+            version: number;
+            /** @enum {string} */
+            status: "open" | "closed" | "cancelled" | "completed";
+        };
+        Booking: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            series_id?: string;
+            /** Format: uuid */
+            session_id?: string;
+            /** Format: uuid */
+            supersedes_id?: string;
+            /** Format: uuid */
+            branch_id: string;
+            /** Format: uuid */
+            service_id: string;
+            party_id: string;
+            /** @enum {string} */
+            status: "held" | "pending_confirmation" | "confirmed" | "checked_in" | "completed" | "cancelled" | "rescheduled" | "no_show";
             participants: number;
-            /** @description Recursos elegidos. Puede omitirse para que Pymes devuelva combinaciones elegibles, incluido cualquier profesional. */
+            /** Format: date-time */
+            start_at: string;
+            /** Format: date-time */
+            end_at: string;
+            version: number;
+            service_name: string;
+            price: string;
+            currency: string;
+            duration_minutes: number;
+            timezone: string;
+            customer_name?: string;
+            /** Format: email */
+            customer_email?: string;
+            customer_phone?: string;
+            notes?: string;
+            cancellation_reason?: string;
+            allocations: components["schemas"]["Allocation"][];
+        };
+        Customer: {
+            party_id?: string;
+            name: string;
+            /** Format: email */
+            email?: string;
+            phone?: string;
+        };
+        Recurrence: {
+            /** @enum {string} */
+            frequency: "daily" | "weekly";
+            interval: number;
+            count?: number;
+            /** Format: date-time */
+            until?: string;
+            by_weekdays?: number[];
+        };
+        BookingInput: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            branch_id: string;
+            /** Format: uuid */
+            service_id: string;
+            /** Format: uuid */
+            session_id?: string;
+            customer: components["schemas"]["Customer"];
+            /** Format: date-time */
+            start_at: string;
+            participants: number;
+            /** @enum {string} */
+            status?: "held" | "pending_confirmation" | "confirmed";
+            hold_minutes?: number;
+            allocations?: components["schemas"]["Allocation"][];
+            notes?: string;
+            recurrence?: components["schemas"]["Recurrence"];
+        };
+        RescheduleInput: {
+            expected_version: number;
+            /** Format: date-time */
+            start_at: string;
+            /** @description Duración snapshot nueva para resize; omitida conserva la actual. */
+            duration_minutes?: number;
             allocations?: components["schemas"]["Allocation"][];
         };
-        PublicSchedulingCatalog: {
-            branches: components["schemas"]["PublicSchedulingBranch"][];
-            services: components["schemas"]["PublicSchedulingService"][];
-            resources: components["schemas"]["PublicSchedulingResource"][];
+        TransitionInput: {
+            expected_version: number;
+            reason?: string;
+        };
+        WaitlistEntry: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            branch_id: string;
+            /** Format: uuid */
+            service_id: string;
+            party_id: string;
+            customer_name?: string;
+            /** Format: email */
+            customer_email?: string;
+            customer_phone?: string;
+            /** Format: date-time */
+            preferred_from: string;
+            /** Format: date-time */
+            preferred_until: string;
+            participants: number;
+            /** @enum {string} */
+            status: "pending" | "offered" | "accepted" | "cancelled" | "expired";
+            /** Format: date-time */
+            offer_expires_at?: string;
+            /** Format: date-time */
+            offered_start_at?: string;
+            /** Format: date-time */
+            offered_end_at?: string;
+            offered_allocations?: components["schemas"]["Allocation"][];
+            /** Format: uuid */
+            accepted_booking_id?: string;
+            version: number;
+        };
+        WaitlistInput: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            branch_id: string;
+            /** Format: uuid */
+            service_id: string;
+            customer: components["schemas"]["Customer"];
+            /** Format: date-time */
+            preferred_from: string;
+            /** Format: date-time */
+            preferred_until: string;
+            participants: number;
+        };
+        QueueTicketInput: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            branch_id: string;
+            /** Format: uuid */
+            service_id: string;
+            party_id: string;
+            priority?: number;
+        };
+        QueueTicket: components["schemas"]["QueueTicketInput"] & {
+            /** Format: uuid */
+            id: string;
+            number: number;
+            /** @enum {string} */
+            status: "waiting" | "called" | "serving" | "completed" | "no_show" | "cancelled";
+            version: number;
+        };
+        QueueAdvanceInput: {
+            expected_version: number;
+            /** @enum {string} */
+            status: "called" | "serving" | "completed" | "no_show" | "cancelled";
         };
         PublicSchedulingBranch: {
             /** Format: uuid */
@@ -559,89 +1213,10 @@ export interface components {
             capacity: number;
             timezone: string;
         };
-        Slot: {
-            /** Format: date-time */
-            start_at: string;
-            /** Format: date-time */
-            end_at: string;
-            /** Format: date-time */
-            occupies_from: string;
-            /** Format: date-time */
-            occupies_until: string;
-            timezone: string;
-            allocations: components["schemas"]["Allocation"][];
-            remaining: number;
-        };
-        Customer: {
-            party_id?: string;
-            name: string;
-            /** Format: email */
-            email?: string;
-            phone?: string;
-        };
-        Recurrence: {
-            /** @enum {string} */
-            frequency: "daily" | "weekly";
-            interval: number;
-            count?: number;
-            /** Format: date-time */
-            until?: string;
-            by_weekdays?: number[];
-        };
-        BookingInput: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            branch_id: string;
-            /** Format: uuid */
-            service_id: string;
-            /** Format: uuid */
-            session_id?: string;
-            customer: components["schemas"]["Customer"];
-            /** Format: date-time */
-            start_at: string;
-            participants: number;
-            /** @enum {string} */
-            status?: "held" | "pending_confirmation" | "confirmed";
-            hold_minutes?: number;
-            allocations?: components["schemas"]["Allocation"][];
-            notes?: string;
-            recurrence?: components["schemas"]["Recurrence"];
-        };
-        Booking: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            series_id?: string;
-            /** Format: uuid */
-            session_id?: string;
-            /** Format: uuid */
-            supersedes_id?: string;
-            /** Format: uuid */
-            branch_id: string;
-            /** Format: uuid */
-            service_id: string;
-            party_id: string;
-            /** @enum {string} */
-            status: "held" | "pending_confirmation" | "confirmed" | "checked_in" | "completed" | "cancelled" | "rescheduled" | "no_show";
-            participants: number;
-            /** Format: date-time */
-            start_at: string;
-            /** Format: date-time */
-            end_at: string;
-            version: number;
-            service_name: string;
-            price: string;
-            currency: string;
-            duration_minutes: number;
-            timezone: string;
-            customer_name?: string;
-            /** Format: email */
-            customer_email?: string;
-            customer_phone?: string;
-            notes?: string;
-            cancellation_reason?: string;
-            allocations: components["schemas"]["Allocation"][];
+        PublicSchedulingCatalog: {
+            branches: components["schemas"]["PublicSchedulingBranch"][];
+            services: components["schemas"]["PublicSchedulingService"][];
+            resources: components["schemas"]["PublicSchedulingResource"][];
         };
         PublicBooking: {
             /** Format: uuid */
@@ -670,82 +1245,6 @@ export interface components {
             duration_minutes: number;
             timezone: string;
         };
-        GroupSessionInput: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            branch_id: string;
-            /** Format: uuid */
-            service_id: string;
-            /** Format: date-time */
-            start_at: string;
-            capacity: number;
-            allocations: components["schemas"]["Allocation"][];
-        };
-        GroupSession: components["schemas"]["GroupSessionInput"] & {
-            /** Format: uuid */
-            id: string;
-            booked: number;
-            version: number;
-            /** @enum {string} */
-            status: "open" | "closed" | "cancelled" | "completed";
-        };
-        RescheduleInput: {
-            expected_version: number;
-            /** Format: date-time */
-            start_at: string;
-            /** @description Duración snapshot nueva para resize; omitida conserva la actual. */
-            duration_minutes?: number;
-            allocations?: components["schemas"]["Allocation"][];
-        };
-        TransitionInput: {
-            expected_version: number;
-            reason?: string;
-        };
-        WaitlistInput: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            branch_id: string;
-            /** Format: uuid */
-            service_id: string;
-            customer: components["schemas"]["Customer"];
-            /** Format: date-time */
-            preferred_from: string;
-            /** Format: date-time */
-            preferred_until: string;
-            participants: number;
-        };
-        WaitlistEntry: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            branch_id: string;
-            /** Format: uuid */
-            service_id: string;
-            party_id: string;
-            customer_name?: string;
-            /** Format: email */
-            customer_email?: string;
-            customer_phone?: string;
-            /** Format: date-time */
-            preferred_from: string;
-            /** Format: date-time */
-            preferred_until: string;
-            participants: number;
-            /** @enum {string} */
-            status: "pending" | "offered" | "accepted" | "cancelled" | "expired";
-            /** Format: date-time */
-            offer_expires_at?: string;
-            /** Format: date-time */
-            offered_start_at?: string;
-            /** Format: date-time */
-            offered_end_at?: string;
-            offered_allocations?: components["schemas"]["Allocation"][];
-            /** Format: uuid */
-            accepted_booking_id?: string;
-            version: number;
-        };
         PublicWaitlistEntry: {
             /** Format: uuid */
             id: string;
@@ -771,29 +1270,6 @@ export interface components {
             accepted_booking_id?: string;
             version: number;
         };
-        QueueTicketInput: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            branch_id: string;
-            /** Format: uuid */
-            service_id: string;
-            party_id: string;
-            priority?: number;
-        };
-        QueueTicket: components["schemas"]["QueueTicketInput"] & {
-            /** Format: uuid */
-            id: string;
-            number: number;
-            /** @enum {string} */
-            status: "waiting" | "called" | "serving" | "completed" | "no_show" | "cancelled";
-            version: number;
-        };
-        QueueAdvanceInput: {
-            expected_version: number;
-            /** @enum {string} */
-            status: "called" | "serving" | "completed" | "no_show" | "cancelled";
-        };
         PublicActionInput: {
             /** @enum {string} */
             purpose: "confirm" | "cancel" | "reschedule" | "accept_waitlist";
@@ -805,7 +1281,25 @@ export interface components {
         };
     };
     responses: {
-        /** @description Falta membresía activa, tenant listo o permiso scheduling. */
+        /** @description Comando inválido o cabeceras idempotentes ausentes. */
+        InvalidCommand: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description La clave o identidad del comando ya fue usada con otro payload. */
+        IdempotencyConflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description La sesión Clerk no pertenece a la organización o el rol no autoriza la operación. */
         Forbidden: {
             headers: {
                 [name: string]: unknown;
@@ -814,8 +1308,8 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description Error estable del dominio de Agenda. */
-        SchedulingError: {
+        /** @description La organización no está lista o una regla comercial impide el comando. */
+        DomainError: {
             headers: {
                 [name: string]: unknown;
             };
@@ -823,13 +1317,54 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description El recurso no existe en la organización autenticada. */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Clerk/IAM no está configurado en el BFF. */
+        AuthUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Falta membresía activa, tenant listo o permiso scheduling. */
+        "responses-Forbidden": {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["schemas-Error"];
+            };
+        };
+        /** @description Error estable del dominio de Agenda. */
+        SchedulingError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["schemas-Error"];
+            };
+        };
     };
     parameters: {
         OrganizationId: string;
-        OrganizationSlug: string;
-        BookingId: string;
+        /** @description Clave pública estable. Queda vinculada a organización, operación, source ID y source version. */
         IdempotencyKey: string;
+        /** @description Versión positiva del snapshot de origen incluida en la identidad idempotente. */
         SourceVersion: number;
+        "parameters-OrganizationId": string;
+        "parameters-IdempotencyKey": string;
+        "parameters-SourceVersion": number;
+        BookingId: string;
+        OrganizationSlug: string;
     };
     requestBodies: never;
     headers: never;
@@ -837,12 +1372,490 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    listSchedulingBranches: {
+    getHealthz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Healthy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getReadyz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description PostgreSQL o una dependencia obligatoria no está lista. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        status: "not_ready";
+                    };
+                };
+            };
+        };
+    };
+    getCurrentSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sesión autenticada y membresía local activa. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentSession"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    clerkWebhook: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Identificador único del mensaje firmado por Clerk/Svix. */
+                "svix-id": string;
+                /** @description Timestamp incluido en la firma Clerk/Svix. */
+                "svix-timestamp": string;
+                /** @description Firma Clerk/Svix verificada sobre el cuerpo HTTP crudo. */
+                "svix-signature": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Evento verificado y aceptado */
+            204: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cuerpo ausente, demasiado grande o evento inválido. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Firma Svix inválida. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Verificador no configurado o inbox IAM no disponible. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    createSale: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Clave pública estable. Queda vinculada a organización, operación, source ID y source version. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Versión positiva del snapshot de origen incluida en la identidad idempotente. */
+                "X-Source-Version": components["parameters"]["SourceVersion"];
+            };
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaleInput"];
+            };
+        };
+        responses: {
+            /** @description Sale accepted for fiscal processing */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sale"];
+                };
+            };
+            400: components["responses"]["InvalidCommand"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["IdempotencyConflict"];
+            422: components["responses"]["DomainError"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    createParty: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Clave pública estable. Queda vinculada a organización, operación, source ID y source version. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Versión positiva del snapshot de origen incluida en la identidad idempotente. */
+                "X-Source-Version": components["parameters"]["SourceVersion"];
+            };
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartyInput"];
+            };
+        };
+        responses: {
+            /** @description Party created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Party"];
+                };
+            };
+            400: components["responses"]["InvalidCommand"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["IdempotencyConflict"];
+            422: components["responses"]["DomainError"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    getParty: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 organizationId: components["parameters"]["OrganizationId"];
+                partyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Party */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Party"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    createPurchase: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Clave pública estable. Queda vinculada a organización, operación, source ID y source version. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Versión positiva del snapshot de origen incluida en la identidad idempotente. */
+                "X-Source-Version": components["parameters"]["SourceVersion"];
+            };
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseInput"];
+            };
+        };
+        responses: {
+            /** @description Purchase accepted for accounting */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Purchase"];
+                };
+            };
+            400: components["responses"]["InvalidCommand"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["IdempotencyConflict"];
+            422: components["responses"]["DomainError"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    getPurchase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+                purchaseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Purchase */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Purchase"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    createPayment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Clave pública estable. Queda vinculada a organización, operación, source ID y source version. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Versión positiva del snapshot de origen incluida en la identidad idempotente. */
+                "X-Source-Version": components["parameters"]["SourceVersion"];
+            };
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentInput"];
+            };
+        };
+        responses: {
+            /** @description Payment and applications accepted for accounting */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Payment"];
+                };
+            };
+            400: components["responses"]["InvalidCommand"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["IdempotencyConflict"];
+            422: components["responses"]["DomainError"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    getPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+                paymentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Payment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Payment"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    createAccountingReversal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Clave pública estable. Queda vinculada a organización, operación, source ID y source version. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Versión positiva del snapshot de origen incluida en la identidad idempotente. */
+                "X-Source-Version": components["parameters"]["SourceVersion"];
+            };
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReversalInput"];
+            };
+        };
+        responses: {
+            /** @description Reversal accepted for accounting */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Reversal"];
+                };
+            };
+            400: components["responses"]["InvalidCommand"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["IdempotencyConflict"];
+            422: components["responses"]["DomainError"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    getAccountingFailure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+                failureId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fallo contable y estado de recuperación, sin exponer el comando privado. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingFailure"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    createAccountingAdjustment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Clave pública estable. Queda vinculada a organización, operación, source ID y source version. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Versión positiva del snapshot de origen incluida en la identidad idempotente. */
+                "X-Source-Version": components["parameters"]["SourceVersion"];
+            };
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+                failureId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingAdjustmentInput"];
+            };
+        };
+        responses: {
+            /** @description Ajuste aceptado y escrito en el outbox transaccional. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingAdjustment"];
+                };
+            };
+            400: components["responses"]["InvalidCommand"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["IdempotencyConflict"];
+            422: components["responses"]["DomainError"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    getSale: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+                saleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sale */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sale"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    listSchedulingBranches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -857,7 +1870,7 @@ export interface operations {
                     "application/json": components["schemas"]["Branch"][];
                 };
             };
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
         };
     };
     createSchedulingBranch: {
@@ -865,7 +1878,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -885,7 +1898,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["SchedulingError"];
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
             409: components["responses"]["SchedulingError"];
         };
     };
@@ -894,7 +1907,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -909,7 +1922,7 @@ export interface operations {
                     "application/json": components["schemas"]["Service"][];
                 };
             };
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
         };
     };
     createSchedulingService: {
@@ -917,7 +1930,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -937,7 +1950,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["SchedulingError"];
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
             409: components["responses"]["SchedulingError"];
         };
     };
@@ -948,7 +1961,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -963,7 +1976,7 @@ export interface operations {
                     "application/json": components["schemas"]["Resource"][];
                 };
             };
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
         };
     };
     createSchedulingResource: {
@@ -971,7 +1984,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -991,7 +2004,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["SchedulingError"];
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
             409: components["responses"]["SchedulingError"];
         };
     };
@@ -1000,7 +2013,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -1020,7 +2033,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["SchedulingError"];
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
         };
     };
     listSchedulingAvailabilityRules: {
@@ -1030,7 +2043,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -1045,7 +2058,7 @@ export interface operations {
                     "application/json": components["schemas"]["AvailabilityRule"][];
                 };
             };
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
         };
     };
     createSchedulingAvailabilityRule: {
@@ -1053,7 +2066,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -1073,7 +2086,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["SchedulingError"];
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
         };
     };
     listSchedulingBlocks: {
@@ -1085,7 +2098,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -1100,7 +2113,7 @@ export interface operations {
                     "application/json": components["schemas"]["AvailabilityException"][];
                 };
             };
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
         };
     };
     createSchedulingBlock: {
@@ -1108,7 +2121,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -1128,18 +2141,18 @@ export interface operations {
                 };
             };
             400: components["responses"]["SchedulingError"];
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
         };
     };
     createSchedulingGroupSession: {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                "X-Source-Version"?: components["parameters"]["SourceVersion"];
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
             };
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -1159,7 +2172,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["SchedulingError"];
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
             409: components["responses"]["SchedulingError"];
         };
     };
@@ -1172,7 +2185,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -1187,18 +2200,18 @@ export interface operations {
                     "application/json": components["schemas"]["Booking"][];
                 };
             };
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
         };
     };
     createSchedulingBooking: {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                "X-Source-Version"?: components["parameters"]["SourceVersion"];
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
             };
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -1218,7 +2231,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["SchedulingError"];
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
             409: components["responses"]["SchedulingError"];
         };
     };
@@ -1227,7 +2240,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
                 bookingId: components["parameters"]["BookingId"];
             };
             cookie?: never;
@@ -1243,7 +2256,7 @@ export interface operations {
                     "application/json": components["schemas"]["Booking"];
                 };
             };
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
             404: components["responses"]["SchedulingError"];
         };
     };
@@ -1251,11 +2264,11 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                "X-Source-Version"?: components["parameters"]["SourceVersion"];
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
             };
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
                 bookingId: components["parameters"]["BookingId"];
             };
             cookie?: never;
@@ -1276,7 +2289,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["SchedulingError"];
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
             409: components["responses"]["SchedulingError"];
         };
     };
@@ -1284,11 +2297,11 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                "X-Source-Version"?: components["parameters"]["SourceVersion"];
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
             };
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
                 bookingId: components["parameters"]["BookingId"];
                 action: "confirm" | "cancel" | "check-in" | "complete" | "no-show";
             };
@@ -1310,7 +2323,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["SchedulingError"];
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
             409: components["responses"]["SchedulingError"];
         };
     };
@@ -1321,7 +2334,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -1336,18 +2349,18 @@ export interface operations {
                     "application/json": components["schemas"]["WaitlistEntry"][];
                 };
             };
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
         };
     };
     createSchedulingWaitlistEntry: {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                "X-Source-Version"?: components["parameters"]["SourceVersion"];
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
             };
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -1367,7 +2380,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["SchedulingError"];
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
             409: components["responses"]["SchedulingError"];
         };
     };
@@ -1378,7 +2391,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -1393,18 +2406,18 @@ export interface operations {
                     "application/json": components["schemas"]["QueueTicket"][];
                 };
             };
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
         };
     };
     createSchedulingQueueTicket: {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                "X-Source-Version"?: components["parameters"]["SourceVersion"];
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
             };
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
             };
             cookie?: never;
         };
@@ -1424,18 +2437,18 @@ export interface operations {
                 };
             };
             400: components["responses"]["SchedulingError"];
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
         };
     };
     advanceSchedulingQueueTicket: {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                "X-Source-Version"?: components["parameters"]["SourceVersion"];
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
             };
             path: {
-                organizationId: components["parameters"]["OrganizationId"];
+                organizationId: components["parameters"]["parameters-OrganizationId"];
                 ticketId: string;
             };
             cookie?: never;
@@ -1456,7 +2469,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["SchedulingError"];
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["responses-Forbidden"];
             409: components["responses"]["SchedulingError"];
         };
     };
@@ -1515,8 +2528,8 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                "X-Source-Version"?: components["parameters"]["SourceVersion"];
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
             };
             path: {
                 organizationSlug: components["parameters"]["OrganizationSlug"];
@@ -1547,8 +2560,8 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                "X-Source-Version"?: components["parameters"]["SourceVersion"];
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
             };
             path: {
                 organizationSlug: components["parameters"]["OrganizationSlug"];
@@ -1578,8 +2591,8 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                "X-Source-Version"?: components["parameters"]["SourceVersion"];
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
             };
             path: {
                 token: string;

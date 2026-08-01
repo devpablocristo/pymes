@@ -46,9 +46,14 @@ function NavIcon({ name }: { name: "calendar" | "clock" | "waitlist" | "queue" }
   );
 }
 
-export function AdminSchedulingPage({ publicSlug }: { publicSlug: string }) {
+export function AdminSchedulingPage() {
   const gateway = useSchedulingGateway();
-  const { identity, organizationName, accountControls } = useSession();
+  const {
+    identity,
+    organizationName,
+    organizationSlug,
+    accountControls,
+  } = useSession();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("agenda");
   const [branchId, setBranchId] = useState("");
@@ -310,7 +315,11 @@ export function AdminSchedulingPage({ publicSlug }: { publicSlug: string }) {
         </nav>
         <div className="app-sidebar__public">
           <span>Booking público</span>
-          <a href={`/reservar/${publicSlug}`} target="_blank" rel="noreferrer">
+          <a
+            href={`/reservar/${encodeURIComponent(organizationSlug)}`}
+            target="_blank"
+            rel="noreferrer"
+          >
             Ver página ↗
           </a>
         </div>

@@ -43,6 +43,7 @@ func TestPostgresProjectsClerkOrganizationAndMembershipIdempotently(t *testing.T
 	}
 	if principal, err := repo.ResolveClerkMembership(context.Background(), "org_clerk", "user_clerk"); err != nil ||
 		principal.OrganizationID != "org_org_clerk" || principal.ActorID != "user_clerk" ||
+		principal.OrganizationName != "Clerk Org" || principal.OrganizationSlug != "clerk-org" ||
 		principal.Role != "admin" || len(principal.Permissions) != 1 || principal.MembershipStatus != "active" ||
 		principal.OrganizationStatus != "pending" {
 		t.Fatalf("resolved=%+v err=%v", principal, err)

@@ -7,13 +7,22 @@ import {
   useAuth,
   useOrganization,
 } from "@clerk/react";
-import { createContext, type ReactNode, useContext, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+} from "react";
 import type { RequestIdentity } from "../api/SchedulingGateway";
+import { getCurrentSession } from "../api/currentSession";
 import type { WebConfig } from "../config";
 
 type Session = {
   identity: RequestIdentity;
   organizationName: string;
+  organizationSlug: string;
   accountControls: ReactNode;
   local: boolean;
 };
@@ -28,17 +37,37 @@ export function useSession(): Session {
   return value;
 }
 
-function ClerkSession({ children }: { children: ReactNode }) {
+function ClerkSession({
+  config,
+  children,
+}: {
+  config: WebConfig;
+  children: ReactNode;
+}) {
   const { getToken } = useAuth();
   const { organization } = useOrganization();
-  const organizationId = organization?.id;
+  const clerkOrganizationId = organization?.id;
+  const currentSession = useQuery({
+    queryKey: ["current-session", clerkOrganizationId],
+    queryFn: () =>
+      getCurrentSession(config.apiBaseUrl, () =>
+        getToken({ skipCache: true }),
+      ),
+    enabled: Boolean(clerkOrganizationId),
+    retry: false,
+  });
+  const schedulingToken = useCallback(() => getToken(), [getToken]);
   const session = useMemo<Session | null>(() => {
-    if (!organizationId) {
+    if (!currentSession.data) {
       return null;
     }
     return {
-      identity: { organizationId, getToken },
-      organizationName: organization?.name ?? "Mi organización",
+      identity: {
+        organizationId: currentSession.data.organization.id,
+        getToken: schedulingToken,
+      },
+      organizationName: currentSession.data.organization.name,
+      organizationSlug: currentSession.data.organization.slug,
       accountControls: (
         <div className="account-controls">
           <OrganizationSwitcher
@@ -51,15 +80,65 @@ function ClerkSession({ children }: { children: ReactNode }) {
       ),
       local: false,
     };
-  }, [getToken, organization?.name, organizationId]);
+  }, [currentSession.data, schedulingToken]);
 
-  if (!session) {
+  if (!clerkOrganizationId) {
     return (
       <main className="auth-stage" id="main-content">
         <div className="auth-card">
           <p className="eyebrow">Organización requerida</p>
           <h1>Elegí dónde vas a trabajar</h1>
           <p>La agenda siempre opera dentro de una organización activa.</p>
+          <OrganizationSwitcher
+            hidePersonal
+            afterCreateOrganizationUrl="/app/agenda"
+            afterSelectOrganizationUrl="/app/agenda"
+          />
+        </div>
+      </main>
+    );
+  }
+  if (currentSession.isPending) {
+    return (
+      <main className="auth-stage" id="main-content">
+        <div className="auth-card">
+          <p className="eyebrow">Sesión segura</p>
+          <h1>Abriendo tu organización</h1>
+          <p>Estamos comprobando la membresía local de Pymes.</p>
+        </div>
+      </main>
+    );
+  }
+  if (currentSession.isError || !session) {
+    return (
+      <main className="auth-stage" id="main-content">
+        <div className="auth-card auth-card--error">
+          <p className="eyebrow">Acceso no disponible</p>
+          <h1>No pudimos abrir esta organización</h1>
+          <p>
+            {currentSession.error instanceof Error
+              ? currentSession.error.message
+              : "Revisá que la organización esté sincronizada con Pymes."}
+          </p>
+          <OrganizationSwitcher
+            hidePersonal
+            afterCreateOrganizationUrl="/app/agenda"
+            afterSelectOrganizationUrl="/app/agenda"
+          />
+        </div>
+      </main>
+    );
+  }
+  if (currentSession.data.organization.status !== "ready") {
+    return (
+      <main className="auth-stage" id="main-content">
+        <div className="auth-card">
+          <p className="eyebrow">Organización en preparación</p>
+          <h1>{currentSession.data.organization.name}</h1>
+          <p>
+            El estado actual es {currentSession.data.organization.status}. La
+            agenda se habilitará cuando termine el provisionamiento.
+          </p>
           <OrganizationSwitcher
             hidePersonal
             afterCreateOrganizationUrl="/app/agenda"
@@ -91,6 +170,7 @@ function LocalSession({ config, children }: { config: WebConfig; children: React
       getToken: async () => "local-e2e-token",
     },
     organizationName: "Centro Norte",
+    organizationSlug: config.publicOrganizationSlug,
     accountControls: <span className="local-session-badge">Sesión local</span>,
     local: true,
   };
@@ -110,7 +190,7 @@ export function AdminAuthBoundary({ config, children }: { config: WebConfig; chi
           </main>
         </Show>
         <Show when="signed-in">
-          <ClerkSession>{children}</ClerkSession>
+          <ClerkSession config={config}>{children}</ClerkSession>
         </Show>
       </ClerkProvider>
     );

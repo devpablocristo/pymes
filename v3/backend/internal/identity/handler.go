@@ -8,11 +8,52 @@ import (
 	clerk "github.com/devpablocristo/platform/sdks/clerk/go"
 	handlerdto "github.com/devpablocristo/pymes/v3/backend/internal/identity/handler/dto"
 	handlerhelpers "github.com/devpablocristo/pymes/v3/backend/internal/identity/handler/helpers"
+	identitydomain "github.com/devpablocristo/pymes/v3/backend/internal/identity/usecases/domain"
 )
 
 type Verifier interface {
 	VerifyAndDecode([]byte, http.Header) (clerk.WebhookEvent, error)
 }
+
+type SessionAuthenticator interface {
+	Principal(*http.Request) (identitydomain.Principal, error)
+}
+
+type SessionHandler struct {
+	authenticator SessionAuthenticator
+}
+
+func NewSessionHandler(authenticator SessionAuthenticator) *SessionHandler {
+	return &SessionHandler{authenticator: authenticator}
+}
+
+func (h *SessionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if h == nil || h.authenticator == nil {
+		handlerhelpers.WriteProblem(
+			w,
+			http.StatusServiceUnavailable,
+			"AUTH_NOT_CONFIGURED",
+			"La autenticación no está configurada.",
+		)
+		return
+	}
+	principal, err := h.authenticator.Principal(r)
+	if err != nil {
+		handlerhelpers.WriteProblem(
+			w,
+			http.StatusForbidden,
+			"FORBIDDEN",
+			"La sesión no pertenece a una organización activa.",
+		)
+		return
+	}
+	handlerhelpers.WriteJSON(
+		w,
+		http.StatusOK,
+		handlerdto.CurrentSessionFromPrincipal(principal),
+	)
+}
+
 type Webhook struct {
 	verifier Verifier
 	receive  ReceiveWebhook

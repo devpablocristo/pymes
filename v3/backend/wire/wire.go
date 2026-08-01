@@ -227,6 +227,10 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 			Handler: featureHTTP,
 		},
 		{
+			Pattern: "GET /api/v1/session",
+			Handler: identity.NewSessionHandler(clerkAuthenticator),
+		},
+		{
 			Pattern: "/api/v1/organizations/{organizationId}/scheduling/",
 			Handler: schedulingHTTP,
 		},

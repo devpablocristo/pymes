@@ -78,6 +78,7 @@ func TestComposePublicHTTPRoutesCalendarCallbackWithoutCommerceCoupling(t *testi
 	t.Parallel()
 	apiCalls := 0
 	calendarCalls := 0
+
 	handler := composePublicHTTP(
 		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			apiCalls++
@@ -108,6 +109,39 @@ func TestComposePublicHTTPRoutesCalendarCallbackWithoutCommerceCoupling(t *testi
 			"status=%d calendar_calls=%d api_calls=%d",
 			response.Code,
 			calendarCalls,
+			apiCalls,
+		)
+	}
+}
+
+func TestComposePublicHTTPRoutesCanonicalSessionWithoutCommerceCoupling(t *testing.T) {
+	t.Parallel()
+	apiCalls := 0
+	sessionCalls := 0
+	handler := composePublicHTTP(
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			apiCalls++
+			w.WriteHeader(http.StatusNoContent)
+		}),
+		http.NotFoundHandler(),
+		publicContextRoute{
+			Pattern: "GET /api/v1/session",
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				sessionCalls++
+				w.WriteHeader(http.StatusOK)
+			}),
+		},
+	)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(
+		response,
+		httptest.NewRequest(http.MethodGet, "/api/v1/session", nil),
+	)
+	if response.Code != http.StatusOK || sessionCalls != 1 || apiCalls != 0 {
+		t.Fatalf(
+			"status=%d session_calls=%d api_calls=%d",
+			response.Code,
+			sessionCalls,
 			apiCalls,
 		)
 	}

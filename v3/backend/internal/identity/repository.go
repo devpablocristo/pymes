@@ -40,15 +40,22 @@ func (r *Postgres) ResolveClerkMembership(ctx context.Context, clerkOrganization
 	principal := identitydomain.Principal{OrganizationID: organizationID, ActorID: clerkUserID}
 	var membership repositorymodels.Membership
 	if err = tx.QueryRow(ctx, `
-		SELECT m.role,m.permissions::text,m.status,o.status
+		SELECT m.role,m.permissions::text,m.status,o.name,o.slug,o.status
 		FROM app.memberships m
 		JOIN app.organizations o ON o.id=m.org_id
 		WHERE m.org_id=$1 AND m.provider='clerk' AND m.provider_user_id=$2`,
 		organizationID, clerkUserID).Scan(
-		&membership.Role, &membership.PermissionsJSON, &membership.Status, &membership.OrganizationStatus,
+		&membership.Role,
+		&membership.PermissionsJSON,
+		&membership.Status,
+		&membership.OrganizationName,
+		&membership.OrganizationSlug,
+		&membership.OrganizationStatus,
 	); err != nil {
 		return identitydomain.Principal{}, fmt.Errorf("resolve clerk membership: %w", err)
 	}
+	principal.OrganizationName = membership.OrganizationName
+	principal.OrganizationSlug = membership.OrganizationSlug
 	principal.MembershipStatus = membership.Status
 	principal.OrganizationStatus = membership.OrganizationStatus
 	if principal.MembershipStatus != "active" {

@@ -5,7 +5,7 @@ import { AdminSchedulingPage } from "../pages/AdminSchedulingPage";
 export default function AdminRoute({ config }: { config: WebConfig }) {
   return (
     <AdminAuthBoundary config={config}>
-      <AdminSchedulingPage publicSlug={config.publicOrganizationSlug} />
+      <AdminSchedulingPage />
     </AdminAuthBoundary>
   );
 }

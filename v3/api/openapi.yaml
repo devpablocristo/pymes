@@ -28,6 +28,25 @@ paths:
                 required: [status]
                 properties:
                   status: { type: string, const: not_ready }
+  /api/v1/session:
+    get:
+      operationId: getCurrentSession
+      summary: Resuelve la sesión Clerk activa a la identidad local de Pymes.
+      description: >-
+        El BFF valida el JWT de Clerk y proyecta la organización externa sobre
+        el identificador tenant local. Los clientes nunca deben usar el
+        identificador de organización de Clerk para construir rutas tenant.
+      responses:
+        '200':
+          description: Sesión autenticada y membresía local activa.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
   /api/v1/webhooks/clerk:
     post:
       operationId: clerkWebhook
@@ -686,6 +705,25 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
   schemas:
+    CurrentSession:
+      type: object
+      additionalProperties: false
+      required: [actor_id, organization, role, permissions]
+      properties:
+        actor_id: { type: string, minLength: 1 }
+        organization:
+          type: object
+          additionalProperties: false
+          required: [id, name, slug, status]
+          properties:
+            id: { type: string, minLength: 1 }
+            name: { type: string, minLength: 1 }
+            slug: { type: string, minLength: 1 }
+            status: { type: string, enum: [pending, ready, failed, suspended] }
+        role: { type: string, enum: [owner, admin, member, viewer] }
+        permissions:
+          type: array
+          items: { type: string }
     Error:
       type: object
       required: [code]

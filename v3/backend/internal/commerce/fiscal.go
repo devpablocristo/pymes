@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	fiscalhelpers "github.com/devpablocristo/pymes/v3/backend/internal/commerce/fiscal/helpers"
@@ -42,6 +43,181 @@ func (c HTTPFiscalClient) Consult(
 		fallback(fiscal.IdempotencyKey, fiscal.RequestID),
 		true,
 	)
+}
+
+func (c HTTPFiscalClient) RequestCredentialCSR(
+	ctx context.Context,
+	organizationID,
+	idempotencyKey,
+	correlationID string,
+	input domain.FiscalCredentialCSRInput,
+) (domain.FiscalCredentialCSRResult, error) {
+	client, err := c.generatedClient(organizationID, idempotencyKey, correlationID)
+	if err != nil {
+		return domain.FiscalCredentialCSRResult{}, err
+	}
+	response, err := client.RequestFiscalCredentialCSRWithResponse(
+		ctx,
+		organizationID,
+		&fiscalapi.RequestFiscalCredentialCSRParams{
+			IdempotencyKey: idempotencyKey,
+			XCorrelationID: correlationID,
+		},
+		fiscalhelpers.CredentialCSRRequest(input),
+	)
+	if err != nil {
+		return domain.FiscalCredentialCSRResult{}, err
+	}
+	if response.StatusCode() != http.StatusCreated || response.JSON201 == nil {
+		return domain.FiscalCredentialCSRResult{}, generatedServiceError(
+			"fiscal credential CSR",
+			response.Status(),
+			response.Body,
+		)
+	}
+	return fiscalhelpers.CredentialCSRResult(*response.JSON201), nil
+}
+
+func (c HTTPFiscalClient) GetCredential(
+	ctx context.Context,
+	organizationID,
+	credentialID,
+	correlationID string,
+) (domain.FiscalCredential, error) {
+	client, err := c.generatedClient(
+		organizationID,
+		"credential-read:"+credentialID,
+		correlationID,
+	)
+	if err != nil {
+		return domain.FiscalCredential{}, err
+	}
+	response, err := client.GetFiscalCredentialWithResponse(
+		ctx,
+		organizationID,
+		credentialID,
+		&fiscalapi.GetFiscalCredentialParams{XCorrelationID: correlationID},
+	)
+	if err != nil {
+		return domain.FiscalCredential{}, err
+	}
+	if response.StatusCode() != http.StatusOK || response.JSON200 == nil {
+		return domain.FiscalCredential{}, generatedServiceError(
+			"fiscal credential",
+			response.Status(),
+			response.Body,
+		)
+	}
+	return fiscalhelpers.Credential(*response.JSON200), nil
+}
+
+func (c HTTPFiscalClient) UploadCertificate(
+	ctx context.Context,
+	organizationID,
+	credentialID,
+	correlationID string,
+	input domain.FiscalCertificateUpload,
+) (domain.FiscalCredential, error) {
+	client, err := c.generatedClient(
+		organizationID,
+		"certificate:"+credentialID+":"+strconv.Itoa(input.ExpectedVersion),
+		correlationID,
+	)
+	if err != nil {
+		return domain.FiscalCredential{}, err
+	}
+	response, err := client.UploadFiscalCertificateWithResponse(
+		ctx,
+		organizationID,
+		credentialID,
+		&fiscalapi.UploadFiscalCertificateParams{XCorrelationID: correlationID},
+		fiscalhelpers.CertificateUpload(input),
+	)
+	if err != nil {
+		return domain.FiscalCredential{}, err
+	}
+	if response.StatusCode() != http.StatusOK || response.JSON200 == nil {
+		return domain.FiscalCredential{}, generatedServiceError(
+			"fiscal certificate",
+			response.Status(),
+			response.Body,
+		)
+	}
+	return fiscalhelpers.Credential(*response.JSON200), nil
+}
+
+func (c HTTPFiscalClient) ConfigurePointOfSale(
+	ctx context.Context,
+	organizationID,
+	credentialID,
+	correlationID string,
+	pointOfSale int,
+	enabled bool,
+) (domain.FiscalPointOfSale, error) {
+	client, err := c.generatedClient(
+		organizationID,
+		pointOfSaleOperationKey("configure", credentialID, pointOfSale, enabled),
+		correlationID,
+	)
+	if err != nil {
+		return domain.FiscalPointOfSale{}, err
+	}
+	response, err := client.ConfigureFiscalPointOfSaleWithResponse(
+		ctx,
+		organizationID,
+		credentialID,
+		pointOfSale,
+		&fiscalapi.ConfigureFiscalPointOfSaleParams{XCorrelationID: correlationID},
+		fiscalapi.ConfigureFiscalPointOfSaleJSONRequestBody{Enabled: enabled},
+	)
+	if err != nil {
+		return domain.FiscalPointOfSale{}, err
+	}
+	if response.StatusCode() != http.StatusOK || response.JSON200 == nil {
+		return domain.FiscalPointOfSale{}, generatedServiceError(
+			"fiscal point of sale",
+			response.Status(),
+			response.Body,
+		)
+	}
+	return fiscalhelpers.PointOfSale(*response.JSON200), nil
+}
+
+func (c HTTPFiscalClient) ValidatePointOfSale(
+	ctx context.Context,
+	organizationID,
+	credentialID,
+	correlationID string,
+	pointOfSale int,
+	enabled bool,
+) (domain.FiscalPointOfSale, error) {
+	client, err := c.generatedClient(
+		organizationID,
+		pointOfSaleOperationKey("validate", credentialID, pointOfSale, enabled),
+		correlationID,
+	)
+	if err != nil {
+		return domain.FiscalPointOfSale{}, err
+	}
+	response, err := client.ValidateFiscalPointOfSaleWithResponse(
+		ctx,
+		organizationID,
+		credentialID,
+		pointOfSale,
+		&fiscalapi.ValidateFiscalPointOfSaleParams{XCorrelationID: correlationID},
+		fiscalapi.ValidateFiscalPointOfSaleJSONRequestBody{Enabled: enabled},
+	)
+	if err != nil {
+		return domain.FiscalPointOfSale{}, err
+	}
+	if response.StatusCode() != http.StatusOK || response.JSON200 == nil {
+		return domain.FiscalPointOfSale{}, generatedServiceError(
+			"fiscal point of sale validation",
+			response.Status(),
+			response.Body,
+		)
+	}
+	return fiscalhelpers.PointOfSale(*response.JSON200), nil
 }
 
 func (c HTTPFiscalClient) call(
@@ -147,6 +323,15 @@ func (c HTTPFiscalClient) client() HTTPDoer {
 		return c.Client
 	}
 	return NewServiceHTTPClient()
+}
+
+func pointOfSaleOperationKey(
+	operation,
+	credentialID string,
+	pointOfSale int,
+	enabled bool,
+) string {
+	return operation + ":" + credentialID + ":" + strconv.Itoa(pointOfSale) + ":" + strconv.FormatBool(enabled)
 }
 
 func decodeFiscalResult(

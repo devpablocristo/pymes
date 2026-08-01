@@ -116,8 +116,16 @@ func (e AccountingFailureRefCode) Valid() bool {
 const (
 	ErrorCodeACCOUNTINGADJUSTMENTNOTALLOWED ErrorCode = "ACCOUNTING_ADJUSTMENT_NOT_ALLOWED"
 	ErrorCodeAUTHNOTCONFIGURED              ErrorCode = "AUTH_NOT_CONFIGURED"
+	ErrorCodeAUTHORITYTIMEOUT               ErrorCode = "AUTHORITY_TIMEOUT"
+	ErrorCodeCERTIFICATECUITMISMATCH        ErrorCode = "CERTIFICATE_CUIT_MISMATCH"
+	ErrorCodeCERTIFICATEENVIRONMENTMISMATCH ErrorCode = "CERTIFICATE_ENVIRONMENT_MISMATCH"
+	ErrorCodeCERTIFICATEINVALID             ErrorCode = "CERTIFICATE_INVALID"
 	ErrorCodeCOMMANDREJECTED                ErrorCode = "COMMAND_REJECTED"
+	ErrorCodeCREDENTIALNOTFOUND             ErrorCode = "CREDENTIAL_NOT_FOUND"
+	ErrorCodeCREDENTIALNOTREADY             ErrorCode = "CREDENTIAL_NOT_READY"
+	ErrorCodeCREDENTIALVERSIONCONFLICT      ErrorCode = "CREDENTIAL_VERSION_CONFLICT"
 	ErrorCodeDOCUMENTNOTREVERSIBLE          ErrorCode = "DOCUMENT_NOT_REVERSIBLE"
+	ErrorCodeFISCALUNAVAILABLE              ErrorCode = "FISCAL_UNAVAILABLE"
 	ErrorCodeFORBIDDEN                      ErrorCode = "FORBIDDEN"
 	ErrorCodeIDEMPOTENCYKEYREQUIRED         ErrorCode = "IDEMPOTENCY_KEY_REQUIRED"
 	ErrorCodeIDEMPOTENCYKEYREUSED           ErrorCode = "IDEMPOTENCY_KEY_REUSED"
@@ -127,6 +135,7 @@ const (
 	ErrorCodeOPENITEMAMOUNTEXCEEDED         ErrorCode = "OPEN_ITEM_AMOUNT_EXCEEDED"
 	ErrorCodeORGNOTPROVISIONED              ErrorCode = "ORG_NOT_PROVISIONED"
 	ErrorCodePERIODLOCKED                   ErrorCode = "PERIOD_LOCKED"
+	ErrorCodePOINTOFSALENOTVALIDATED        ErrorCode = "POINT_OF_SALE_NOT_VALIDATED"
 	ErrorCodeSOURCEVERSIONREQUIRED          ErrorCode = "SOURCE_VERSION_REQUIRED"
 	ErrorCodeVALIDATIONERROR                ErrorCode = "VALIDATION_ERROR"
 )
@@ -138,9 +147,25 @@ func (e ErrorCode) Valid() bool {
 		return true
 	case ErrorCodeAUTHNOTCONFIGURED:
 		return true
+	case ErrorCodeAUTHORITYTIMEOUT:
+		return true
+	case ErrorCodeCERTIFICATECUITMISMATCH:
+		return true
+	case ErrorCodeCERTIFICATEENVIRONMENTMISMATCH:
+		return true
+	case ErrorCodeCERTIFICATEINVALID:
+		return true
 	case ErrorCodeCOMMANDREJECTED:
 		return true
+	case ErrorCodeCREDENTIALNOTFOUND:
+		return true
+	case ErrorCodeCREDENTIALNOTREADY:
+		return true
+	case ErrorCodeCREDENTIALVERSIONCONFLICT:
+		return true
 	case ErrorCodeDOCUMENTNOTREVERSIBLE:
+		return true
+	case ErrorCodeFISCALUNAVAILABLE:
 		return true
 	case ErrorCodeFORBIDDEN:
 		return true
@@ -160,9 +185,89 @@ func (e ErrorCode) Valid() bool {
 		return true
 	case ErrorCodePERIODLOCKED:
 		return true
+	case ErrorCodePOINTOFSALENOTVALIDATED:
+		return true
 	case ErrorCodeSOURCEVERSIONREQUIRED:
 		return true
 	case ErrorCodeVALIDATIONERROR:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalCredentialEnvironment.
+const (
+	FiscalCredentialEnvironmentHomologation FiscalCredentialEnvironment = "homologation"
+	FiscalCredentialEnvironmentProduction   FiscalCredentialEnvironment = "production"
+)
+
+// Valid indicates whether the value is a known member of the FiscalCredentialEnvironment enum.
+func (e FiscalCredentialEnvironment) Valid() bool {
+	switch e {
+	case FiscalCredentialEnvironmentHomologation:
+		return true
+	case FiscalCredentialEnvironmentProduction:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalCredentialStatus.
+const (
+	Disabled           FiscalCredentialStatus = "disabled"
+	Expired            FiscalCredentialStatus = "expired"
+	PendingCertificate FiscalCredentialStatus = "pending_certificate"
+	Ready              FiscalCredentialStatus = "ready"
+)
+
+// Valid indicates whether the value is a known member of the FiscalCredentialStatus enum.
+func (e FiscalCredentialStatus) Valid() bool {
+	switch e {
+	case Disabled:
+		return true
+	case Expired:
+		return true
+	case PendingCertificate:
+		return true
+	case Ready:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalCredentialCSRInputEnvironment.
+const (
+	FiscalCredentialCSRInputEnvironmentHomologation FiscalCredentialCSRInputEnvironment = "homologation"
+	FiscalCredentialCSRInputEnvironmentProduction   FiscalCredentialCSRInputEnvironment = "production"
+)
+
+// Valid indicates whether the value is a known member of the FiscalCredentialCSRInputEnvironment enum.
+func (e FiscalCredentialCSRInputEnvironment) Valid() bool {
+	switch e {
+	case FiscalCredentialCSRInputEnvironmentHomologation:
+		return true
+	case FiscalCredentialCSRInputEnvironmentProduction:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalPointOfSaleEnvironment.
+const (
+	FiscalPointOfSaleEnvironmentHomologation FiscalPointOfSaleEnvironment = "homologation"
+	FiscalPointOfSaleEnvironmentProduction   FiscalPointOfSaleEnvironment = "production"
+)
+
+// Valid indicates whether the value is a known member of the FiscalPointOfSaleEnvironment enum.
+func (e FiscalPointOfSaleEnvironment) Valid() bool {
+	switch e {
+	case FiscalPointOfSaleEnvironmentHomologation:
+		return true
+	case FiscalPointOfSaleEnvironmentProduction:
 		return true
 	default:
 		return false
@@ -652,6 +757,73 @@ type Error struct {
 // ErrorCode defines model for Error.Code.
 type ErrorCode string
 
+// FiscalCertificateUpload defines model for FiscalCertificateUpload.
+type FiscalCertificateUpload struct {
+	CertificatePem  *string `json:"certificate_pem,omitempty"`
+	ExpectedVersion int     `json:"expected_version"`
+}
+
+// FiscalCredential defines model for FiscalCredential.
+type FiscalCredential struct {
+	CertificateExpiresAt    *time.Time                  `json:"certificate_expires_at,omitempty"`
+	CertificateFingerprint  *string                     `json:"certificate_fingerprint,omitempty"`
+	CertificateSerialNumber *string                     `json:"certificate_serial_number,omitempty"`
+	CertificateValidFrom    *time.Time                  `json:"certificate_valid_from,omitempty"`
+	CommonName              string                      `json:"common_name"`
+	CreatedAt               *time.Time                  `json:"created_at,omitempty"`
+	Cuit                    string                      `json:"cuit"`
+	Environment             FiscalCredentialEnvironment `json:"environment"`
+	Id                      openapi_types.UUID          `json:"id"`
+	LegalName               string                      `json:"legal_name"`
+	OrganizationId          string                      `json:"organization_id"`
+	Status                  FiscalCredentialStatus      `json:"status"`
+	UpdatedAt               *time.Time                  `json:"updated_at,omitempty"`
+	Version                 int                         `json:"version"`
+}
+
+// FiscalCredentialEnvironment defines model for FiscalCredential.Environment.
+type FiscalCredentialEnvironment string
+
+// FiscalCredentialStatus defines model for FiscalCredential.Status.
+type FiscalCredentialStatus string
+
+// FiscalCredentialCSRInput defines model for FiscalCredentialCSRInput.
+type FiscalCredentialCSRInput struct {
+	CommonName  string                              `json:"common_name"`
+	Cuit        string                              `json:"cuit"`
+	Environment FiscalCredentialCSRInputEnvironment `json:"environment"`
+	LegalName   string                              `json:"legal_name"`
+}
+
+// FiscalCredentialCSRInputEnvironment defines model for FiscalCredentialCSRInput.Environment.
+type FiscalCredentialCSRInputEnvironment string
+
+// FiscalCredentialCSRResult defines model for FiscalCredentialCSRResult.
+type FiscalCredentialCSRResult struct {
+	Credential FiscalCredential `json:"credential"`
+
+	// CsrPem CSR público para registrar en ARCA; nunca contiene la clave privada.
+	CsrPem *string `json:"csr_pem,omitempty"`
+}
+
+// FiscalPointOfSale defines model for FiscalPointOfSale.
+type FiscalPointOfSale struct {
+	CredentialId   openapi_types.UUID           `json:"credential_id"`
+	Enabled        bool                         `json:"enabled"`
+	Environment    FiscalPointOfSaleEnvironment `json:"environment"`
+	Number         int                          `json:"number"`
+	OrganizationId string                       `json:"organization_id"`
+	ValidatedAt    *time.Time                   `json:"validated_at,omitempty"`
+}
+
+// FiscalPointOfSaleEnvironment defines model for FiscalPointOfSale.Environment.
+type FiscalPointOfSaleEnvironment string
+
+// FiscalPointOfSaleConfiguration defines model for FiscalPointOfSaleConfiguration.
+type FiscalPointOfSaleConfiguration struct {
+	Enabled bool `json:"enabled"`
+}
+
 // Money defines model for Money.
 type Money struct {
 	Amount   string `json:"amount"`
@@ -891,6 +1063,12 @@ type VatBreakdownItem struct {
 // VatBreakdownItemRate Alícuota IVA expresada como string exacta.
 type VatBreakdownItemRate string
 
+// FiscalCredentialId defines model for FiscalCredentialId.
+type FiscalCredentialId = openapi_types.UUID
+
+// FiscalPointOfSaleNumber defines model for FiscalPointOfSaleNumber.
+type FiscalPointOfSaleNumber = int
+
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
 
@@ -905,6 +1083,9 @@ type AuthUnavailable = Error
 
 // DomainError defines model for DomainError.
 type DomainError = Error
+
+// FiscalUnavailable defines model for FiscalUnavailable.
+type FiscalUnavailable = Error
 
 // Forbidden defines model for Forbidden.
 type Forbidden = Error
@@ -925,6 +1106,12 @@ type CreateAccountingAdjustmentParams struct {
 
 	// XSourceVersion Versión positiva del snapshot de origen incluida en la identidad idempotente.
 	XSourceVersion SourceVersion `json:"X-Source-Version"`
+}
+
+// RequestFiscalCredentialCSRParams defines parameters for RequestFiscalCredentialCSR.
+type RequestFiscalCredentialCSRParams struct {
+	// IdempotencyKey Clave pública estable. Queda vinculada a organización, operación, source ID y source version.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
 // CreatePartyParams defines parameters for CreateParty.
@@ -978,6 +1165,18 @@ type GetReadyz503JSONResponseBodyStatus string
 // CreateAccountingAdjustmentJSONRequestBody defines body for CreateAccountingAdjustment for application/json ContentType.
 type CreateAccountingAdjustmentJSONRequestBody = AccountingAdjustmentInput
 
+// RequestFiscalCredentialCSRJSONRequestBody defines body for RequestFiscalCredentialCSR for application/json ContentType.
+type RequestFiscalCredentialCSRJSONRequestBody = FiscalCredentialCSRInput
+
+// UploadFiscalCertificateJSONRequestBody defines body for UploadFiscalCertificate for application/json ContentType.
+type UploadFiscalCertificateJSONRequestBody = FiscalCertificateUpload
+
+// ConfigureFiscalPointOfSaleJSONRequestBody defines body for ConfigureFiscalPointOfSale for application/json ContentType.
+type ConfigureFiscalPointOfSaleJSONRequestBody = FiscalPointOfSaleConfiguration
+
+// ValidateFiscalPointOfSaleJSONRequestBody defines body for ValidateFiscalPointOfSale for application/json ContentType.
+type ValidateFiscalPointOfSaleJSONRequestBody = FiscalPointOfSaleConfiguration
+
 // CreatePartyJSONRequestBody defines body for CreateParty for application/json ContentType.
 type CreatePartyJSONRequestBody = PartyInput
 
@@ -1001,6 +1200,21 @@ type ServerInterface interface {
 	// CreateAccountingAdjustment Solicita explícitamente contabilizar en un período abierto autorizado.
 	// (POST /api/v1/organizations/{organizationId}/accounting-failures/{failureId}/adjustments)
 	CreateAccountingAdjustment(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, failureId openapi_types.UUID, params CreateAccountingAdjustmentParams)
+	// RequestFiscalCredentialCSR Genera dentro de Fiscal la clave privada tenant y devuelve sólo el CSR público.
+	// (POST /api/v1/organizations/{organizationId}/fiscal/credentials/csr)
+	RequestFiscalCredentialCSR(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, params RequestFiscalCredentialCSRParams)
+	// GetFiscalCredential Consulta metadatos fiscales sin devolver material criptográfico.
+	// (GET /api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId})
+	GetFiscalCredential(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId FiscalCredentialId)
+	// UploadFiscalCertificate Entrega a Fiscal el certificado emitido por ARCA para la clave tenant.
+	// (PUT /api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId})
+	UploadFiscalCertificate(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId FiscalCredentialId)
+
+	// (PUT /api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}/points-of-sale/{pointOfSale})
+	ConfigureFiscalPointOfSale(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId FiscalCredentialId, pointOfSale FiscalPointOfSaleNumber)
+
+	// (POST /api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate)
+	ValidateFiscalPointOfSale(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId FiscalCredentialId, pointOfSale FiscalPointOfSaleNumber)
 
 	// (POST /api/v1/organizations/{organizationId}/parties)
 	CreateParty(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, params CreatePartyParams)
@@ -1049,6 +1263,34 @@ func (_ Unimplemented) GetAccountingFailure(w http.ResponseWriter, r *http.Reque
 // CreateAccountingAdjustment Solicita explícitamente contabilizar en un período abierto autorizado.
 // (POST /api/v1/organizations/{organizationId}/accounting-failures/{failureId}/adjustments)
 func (_ Unimplemented) CreateAccountingAdjustment(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, failureId openapi_types.UUID, params CreateAccountingAdjustmentParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// RequestFiscalCredentialCSR Genera dentro de Fiscal la clave privada tenant y devuelve sólo el CSR público.
+// (POST /api/v1/organizations/{organizationId}/fiscal/credentials/csr)
+func (_ Unimplemented) RequestFiscalCredentialCSR(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, params RequestFiscalCredentialCSRParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetFiscalCredential Consulta metadatos fiscales sin devolver material criptográfico.
+// (GET /api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId})
+func (_ Unimplemented) GetFiscalCredential(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId FiscalCredentialId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UploadFiscalCertificate Entrega a Fiscal el certificado emitido por ARCA para la clave tenant.
+// (PUT /api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId})
+func (_ Unimplemented) UploadFiscalCertificate(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId FiscalCredentialId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}/points-of-sale/{pointOfSale})
+func (_ Unimplemented) ConfigureFiscalPointOfSale(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId FiscalCredentialId, pointOfSale FiscalPointOfSaleNumber) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate)
+func (_ Unimplemented) ValidateFiscalPointOfSale(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId FiscalCredentialId, pointOfSale FiscalPointOfSaleNumber) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1228,6 +1470,218 @@ func (siw *ServerInterfaceWrapper) CreateAccountingAdjustment(w http.ResponseWri
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAccountingAdjustment(w, r, organizationId, failureId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RequestFiscalCredentialCSR operation middleware
+func (siw *ServerInterfaceWrapper) RequestFiscalCredentialCSR(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "organizationId" -------------
+	var organizationId OrganizationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "organizationId", chi.URLParam(r, "organizationId"), &organizationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "organizationId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RequestFiscalCredentialCSRParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestFiscalCredentialCSR(w, r, organizationId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFiscalCredential operation middleware
+func (siw *ServerInterfaceWrapper) GetFiscalCredential(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "organizationId" -------------
+	var organizationId OrganizationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "organizationId", chi.URLParam(r, "organizationId"), &organizationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "organizationId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "credentialId" -------------
+	var credentialId FiscalCredentialId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "credentialId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFiscalCredential(w, r, organizationId, credentialId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UploadFiscalCertificate operation middleware
+func (siw *ServerInterfaceWrapper) UploadFiscalCertificate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "organizationId" -------------
+	var organizationId OrganizationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "organizationId", chi.URLParam(r, "organizationId"), &organizationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "organizationId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "credentialId" -------------
+	var credentialId FiscalCredentialId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "credentialId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadFiscalCertificate(w, r, organizationId, credentialId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConfigureFiscalPointOfSale operation middleware
+func (siw *ServerInterfaceWrapper) ConfigureFiscalPointOfSale(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "organizationId" -------------
+	var organizationId OrganizationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "organizationId", chi.URLParam(r, "organizationId"), &organizationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "organizationId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "credentialId" -------------
+	var credentialId FiscalCredentialId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "credentialId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "pointOfSale" -------------
+	var pointOfSale FiscalPointOfSaleNumber
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pointOfSale", chi.URLParam(r, "pointOfSale"), &pointOfSale, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pointOfSale", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfigureFiscalPointOfSale(w, r, organizationId, credentialId, pointOfSale)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ValidateFiscalPointOfSale operation middleware
+func (siw *ServerInterfaceWrapper) ValidateFiscalPointOfSale(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "organizationId" -------------
+	var organizationId OrganizationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "organizationId", chi.URLParam(r, "organizationId"), &organizationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "organizationId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "credentialId" -------------
+	var credentialId FiscalCredentialId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "credentialId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "pointOfSale" -------------
+	var pointOfSale FiscalPointOfSaleNumber
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pointOfSale", chi.URLParam(r, "pointOfSale"), &pointOfSale, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pointOfSale", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ValidateFiscalPointOfSale(w, r, organizationId, credentialId, pointOfSale)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1941,6 +2395,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/organizations/{organizationId}/sales/{saleId}", wrapper.GetSale)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/organizations/{organizationId}/fiscal/credentials/csr", wrapper.RequestFiscalCredentialCSR)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}", wrapper.GetFiscalCredential)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}", wrapper.UploadFiscalCertificate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}/points-of-sale/{pointOfSale}", wrapper.ConfigureFiscalPointOfSale)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate", wrapper.ValidateFiscalPointOfSale)
 	})
 
 	return r

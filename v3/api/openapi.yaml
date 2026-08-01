@@ -245,6 +245,116 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/v1/organizations/{organizationId}/fiscal/credentials/csr:
+    post:
+      operationId: requestFiscalCredentialCSR
+      summary: Genera dentro de Fiscal la clave privada tenant y devuelve sólo el CSR público.
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FiscalCredentialCSRInput' }
+      responses:
+        '201':
+          description: Clave generada y cifrada; la clave privada nunca atraviesa el BFF.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FiscalCredentialCSRResult' }
+        '400': { $ref: '#/components/responses/InvalidCommand' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503': { $ref: '#/components/responses/FiscalUnavailable' }
+  /api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}:
+    get:
+      operationId: getFiscalCredential
+      summary: Consulta metadatos fiscales sin devolver material criptográfico.
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - { $ref: '#/components/parameters/FiscalCredentialId' }
+      responses:
+        '200':
+          description: Metadatos de la credencial tenant.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FiscalCredential' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503': { $ref: '#/components/responses/FiscalUnavailable' }
+    put:
+      operationId: uploadFiscalCertificate
+      summary: Entrega a Fiscal el certificado emitido por ARCA para la clave tenant.
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - { $ref: '#/components/parameters/FiscalCredentialId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FiscalCertificateUpload' }
+      responses:
+        '200':
+          description: Certificado validado y cifrado dentro de Fiscal.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FiscalCredential' }
+        '400': { $ref: '#/components/responses/InvalidCommand' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503': { $ref: '#/components/responses/FiscalUnavailable' }
+  /api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}/points-of-sale/{pointOfSale}:
+    put:
+      operationId: configureFiscalPointOfSale
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - { $ref: '#/components/parameters/FiscalCredentialId' }
+        - { $ref: '#/components/parameters/FiscalPointOfSaleNumber' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FiscalPointOfSaleConfiguration' }
+      responses:
+        '200':
+          description: Punto de venta configurado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FiscalPointOfSale' }
+        '400': { $ref: '#/components/responses/InvalidCommand' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503': { $ref: '#/components/responses/FiscalUnavailable' }
+  /api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate:
+    post:
+      operationId: validateFiscalPointOfSale
+      description: Valida WSAA/WSFE sin emitir un comprobante y opcionalmente habilita el punto.
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - { $ref: '#/components/parameters/FiscalCredentialId' }
+        - { $ref: '#/components/parameters/FiscalPointOfSaleNumber' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FiscalPointOfSaleConfiguration' }
+      responses:
+        '200':
+          description: Credencial y punto de venta validados contra ARCA.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FiscalPointOfSale' }
+        '400': { $ref: '#/components/responses/InvalidCommand' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503': { $ref: '#/components/responses/FiscalUnavailable' }
 components:
   securitySchemes:
     clerkBearer:
@@ -254,6 +364,16 @@ components:
       description: JWT de sesión Clerk validado por el BFF.
   parameters:
     OrganizationId: { name: organizationId, in: path, required: true, schema: { type: string } }
+    FiscalCredentialId:
+      name: credentialId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    FiscalPointOfSaleNumber:
+      name: pointOfSale
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1, maximum: 99999 }
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -297,6 +417,11 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    FiscalUnavailable:
+      description: Fiscal o ARCA no están disponibles; no se expone detalle sensible.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
   schemas:
     Error:
       type: object
@@ -318,8 +443,92 @@ components:
             - OPEN_ITEM_AMOUNT_EXCEEDED
             - PERIOD_LOCKED
             - ACCOUNTING_ADJUSTMENT_NOT_ALLOWED
+            - CREDENTIAL_NOT_FOUND
+            - CREDENTIAL_NOT_READY
+            - CREDENTIAL_VERSION_CONFLICT
+            - CERTIFICATE_INVALID
+            - CERTIFICATE_CUIT_MISMATCH
+            - CERTIFICATE_ENVIRONMENT_MISMATCH
+            - POINT_OF_SALE_NOT_VALIDATED
+            - AUTHORITY_TIMEOUT
+            - FISCAL_UNAVAILABLE
             - VALIDATION_ERROR
             - COMMAND_REJECTED
+    FiscalCredentialCSRInput:
+      type: object
+      additionalProperties: false
+      required: [cuit, legal_name, common_name, environment]
+      properties:
+        cuit: { type: string, pattern: '^[0-9]{11}$' }
+        legal_name: { type: string, minLength: 1, maxLength: 200 }
+        common_name: { type: string, minLength: 1, maxLength: 200 }
+        environment: { type: string, enum: [homologation, production] }
+    FiscalCredential:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - organization_id
+        - cuit
+        - legal_name
+        - common_name
+        - environment
+        - status
+        - version
+        - created_at
+        - updated_at
+      properties:
+        id: { type: string, format: uuid }
+        organization_id: { type: string }
+        cuit: { type: string, pattern: '^[0-9]{11}$' }
+        legal_name: { type: string }
+        common_name: { type: string }
+        environment: { type: string, enum: [homologation, production] }
+        status: { type: string, enum: [pending_certificate, ready, expired, disabled] }
+        version: { type: integer, minimum: 1 }
+        certificate_fingerprint: { type: string, readOnly: true }
+        certificate_serial_number: { type: string, readOnly: true }
+        certificate_valid_from: { type: string, format: date-time, readOnly: true }
+        certificate_expires_at: { type: string, format: date-time, readOnly: true }
+        created_at: { type: string, format: date-time, readOnly: true }
+        updated_at: { type: string, format: date-time, readOnly: true }
+    FiscalCredentialCSRResult:
+      type: object
+      additionalProperties: false
+      required: [credential, csr_pem]
+      properties:
+        credential: { $ref: '#/components/schemas/FiscalCredential' }
+        csr_pem:
+          type: string
+          readOnly: true
+          description: CSR público para registrar en ARCA; nunca contiene la clave privada.
+    FiscalCertificateUpload:
+      type: object
+      additionalProperties: false
+      required: [certificate_pem, expected_version]
+      properties:
+        certificate_pem:
+          type: string
+          writeOnly: true
+          minLength: 1
+        expected_version: { type: integer, minimum: 1 }
+    FiscalPointOfSaleConfiguration:
+      type: object
+      additionalProperties: false
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+    FiscalPointOfSale:
+      type: object
+      additionalProperties: false
+      required: [organization_id, credential_id, environment, number, enabled]
+      properties:
+        organization_id: { type: string }
+        credential_id: { type: string, format: uuid }
+        environment: { type: string, enum: [homologation, production] }
+        number: { type: integer, minimum: 1, maximum: 99999 }
+        enabled: { type: boolean }
+        validated_at: { type: string, format: date-time, readOnly: true }
     AccountingFailureRef:
       type: object
       readOnly: true

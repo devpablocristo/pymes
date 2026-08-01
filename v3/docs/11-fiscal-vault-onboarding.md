@@ -34,6 +34,22 @@ La solicitud de CSR es idempotente por organización. Reusar la clave con otro
 payload devuelve `IDEMPOTENCY_KEY_REUSED`; las cargas de certificado usan
 versión optimista.
 
+## Fachada pública del BFF
+
+El navegador autenticado con Clerk llama únicamente a Pymes:
+
+- `POST /api/v1/organizations/{organizationId}/fiscal/credentials/csr`;
+- `GET|PUT /api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}`;
+- `PUT /api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}/points-of-sale/{pointOfSale}`;
+- `POST .../points-of-sale/{pointOfSale}/validate`.
+
+Lectura requiere membresía activa; cualquier mutación requiere `owner` o
+`admin` y una organización lista. El BFF traduce DTOs, propaga identidad
+interna firmada y no persiste CSR ni certificado. El certificado PEM es
+`writeOnly`; ninguna respuesta pública contiene PEM, claves, tickets, XML,
+envelopes KMS ni artefactos privados. Fiscal sigue siendo la única fuente de
+verdad de las credenciales.
+
 ## Cifrado
 
 El envelope tiene formato `aes-256-gcm+kms-v1`. Cada operación genera DEK e IV

@@ -31,6 +31,7 @@ func InitializeFakeService(kind string) (http.Handler, error) {
 type App struct {
 	Handler         http.Handler
 	database        *postgres.Database
+	identity        closeResource
 	shutdownTracing func(context.Context) error
 	closeOnce       sync.Once
 	closeErr        error
@@ -41,14 +42,23 @@ func (a *App) Close() error {
 		return nil
 	}
 	a.closeOnce.Do(func() {
+		var closeErrors []error
+		if a.identity != nil {
+			if err := a.identity.Close(); err != nil {
+				closeErrors = append(closeErrors, err)
+			}
+		}
 		if a.shutdownTracing != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			a.closeErr = a.shutdownTracing(ctx)
+			if err := a.shutdownTracing(ctx); err != nil {
+				closeErrors = append(closeErrors, err)
+			}
 			cancel()
 		}
 		if a.database != nil {
 			a.database.Close()
 		}
+		a.closeErr = errors.Join(closeErrors...)
 	})
 	return a.closeErr
 }
@@ -91,14 +101,40 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 			Err:  fmt.Errorf("Clerk webhook verifier: %w", err),
 		}
 	}
+	internalTokens, err := identity.TokenSourceFromRuntimeContext(
+		ctx,
+		"api:fiscal-settings",
+	)
+	if err != nil {
+		database.Close()
+		_ = shutdownTracing(context.Background())
+		return nil, &APIStartupError{
+			Code: "WORKLOAD_IDENTITY_INVALID",
+			Err:  fmt.Errorf("internal fiscal identity: %w", err),
+		}
+	}
+	var platformTokens commerce.PlatformTokenSource
+	if !cfg.AllowInsecureLocalServices {
+		platformTokens = identity.NewMetadataIDTokenSource()
+	}
 	store := commerce.New(pool)
 	identities := identity.New(pool)
+	fiscalCredentials := commerce.HTTPFiscalClient{
+		BaseURL:        cfg.FiscalURL,
+		Client:         commerce.NewServiceHTTPClient(),
+		Tokens:         internalTokens,
+		PlatformTokens: platformTokens,
+	}
 	api := commerce.NewHTTPServer(commerce.Commands{
-		Store: store, AccountingAdjustments: store, Now: store.Clock,
+		Store:                 store,
+		AccountingAdjustments: store,
+		FiscalCredentials:     fiscalCredentials,
+		Now:                   store.Clock,
 	}, identity.ClerkAuthenticator{Memberships: identities, Verifier: sessions})
 	handler := composePublicHTTP(api.Handler(), identity.NewWebhook(webhooks, identity.ReceiveWebhook{Inbox: identities}))
 	return &App{
 		Handler: observability.HTTP(handler, nil), database: database,
+		identity:        internalTokens,
 		shutdownTracing: shutdownTracing,
 	}, nil
 }

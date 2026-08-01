@@ -134,7 +134,12 @@ services:
     build: { context: ., target: api }
     environment:
       PYMES_DATABASE_URL: postgres://pymes:pymes@postgres:5432/pymes_v3?sslmode=disable
+      FISCAL_ADAPTER_URL: http://fiscal-fake:8080
       PYMES_ENVIRONMENT: development
+      PYMES_ALLOW_INSECURE_LOCAL_SERVICES: "true"
+      PYMES_INTERNAL_SIGNING_SEED_B64: AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=
+      PYMES_INTERNAL_ISSUER: pymes-v3
+      PYMES_INTERNAL_KEY_ID: local-dev-1
       PYMES_CLERK_SECRET_KEY: ${PYMES_CLERK_SECRET_KEY:-sk_test_local}
       PYMES_CLERK_JWT_KEY: ${PYMES_CLERK_JWT_KEY:-}
       PYMES_CLERK_ISSUER: ${PYMES_CLERK_ISSUER:-https://clerk.local}
@@ -143,6 +148,7 @@ services:
       PYMES_CLERK_WEBHOOK_SECRET: ${PYMES_CLERK_WEBHOOK_SECRET:-whsec_dGVzdHRlc3R0ZXN0dGVzdHRlc3R0ZXN0dGVzdA==}
     depends_on:
       migrate: { condition: service_completed_successfully }
+      fiscal-fake: { condition: service_healthy }
     ports: ["18080:8080"]
     healthcheck:
       test: ["CMD", "/healthcheck", "http://127.0.0.1:8080/readyz"]

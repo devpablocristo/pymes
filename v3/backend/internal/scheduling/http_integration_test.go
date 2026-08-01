@@ -182,6 +182,7 @@ func TestSchedulingHTTPEndToEnd(t *testing.T) {
 	handler := NewHTTPHandler(
 		service,
 		authenticatorFake{principal: principal},
+		schedulingFeatureGateFake{enabled: true},
 	).Handler()
 
 	location, err := time.LoadLocation("America/Argentina/Buenos_Aires")

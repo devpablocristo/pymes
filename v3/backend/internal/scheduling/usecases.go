@@ -985,6 +985,34 @@ func (s *Service) ConsumeBookingAction(
 	return result, nil
 }
 
+func (s *Service) ResolveActionOrganization(
+	ctx context.Context,
+	rawToken string,
+) (string, error) {
+	if s.repository == nil || s.tokens == nil ||
+		strings.TrimSpace(rawToken) == "" {
+		return "", domain.NewError(
+			domain.CodeActionTokenInvalid,
+			"action token is invalid",
+		)
+	}
+	hash, err := s.tokens.HashVerified(rawToken)
+	if err != nil {
+		return "", domain.NewError(
+			domain.CodeActionTokenInvalid,
+			"action token is invalid",
+		)
+	}
+	token, err := s.repository.FindActionToken(ctx, hash)
+	if err != nil || token.OrganizationID == "" {
+		return "", domain.NewError(
+			domain.CodeActionTokenInvalid,
+			"action token is invalid",
+		)
+	}
+	return token.OrganizationID, nil
+}
+
 func (s *Service) ConsumeWaitlistAction(
 	ctx context.Context,
 	rawToken string,

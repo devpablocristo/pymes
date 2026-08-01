@@ -1,5 +1,10 @@
 # Agenda multi-tenant
 
+Todas las rutas administrativas, públicas y de tokens de acción requieren
+`organization_feature_flags.scheduling_enabled=true`. La organización se
+resuelve desde Clerk, slug o token antes de consultar el flag; el cliente nunca
+puede seleccionar otro tenant mediante el payload.
+
 ## Alcance y ownership
 
 `internal/scheduling` es un contexto del monolito modular de Pymes. Es dueño de

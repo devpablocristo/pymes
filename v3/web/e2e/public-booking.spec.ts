@@ -3,6 +3,15 @@ import { expect, test } from "@playwright/test";
 test("reserva un turno público sin autenticarse", async ({ page }) => {
   await page.goto("/reservar/centro-norte");
   await expect(page.getByRole("heading", { name: "Centro Norte" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth + 1,
+      ),
+    )
+    .toBe(true);
   if (process.env.PYMES_VISUAL_CAPTURE) {
     await page.screenshot({ path: `/tmp/pymes-public-booking-${test.info().project.name}.png`, fullPage: true });
   }

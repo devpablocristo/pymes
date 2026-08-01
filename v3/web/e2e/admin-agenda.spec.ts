@@ -4,10 +4,19 @@ test("opera agenda, disponibilidad y cola con fake contractual", async ({ page }
   await page.goto("/app/agenda");
   await expect(page.getByRole("heading", { name: "Agenda", exact: true })).toBeVisible();
   await expect(page.getByText("Centro Norte")).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth + 1,
+      ),
+    )
+    .toBe(true);
 
   await page.getByRole("button", { name: "+ Nuevo turno" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "Nuevo turno" })).toBeVisible();
+  const dialog = page.getByRole("dialog", { name: "Nuevo turno" });
+  await expect(dialog).toBeVisible();
   await dialog.getByLabel("Servicio").selectOption({ index: 1 });
   await dialog.getByLabel("Cliente").fill("Cliente E2E");
   await dialog.getByLabel("Email").fill("cliente@example.invalid");
@@ -24,7 +33,7 @@ test("opera agenda, disponibilidad y cola con fake contractual", async ({ page }
   await page.getByRole("button", { name: "Disponibilidad" }).click();
   await expect(page.getByRole("heading", { name: "Disponibilidad habitual" })).toBeVisible();
   await page.getByRole("button", { name: "Bloquear horario" }).click();
-  const blockDialog = page.getByRole("dialog");
+  const blockDialog = page.getByRole("dialog", { name: "Bloquear disponibilidad" });
   await blockDialog.getByLabel("Detalle visible para el equipo").fill("Capacitación interna");
   await blockDialog.getByRole("button", { name: "Crear bloqueo" }).click();
   await expect(page.getByText("Bloqueo creado.")).toBeVisible();

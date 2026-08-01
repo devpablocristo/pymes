@@ -1,4 +1,10 @@
-import { type FormEvent, type ReactNode, useEffect, useRef } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+} from "react";
 
 type DialogProps = {
   open: boolean;
@@ -12,6 +18,7 @@ type DialogProps = {
 
 export function Dialog({ open, title, eyebrow, children, footer, onClose, size = "medium" }: DialogProps) {
   const ref = useRef<HTMLDialogElement | null>(null);
+  const titleID = useId();
 
   useEffect(() => {
     const dialog = ref.current;
@@ -24,6 +31,7 @@ export function Dialog({ open, title, eyebrow, children, footer, onClose, size =
     <dialog
       ref={ref}
       className={`dialog dialog--${size}`}
+      aria-labelledby={titleID}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
@@ -36,7 +44,7 @@ export function Dialog({ open, title, eyebrow, children, footer, onClose, size =
         <header className="dialog__header">
           <div>
             {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-            <h2>{title}</h2>
+            <h2 id={titleID}>{title}</h2>
           </div>
           <button type="button" className="icon-button" aria-label="Cerrar" onClick={onClose}>
             ×

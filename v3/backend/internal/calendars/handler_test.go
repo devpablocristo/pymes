@@ -96,6 +96,10 @@ func TestCalendarBFFBindsOAuthToVerifiedClerkSessionAndHidesTokens(
 	if startResponse.Code != http.StatusCreated {
 		t.Fatalf("start status=%d body=%s", startResponse.Code, startResponse.Body)
 	}
+	if startResponse.Header().Get("Cache-Control") != "no-store" ||
+		startResponse.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("OAuth response headers=%v", startResponse.Header())
+	}
 	if commands.startInput.SessionBinding != "session-a" ||
 		commands.startInput.ActorID != "user-a" ||
 		commands.startInput.OrganizationID != "org-a" {

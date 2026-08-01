@@ -10,6 +10,7 @@ export type Session = {
   organizationName: string;
   organizationSlug: string;
   accountControls: ReactNode;
+  permissions: readonly string[];
   local: boolean;
 };
 

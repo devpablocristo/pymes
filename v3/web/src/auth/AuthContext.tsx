@@ -63,6 +63,7 @@ function ClerkSession({
       },
       organizationName: currentSession.data.organization.name,
       organizationSlug: currentSession.data.organization.slug,
+      permissions: currentSession.data.permissions,
       accountControls: (
         <div className="account-controls">
           <OrganizationSwitcher

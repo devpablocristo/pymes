@@ -53,7 +53,10 @@ export function AdminSchedulingPage() {
     organizationName,
     organizationSlug,
     accountControls,
+    permissions,
   } = useSession();
+  const canOperate = permissions.includes("scheduling:operate");
+  const canManage = permissions.includes("scheduling:manage");
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("agenda");
   const [branchId, setBranchId] = useState("");
@@ -340,7 +343,7 @@ export function AdminSchedulingPage() {
             </h1>
           </div>
           <div className="app-header__actions">
-            {tab === "agenda" ? (
+            {tab === "agenda" && canOperate ? (
               <button
                 type="button"
                 className="button button--primary"
@@ -412,6 +415,7 @@ export function AdminSchedulingPage() {
                 blocks={blocksQuery.data ?? []}
                 loaded={!bookingsQuery.isLoading}
                 timezone={timezone}
+                canOperate={canOperate}
                 selectedBookingId={selectedBookingId}
                 onRangeChange={updateRange}
                 onCreateAt={(startAt, endAt) => setBookingDraft({ startAt, endAt })}
@@ -426,6 +430,7 @@ export function AdminSchedulingPage() {
               resources={resources}
               timezone={timezone}
               pending={pending?.startsWith("booking:") ?? false}
+              canOperate={canOperate}
               onClose={() => setSelectedBookingId(null)}
               onReschedule={setReschedulingBooking}
               onAction={transitionBooking}
@@ -439,6 +444,7 @@ export function AdminSchedulingPage() {
             blocks={blocksQuery.data ?? []}
             resources={resources}
             timezone={timezone}
+            canManage={canManage}
             onCreateBlock={() => setBlockOpen(true)}
           />
         ) : null}
@@ -450,6 +456,7 @@ export function AdminSchedulingPage() {
             services={services}
             timezone={timezone}
             pending={pending === "waitlist"}
+            canOperate={canOperate}
             onCreate={createWaitlist}
           />
         ) : null}
@@ -459,6 +466,7 @@ export function AdminSchedulingPage() {
             tickets={queueQuery.data ?? []}
             services={services}
             pendingTicketId={pending?.startsWith("queue:") ? pending.slice(6) : null}
+            canOperate={canOperate}
             onAdvance={(ticket, status) => void advanceQueue(ticket, status)}
           />
         ) : null}

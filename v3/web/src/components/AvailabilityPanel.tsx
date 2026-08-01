@@ -15,12 +15,14 @@ export function AvailabilityPanel({
   blocks,
   resources,
   timezone,
+  canManage,
   onCreateBlock,
 }: {
   rules: AvailabilityRule[];
   blocks: AvailabilityBlock[];
   resources: Resource[];
   timezone: string;
+  canManage: boolean;
   onCreateBlock: () => void;
 }) {
   return (
@@ -57,9 +59,11 @@ export function AvailabilityPanel({
             <p className="eyebrow">Excepciones</p>
             <h2>Bloqueos próximos</h2>
           </div>
-          <button type="button" className="button button--primary" onClick={onCreateBlock}>
-            Bloquear horario
-          </button>
+          {canManage ? (
+            <button type="button" className="button button--primary" onClick={onCreateBlock}>
+              Bloquear horario
+            </button>
+          ) : null}
         </header>
         {blocks.length ? (
           <ul className="block-list">

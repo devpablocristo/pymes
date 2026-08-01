@@ -21,6 +21,7 @@ type CalendarBoardProps = {
   blocks: AvailabilityBlock[];
   loaded: boolean;
   timezone: string;
+  canOperate: boolean;
   selectedBookingId?: string | null;
   onRangeChange: (range: DateRange) => void;
   onCreateAt: (startAt: string, endAt: string) => void;
@@ -45,6 +46,7 @@ export function CalendarBoard({
   blocks,
   loaded,
   timezone,
+  canOperate,
   selectedBookingId,
   onRangeChange,
   onCreateAt,
@@ -61,7 +63,11 @@ export function CalendarBoard({
       title: booking.service_name,
       start: booking.start_at,
       end: booking.end_at,
-      editable: !["cancelled", "completed", "rescheduled", "no_show"].includes(booking.status),
+      editable:
+        canOperate &&
+        !["cancelled", "completed", "rescheduled", "no_show"].includes(
+          booking.status,
+        ),
       classNames: eventClass(booking.status, booking.id === selectedBookingId),
       extendedProps: { kind: "booking", booking },
     }));
@@ -76,7 +82,7 @@ export function CalendarBoard({
       extendedProps: { kind: "block" },
     }));
     return [...bookingEvents, ...blockEvents];
-  }, [blocks, bookings, selectedBookingId]);
+  }, [blocks, bookings, canOperate, selectedBookingId]);
 
   function api() {
     return calendarRef.current?.getApi();
@@ -153,9 +159,9 @@ export function CalendarBoard({
       slotDuration="00:15:00"
       snapDuration="00:15:00"
       events={events}
-      editable
-      selectable
-      eventDurationEditable
+      editable={canOperate}
+      selectable={canOperate}
+      eventDurationEditable={canOperate}
       onDatesSet={datesSet}
       onSelect={selectRange}
       onEventClick={eventClick}

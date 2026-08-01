@@ -8,6 +8,7 @@ export function WaitlistPanel({
   services,
   timezone,
   pending,
+  canOperate,
   onCreate,
 }: {
   entries: WaitlistEntry[];
@@ -15,6 +16,7 @@ export function WaitlistPanel({
   services: Service[];
   timezone: string;
   pending: boolean;
+  canOperate: boolean;
   onCreate: (input: WaitlistInput) => Promise<void>;
 }) {
   const [name, setName] = useState("");
@@ -78,7 +80,7 @@ export function WaitlistPanel({
           </div>
         )}
       </section>
-      <aside className="operation-panel__side">
+      {canOperate ? <aside className="operation-panel__side">
         <header className="section-heading">
           <div>
             <p className="eyebrow">Carga manual</p>
@@ -112,7 +114,14 @@ export function WaitlistPanel({
             {pending ? "Agregando…" : "Agregar a espera"}
           </button>
         </form>
-      </aside>
+      </aside> : (
+        <aside className="operation-panel__side">
+          <div className="empty-state empty-state--compact">
+            <h3>Acceso de sólo lectura</h3>
+            <p>Necesitás el permiso de operación para agregar solicitudes.</p>
+          </div>
+        </aside>
+      )}
     </div>
   );
 }

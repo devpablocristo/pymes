@@ -27,6 +27,11 @@ export default function LocalSession({
     },
     organizationName: "Centro Norte",
     organizationSlug: config.publicOrganizationSlug,
+    permissions: [
+      "scheduling:read",
+      "scheduling:operate",
+      "scheduling:manage",
+    ],
     accountControls: <span className="local-session-badge">Sesión local</span>,
     local: true,
   };

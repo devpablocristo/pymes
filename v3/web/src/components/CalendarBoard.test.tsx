@@ -9,8 +9,19 @@ vi.mock("@devpablocristo/platform-calendar-board/next", () => ({
   CalendarSurface: (props: {
     onEventDrop: (arg: unknown) => void;
     onEventResize: (arg: unknown) => void;
+    editable: boolean;
+    selectable: boolean;
+    eventDurationEditable: boolean;
+    events: Array<{ editable?: boolean }>;
   }) => (
     <>
+      <output
+        data-testid="calendar-capabilities"
+        data-editable={String(props.editable)}
+        data-selectable={String(props.selectable)}
+        data-duration-editable={String(props.eventDurationEditable)}
+        data-event-editable={String(props.events[0]?.editable)}
+      />
       <button
         type="button"
         onClick={() =>
@@ -78,6 +89,7 @@ describe("CalendarBoard", () => {
           blocks={[]}
           loaded
           timezone="America/Argentina/Buenos_Aires"
+          canOperate
           onRangeChange={vi.fn()}
           onCreateAt={vi.fn()}
           onSelectBooking={vi.fn()}
@@ -97,4 +109,28 @@ describe("CalendarBoard", () => {
       );
     },
   );
+
+  it("deshabilita selección y mutaciones para sesiones de sólo lectura", async () => {
+    const { CalendarBoard } = await import("./CalendarBoard");
+    render(
+      <CalendarBoard
+        bookings={[booking]}
+        blocks={[]}
+        loaded
+        timezone="America/Argentina/Buenos_Aires"
+        canOperate={false}
+        onRangeChange={vi.fn()}
+        onCreateAt={vi.fn()}
+        onSelectBooking={vi.fn()}
+        onReschedule={vi.fn()}
+        onMutationError={vi.fn()}
+      />,
+    );
+
+    const capabilities = screen.getByTestId("calendar-capabilities");
+    expect(capabilities).toHaveAttribute("data-editable", "false");
+    expect(capabilities).toHaveAttribute("data-selectable", "false");
+    expect(capabilities).toHaveAttribute("data-duration-editable", "false");
+    expect(capabilities).toHaveAttribute("data-event-editable", "false");
+  });
 });

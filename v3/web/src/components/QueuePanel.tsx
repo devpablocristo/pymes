@@ -13,11 +13,13 @@ export function QueuePanel({
   tickets,
   services,
   pendingTicketId,
+  canOperate,
   onAdvance,
 }: {
   tickets: QueueTicket[];
   services: Service[];
   pendingTicketId: string | null;
+  canOperate: boolean;
   onAdvance: (ticket: QueueTicket, status: "called" | "serving" | "completed" | "no_show" | "cancelled") => void;
 }) {
   const active = tickets
@@ -51,7 +53,7 @@ export function QueuePanel({
                         <strong>Cliente · {ticket.party_id.slice(-6)}</strong>
                         <span>{services.find((service) => service.id === ticket.service_id)?.name ?? "Servicio"}</span>
                       </div>
-                      <div className="queue-ticket__actions">
+                      {canOperate ? <div className="queue-ticket__actions">
                         {status === "waiting" ? (
                           <button
                             type="button"
@@ -87,7 +89,7 @@ export function QueuePanel({
                         >
                           No respondió
                         </button>
-                      </div>
+                      </div> : null}
                     </article>
                   ))}
               </div>

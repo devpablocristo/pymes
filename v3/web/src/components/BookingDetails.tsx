@@ -7,6 +7,7 @@ type BookingDetailsProps = {
   resources: Resource[];
   timezone: string;
   pending: boolean;
+  canOperate: boolean;
   onClose: () => void;
   onReschedule: (booking: Booking) => void;
   onAction: (booking: Booking, action: BookingAction) => Promise<void>;
@@ -36,6 +37,7 @@ export function BookingDetails({
   resources,
   timezone,
   pending,
+  canOperate,
   onClose,
   onReschedule,
   onAction,
@@ -98,12 +100,12 @@ export function BookingDetails({
         )}
       </section>
       <footer className="drawer-actions">
-        {canReschedule ? (
+        {canOperate && canReschedule ? (
           <button type="button" className="button button--secondary" onClick={() => onReschedule(booking)}>
             Reprogramar
           </button>
         ) : null}
-        {allowedActions[booking.status].map((action) => (
+        {canOperate ? allowedActions[booking.status].map((action) => (
           <button
             key={action}
             type="button"
@@ -113,7 +115,9 @@ export function BookingDetails({
           >
             {actionLabels[action]}
           </button>
-        ))}
+        )) : (
+          <p className="muted">Tenés acceso de sólo lectura.</p>
+        )}
       </footer>
     </aside>
   );

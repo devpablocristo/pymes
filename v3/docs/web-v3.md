@@ -30,6 +30,12 @@ claves de caché. El `organization.slug` canónico construye el enlace de bookin
 público. La respuesta lleva `Cache-Control: no-store`; un tenant pendiente,
 fallido o suspendido no abre Agenda.
 
+Los permisos `scheduling:read`, `scheduling:operate` y `scheduling:manage`
+también provienen de esa sesión canónica. La Web oculta selección, drag/resize,
+transiciones, bloqueos, waitlist y cola cuando falta el permiso correspondiente.
+Esto mejora la experiencia, pero no reemplaza la autorización obligatoria del
+BFF en cada request.
+
 `VITE_ALLOW_INSECURE_LOCAL_AUTH`, `VITE_USE_FAKE_API` y
 `VITE_PYMES_ORGANIZATION_ID` existen únicamente para desarrollo. Los bundles
 productivos abortan si se intenta habilitar autenticación insegura o fakes. El

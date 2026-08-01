@@ -479,3 +479,85 @@ func TestSchedulingStatusCustomizationRoutesAndMetadata(t *testing.T) {
 		)
 	}
 }
+
+func TestSchedulingStatusCustomizationEnforcesEachPermission(t *testing.T) {
+	bookingID := uuid.New()
+	tests := []struct {
+		name        string
+		method      string
+		path        string
+		body        string
+		permissions []string
+	}{
+		{
+			name:   "configure requires manage",
+			method: http.MethodPut,
+			path: "/api/v1/organizations/org_a/scheduling/" +
+				"status-configurations/confirmed",
+			body: `{"label":"Confirmado","substates":[]}`,
+			permissions: []string{
+				domain.PermissionRead,
+				domain.PermissionOperate,
+			},
+		},
+		{
+			name:   "list requires read",
+			method: http.MethodGet,
+			path: "/api/v1/organizations/org_a/scheduling/" +
+				"status-configurations",
+			permissions: []string{
+				domain.PermissionOperate,
+				domain.PermissionManage,
+			},
+		},
+		{
+			name:   "substate requires operate",
+			method: http.MethodPost,
+			path: "/api/v1/organizations/org_a/scheduling/bookings/" +
+				bookingID.String() + "/substate",
+			body: `{"expected_version":1,"substate_code":"arrived"}`,
+			permissions: []string{
+				domain.PermissionRead,
+				domain.PermissionManage,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			usecases := &handlerUsecasesFake{}
+			principal := Principal{
+				OrganizationID:     "org_a",
+				ActorID:            "member",
+				Role:               "member",
+				Permissions:        test.permissions,
+				OrganizationStatus: "ready",
+				MembershipStatus:   "active",
+			}
+			request := httptest.NewRequest(
+				test.method,
+				test.path,
+				strings.NewReader(test.body),
+			)
+			request.Header.Set("Idempotency-Key", "permission-test")
+			request.Header.Set("X-Source-Version", "1")
+			response := httptest.NewRecorder()
+			NewHTTPHandler(
+				usecases,
+				authenticatorFake{principal: principal},
+				schedulingFeatureGateFake{enabled: true},
+			).Handler().ServeHTTP(response, request)
+			if response.Code != http.StatusForbidden {
+				t.Fatalf(
+					"status=%d body=%s",
+					response.Code,
+					response.Body.String(),
+				)
+			}
+			if usecases.statusMetadata.IdempotencyKey != "" ||
+				usecases.statusConfigurationListOrgID != "" ||
+				usecases.substateBookingID != uuid.Nil {
+				t.Fatalf("unauthorized request reached use cases: %+v", usecases)
+			}
+		})
+	}
+}

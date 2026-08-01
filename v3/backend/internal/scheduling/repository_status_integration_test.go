@@ -2,12 +2,14 @@ package scheduling
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 	"time"
 
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/usecases/domain"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -77,6 +79,28 @@ func TestBookingStatusCustomizationPreservesTenantAndLifecycleInvariants(t *test
 		string(configuration.Status),
 	)
 	updatedMetadata.SourceVersion = 2
+	configurationLock := holdBookingStatusLock(
+		t,
+		pool,
+		organizationID,
+		configuration.Status,
+	)
+	blockedConfigureContext, cancelConfigure := context.WithTimeout(
+		ctx,
+		150*time.Millisecond,
+	)
+	_, blockedConfigureErr := repository.ConfigureBookingStatus(
+		blockedConfigureContext,
+		updatedMetadata,
+		updatedConfiguration,
+	)
+	cancelConfigure()
+	if !errors.Is(blockedConfigureErr, context.DeadlineExceeded) {
+		t.Fatalf("configuration bypassed status lock: %v", blockedConfigureErr)
+	}
+	if err = configurationLock.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
 	if _, err = repository.ConfigureBookingStatus(
 		ctx,
 		updatedMetadata,
@@ -126,6 +150,30 @@ func TestBookingStatusCustomizationPreservesTenantAndLifecycleInvariants(t *test
 		"set-substate-"+suffix,
 		booking.ID.String(),
 	)
+	substateLock := holdBookingStatusLock(
+		t,
+		pool,
+		organizationID,
+		domain.BookingConfirmed,
+	)
+	blockedSubstateContext, cancelSubstate := context.WithTimeout(
+		ctx,
+		150*time.Millisecond,
+	)
+	_, blockedSubstateErr := repository.SetBookingSubstate(
+		blockedSubstateContext,
+		substateMetadata,
+		booking.ID,
+		1,
+		"first_visit",
+	)
+	cancelSubstate()
+	if !errors.Is(blockedSubstateErr, context.DeadlineExceeded) {
+		t.Fatalf("substate assignment bypassed status lock: %v", blockedSubstateErr)
+	}
+	if err = substateLock.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
 	withSubstate, err := repository.SetBookingSubstate(
 		ctx,
 		substateMetadata,
@@ -203,4 +251,27 @@ func TestBookingStatusCustomizationPreservesTenantAndLifecycleInvariants(t *test
 			err,
 		)
 	}
+}
+
+func holdBookingStatusLock(
+	t *testing.T,
+	pool *pgxpool.Pool,
+	organizationID string,
+	status domain.BookingStatus,
+) pgx.Tx {
+	t.Helper()
+	tx, err := pool.BeginTx(context.Background(), pgx.TxOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := organizationID + ":" + string(status)
+	if _, err = tx.Exec(
+		context.Background(),
+		"SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+		key,
+	); err != nil {
+		_ = tx.Rollback(context.Background())
+		t.Fatal(err)
+	}
+	return tx
 }

@@ -185,6 +185,7 @@ services:
       fiscal-fake: { condition: service_healthy }
       accounting: { condition: service_healthy }
       pergo-fake: { condition: service_healthy }
+    ports: ["127.0.0.1:18083:8080"]
     healthcheck:
       test: ["CMD", "/healthcheck", "http://127.0.0.1:8080/readyz"]
       interval: 2s

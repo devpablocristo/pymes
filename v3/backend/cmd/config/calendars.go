@@ -71,6 +71,12 @@ func loadCalendars(
 			"PYMES_GOOGLE_REDIRECT_URL must be an absolute URL",
 		)
 	}
+	if redirect.Path != "/api/v1/calendars/google/oauth/callback" ||
+		redirect.RawQuery != "" || redirect.Fragment != "" {
+		return Calendars{}, fmt.Errorf(
+			"PYMES_GOOGLE_REDIRECT_URL must target the global BFF Google callback",
+		)
+	}
 	if environment == "production" && redirect.Scheme != "https" {
 		return Calendars{}, fmt.Errorf(
 			"production Google Calendar redirect URL must use HTTPS",

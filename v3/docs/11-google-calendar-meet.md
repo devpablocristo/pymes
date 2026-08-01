@@ -46,9 +46,12 @@ Scopes mínimos:
 - `calendar.calendarlist.readonly`, para reconciliar el calendario secundario;
 - `calendar.freebusy`, sólo cuando la organización habilita FreeBusy.
 
-El callback lógico termina en el BFF. El redirect público puede ser una ruta de
-la web que reenvía el código al BFF autenticado; nunca intercambia tokens
-directamente con Google.
+El callback termina directamente en el BFF mediante
+`GET /api/v1/calendars/google/oauth/callback`; no incluye organización en el
+path y la web nunca recibe ni reenvía el código. El `state` contiene una pista
+base64url sólo para seleccionar el contexto RLS: el BFF autentica la sesión
+Clerk y valida después el hash completo contra organización, actor, sesión,
+vencimiento y consumo único antes de intercambiar el código.
 
 ## Cifrado
 
@@ -90,7 +93,7 @@ la misma identidad lógica.
 | `PYMES_GOOGLE_CALENDAR_ENABLED` | Habilita rutas y worker Calendar |
 | `PYMES_GOOGLE_CLIENT_ID` | OAuth client del entorno |
 | `PYMES_GOOGLE_CLIENT_SECRET` | Secret Manager → variable de workload |
-| `PYMES_GOOGLE_REDIRECT_URL` | Redirect exacto autorizado |
+| `PYMES_GOOGLE_REDIRECT_URL` | `${API_ORIGIN}/api/v1/calendars/google/oauth/callback` |
 | `PYMES_CALENDAR_KMS_KEY` | CryptoKey de STG o PRD |
 | `PYMES_CALENDAR_LOCAL_KEY` | Base64 de 32 bytes, sólo local/test |
 | `PYMES_GOOGLE_AUTH_URL` | Override contractual, no producción |
@@ -120,4 +123,3 @@ Para una incidencia:
    sensible.
 
 Los jobs contra Google real son protegidos y separados del CI determinístico.
-

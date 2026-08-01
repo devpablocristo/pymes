@@ -62,7 +62,8 @@ func TestLoadCalendarsRequiresKMSAndHTTPSInProduction(t *testing.T) {
 	}
 
 	delete(values, "PYMES_CALENDAR_LOCAL_KEY")
-	values["PYMES_GOOGLE_REDIRECT_URL"] = "http://pymes.test/callback"
+	values["PYMES_GOOGLE_REDIRECT_URL"] =
+		"http://pymes.test/api/v1/calendars/google/oauth/callback"
 	if _, err := loadCalendars(
 		func(key string) string { return values[key] },
 		"production",
@@ -137,7 +138,7 @@ func TestWorkerCalendarConfigurationUsesStableErrorCode(t *testing.T) {
 		"PYMES_GOOGLE_CALENDAR_ENABLED":       "true",
 		"PYMES_GOOGLE_CLIENT_ID":              "client",
 		"PYMES_GOOGLE_CLIENT_SECRET":          "secret",
-		"PYMES_GOOGLE_REDIRECT_URL":           "https://app.test/callback",
+		"PYMES_GOOGLE_REDIRECT_URL":           "https://app.test/api/v1/calendars/google/oauth/callback",
 		"PYMES_ALLOW_INSECURE_LOCAL_SERVICES": "true",
 	}
 	_, err := LoadWorkerFrom(func(key string) string { return values[key] })
@@ -151,6 +152,23 @@ func validCalendarValues() map[string]string {
 		"PYMES_GOOGLE_CALENDAR_ENABLED": "true",
 		"PYMES_GOOGLE_CLIENT_ID":        "client-id",
 		"PYMES_GOOGLE_CLIENT_SECRET":    "client-secret",
-		"PYMES_GOOGLE_REDIRECT_URL":     "https://app.test/oauth/google/callback",
+		"PYMES_GOOGLE_REDIRECT_URL":     "https://app.test/api/v1/calendars/google/oauth/callback",
+	}
+}
+
+func TestLoadCalendarsRejectsNonBFFCallbackPath(t *testing.T) {
+	t.Parallel()
+	values := validCalendarValues()
+	values["PYMES_CALENDAR_LOCAL_KEY"] = base64.StdEncoding.EncodeToString(
+		make([]byte, 32),
+	)
+	values["PYMES_GOOGLE_REDIRECT_URL"] =
+		"https://app.test/organizations/org-a/calendars/google/oauth/complete"
+	_, err := loadCalendars(
+		func(key string) string { return values[key] },
+		"development",
+	)
+	if err == nil || !strings.Contains(err.Error(), "global BFF") {
+		t.Fatalf("expected callback path rejection, got %v", err)
 	}
 }

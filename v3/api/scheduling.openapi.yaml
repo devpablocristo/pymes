@@ -1,0 +1,609 @@
+openapi: 3.1.0
+info:
+  title: Pymes Scheduling API
+  version: 1.0.0-draft
+  description: >-
+    Fragmento canónico de Agenda para integrar en la API pública de Pymes
+    después de fusionar la migración arquitectónica H1.
+security:
+  - clerkBearer: []
+paths:
+  /api/v1/organizations/{organizationId}/scheduling/branches:
+    parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+    get:
+      operationId: listSchedulingBranches
+      responses:
+        '200': { description: Sucursales, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Branch' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createSchedulingBranch
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BranchInput' } } } }
+      responses:
+        '201': { description: Sucursal creada, content: { application/json: { schema: { $ref: '#/components/schemas/Branch' } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/SchedulingError' }
+  /api/v1/organizations/{organizationId}/scheduling/services:
+    parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+    get:
+      operationId: listSchedulingServices
+      responses:
+        '200': { description: Servicios, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Service' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createSchedulingService
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ServiceInput' } } } }
+      responses:
+        '201': { description: Servicio creado, content: { application/json: { schema: { $ref: '#/components/schemas/Service' } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/SchedulingError' }
+  /api/v1/organizations/{organizationId}/scheduling/resources:
+    parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+    get:
+      operationId: listSchedulingResources
+      parameters:
+        - { name: branch_id, in: query, required: false, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Recursos, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Resource' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createSchedulingResource
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ResourceInput' } } } }
+      responses:
+        '201': { description: Recurso creado, content: { application/json: { schema: { $ref: '#/components/schemas/Resource' } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/SchedulingError' }
+  /api/v1/organizations/{organizationId}/scheduling/availability:
+    parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+    post:
+      operationId: calculateSchedulingAvailability
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AvailabilityQuery' } } } }
+      responses:
+        '200': { description: Slots revalidables, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Slot' } } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/organizations/{organizationId}/scheduling/availability/rules:
+    parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+    get:
+      operationId: listSchedulingAvailabilityRules
+      parameters: [{ name: branch_id, in: query, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Reglas, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AvailabilityRule' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createSchedulingAvailabilityRule
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AvailabilityRuleInput' } } } }
+      responses:
+        '201': { description: Regla creada, content: { application/json: { schema: { $ref: '#/components/schemas/AvailabilityRule' } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/organizations/{organizationId}/scheduling/blocks:
+    parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+    get:
+      operationId: listSchedulingBlocks
+      parameters:
+        - { name: branch_id, in: query, required: true, schema: { type: string, format: uuid } }
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: until, in: query, required: true, schema: { type: string, format: date-time } }
+      responses:
+        '200': { description: Bloqueos y excepciones, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AvailabilityException' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createSchedulingBlock
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AvailabilityExceptionInput' } } } }
+      responses:
+        '201': { description: Bloqueo creado, content: { application/json: { schema: { $ref: '#/components/schemas/AvailabilityException' } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/organizations/{organizationId}/scheduling/sessions:
+    parameters:
+      - { $ref: '#/components/parameters/OrganizationId' }
+      - { $ref: '#/components/parameters/IdempotencyKey' }
+      - { $ref: '#/components/parameters/SourceVersion' }
+    post:
+      operationId: createSchedulingGroupSession
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/GroupSessionInput' } } } }
+      responses:
+        '201': { description: Sesión grupal creada, content: { application/json: { schema: { $ref: '#/components/schemas/GroupSession' } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/SchedulingError' }
+  /api/v1/organizations/{organizationId}/scheduling/bookings:
+    parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+    get:
+      operationId: listSchedulingBookings
+      parameters:
+        - { name: branch_id, in: query, required: true, schema: { type: string, format: uuid } }
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: until, in: query, required: true, schema: { type: string, format: date-time } }
+      responses:
+        '200': { description: Turnos, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Booking' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createSchedulingBooking
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/SourceVersion' }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BookingInput' } } } }
+      responses:
+        '201': { description: Turno o serie creada, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Booking' } } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/SchedulingError' }
+  /api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}:
+    parameters:
+      - { $ref: '#/components/parameters/OrganizationId' }
+      - { $ref: '#/components/parameters/BookingId' }
+    get:
+      operationId: getSchedulingBooking
+      responses:
+        '200': { description: Turno, content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/SchedulingError' }
+  /api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}/reschedule:
+    parameters:
+      - { $ref: '#/components/parameters/OrganizationId' }
+      - { $ref: '#/components/parameters/BookingId' }
+      - { $ref: '#/components/parameters/IdempotencyKey' }
+      - { $ref: '#/components/parameters/SourceVersion' }
+    post:
+      operationId: rescheduleSchedulingBooking
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RescheduleInput' } } } }
+      responses:
+        '200': { description: Turno reemplazante, content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/SchedulingError' }
+  /api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}/{action}:
+    parameters:
+      - { $ref: '#/components/parameters/OrganizationId' }
+      - { $ref: '#/components/parameters/BookingId' }
+      - { name: action, in: path, required: true, schema: { type: string, enum: [confirm, cancel, check-in, complete, no-show] } }
+      - { $ref: '#/components/parameters/IdempotencyKey' }
+      - { $ref: '#/components/parameters/SourceVersion' }
+    post:
+      operationId: transitionSchedulingBooking
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TransitionInput' } } } }
+      responses:
+        '200': { description: Turno actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/SchedulingError' }
+  /api/v1/organizations/{organizationId}/scheduling/waitlist:
+    parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+    get:
+      operationId: listSchedulingWaitlist
+      parameters: [{ name: branch_id, in: query, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Lista de espera, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/WaitlistEntry' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createSchedulingWaitlistEntry
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/SourceVersion' }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WaitlistInput' } } } }
+      responses:
+        '201': { description: Entrada creada, content: { application/json: { schema: { $ref: '#/components/schemas/WaitlistEntry' } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/SchedulingError' }
+  /api/v1/organizations/{organizationId}/scheduling/queue:
+    parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+    get:
+      operationId: listSchedulingQueue
+      parameters: [{ name: branch_id, in: query, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Cola, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/QueueTicket' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createSchedulingQueueTicket
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/SourceVersion' }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/QueueTicketInput' } } } }
+      responses:
+        '201': { description: Ticket creado, content: { application/json: { schema: { $ref: '#/components/schemas/QueueTicket' } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/organizations/{organizationId}/scheduling/queue/{ticketId}:
+    parameters:
+      - { $ref: '#/components/parameters/OrganizationId' }
+      - { name: ticketId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { $ref: '#/components/parameters/IdempotencyKey' }
+      - { $ref: '#/components/parameters/SourceVersion' }
+    post:
+      operationId: advanceSchedulingQueueTicket
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/QueueAdvanceInput' } } } }
+      responses:
+        '200': { description: Ticket actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/QueueTicket' } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/SchedulingError' }
+  /api/v1/public/scheduling/{organizationSlug}/availability:
+    post:
+      operationId: calculatePublicSchedulingAvailability
+      security: []
+      parameters: [{ $ref: '#/components/parameters/OrganizationSlug' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AvailabilityQuery' } } } }
+      responses:
+        '200': { description: Slots públicos, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Slot' } } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '404': { $ref: '#/components/responses/SchedulingError' }
+  /api/v1/public/scheduling/{organizationSlug}/bookings:
+    post:
+      operationId: createPublicSchedulingBooking
+      security: []
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationSlug' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/SourceVersion' }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BookingInput' } } } }
+      responses:
+        '201': { description: Turno público creado, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Booking' } } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '404': { $ref: '#/components/responses/SchedulingError' }
+        '409': { $ref: '#/components/responses/SchedulingError' }
+  /api/v1/public/scheduling/{organizationSlug}/waitlist:
+    post:
+      operationId: createPublicSchedulingWaitlistEntry
+      security: []
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationSlug' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/SourceVersion' }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WaitlistInput' } } } }
+      responses:
+        '201': { description: Entrada pública creada, content: { application/json: { schema: { $ref: '#/components/schemas/WaitlistEntry' } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '404': { $ref: '#/components/responses/SchedulingError' }
+  /api/v1/public/scheduling/actions/{token}:
+    post:
+      operationId: consumePublicSchedulingAction
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string, minLength: 80, maxLength: 256 } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/SourceVersion' }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PublicActionInput' } } } }
+      responses:
+        '200': { description: Acción consumida idempotentemente }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '401': { $ref: '#/components/responses/SchedulingError' }
+        '409': { $ref: '#/components/responses/SchedulingError' }
+        '410': { $ref: '#/components/responses/SchedulingError' }
+components:
+  securitySchemes:
+    clerkBearer: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    OrganizationId: { name: organizationId, in: path, required: true, schema: { type: string, minLength: 1 } }
+    OrganizationSlug: { name: organizationSlug, in: path, required: true, schema: { type: string, pattern: '^[a-z0-9-]+$' } }
+    BookingId: { name: bookingId, in: path, required: true, schema: { type: string, format: uuid } }
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 1, maxLength: 255 } }
+    SourceVersion: { name: X-Source-Version, in: header, required: false, schema: { type: integer, minimum: 1, default: 1 } }
+  responses:
+    Forbidden:
+      description: Falta membresía activa, tenant listo o permiso scheduling.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    SchedulingError:
+      description: Error estable del dominio de Agenda.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  schemas:
+    Error:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - NOT_FOUND
+            - SLOT_CONFLICT
+            - RESOURCE_CONFLICT
+            - CAPACITY_EXCEEDED
+            - BOOKING_VERSION_CONFLICT
+            - HOLD_EXPIRED
+            - ACTION_TOKEN_INVALID
+            - ACTION_TOKEN_EXPIRED
+            - BOOKING_STATE_INVALID
+            - IDEMPOTENCY_KEY_REUSED
+            - FORBIDDEN
+        message: { type: string }
+    Allocation:
+      type: object
+      required: [resource_id, mode, units]
+      properties:
+        resource_id: { type: string, format: uuid }
+        mode: { type: string, enum: [capacity, exclusive] }
+        units: { type: integer, minimum: 0, maximum: 100000 }
+    BranchInput:
+      type: object
+      required: [code, name, timezone]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, minLength: 1 }
+        slug: { type: string, pattern: '^[a-z0-9-]*$' }
+        name: { type: string, minLength: 1 }
+        timezone: { type: string, description: Zona IANA }
+        address: { type: string }
+        active: { type: boolean, default: true }
+    Branch:
+      allOf:
+        - { $ref: '#/components/schemas/BranchInput' }
+        - type: object
+          required: [id, organization_id, created_at, updated_at]
+          properties:
+            id: { type: string, format: uuid }
+            organization_id: { type: string }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    ResourceRequirement:
+      type: object
+      required: [resource_kind, allocation_mode, units]
+      properties:
+        id: { type: string, format: uuid }
+        resource_id: { type: string, format: uuid }
+        resource_kind: { $ref: '#/components/schemas/ResourceKind' }
+        allocation_mode: { type: string, enum: [capacity, exclusive] }
+        units: { type: integer, minimum: 1, maximum: 100000 }
+        optional: { type: boolean, default: false }
+    ServiceInput:
+      type: object
+      required: [code, name, duration_minutes, slot_minutes, price, currency, fulfillment_mode, max_participants]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        duration_minutes: { type: integer, minimum: 1, maximum: 1440 }
+        buffer_before_minutes: { type: integer, minimum: 0 }
+        buffer_after_minutes: { type: integer, minimum: 0 }
+        slot_minutes: { type: integer, minimum: 1, maximum: 1440 }
+        price: { type: string, pattern: '^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$' }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        fulfillment_mode: { type: string, enum: [in_person, virtual, hybrid] }
+        max_participants: { type: integer, minimum: 1, maximum: 100000 }
+        allow_group: { type: boolean }
+        allow_waitlist: { type: boolean }
+        confirmation_required: { type: boolean }
+        active: { type: boolean, default: true }
+        resource_requirements: { type: array, items: { $ref: '#/components/schemas/ResourceRequirement' } }
+    Service:
+      allOf:
+        - { $ref: '#/components/schemas/ServiceInput' }
+        - type: object
+          required: [id, organization_id, created_at, updated_at]
+          properties:
+            id: { type: string, format: uuid }
+            organization_id: { type: string }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    ResourceKind: { type: string, enum: [professional, room, machine, vehicle, equipment, generic] }
+    ResourceInput:
+      type: object
+      required: [branch_id, code, name, kind, capacity, timezone]
+      properties:
+        id: { type: string, format: uuid }
+        branch_id: { type: string, format: uuid }
+        code: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        kind: { $ref: '#/components/schemas/ResourceKind' }
+        capacity: { type: integer, minimum: 1, maximum: 100000 }
+        timezone: { type: string, description: Zona IANA }
+        active: { type: boolean, default: true }
+    Resource:
+      allOf:
+        - { $ref: '#/components/schemas/ResourceInput' }
+        - type: object
+          required: [id, organization_id, created_at, updated_at]
+          properties:
+            id: { type: string, format: uuid }
+            organization_id: { type: string }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    AvailabilityRuleInput:
+      type: object
+      required: [branch_id, kind, weekday, start_minute, end_minute, timezone]
+      properties:
+        id: { type: string, format: uuid }
+        branch_id: { type: string, format: uuid }
+        resource_id: { type: string, format: uuid }
+        kind: { type: string, enum: [branch, resource] }
+        weekday: { type: integer, minimum: 0, maximum: 6 }
+        start_minute: { type: integer, minimum: 0, maximum: 1439 }
+        end_minute: { type: integer, minimum: 0, maximum: 2879 }
+        valid_from: { type: string, format: date-time }
+        valid_until: { type: string, format: date-time }
+        timezone: { type: string }
+        active: { type: boolean, default: true }
+    AvailabilityRule:
+      allOf:
+        - { $ref: '#/components/schemas/AvailabilityRuleInput' }
+        - type: object
+          required: [id, organization_id]
+          properties:
+            id: { type: string, format: uuid }
+            organization_id: { type: string }
+    AvailabilityExceptionInput:
+      type: object
+      required: [branch_id, kind, start_at, end_at]
+      properties:
+        id: { type: string, format: uuid }
+        branch_id: { type: string, format: uuid }
+        resource_id: { type: string, format: uuid }
+        kind: { type: string, enum: [holiday, vacation, absence, manual, maintenance, availability] }
+        start_at: { type: string, format: date-time }
+        end_at: { type: string, format: date-time }
+        reason: { type: string }
+    AvailabilityException:
+      allOf:
+        - { $ref: '#/components/schemas/AvailabilityExceptionInput' }
+        - type: object
+          required: [id, organization_id]
+          properties:
+            id: { type: string, format: uuid }
+            organization_id: { type: string }
+    AvailabilityQuery:
+      type: object
+      required: [branch_id, service_id, from, until, participants, allocations]
+      properties:
+        branch_id: { type: string, format: uuid }
+        service_id: { type: string, format: uuid }
+        from: { type: string, format: date-time }
+        until: { type: string, format: date-time }
+        participants: { type: integer, minimum: 1, maximum: 100000 }
+        allocations: { type: array, minItems: 1, items: { $ref: '#/components/schemas/Allocation' } }
+    Slot:
+      type: object
+      required: [start_at, end_at, occupies_from, occupies_until, timezone, allocations, remaining]
+      properties:
+        start_at: { type: string, format: date-time }
+        end_at: { type: string, format: date-time }
+        occupies_from: { type: string, format: date-time }
+        occupies_until: { type: string, format: date-time }
+        timezone: { type: string }
+        allocations: { type: array, items: { $ref: '#/components/schemas/Allocation' } }
+        remaining: { type: integer, minimum: 0 }
+    Customer:
+      type: object
+      required: [name]
+      properties:
+        party_id: { type: string }
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        phone: { type: string }
+    Recurrence:
+      type: object
+      required: [frequency, interval]
+      properties:
+        frequency: { type: string, enum: [daily, weekly] }
+        interval: { type: integer, minimum: 1, maximum: 365 }
+        count: { type: integer, minimum: 1, maximum: 500 }
+        until: { type: string, format: date-time }
+        by_weekdays: { type: array, uniqueItems: true, items: { type: integer, minimum: 0, maximum: 6 } }
+    BookingInput:
+      type: object
+      required: [branch_id, service_id, customer, start_at, participants]
+      properties:
+        id: { type: string, format: uuid }
+        branch_id: { type: string, format: uuid }
+        service_id: { type: string, format: uuid }
+        session_id: { type: string, format: uuid }
+        customer: { $ref: '#/components/schemas/Customer' }
+        start_at: { type: string, format: date-time }
+        participants: { type: integer, minimum: 1, maximum: 100000 }
+        status: { type: string, enum: [held, pending_confirmation, confirmed] }
+        hold_minutes: { type: integer, minimum: 0, maximum: 30 }
+        allocations: { type: array, items: { $ref: '#/components/schemas/Allocation' } }
+        notes: { type: string }
+        recurrence: { $ref: '#/components/schemas/Recurrence' }
+    Booking:
+      type: object
+      required: [id, branch_id, service_id, party_id, status, participants, start_at, end_at, version, service_name, price, currency, duration_minutes, timezone, allocations]
+      properties:
+        id: { type: string, format: uuid }
+        series_id: { type: string, format: uuid }
+        session_id: { type: string, format: uuid }
+        supersedes_id: { type: string, format: uuid }
+        branch_id: { type: string, format: uuid }
+        service_id: { type: string, format: uuid }
+        party_id: { type: string }
+        status: { type: string, enum: [held, pending_confirmation, confirmed, checked_in, completed, cancelled, rescheduled, no_show] }
+        participants: { type: integer }
+        start_at: { type: string, format: date-time }
+        end_at: { type: string, format: date-time }
+        version: { type: integer, minimum: 1 }
+        service_name: { type: string }
+        price: { type: string }
+        currency: { type: string }
+        duration_minutes: { type: integer }
+        timezone: { type: string }
+        allocations: { type: array, items: { $ref: '#/components/schemas/Allocation' } }
+    GroupSessionInput:
+      type: object
+      required: [branch_id, service_id, start_at, capacity, allocations]
+      properties:
+        id: { type: string, format: uuid }
+        branch_id: { type: string, format: uuid }
+        service_id: { type: string, format: uuid }
+        start_at: { type: string, format: date-time }
+        capacity: { type: integer, minimum: 1, maximum: 100000 }
+        allocations: { type: array, minItems: 1, items: { $ref: '#/components/schemas/Allocation' } }
+    GroupSession:
+      allOf:
+        - { $ref: '#/components/schemas/GroupSessionInput' }
+        - type: object
+          required: [id, booked, version, status]
+          properties:
+            id: { type: string, format: uuid }
+            booked: { type: integer, minimum: 0 }
+            version: { type: integer, minimum: 1 }
+            status: { type: string, enum: [open, closed, cancelled, completed] }
+    RescheduleInput:
+      type: object
+      required: [expected_version, start_at]
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        start_at: { type: string, format: date-time }
+        allocations: { type: array, items: { $ref: '#/components/schemas/Allocation' } }
+    TransitionInput:
+      type: object
+      required: [expected_version]
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+    WaitlistInput:
+      type: object
+      required: [branch_id, service_id, customer, preferred_from, preferred_until, participants]
+      properties:
+        id: { type: string, format: uuid }
+        branch_id: { type: string, format: uuid }
+        service_id: { type: string, format: uuid }
+        customer: { $ref: '#/components/schemas/Customer' }
+        preferred_from: { type: string, format: date-time }
+        preferred_until: { type: string, format: date-time }
+        participants: { type: integer, minimum: 1 }
+    WaitlistEntry:
+      allOf:
+        - { $ref: '#/components/schemas/WaitlistInput' }
+        - type: object
+          required: [id, party_id, status, version]
+          properties:
+            id: { type: string, format: uuid }
+            party_id: { type: string }
+            status: { type: string, enum: [pending, offered, accepted, cancelled, expired] }
+            offer_expires_at: { type: string, format: date-time }
+            version: { type: integer, minimum: 1 }
+    QueueTicketInput:
+      type: object
+      required: [branch_id, service_id, party_id]
+      properties:
+        id: { type: string, format: uuid }
+        branch_id: { type: string, format: uuid }
+        service_id: { type: string, format: uuid }
+        party_id: { type: string }
+        priority: { type: integer }
+    QueueTicket:
+      allOf:
+        - { $ref: '#/components/schemas/QueueTicketInput' }
+        - type: object
+          required: [id, number, status, version]
+          properties:
+            id: { type: string, format: uuid }
+            number: { type: integer, minimum: 1 }
+            status: { type: string, enum: [waiting, called, serving, completed, no_show, cancelled] }
+            version: { type: integer, minimum: 1 }
+    QueueAdvanceInput:
+      type: object
+      required: [expected_version, status]
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        status: { type: string, enum: [called, serving, completed, no_show, cancelled] }
+    PublicActionInput:
+      type: object
+      required: [purpose, expected_version]
+      properties:
+        purpose: { type: string, enum: [confirm, cancel, reschedule, accept_waitlist] }
+        expected_version: { type: integer, minimum: 1 }
+        start_at: { type: string, format: date-time }

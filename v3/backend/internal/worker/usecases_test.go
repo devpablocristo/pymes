@@ -19,6 +19,30 @@ func (f dispatcherFunc) DispatchOnce(ctx context.Context) error {
 	return f(ctx)
 }
 
+func TestDispatchersRunEveryContextEvenWhenOneFails(t *testing.T) {
+	t.Parallel()
+	sentinel := errors.New("first failed")
+	var calls atomic.Int64
+	dispatchers := Dispatchers{
+		dispatcherFunc(func(context.Context) error {
+			calls.Add(1)
+			return sentinel
+		}),
+		dispatcherFunc(func(context.Context) error {
+			calls.Add(1)
+			return nil
+		}),
+	}
+	if err := dispatchers.DispatchOnce(
+		context.Background(),
+	); !errors.Is(err, sentinel) {
+		t.Fatalf("joined error=%v", err)
+	}
+	if calls.Load() != 2 {
+		t.Fatalf("dispatch calls=%d want=2", calls.Load())
+	}
+}
+
 type countingMetrics struct {
 	calls atomic.Int64
 	value workerdomain.Metrics

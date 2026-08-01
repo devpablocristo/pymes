@@ -8,11 +8,13 @@ security:
 paths:
   /healthz:
     get:
+      operationId: getHealthz
       security: []
       responses:
         '200': { description: Healthy }
   /readyz:
     get:
+      operationId: getReadyz
       security: []
       responses:
         '200': { description: Ready }
@@ -245,6 +247,44 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/v1/organizations/{organizationId}/scheduling/branches:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1branches'
+  /api/v1/organizations/{organizationId}/scheduling/services:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1services'
+  /api/v1/organizations/{organizationId}/scheduling/resources:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1resources'
+  /api/v1/organizations/{organizationId}/scheduling/availability:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1availability'
+  /api/v1/organizations/{organizationId}/scheduling/availability/rules:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1availability~1rules'
+  /api/v1/organizations/{organizationId}/scheduling/blocks:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1blocks'
+  /api/v1/organizations/{organizationId}/scheduling/sessions:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1sessions'
+  /api/v1/organizations/{organizationId}/scheduling/bookings:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1bookings'
+  /api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1bookings~1{bookingId}'
+  /api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}/reschedule:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1bookings~1{bookingId}~1reschedule'
+  /api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}/{action}:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1bookings~1{bookingId}~1{action}'
+  /api/v1/organizations/{organizationId}/scheduling/waitlist:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1waitlist'
+  /api/v1/organizations/{organizationId}/scheduling/queue:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1queue'
+  /api/v1/organizations/{organizationId}/scheduling/queue/{ticketId}:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1queue~1{ticketId}'
+  /api/v1/public/scheduling/{organizationSlug}/availability:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1public~1scheduling~1{organizationSlug}~1availability'
+  /api/v1/public/scheduling/{organizationSlug}/catalog:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1public~1scheduling~1{organizationSlug}~1catalog'
+  /api/v1/public/scheduling/{organizationSlug}/bookings:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1public~1scheduling~1{organizationSlug}~1bookings'
+  /api/v1/public/scheduling/{organizationSlug}/waitlist:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1public~1scheduling~1{organizationSlug}~1waitlist'
+  /api/v1/public/scheduling/actions/{token}:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1public~1scheduling~1actions~1{token}'
 components:
   securitySchemes:
     clerkBearer:

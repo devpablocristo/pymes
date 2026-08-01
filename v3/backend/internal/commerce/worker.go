@@ -31,7 +31,7 @@ type AccountingClient interface {
 // RelayStore is the persistence port for the commerce outbox relay. PostgreSQL
 // is an adapter of this port; the workflow itself has no pgx dependency.
 type RelayStore interface {
-	Lease(context.Context, int, time.Duration) ([]domain.Event, error)
+	LeaseTopics(context.Context, []string, int, time.Duration) ([]domain.Event, error)
 	Retry(context.Context, domain.Event) error
 	DeadLetter(context.Context, domain.Event, string) error
 	MarkPublished(context.Context, domain.Event) error
@@ -52,6 +52,16 @@ type RelayStore interface {
 	ReserveFiscalConsultAttempt(context.Context, string, string) (int, error)
 }
 
+var commerceOutboxTopics = []string{
+	"AccountingAdjustmentRequested",
+	"PurchasePostingRequested",
+	"PaymentPostingRequested",
+	"OpenItemApplicationRequested",
+	"AccountingReversalRequested",
+	"FiscalAuthorizationRequested",
+	"AccountingPostingRequested",
+}
+
 // DurableWorker relays commerce commands at-least-once. Private services must
 // treat a repeated command identifier as a duplicate.
 type DurableWorker struct {
@@ -70,7 +80,12 @@ func (w DurableWorker) DispatchOnce(ctx context.Context) error {
 	if leaseFor <= 0 {
 		leaseFor = 30 * time.Second
 	}
-	events, err := w.Store.Lease(ctx, 20, leaseFor)
+	events, err := w.Store.LeaseTopics(
+		ctx,
+		commerceOutboxTopics,
+		20,
+		leaseFor,
+	)
 	if err != nil {
 		return err
 	}

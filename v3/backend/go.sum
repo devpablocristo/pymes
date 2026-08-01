@@ -41,6 +41,12 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/devpablocristo/platform/databases/postgres/go v0.5.0 h1:yLg42w0O8bA48my2S7iL3yJGUcwdxXifhGKO1lW84n8=
 github.com/devpablocristo/platform/databases/postgres/go v0.5.0/go.mod h1:nu3BGv8CbneLW/80NVJIc1fPiHe4IBpSN2CgOsYZ59g=
+github.com/devpablocristo/platform/errors/go v0.2.0 h1:I7WZlgEd7ic6c2IETYgzA3ULykDd8Qnx+w6NYPXlRKM=
+github.com/devpablocristo/platform/errors/go v0.2.0/go.mod h1:1cHoflrIdeQrLDtVPgsl5GqjYH7AZKASNYCMSAcdjOA=
+github.com/devpablocristo/platform/features/scheduling/go v0.2.0 h1:L9/5ilZxjKI/W5nIFfYhIh+1P0Ji7jVG6JusIqEiCcg=
+github.com/devpablocristo/platform/features/scheduling/go v0.2.0/go.mod h1:99cXanVseafDoa/ChG/3tPnuF8T996+B15w2PCwZmLk=
+github.com/devpablocristo/platform/jobs/go v0.1.0 h1:3jMfKluabIgMlbJOK+46b1mSI5amBfMX9Jnp15Bkyp8=
+github.com/devpablocristo/platform/jobs/go v0.1.0/go.mod h1:C4NR+l9MeDT2a+hyM9oFS45OV0CiCZVKe6RjYtoGeGs=
 github.com/devpablocristo/platform/observability/go v0.2.1 h1:lu5nefAmX6NTHbjRs4lhx6WUyvG2ubE3Jw1vP7q0Oec=
 github.com/devpablocristo/platform/observability/go v0.2.1/go.mod h1:5wQDDBbjRN2m1S1rcmZzfavQeXN6CPnDvGpgF19uU38=
 github.com/devpablocristo/platform/sdks/clerk/go v0.5.1 h1:xqboOZYDYEA4kXXUx2KnHfjiNHpwFlPtu7PD3hhV5rE=

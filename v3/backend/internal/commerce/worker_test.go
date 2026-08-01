@@ -3,10 +3,11 @@ package commerce
 import (
 	"context"
 	"encoding/json"
-	domain "github.com/devpablocristo/pymes/v3/backend/internal/commerce/usecases/domain"
-	identityusecases "github.com/devpablocristo/pymes/v3/backend/internal/identity"
 	"testing"
 	"time"
+
+	domain "github.com/devpablocristo/pymes/v3/backend/internal/commerce/usecases/domain"
+	identityusecases "github.com/devpablocristo/pymes/v3/backend/internal/identity"
 )
 
 type deadLetterStore struct {
@@ -20,7 +21,53 @@ type deadLetterStore struct {
 	failure      domain.AccountingFailure
 }
 
-func (s *deadLetterStore) Lease(context.Context, int, time.Duration) ([]domain.Event, error) {
+type topicLeaseStore struct {
+	deadLetterStore
+	topics []string
+}
+
+func (store *topicLeaseStore) LeaseTopics(
+	_ context.Context,
+	topics []string,
+	_ int,
+	_ time.Duration,
+) ([]domain.Event, error) {
+	store.topics = append([]string(nil), topics...)
+	return nil, nil
+}
+
+func TestDurableWorkerLeasesOnlyOwnedContextTopics(t *testing.T) {
+	store := &topicLeaseStore{}
+	worker := DurableWorker{
+		Store:      store,
+		Fiscal:     NewFakeFiscal(),
+		Accounting: NewFakeAccounting(),
+	}
+	if err := worker.DispatchOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{
+		"FiscalAuthorizationRequested": true,
+		"AccountingPostingRequested":   true,
+	}
+	for _, topic := range store.topics {
+		if topic == "NotificationRequested" ||
+			topic == "CalendarSyncRequested" {
+			t.Fatalf("foreign topic leased by commerce: %q", topic)
+		}
+		delete(want, topic)
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing owned lease topics: %v; got=%v", want, store.topics)
+	}
+}
+
+func (s *deadLetterStore) LeaseTopics(
+	context.Context,
+	[]string,
+	int,
+	time.Duration,
+) ([]domain.Event, error) {
 	return []domain.Event{s.event}, nil
 }
 

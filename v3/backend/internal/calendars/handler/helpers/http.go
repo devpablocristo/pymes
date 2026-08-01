@@ -30,12 +30,16 @@ func WriteJSON(w http.ResponseWriter, status int, value any) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(status)
 	_, _ = w.Write(body.Bytes())
 }
 
 func WriteError(w http.ResponseWriter, status int, code string) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(handlerdto.ErrorResponse{Code: code})
 }

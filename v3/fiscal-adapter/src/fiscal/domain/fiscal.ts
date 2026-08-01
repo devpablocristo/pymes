@@ -20,6 +20,9 @@ export interface MoneyTotals {
 export interface FiscalRequest {
   request_id: string;
   organization_id: string;
+  idempotency_key: string;
+  correlation_id: string;
+  source_version: number;
   credential_ref: string;
   environment: FiscalEnvironment;
   point_of_sale: number;
@@ -53,6 +56,9 @@ export interface FiscalRequest {
 export interface FiscalResult {
   request_id: string;
   organization_id: string;
+  idempotency_key: string;
+  correlation_id: string;
+  source_version: number;
   status: FiscalStatus;
   cae?: string;
   cae_expires_on?: string;
@@ -61,7 +67,6 @@ export interface FiscalResult {
   artifact_ref?: string;
   snapshot_digest: string;
   observed_at: string;
-  correlation_id: string;
 }
 
 export interface FiscalProblem {

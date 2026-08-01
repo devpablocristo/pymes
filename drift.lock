@@ -1,0 +1,21 @@
+version = 1
+
+[[bindings]]
+doc = "v3/docs/04-validacion.md"
+target = "v3/scripts/backup-restore-smoke.sh"
+sig = "d87ab1ac3d11156d"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/backup-restore-smoke.sh"
+sig = "d87ab1ac3d11156d"
+
+[[bindings]]
+doc = "v3/docs/adr/0006-transporte-privado-cloud-run.md"
+target = "v3/scripts/deploy/cloud-run-security-check.sh"
+sig = "cb445ffc14e83832"
+
+[[bindings]]
+doc = "v3/docs/adr/0006-transporte-privado-cloud-run.md"
+target = "v3/scripts/deploy/cloud-run.sh"
+sig = "33e64b4305dc1023"

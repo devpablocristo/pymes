@@ -21,7 +21,7 @@ export async function initialize(config: Config) {
   const application = new FiscalService(authority, store);
   const authorizer: InternalAuthorizer = config.allowInsecureLocal
     ? new InsecureLocalAuthorizer()
-    : new Ed25519JWTAuthorizer(config.internalIssuer ?? "", config.internalPublicKey);
+    : new Ed25519JWTAuthorizer(config.internalIssuer ?? "", config.internalJWKSJSON);
   const server = createFiscalHTTPServer(application, authorizer, store);
   return {
     server,

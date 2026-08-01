@@ -5,7 +5,7 @@ import { InMemoryFiscalLedger } from "../../src/fiscal/companion/in-memory-ledge
 import { MockFiscalAuthority } from "../../src/fiscal/companion/mock-authority.js";
 import { FiscalError, type FiscalProblem, type FiscalRequest, type FiscalResult } from "../../src/fiscal/domain/fiscal.js";
 import { createFiscalHTTPServer, type FiscalApplication } from "../../src/fiscal/handler/http.js";
-import type { InternalAuthorizer } from "../../src/fiscal/ports/internal-authorizer.js";
+import type { InternalAuthorizer, InternalIdentity } from "../../src/fiscal/ports/internal-authorizer.js";
 import type { FiscalRuntimeObserver } from "../../src/fiscal/ports/runtime-observer.js";
 import { FiscalService } from "../../src/fiscal/usecases/fiscal-service.js";
 import { InsecureLocalAuthorizer } from "../../src/identity/access/authorizer.js";
@@ -13,6 +13,9 @@ import { InsecureLocalAuthorizer } from "../../src/identity/access/authorizer.js
 const request: FiscalRequest = {
   request_id: "fiscal:sale-http:1",
   organization_id: "org_http",
+  idempotency_key: "fiscal:sale-http:1",
+  correlation_id: "http-status-test",
+  source_version: 1,
   credential_ref: "mock://credential/http",
   environment: "homologation",
   point_of_sale: 3,
@@ -40,18 +43,21 @@ test("private HTTP contract exposes uncertain and exact reconciliation", async (
   t.after(() => new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())));
   const { port } = server.address() as AddressInfo;
   const base = `http://127.0.0.1:${port}/internal/v1/organizations/${request.organization_id}/authorizations`;
-  const headers = { "content-type": "application/json", "idempotency-key": request.request_id, "x-correlation-id": "http-test" };
+  const headers = { "content-type": "application/json", "idempotency-key": request.idempotency_key, "x-correlation-id": request.correlation_id };
 
   const authorize = await fetch(base, { method: "POST", headers, body: JSON.stringify(request) });
   assert.equal(authorize.status, 202);
   assert.equal(authorize.headers.get("cache-control"), "no-store");
   assert.equal(((await authorize.json()) as FiscalResult).status, "uncertain");
 
-  const consult = await fetch(`${base}/${encodeURIComponent(request.request_id)}/consult`, { method: "POST", headers: { ...headers, "idempotency-key": `consult:${request.request_id}` }, body: JSON.stringify(request) });
+  const consult = await fetch(`${base}/${encodeURIComponent(request.request_id)}/consult`, { method: "POST", headers, body: JSON.stringify(request) });
   assert.equal(consult.status, 200);
   const result = (await consult.json()) as FiscalResult;
   assert.equal(result.status, "authorized");
-  assert.equal(result.correlation_id, "http-test");
+  assert.equal(result.idempotency_key, request.idempotency_key);
+  assert.equal(result.source_version, request.source_version);
+  assert.equal(result.snapshot_digest, request.snapshot_digest);
+  assert.equal(result.correlation_id, request.correlation_id);
   assert.equal(result.cae?.length, 14);
 });
 
@@ -83,7 +89,7 @@ test("readiness and metrics reflect the durable runtime", async () => {
 
 test("catalog is implemented and private routes reject invalid workload identity", async () => {
   await withHTTP(new FiscalService(new MockFiscalAuthority(), new InMemoryFiscalLedger()), new InsecureLocalAuthorizer(), async (origin) => {
-    const catalog = await fetch(`${origin}/internal/v1/catalogs/document-types`);
+    const catalog = await fetch(`${origin}/internal/v1/catalogs/document-types`, { headers: { "x-correlation-id": "catalog-test" } });
     assert.equal(catalog.status, 200);
     const values = await catalog.json() as Array<{ code: string; letter: string; kind: string }>;
     assert.equal(values.length, 9);
@@ -96,7 +102,7 @@ test("catalog is implemented and private routes reject invalid workload identity
     },
   };
   await withHTTP(new FiscalService(new MockFiscalAuthority(), new InMemoryFiscalLedger()), denied, async (origin) => {
-    const catalog = await fetch(`${origin}/internal/v1/catalogs/document-types`);
+    const catalog = await fetch(`${origin}/internal/v1/catalogs/document-types`, { headers: { "x-correlation-id": "catalog-test" } });
     assert.equal(catalog.status, 401);
     const authorize = await fetch(`${origin}/internal/v1/organizations/${request.organization_id}/authorizations`, {
       method: "POST",
@@ -118,7 +124,7 @@ test("HTTP statuses distinguish rejected, not found, conflict, validation and ti
     const base = authorizationURL(origin);
     const consult = await fetch(`${base}/${encodeURIComponent(request.request_id)}/consult`, {
       method: "POST",
-      headers: { ...requestHeaders, "idempotency-key": `consult:${request.request_id}` },
+      headers: requestHeaders,
       body: JSON.stringify(request),
     });
     assert.equal(consult.status, 200);
@@ -158,10 +164,61 @@ test("unexpected application failures are 500 and never mislabeled as authentica
   });
 });
 
+test("binds the signed correlation byte-for-byte to the header and body", async () => {
+  const signedIdentity: InternalIdentity = {
+    issuer: "pymes-v3",
+    subject: "worker:fiscal",
+    organizationId: request.organization_id,
+    actorId: "user_primary",
+    delegatedActorId: "user_delegated",
+    roles: ["service"],
+    requestId: "http-request-1",
+    correlationId: request.correlation_id,
+    tokenId: "token-1",
+  };
+  const signed: InternalAuthorizer = {
+    async authorize() {
+      return signedIdentity;
+    },
+  };
+  await withHTTP(new FiscalService(new MockFiscalAuthority(), new InMemoryFiscalLedger()), signed, async (origin) => {
+    const tamperedHeader = await fetch(authorizationURL(origin), {
+      method: "POST",
+      headers: { ...requestHeaders, "x-correlation-id": `${request.correlation_id}-tampered` },
+      body: JSON.stringify(request),
+    });
+    assert.equal(tamperedHeader.status, 401);
+    assert.equal(((await tamperedHeader.json()) as FiscalProblem).code, "UNAUTHORIZED_SERVICE");
+
+    const tamperedBody = structuredClone(request);
+    tamperedBody.correlation_id = `${request.correlation_id}-tampered`;
+    const response = await fetch(authorizationURL(origin), {
+      method: "POST",
+      headers: requestHeaders,
+      body: JSON.stringify(tamperedBody),
+    });
+    assert.equal(response.status, 422);
+    assert.equal(((await response.json()) as FiscalProblem).code, "VALIDATION_ERROR");
+
+    const bodyWithForgedActor = {
+      ...request,
+      actor_id: "user_attacker",
+      delegated_actor_id: "user_forged",
+    };
+    const forgedActor = await fetch(authorizationURL(origin), {
+      method: "POST",
+      headers: requestHeaders,
+      body: JSON.stringify(bodyWithForgedActor),
+    });
+    assert.equal(forgedActor.status, 422);
+    assert.equal(((await forgedActor.json()) as FiscalProblem).code, "VALIDATION_ERROR");
+  });
+});
+
 const requestHeaders = {
   "content-type": "application/json",
-  "idempotency-key": request.request_id,
-  "x-correlation-id": "http-status-test",
+  "idempotency-key": request.idempotency_key,
+  "x-correlation-id": request.correlation_id,
 };
 
 function authorizationURL(origin: string): string {

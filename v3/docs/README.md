@@ -21,8 +21,11 @@ implementada es:
 5. [Roadmap](05-roadmap.md)
 6. [Plan de ejecución](06-plan-ejecucion.md)
 7. [Estado verificable de implementación](07-estado-implementacion.md)
-8. [ADRs](adr/)
-9. [Contratos OpenAPI internos](../contracts/)
+8. [Auditoría de cierre](08-auditoria-cierre.md)
+9. [Seguridad GCP STG/PRD](09-gcp-stg-prd.md)
+10. [Runbook de operación y recuperación](10-runbook-operacion.md)
+11. [ADRs](adr/)
+12. [Contratos OpenAPI internos](../contracts/)
 
 Los diagramas Mermaid describen la arquitectura objetivo. Toda API marcada
 `internal` sólo admite credenciales de servicio: ningún navegador llega a los

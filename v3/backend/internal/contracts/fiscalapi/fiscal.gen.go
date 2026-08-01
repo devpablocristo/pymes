@@ -20,15 +20,11 @@ import (
 
 // Defines values for ErrorCode.
 const (
-	AUTHORITYTIMEOUT       ErrorCode = "AUTHORITY_TIMEOUT"
-	CERTIFICATEUNAVAILABLE ErrorCode = "CERTIFICATE_UNAVAILABLE"
-	FISCALREJECTED         ErrorCode = "FISCAL_REJECTED"
-	FISCALUNCERTAIN        ErrorCode = "FISCAL_UNCERTAIN"
-	IDEMPOTENCYKEYREUSED   ErrorCode = "IDEMPOTENCY_KEY_REUSED"
-	INTERNALERROR          ErrorCode = "INTERNAL_ERROR"
-	ORGNOTPROVISIONED      ErrorCode = "ORG_NOT_PROVISIONED"
-	UNAUTHORIZEDSERVICE    ErrorCode = "UNAUTHORIZED_SERVICE"
-	VALIDATIONERROR        ErrorCode = "VALIDATION_ERROR"
+	AUTHORITYTIMEOUT     ErrorCode = "AUTHORITY_TIMEOUT"
+	IDEMPOTENCYKEYREUSED ErrorCode = "IDEMPOTENCY_KEY_REUSED"
+	INTERNALERROR        ErrorCode = "INTERNAL_ERROR"
+	UNAUTHORIZEDSERVICE  ErrorCode = "UNAUTHORIZED_SERVICE"
+	VALIDATIONERROR      ErrorCode = "VALIDATION_ERROR"
 )
 
 // Valid indicates whether the value is a known member of the ErrorCode enum.
@@ -36,17 +32,9 @@ func (e ErrorCode) Valid() bool {
 	switch e {
 	case AUTHORITYTIMEOUT:
 		return true
-	case CERTIFICATEUNAVAILABLE:
-		return true
-	case FISCALREJECTED:
-		return true
-	case FISCALUNCERTAIN:
-		return true
 	case IDEMPOTENCYKEYREUSED:
 		return true
 	case INTERNALERROR:
-		return true
-	case ORGNOTPROVISIONED:
 		return true
 	case UNAUTHORIZEDSERVICE:
 		return true
@@ -180,6 +168,66 @@ func (e FiscalResultStatus) Valid() bool {
 	}
 }
 
+// Defines values for HealthStatusStatus.
+const (
+	Ok HealthStatusStatus = "ok"
+)
+
+// Valid indicates whether the value is a known member of the HealthStatusStatus enum.
+func (e HealthStatusStatus) Valid() bool {
+	switch e {
+	case Ok:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MetricsUnavailableCode.
+const (
+	METRICSUNAVAILABLE MetricsUnavailableCode = "METRICS_UNAVAILABLE"
+)
+
+// Valid indicates whether the value is a known member of the MetricsUnavailableCode enum.
+func (e MetricsUnavailableCode) Valid() bool {
+	switch e {
+	case METRICSUNAVAILABLE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotReadyStatusStatus.
+const (
+	NotReady NotReadyStatusStatus = "not_ready"
+)
+
+// Valid indicates whether the value is a known member of the NotReadyStatusStatus enum.
+func (e NotReadyStatusStatus) Valid() bool {
+	switch e {
+	case NotReady:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReadinessStatusStatus.
+const (
+	Ready ReadinessStatusStatus = "ready"
+)
+
+// Valid indicates whether the value is a known member of the ReadinessStatusStatus enum.
+func (e ReadinessStatusStatus) Valid() bool {
+	switch e {
+	case Ready:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListDocumentTypes200JSONResponseBodyCode.
 const (
 	ListDocumentTypes200JSONResponseBodyCodeFA  ListDocumentTypes200JSONResponseBodyCode = "FA"
@@ -261,7 +309,7 @@ func (e ListDocumentTypes200JSONResponseBodyLetter) Valid() bool {
 	}
 }
 
-// Decimal defines model for Decimal.
+// Decimal Decimal base diez exacto, sin signo, exponente ni JSON number.
 type Decimal = string
 
 // Error defines model for Error.
@@ -275,7 +323,7 @@ type Error struct {
 // ErrorCode defines model for Error.Code.
 type ErrorCode string
 
-// FiscalRequest defines model for FiscalRequest.
+// FiscalRequest idempotency_key y correlation_id deben coincidir con sus headers. source_version identifica la versión del documento Pymes y snapshot_digest su hash SHA-256 inmutable.
 type FiscalRequest struct {
 	AssociatedVoucher *struct {
 		DocumentType  FiscalRequestAssociatedVoucherDocumentType `json:"document_type"`
@@ -283,20 +331,32 @@ type FiscalRequest struct {
 		PointOfSale   int                                        `json:"point_of_sale"`
 		VoucherNumber int                                        `json:"voucher_number"`
 	} `json:"associated_voucher,omitempty"`
+	CorrelationId string `json:"correlation_id"`
 
 	// CredentialRef Referencia KMS/secret; jamás certificado o clave.
 	CredentialRef string                    `json:"credential_ref"`
 	Currency      FiscalRequestCurrency     `json:"currency"`
 	DocumentType  FiscalRequestDocumentType `json:"document_type"`
 	Environment   FiscalRequestEnvironment  `json:"environment"`
-	ExchangeRate  *Decimal                  `json:"exchange_rate,omitempty"`
-	IssueDate     openapi_types.Date        `json:"issue_date"`
-	Lines         []struct {
-		Description string  `json:"description"`
-		Net         Decimal `json:"net"`
-		Quantity    Decimal `json:"quantity"`
-		UnitPrice   Decimal `json:"unit_price"`
-		VatRate     Decimal `json:"vat_rate"`
+
+	// ExchangeRate Obligatorio para USD y EUR.
+	ExchangeRate   *PositiveDecimal   `json:"exchange_rate,omitempty"`
+	IdempotencyKey string             `json:"idempotency_key"`
+	IssueDate      openapi_types.Date `json:"issue_date"`
+	Lines          []struct {
+		Description string `json:"description"`
+
+		// Net Decimal base diez exacto, sin signo, exponente ni JSON number.
+		Net Decimal `json:"net"`
+
+		// Quantity Decimal base diez exacto estrictamente mayor que cero.
+		Quantity PositiveDecimal `json:"quantity"`
+
+		// UnitPrice Decimal base diez exacto, sin signo, exponente ni JSON number.
+		UnitPrice Decimal `json:"unit_price"`
+
+		// VatRate Alícuota IVA soportada por el mock (0; 2,5; 5; 10,5; 21 o 27).
+		VatRate VatRate `json:"vat_rate"`
 	} `json:"lines"`
 	OrganizationId string `json:"organization_id"`
 	PointOfSale    int    `json:"point_of_sale"`
@@ -307,13 +367,21 @@ type FiscalRequest struct {
 	} `json:"recipient"`
 	RequestId string `json:"request_id"`
 
-	// SnapshotDigest SHA-256 del documento congelado.
+	// SnapshotDigest Hash SHA-256 hexadecimal del documento congelado.
 	SnapshotDigest string `json:"snapshot_digest"`
+	SourceVersion  int    `json:"source_version"`
 	Totals         struct {
+		// Exempt Decimal base diez exacto, sin signo, exponente ni JSON number.
 		Exempt Decimal `json:"exempt"`
-		Net    Decimal `json:"net"`
-		Total  Decimal `json:"total"`
-		Vat    Decimal `json:"vat"`
+
+		// Net Decimal base diez exacto, sin signo, exponente ni JSON number.
+		Net Decimal `json:"net"`
+
+		// Total Decimal base diez exacto, sin signo, exponente ni JSON number.
+		Total Decimal `json:"total"`
+
+		// Vat Decimal base diez exacto, sin signo, exponente ni JSON number.
+		Vat Decimal `json:"vat"`
 	} `json:"totals"`
 
 	// VoucherNumber Reservado por Pymes.
@@ -341,15 +409,58 @@ type FiscalResult struct {
 	Cae                 *string             `json:"cae,omitempty"`
 	CaeExpiresOn        *openapi_types.Date `json:"cae_expires_on,omitempty"`
 	CorrelationId       string              `json:"correlation_id"`
+	IdempotencyKey      string              `json:"idempotency_key"`
 	ObservedAt          time.Time           `json:"observed_at"`
 	OrganizationId      string              `json:"organization_id"`
 	RequestId           string              `json:"request_id"`
 	SnapshotDigest      string              `json:"snapshot_digest"`
+	SourceVersion       int                 `json:"source_version"`
 	Status              FiscalResultStatus  `json:"status"`
 }
 
 // FiscalResultStatus defines model for FiscalResult.Status.
 type FiscalResultStatus string
+
+// HealthStatus defines model for HealthStatus.
+type HealthStatus struct {
+	Status HealthStatusStatus `json:"status"`
+}
+
+// HealthStatusStatus defines model for HealthStatus.Status.
+type HealthStatusStatus string
+
+// MetricsUnavailable defines model for MetricsUnavailable.
+type MetricsUnavailable struct {
+	Code MetricsUnavailableCode `json:"code"`
+}
+
+// MetricsUnavailableCode defines model for MetricsUnavailable.Code.
+type MetricsUnavailableCode string
+
+// NotReadyStatus defines model for NotReadyStatus.
+type NotReadyStatus struct {
+	Status NotReadyStatusStatus `json:"status"`
+}
+
+// NotReadyStatusStatus defines model for NotReadyStatus.Status.
+type NotReadyStatusStatus string
+
+// PositiveDecimal Decimal base diez exacto estrictamente mayor que cero.
+type PositiveDecimal = string
+
+// ReadinessStatus defines model for ReadinessStatus.
+type ReadinessStatus struct {
+	Status ReadinessStatusStatus `json:"status"`
+}
+
+// ReadinessStatusStatus defines model for ReadinessStatus.Status.
+type ReadinessStatusStatus string
+
+// VatRate Alícuota IVA soportada por el mock (0; 2,5; 5; 10,5; 21 o 27).
+type VatRate = string
+
+// CorrelationId defines model for CorrelationId.
+type CorrelationId = string
 
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
@@ -372,6 +483,12 @@ type InternalError = Error
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Error
 
+// ListDocumentTypesParams defines parameters for ListDocumentTypes.
+type ListDocumentTypesParams struct {
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
+}
+
 // ListDocumentTypes200JSONResponseBodyCode defines parameters for ListDocumentTypes.
 type ListDocumentTypes200JSONResponseBodyCode string
 
@@ -384,11 +501,17 @@ type ListDocumentTypes200JSONResponseBodyLetter string
 // RequestAuthorizationParams defines parameters for RequestAuthorization.
 type RequestAuthorizationParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
 }
 
 // ConsultAuthorizationParams defines parameters for ConsultAuthorization.
 type ConsultAuthorizationParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
 }
 
 // RequestAuthorizationJSONRequestBody defines body for RequestAuthorization for application/json ContentType.
@@ -471,8 +594,11 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 
+	// FiscalHealth performs a GET /healthz (the `FiscalHealth` operationId) request.
+	FiscalHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListDocumentTypes performs a GET /internal/v1/catalogs/document-types (the `ListDocumentTypes` operationId) request.
-	ListDocumentTypes(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListDocumentTypes(ctx context.Context, params *ListDocumentTypesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RequestAuthorizationWithBody performs a POST /internal/v1/organizations/{organizationId}/authorizations (the `RequestAuthorization` operationId) request,
 	// with any type of body and a specified content type.
@@ -489,11 +615,30 @@ type ClientInterface interface {
 	// ConsultAuthorization performs a POST /internal/v1/organizations/{organizationId}/authorizations/{requestId}/consult (the `ConsultAuthorization` operationId) request.
 	// Takes a body of the `application/json` content type.
 	ConsultAuthorization(ctx context.Context, organizationId OrganizationId, requestId string, params *ConsultAuthorizationParams, body ConsultAuthorizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FiscalMetrics performs a GET /metrics (the `FiscalMetrics` operationId) request.
+	FiscalMetrics(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FiscalReadiness performs a GET /readyz (the `FiscalReadiness` operationId) request.
+	FiscalReadiness(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// FiscalHealth performs a GET /healthz (the `FiscalHealth` operationId) request.
+func (c *Client) FiscalHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFiscalHealthRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 // ListDocumentTypes performs a GET /internal/v1/catalogs/document-types (the `ListDocumentTypes` operationId) request.
-func (c *Client) ListDocumentTypes(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListDocumentTypesRequest(c.Server)
+func (c *Client) ListDocumentTypes(ctx context.Context, params *ListDocumentTypesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDocumentTypesRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -560,8 +705,61 @@ func (c *Client) ConsultAuthorization(ctx context.Context, organizationId Organi
 	return c.Client.Do(req)
 }
 
+// FiscalMetrics performs a GET /metrics (the `FiscalMetrics` operationId) request.
+func (c *Client) FiscalMetrics(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFiscalMetricsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// FiscalReadiness performs a GET /readyz (the `FiscalReadiness` operationId) request.
+func (c *Client) FiscalReadiness(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFiscalReadinessRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// NewFiscalHealthRequest constructs an http.Request for the FiscalHealth method
+func NewFiscalHealthRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/healthz")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListDocumentTypesRequest constructs an http.Request for the ListDocumentTypes method
-func NewListDocumentTypesRequest(server string) (*http.Request, error) {
+func NewListDocumentTypesRequest(server string, params *ListDocumentTypesParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -582,6 +780,19 @@ func NewListDocumentTypesRequest(server string) (*http.Request, error) {
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam0)
+
 	}
 
 	return req, nil
@@ -641,6 +852,15 @@ func NewRequestAuthorizationRequestWithBody(server string, organizationId Organi
 		}
 
 		req.Header.Set("Idempotency-Key", headerParam0)
+
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam1)
 
 	}
 
@@ -709,6 +929,69 @@ func NewConsultAuthorizationRequestWithBody(server string, organizationId Organi
 
 		req.Header.Set("Idempotency-Key", headerParam0)
 
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam1)
+
+	}
+
+	return req, nil
+}
+
+// NewFiscalMetricsRequest constructs an http.Request for the FiscalMetrics method
+func NewFiscalMetricsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/metrics")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewFiscalReadinessRequest constructs an http.Request for the FiscalReadiness method
+func NewFiscalReadinessRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/readyz")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
 	}
 
 	return req, nil
@@ -758,10 +1041,15 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
+	// FiscalHealthWithResponse performs a GET /healthz (the `FiscalHealth` operationId) request.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	FiscalHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*FiscalHealthResponse, error)
+
 	// ListDocumentTypesWithResponse performs a GET /internal/v1/catalogs/document-types (the `ListDocumentTypes` operationId) request.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	ListDocumentTypesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListDocumentTypesResponse, error)
+	ListDocumentTypesWithResponse(ctx context.Context, params *ListDocumentTypesParams, reqEditors ...RequestEditorFn) (*ListDocumentTypesResponse, error)
 
 	// RequestAuthorizationWithBodyWithResponse performs a POST /internal/v1/organizations/{organizationId}/authorizations (the `RequestAuthorization` operationId) request,
 	// with any type of body and a specified content type.
@@ -782,6 +1070,57 @@ type ClientWithResponsesInterface interface {
 	// ConsultAuthorizationWithResponse performs a POST /internal/v1/organizations/{organizationId}/authorizations/{requestId}/consult (the `ConsultAuthorization` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	ConsultAuthorizationWithResponse(ctx context.Context, organizationId OrganizationId, requestId string, params *ConsultAuthorizationParams, body ConsultAuthorizationJSONRequestBody, reqEditors ...RequestEditorFn) (*ConsultAuthorizationResponse, error)
+
+	// FiscalMetricsWithResponse performs a GET /metrics (the `FiscalMetrics` operationId) request.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	FiscalMetricsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*FiscalMetricsResponse, error)
+
+	// FiscalReadinessWithResponse performs a GET /readyz (the `FiscalReadiness` operationId) request.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	FiscalReadinessWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*FiscalReadinessResponse, error)
+}
+
+type FiscalHealthResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *HealthStatus
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r FiscalHealthResponse) GetJSON200() *HealthStatus {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r FiscalHealthResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r FiscalHealthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r FiscalHealthResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r FiscalHealthResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
 }
 
 type ListDocumentTypesResponse struct {
@@ -795,6 +1134,8 @@ type ListDocumentTypesResponse struct {
 	}
 	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
 	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *DomainError
 	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
 	ApplicationproblemJSON500 *InternalError
 }
@@ -811,6 +1152,11 @@ func (r ListDocumentTypesResponse) GetJSON200() *[]struct {
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
 func (r ListDocumentTypesResponse) GetApplicationproblemJSON401() *Unauthorized {
 	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ListDocumentTypesResponse) GetApplicationproblemJSON422() *DomainError {
+	return r.ApplicationproblemJSON422
 }
 
 // GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
@@ -1006,11 +1352,111 @@ func (r ConsultAuthorizationResponse) ContentType() string {
 	return ""
 }
 
+type FiscalMetricsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *MetricsUnavailable
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r FiscalMetricsResponse) GetJSON503() *MetricsUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r FiscalMetricsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r FiscalMetricsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r FiscalMetricsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r FiscalMetricsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type FiscalReadinessResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ReadinessStatus
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *NotReadyStatus
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r FiscalReadinessResponse) GetJSON200() *ReadinessStatus {
+	return r.JSON200
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r FiscalReadinessResponse) GetJSON503() *NotReadyStatus {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r FiscalReadinessResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r FiscalReadinessResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r FiscalReadinessResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r FiscalReadinessResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// FiscalHealthWithResponse performs a GET /healthz (the `FiscalHealth` operationId) request.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) FiscalHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*FiscalHealthResponse, error) {
+	rsp, err := c.FiscalHealth(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFiscalHealthResponse(rsp)
+}
+
 // ListDocumentTypesWithResponse performs a GET /internal/v1/catalogs/document-types (the `ListDocumentTypes` operationId) request.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) ListDocumentTypesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListDocumentTypesResponse, error) {
-	rsp, err := c.ListDocumentTypes(ctx, reqEditors...)
+func (c *ClientWithResponses) ListDocumentTypesWithResponse(ctx context.Context, params *ListDocumentTypesParams, reqEditors ...RequestEditorFn) (*ListDocumentTypesResponse, error) {
+	rsp, err := c.ListDocumentTypes(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1061,6 +1507,54 @@ func (c *ClientWithResponses) ConsultAuthorizationWithResponse(ctx context.Conte
 	return ParseConsultAuthorizationResponse(rsp)
 }
 
+// FiscalMetricsWithResponse performs a GET /metrics (the `FiscalMetrics` operationId) request.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) FiscalMetricsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*FiscalMetricsResponse, error) {
+	rsp, err := c.FiscalMetrics(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFiscalMetricsResponse(rsp)
+}
+
+// FiscalReadinessWithResponse performs a GET /readyz (the `FiscalReadiness` operationId) request.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) FiscalReadinessWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*FiscalReadinessResponse, error) {
+	rsp, err := c.FiscalReadiness(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFiscalReadinessResponse(rsp)
+}
+
+// ParseFiscalHealthResponse parses an HTTP response from a FiscalHealthWithResponse call
+func ParseFiscalHealthResponse(rsp *http.Response) (*FiscalHealthResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &FiscalHealthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest HealthStatus
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListDocumentTypesResponse parses an HTTP response from a ListDocumentTypesWithResponse call
 func ParseListDocumentTypesResponse(rsp *http.Response) (*ListDocumentTypesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -1092,6 +1586,13 @@ func ParseListDocumentTypesResponse(rsp *http.Response) (*ListDocumentTypesRespo
 			return nil, err
 		}
 		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest DomainError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalError
@@ -1228,6 +1729,65 @@ func ParseConsultAuthorizationResponse(rsp *http.Response) (*ConsultAuthorizatio
 			return nil, err
 		}
 		response.ApplicationproblemJSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseFiscalMetricsResponse parses an HTTP response from a FiscalMetricsWithResponse call
+func ParseFiscalMetricsResponse(rsp *http.Response) (*FiscalMetricsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &FiscalMetricsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest MetricsUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseFiscalReadinessResponse parses an HTTP response from a FiscalReadinessWithResponse call
+func ParseFiscalReadinessResponse(rsp *http.Response) (*FiscalReadinessResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &FiscalReadinessResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ReadinessStatus
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest NotReadyStatus
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

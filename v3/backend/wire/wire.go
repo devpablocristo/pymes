@@ -14,46 +14,58 @@ import (
 	identityhandler "github.com/devpablocristo/pymes/v3/backend/internal/identity/handler"
 	identityrepository "github.com/devpablocristo/pymes/v3/backend/internal/identity/repository"
 	identityusecases "github.com/devpablocristo/pymes/v3/backend/internal/identity/usecases"
-	"github.com/jackc/pgx/v5/pgxpool"
+	postgresadapter "github.com/devpablocristo/pymes/v3/backend/internal/infrastructure/postgres"
+	"github.com/devpablocristo/pymes/v3/backend/internal/observability"
 )
 
 // App is the sole composition boundary. Resources own their domain, ports and
 // adapters; cmd/api never constructs infrastructure dependencies directly.
 type App struct {
-	Handler http.Handler
-	pool    *pgxpool.Pool
+	Handler  http.Handler
+	database *postgresadapter.Database
 }
 
 func (a *App) Close() {
-	if a != nil && a.pool != nil {
-		a.pool.Close()
+	if a != nil && a.database != nil {
+		a.database.Close()
 	}
 }
 
 func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	database, err := postgresadapter.Open(
+		ctx,
+		cfg.DatabaseURL,
+		"pymes-v3-api",
+	)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
-	if err = pool.Ping(ctx); err != nil {
-		pool.Close()
-		return nil, fmt.Errorf("ping database: %w", err)
-	}
+	pool := database.Pool()
 	sessions, err := clerk.NewSessionVerifier(clerk.SessionVerifierConfig{SecretKey: cfg.Clerk.SecretKey, PublicKeyPEM: cfg.Clerk.JWTKey, Issuer: cfg.Clerk.Issuer, Audience: cfg.Clerk.Audience, AuthorizedParties: cfg.Clerk.AuthorizedParties})
 	if err != nil {
-		pool.Close()
+		database.Close()
 		return nil, fmt.Errorf("Clerk session verifier: %w", err)
 	}
 	webhooks, err := clerk.NewWebhookVerifier(cfg.Clerk.WebhookSecret)
 	if err != nil {
-		pool.Close()
+		database.Close()
 		return nil, fmt.Errorf("Clerk webhook verifier: %w", err)
 	}
 	store := commercerepository.New(pool)
 	identities := identityrepository.New(pool)
-	api := commercehandler.NewHTTPServer(commerceusecases.Commands{Store: store, Now: store.Clock}, identityaccess.ClerkAuthenticator{Memberships: identities, Verifier: sessions})
+	api := commercehandler.NewHTTPServer(commerceusecases.Commands{
+		Store: store, AccountingAdjustments: store, Now: store.Clock,
+	}, identityaccess.ClerkAuthenticator{Memberships: identities, Verifier: sessions})
+	handler := composePublicHTTP(api.Handler(), identityhandler.NewWebhook(webhooks, identityusecases.ReceiveWebhook{Inbox: identities}))
+	return &App{
+		Handler:  observability.HTTP(handler, nil),
+		database: database,
+	}, nil
+}
+
+func composePublicHTTP(api, clerkWebhook http.Handler) http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("/", api.Handler())
-	mux.Handle("POST /api/v1/webhooks/clerk", identityhandler.NewWebhook(webhooks, identityusecases.ReceiveWebhook{Inbox: identities}))
-	return &App{Handler: mux, pool: pool}, nil
+	mux.Handle("/", api)
+	mux.Handle("POST /api/v1/webhooks/clerk", clerkWebhook)
+	return mux
 }

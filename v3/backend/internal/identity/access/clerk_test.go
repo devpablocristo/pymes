@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	clerk "github.com/devpablocristo/platform/sdks/clerk/go"
+	identitydomain "github.com/devpablocristo/pymes/v3/backend/internal/identity/domain"
 )
 
 type verifierStub func(context.Context, string) (clerk.SessionClaims, error)
@@ -15,16 +16,16 @@ func (f verifierStub) VerifySession(ctx context.Context, token string) (clerk.Se
 	return f(ctx, token)
 }
 
-type membershipStub func(context.Context, string, string) (string, error)
+type membershipStub func(context.Context, string, string) (identitydomain.Principal, error)
 
-func (f membershipStub) ResolveClerkMembership(ctx context.Context, organizationID, userID string) (string, error) {
+func (f membershipStub) ResolveClerkMembership(ctx context.Context, organizationID, userID string) (identitydomain.Principal, error) {
 	return f(ctx, organizationID, userID)
 }
 
 func TestClerkAuthenticatorRejectsMissingConfigurationAndBearer(t *testing.T) {
 	t.Parallel()
 	request := httptest.NewRequest("GET", "/", nil)
-	if _, err := (ClerkAuthenticator{}).OrganizationID(request); err == nil {
+	if _, err := (ClerkAuthenticator{}).Principal(request); err == nil {
 		t.Fatal("expected missing configuration to fail")
 	}
 	auth := ClerkAuthenticator{
@@ -32,12 +33,12 @@ func TestClerkAuthenticatorRejectsMissingConfigurationAndBearer(t *testing.T) {
 			t.Fatal("verifier must not run without a bearer token")
 			return clerk.SessionClaims{}, nil
 		}),
-		Memberships: membershipStub(func(context.Context, string, string) (string, error) {
+		Memberships: membershipStub(func(context.Context, string, string) (identitydomain.Principal, error) {
 			t.Fatal("membership resolver must not run without a bearer token")
-			return "", nil
+			return identitydomain.Principal{}, nil
 		}),
 	}
-	if _, err := auth.OrganizationID(request); err == nil {
+	if _, err := auth.Principal(request); err == nil {
 		t.Fatal("expected missing bearer token to fail")
 	}
 }
@@ -53,19 +54,24 @@ func TestClerkAuthenticatorVerifiesTokenAndResolvesLocalMembership(t *testing.T)
 			}
 			return clerk.SessionClaims{OrganizationID: "org_clerk", Subject: "user_clerk"}, nil
 		}),
-		Memberships: membershipStub(func(_ context.Context, organizationID, userID string) (string, error) {
+		Memberships: membershipStub(func(_ context.Context, organizationID, userID string) (identitydomain.Principal, error) {
 			if organizationID != "org_clerk" || userID != "user_clerk" {
 				t.Fatalf("unexpected Clerk identity %q/%q", organizationID, userID)
 			}
-			return "local-organization", nil
+			return identitydomain.Principal{
+				OrganizationID: "local-organization", ActorID: "user_clerk", Role: identitydomain.RoleAdmin,
+				Permissions: []string{"org:members:read"}, OrganizationStatus: "ready", MembershipStatus: "active",
+			}, nil
 		}),
 	}
-	organizationID, err := auth.OrganizationID(request)
+	principal, err := auth.Principal(request)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if organizationID != "local-organization" {
-		t.Fatalf("unexpected local organization %q", organizationID)
+	if principal.OrganizationID != "local-organization" || principal.ActorID != "user_clerk" ||
+		principal.Role != identitydomain.RoleAdmin || len(principal.Permissions) != 1 ||
+		principal.OrganizationStatus != "ready" || principal.MembershipStatus != "active" {
+		t.Fatalf("unexpected local principal %+v", principal)
 	}
 }
 
@@ -78,18 +84,18 @@ func TestClerkAuthenticatorRejectsInvalidOrIncompleteSession(t *testing.T) {
 		Verifier: verifierStub(func(context.Context, string) (clerk.SessionClaims, error) {
 			return clerk.SessionClaims{}, sentinel
 		}),
-		Memberships: membershipStub(func(context.Context, string, string) (string, error) {
+		Memberships: membershipStub(func(context.Context, string, string) (identitydomain.Principal, error) {
 			t.Fatal("membership resolver must not run for an invalid session")
-			return "", nil
+			return identitydomain.Principal{}, nil
 		}),
 	}
-	if _, err := auth.OrganizationID(request); !errors.Is(err, sentinel) {
+	if _, err := auth.Principal(request); !errors.Is(err, sentinel) {
 		t.Fatalf("expected verifier error, got %v", err)
 	}
 	auth.Verifier = verifierStub(func(context.Context, string) (clerk.SessionClaims, error) {
 		return clerk.SessionClaims{Subject: "user_clerk"}, nil
 	})
-	if _, err := auth.OrganizationID(request); err == nil {
+	if _, err := auth.Principal(request); err == nil {
 		t.Fatal("expected session without active organization to fail")
 	}
 }

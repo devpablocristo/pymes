@@ -13,7 +13,8 @@ export class InMemoryFiscalLedger implements FiscalLedger {
   }
 
   async save(record: FiscalRecord): Promise<void> {
-    const copy = clone(record)!;
+    const existing = this.byRequest.get(`${record.request.organization_id}|${record.request.request_id}`);
+    const copy = clone(existing === undefined ? record : { ...record, audit: existing.audit })!;
     this.byIdempotency.set(`${record.request.organization_id}|${record.idempotencyKey}`, copy);
     this.byRequest.set(`${record.request.organization_id}|${record.request.request_id}`, copy);
   }

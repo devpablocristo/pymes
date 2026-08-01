@@ -43,8 +43,11 @@ func TestPostgresProjectsClerkOrganizationAndMembershipIdempotently(t *testing.T
 	if status != "active" || role != "admin" {
 		t.Fatalf("status=%s role=%s", status, role)
 	}
-	if organizationID, err := repo.ResolveClerkMembership(context.Background(), "org_clerk", "user_clerk"); err != nil || organizationID != "org_org_clerk" {
-		t.Fatalf("resolved=%q err=%v", organizationID, err)
+	if principal, err := repo.ResolveClerkMembership(context.Background(), "org_clerk", "user_clerk"); err != nil ||
+		principal.OrganizationID != "org_org_clerk" || principal.ActorID != "user_clerk" ||
+		principal.Role != "admin" || len(principal.Permissions) != 1 || principal.MembershipStatus != "active" ||
+		principal.OrganizationStatus != "pending" {
+		t.Fatalf("resolved=%+v err=%v", principal, err)
 	}
 	if _, err := repo.ResolveClerkMembership(context.Background(), "org_clerk", "other_user"); err == nil {
 		t.Fatal("unknown membership must not authorize")

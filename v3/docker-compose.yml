@@ -45,38 +45,85 @@ services:
     restart: "no"
   accounting-postgres:
     image: postgres:16-alpine
+    command: ["postgres", "-c", "hba_file=/etc/postgresql/pymes-local-pg_hba.conf"]
     environment:
       POSTGRES_USER: accounting
       POSTGRES_PASSWORD: accounting
       POSTGRES_DB: pymes_accounting
-    ports: ["55436:5432"]
-    volumes: ["accounting-postgres-data:/var/lib/postgresql/data"]
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports: ["127.0.0.1:55436:5432"]
+    volumes:
+      - accounting-postgres-data:/var/lib/postgresql/data
+      - ./scripts/accounting-local-pg_hba.conf:/etc/postgresql/pymes-local-pg_hba.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U accounting -d pymes_accounting"]
       interval: 2s
       timeout: 3s
       retries: 30
+  accounting-roles:
+    image: postgres:16-alpine
+    environment:
+      ACCOUNTING_ADMIN_DATABASE_URL: postgres://accounting@accounting-postgres:5432/pymes_accounting?sslmode=disable
+    volumes: ["./scripts/accounting-local-roles.sh:/scripts/accounting-local-roles.sh:ro"]
+    depends_on:
+      accounting-postgres: { condition: service_healthy }
+    command: ["/scripts/accounting-local-roles.sh"]
+    restart: "no"
   accounting-migrate:
     build:
       context: ${ACCOUNTING_BUILD_CONTEXT:-../../open-accounting}
       target: pymes-accounting-migrate
     environment:
-      DATABASE_URL: postgres://accounting:accounting@accounting-postgres:5432/pymes_accounting?sslmode=disable
+      DATABASE_URL: postgres://accounting_migrate@accounting-postgres:5432/pymes_accounting?sslmode=disable&options=-c%20role%3Daccounting_owner
     depends_on:
-      accounting-postgres: { condition: service_healthy }
+      accounting-roles: { condition: service_completed_successfully }
+    restart: "no"
+  accounting-grants:
+    build:
+      context: ${ACCOUNTING_BUILD_CONTEXT:-../../open-accounting}
+      target: pymes-accounting-admin
+    environment:
+      ACCOUNTING_ADMIN_DATABASE_URL: postgres://accounting_control@accounting-postgres:5432/pymes_accounting?sslmode=disable&options=-c%20role%3Daccounting_owner
+      ACCOUNTING_ADMIN_OPERATION: sync-runtime-grants
+      ACCOUNTING_RUNTIME_ROLE: accounting_runtime
+      ACCOUNTING_OWNER_ROLE: accounting_owner
+    depends_on:
+      accounting-migrate: { condition: service_completed_successfully }
     restart: "no"
   accounting:
     build:
       context: ${ACCOUNTING_BUILD_CONTEXT:-../../open-accounting}
       target: pymes-accounting
     environment:
-      ACCOUNTING_DATABASE_URL: postgres://accounting:accounting@accounting-postgres:5432/pymes_accounting?sslmode=disable
+      ACCOUNTING_DATABASE_URL: postgres://accounting_runtime@accounting-postgres:5432/pymes_accounting?sslmode=disable
+      PYMES_ENVIRONMENT: development
       PYMES_INTERNAL_ISSUER: pymes-v3
-      PYMES_INTERNAL_PUBLIC_KEY_B64: ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=
+      PYMES_INTERNAL_JWKS_JSON: '{"keys":[{"kty":"OKP","crv":"Ed25519","alg":"EdDSA","use":"sig","key_ops":["verify"],"kid":"local-dev-1","x":"ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"}]}'
       PORT: "8080"
     depends_on:
-      accounting-migrate: { condition: service_completed_successfully }
+      accounting-grants: { condition: service_completed_successfully }
     ports: ["18082:8080"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  accounting-admin:
+    build:
+      context: ${ACCOUNTING_BUILD_CONTEXT:-../../open-accounting}
+      target: pymes-accounting-admin
+    environment:
+      ACCOUNTING_ADMIN_DATABASE_URL: postgres://accounting_control@accounting-postgres:5432/pymes_accounting?sslmode=disable&options=-c%20role%3Daccounting_owner
+      ACCOUNTING_ADMIN_OPERATION: serve
+      ACCOUNTING_RUNTIME_ROLE: accounting_runtime
+      ACCOUNTING_OWNER_ROLE: accounting_owner
+      PYMES_ENVIRONMENT: development
+      PYMES_INTERNAL_ISSUER: pymes-v3
+      PYMES_INTERNAL_JWKS_JSON: '{"keys":[{"kty":"OKP","crv":"Ed25519","alg":"EdDSA","use":"sig","key_ops":["verify"],"kid":"local-dev-1","x":"ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"}]}'
+      PORT: "8080"
+    depends_on:
+      accounting-grants: { condition: service_completed_successfully }
+    ports: ["127.0.0.1:18084:8080"]
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/readyz"]
       interval: 2s
@@ -88,6 +135,7 @@ services:
       PYMES_DATABASE_URL: postgres://pymes:pymes@postgres:5432/pymes_v3?sslmode=disable
       PYMES_ENVIRONMENT: development
       PYMES_CLERK_SECRET_KEY: ${PYMES_CLERK_SECRET_KEY:-sk_test_local}
+      PYMES_CLERK_JWT_KEY: ${PYMES_CLERK_JWT_KEY:-}
       PYMES_CLERK_ISSUER: ${PYMES_CLERK_ISSUER:-https://clerk.local}
       PYMES_CLERK_AUDIENCE: ${PYMES_CLERK_AUDIENCE:-pymes-v3}
       PYMES_CLERK_AUTHORIZED_PARTIES: ${PYMES_CLERK_AUTHORIZED_PARTIES:-http://localhost:18080}
@@ -106,6 +154,8 @@ services:
       PYMES_DATABASE_URL: postgres://pymes:pymes@postgres:5432/pymes_v3?sslmode=disable
       FISCAL_ADAPTER_URL: http://fiscal-fake:8080
       ACCOUNTING_URL: http://accounting:8080
+      PYMES_ENVIRONMENT: development
+      PYMES_ALLOW_INSECURE_LOCAL_SERVICES: "true"
       PYMES_INTERNAL_SIGNING_SEED_B64: AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=
       PYMES_INTERNAL_ISSUER: pymes-v3
       PYMES_INTERNAL_KEY_ID: local-dev-1
@@ -124,10 +174,11 @@ services:
     build: { context: ., target: fiscal-adapter }
     environment:
       FISCAL_ADAPTER_MODE: mock
-      FISCAL_MOCK_SCENARIO: authorized
+      FISCAL_MOCK_SCENARIO: ${FISCAL_MOCK_SCENARIO:-authorized}
       FISCAL_DATABASE_URL: postgres://fiscal:fiscal@fiscal-postgres:5432/pymes_fiscal?sslmode=disable
+      PYMES_ENVIRONMENT: development
       PYMES_INTERNAL_ISSUER: pymes-v3
-      PYMES_INTERNAL_PUBLIC_KEY_B64: ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=
+      PYMES_INTERNAL_JWKS_JSON: '{"keys":[{"kty":"OKP","crv":"Ed25519","alg":"EdDSA","use":"sig","key_ops":["verify"],"kid":"local-dev-1","x":"ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"}]}'
       PORT: "8080"
     depends_on:
       fiscal-migrate: { condition: service_completed_successfully }

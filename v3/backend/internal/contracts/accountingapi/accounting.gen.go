@@ -75,7 +75,6 @@ const (
 	PERIODLOCKED             ErrorCode = "PERIOD_LOCKED"
 	PERIODOVERLAP            ErrorCode = "PERIOD_OVERLAP"
 	SERVICEUNAVAILABLE       ErrorCode = "SERVICE_UNAVAILABLE"
-	SOURCEALREADYPOSTED      ErrorCode = "SOURCE_ALREADY_POSTED"
 	UNAUTHORIZEDSERVICE      ErrorCode = "UNAUTHORIZED_SERVICE"
 	UNBALANCEDPOSTING        ErrorCode = "UNBALANCED_POSTING"
 	VALIDATIONERROR          ErrorCode = "VALIDATION_ERROR"
@@ -104,13 +103,26 @@ func (e ErrorCode) Valid() bool {
 		return true
 	case SERVICEUNAVAILABLE:
 		return true
-	case SOURCEALREADYPOSTED:
-		return true
 	case UNAUTHORIZEDSERVICE:
 		return true
 	case UNBALANCEDPOSTING:
 		return true
 	case VALIDATIONERROR:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HealthStatusStatus.
+const (
+	Ok HealthStatusStatus = "ok"
+)
+
+// Valid indicates whether the value is a known member of the HealthStatusStatus enum.
+func (e HealthStatusStatus) Valid() bool {
+	switch e {
+	case Ok:
 		return true
 	default:
 		return false
@@ -132,6 +144,36 @@ func (e PeriodStatus) Valid() bool {
 	case PeriodStatusOpen:
 		return true
 	case PeriodStatusSoftClosed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProvisioningResultStatus.
+const (
+	ProvisioningResultStatusReady ProvisioningResultStatus = "ready"
+)
+
+// Valid indicates whether the value is a known member of the ProvisioningResultStatus enum.
+func (e ProvisioningResultStatus) Valid() bool {
+	switch e {
+	case ProvisioningResultStatusReady:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReadinessStatusStatus.
+const (
+	ReadinessStatusStatusReady ReadinessStatusStatus = "ready"
+)
+
+// Valid indicates whether the value is a known member of the ReadinessStatusStatus enum.
+func (e ReadinessStatusStatus) Valid() bool {
+	switch e {
+	case ReadinessStatusStatusReady:
 		return true
 	default:
 		return false
@@ -193,15 +235,20 @@ type AccountNormalSide string
 
 // AccountingEvent defines model for AccountingEvent.
 type AccountingEvent struct {
-	ApplicationId  *UUID                 `json:"application_id,omitempty"`
-	CommandId      UUID                  `json:"command_id"`
-	CorrelationId  *string               `json:"correlation_id,omitempty"`
-	EventId        UUID                  `json:"event_id"`
-	JournalEntryId *UUID                 `json:"journal_entry_id,omitempty"`
-	OccurredAt     time.Time             `json:"occurred_at"`
-	OpenItemIds    *[]UUID               `json:"open_item_ids,omitempty"`
-	OrganizationId string                `json:"organization_id"`
+	ApplicationId  *UUID     `json:"application_id,omitempty"`
+	CommandId      UUID      `json:"command_id"`
+	CorrelationId  string    `json:"correlation_id"`
+	EventId        UUID      `json:"event_id"`
+	IdempotencyKey string    `json:"idempotency_key"`
+	JournalEntryId *UUID     `json:"journal_entry_id,omitempty"`
+	OccurredAt     time.Time `json:"occurred_at"`
+	OpenItemIds    *[]UUID   `json:"open_item_ids,omitempty"`
+	OrganizationId string    `json:"organization_id"`
+
+	// SnapshotDigest Hash SHA-256 hexadecimal del snapshot procesado.
+	SnapshotDigest string                `json:"snapshot_digest"`
 	Source         *SourceRef            `json:"source,omitempty"`
+	SourceVersion  int                   `json:"source_version"`
 	Status         AccountingEventStatus `json:"status"`
 }
 
@@ -222,11 +269,51 @@ type Error struct {
 // ErrorCode defines model for Error.Code.
 type ErrorCode string
 
+// HealthStatus defines model for HealthStatus.
+type HealthStatus struct {
+	Status HealthStatusStatus `json:"status"`
+}
+
+// HealthStatusStatus defines model for HealthStatus.Status.
+type HealthStatusStatus string
+
 // Money defines model for Money.
 type Money struct {
 	// Amount Decimal base diez exacto; no JSON number.
 	Amount   Decimal `json:"amount"`
 	Currency string  `json:"currency"`
+}
+
+// OpenItemApplicationCommand defines model for OpenItemApplicationCommand.
+type OpenItemApplicationCommand struct {
+	Amount           Money     `json:"amount"`
+	AppliedAt        time.Time `json:"applied_at"`
+	CommandId        UUID      `json:"command_id"`
+	CorrelationId    string    `json:"correlation_id"`
+	CreditOpenItemId UUID      `json:"credit_open_item_id"`
+	DebitOpenItemId  UUID      `json:"debit_open_item_id"`
+	IdempotencyKey   string    `json:"idempotency_key"`
+	OrganizationId   string    `json:"organization_id"`
+
+	// SnapshotDigest Hash SHA-256 hexadecimal de la aplicación fuente congelada.
+	SnapshotDigest    string     `json:"snapshot_digest"`
+	SourceDocumentRef *SourceRef `json:"source_document_ref,omitempty"`
+	SourceVersion     int        `json:"source_version"`
+}
+
+// OpenItemApplicationReversalCommand defines model for OpenItemApplicationReversalCommand.
+type OpenItemApplicationReversalCommand struct {
+	ApplicationId  UUID      `json:"application_id"`
+	CommandId      UUID      `json:"command_id"`
+	CorrelationId  string    `json:"correlation_id"`
+	IdempotencyKey string    `json:"idempotency_key"`
+	OrganizationId string    `json:"organization_id"`
+	Reason         string    `json:"reason"`
+	ReversedAt     time.Time `json:"reversed_at"`
+
+	// SnapshotDigest Hash SHA-256 hexadecimal de la reversa fuente congelada.
+	SnapshotDigest string `json:"snapshot_digest"`
+	SourceVersion  int    `json:"source_version"`
 }
 
 // Period defines model for Period.
@@ -246,18 +333,30 @@ type PeriodInput struct {
 	StartsOn openapi_types.Date `json:"starts_on"`
 }
 
-// PostingCommand defines model for PostingCommand.
+// PostingCommand idempotency_key y correlation_id deben coincidir con sus headers. source_version y snapshot_digest deben coincidir con source.version y source.digest; el servicio rechaza cualquier divergencia.
 type PostingCommand struct {
-	CommandId   UUID      `json:"command_id"`
-	Description string    `json:"description"`
-	EffectiveAt time.Time `json:"effective_at"`
+	CommandId     UUID      `json:"command_id"`
+	CorrelationId string    `json:"correlation_id"`
+	Description   string    `json:"description"`
+	EffectiveAt   time.Time `json:"effective_at"`
 
 	// ExchangeRate Decimal base diez exacto; no JSON number.
 	ExchangeRate   *Decimal      `json:"exchange_rate,omitempty"`
+	IdempotencyKey string        `json:"idempotency_key"`
 	Journal        *string       `json:"journal,omitempty"`
 	Lines          []PostingLine `json:"lines"`
 	OrganizationId string        `json:"organization_id"`
-	Source         SourceRef     `json:"source"`
+
+	// OriginalJournalEntryId Asiento del documento original; vínculo auditable, no una orden de reversa.
+	OriginalJournalEntryId *string `json:"original_journal_entry_id,omitempty"`
+
+	// RelatedSource Documento original asociado a una nota de crédito o débito.
+	RelatedSource *SourceRef `json:"related_source,omitempty"`
+
+	// SnapshotDigest Hash SHA-256 hexadecimal del snapshot fuente congelado.
+	SnapshotDigest string    `json:"snapshot_digest"`
+	Source         SourceRef `json:"source"`
+	SourceVersion  int       `json:"source_version"`
 }
 
 // PostingLine defines model for PostingLine.
@@ -280,6 +379,39 @@ type PostingLine struct {
 	PartyRef *string `json:"party_ref,omitempty"`
 }
 
+// ProvisioningResult defines model for ProvisioningResult.
+type ProvisioningResult struct {
+	OrganizationId string                   `json:"organization_id"`
+	Status         ProvisioningResultStatus `json:"status"`
+}
+
+// ProvisioningResultStatus defines model for ProvisioningResult.Status.
+type ProvisioningResultStatus string
+
+// ReadinessStatus defines model for ReadinessStatus.
+type ReadinessStatus struct {
+	Status ReadinessStatusStatus `json:"status"`
+}
+
+// ReadinessStatusStatus defines model for ReadinessStatus.Status.
+type ReadinessStatusStatus string
+
+// ReversalCommand defines model for ReversalCommand.
+type ReversalCommand struct {
+	CommandId              UUID      `json:"command_id"`
+	CorrelationId          string    `json:"correlation_id"`
+	EffectiveAt            time.Time `json:"effective_at"`
+	IdempotencyKey         string    `json:"idempotency_key"`
+	OrganizationId         string    `json:"organization_id"`
+	OriginalJournalEntryId UUID      `json:"original_journal_entry_id"`
+	Reason                 string    `json:"reason"`
+
+	// SnapshotDigest Hash SHA-256 hexadecimal del comando fuente congelado.
+	SnapshotDigest    string     `json:"snapshot_digest"`
+	SourceDocumentRef *SourceRef `json:"source_document_ref,omitempty"`
+	SourceVersion     int        `json:"source_version"`
+}
+
 // SourceRef defines model for SourceRef.
 type SourceRef struct {
 	// Digest SHA-256 del snapshot fuente
@@ -292,11 +424,20 @@ type SourceRef struct {
 // UUID defines model for UUID.
 type UUID = openapi_types.UUID
 
+// CorrelationId defines model for CorrelationId.
+type CorrelationId = string
+
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
 
 // OrganizationId defines model for OrganizationId.
 type OrganizationId = string
+
+// PayloadDigest defines model for PayloadDigest.
+type PayloadDigest = string
+
+// RequestId defines model for RequestId.
+type RequestId = string
 
 // Conflict defines model for Conflict.
 type Conflict = Error
@@ -304,8 +445,17 @@ type Conflict = Error
 // DomainError defines model for DomainError.
 type DomainError = Error
 
+// InternalError defines model for InternalError.
+type InternalError = Error
+
+// InvalidRequest defines model for InvalidRequest.
+type InvalidRequest = Error
+
 // ServiceUnavailable defines model for ServiceUnavailable.
 type ServiceUnavailable = Error
+
+// Unauthorized defines model for Unauthorized.
+type Unauthorized = Error
 
 // ProvisionOrganizationJSONBody defines parameters for ProvisionOrganization.
 type ProvisionOrganizationJSONBody struct {
@@ -316,39 +466,49 @@ type ProvisionOrganizationJSONBody struct {
 // ProvisionOrganizationParams defines parameters for ProvisionOrganization.
 type ProvisionOrganizationParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
+	XRequestID     RequestId     `json:"X-Request-ID"`
+
+	// XPayloadDigest SHA-256 hexadecimal minúsculo del JSON canónico exacto.
+	XPayloadDigest PayloadDigest `json:"X-Payload-Digest"`
 }
 
-// ReverseOpenItemApplicationJSONBody defines parameters for ReverseOpenItemApplication.
-type ReverseOpenItemApplicationJSONBody struct {
-	ApplicationId UUID      `json:"application_id"`
-	CommandId     UUID      `json:"command_id"`
-	Reason        string    `json:"reason"`
-	ReversedAt    time.Time `json:"reversed_at"`
+// ListAccountsParams defines parameters for ListAccounts.
+type ListAccountsParams struct {
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
 }
 
 // ReverseOpenItemApplicationParams defines parameters for ReverseOpenItemApplication.
 type ReverseOpenItemApplicationParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
-}
 
-// ApplyOpenItemJSONBody defines parameters for ApplyOpenItem.
-type ApplyOpenItemJSONBody struct {
-	Amount            Money      `json:"amount"`
-	AppliedAt         time.Time  `json:"applied_at"`
-	CommandId         UUID       `json:"command_id"`
-	CreditOpenItemId  UUID       `json:"credit_open_item_id"`
-	DebitOpenItemId   UUID       `json:"debit_open_item_id"`
-	SourceDocumentRef *SourceRef `json:"source_document_ref,omitempty"`
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
 }
 
 // ApplyOpenItemParams defines parameters for ApplyOpenItem.
 type ApplyOpenItemParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
+}
+
+// ListPeriodsParams defines parameters for ListPeriods.
+type ListPeriodsParams struct {
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
 }
 
 // CreatePeriodParams defines parameters for CreatePeriod.
 type CreatePeriodParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
 }
 
 // TransitionPeriodJSONBody defines parameters for TransitionPeriod.
@@ -359,6 +519,9 @@ type TransitionPeriodJSONBody struct {
 // TransitionPeriodParams defines parameters for TransitionPeriod.
 type TransitionPeriodParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
 }
 
 // TransitionPeriodJSONBodyTargetStatus defines parameters for TransitionPeriod.
@@ -367,38 +530,38 @@ type TransitionPeriodJSONBodyTargetStatus string
 // SubmitPostingCommandParams defines parameters for SubmitPostingCommand.
 type SubmitPostingCommandParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
 }
 
 // GetReportParams defines parameters for GetReport.
 type GetReportParams struct {
 	AsOf openapi_types.Date `form:"as_of" json:"as_of"`
+
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
 }
 
 // GetReportParamsReport defines parameters for GetReport.
 type GetReportParamsReport string
 
-// ReverseJournalEntryJSONBody defines parameters for ReverseJournalEntry.
-type ReverseJournalEntryJSONBody struct {
-	CommandId              UUID       `json:"command_id"`
-	EffectiveAt            time.Time  `json:"effective_at"`
-	OriginalJournalEntryId UUID       `json:"original_journal_entry_id"`
-	Reason                 string     `json:"reason"`
-	SourceDocumentRef      *SourceRef `json:"source_document_ref,omitempty"`
-}
-
 // ReverseJournalEntryParams defines parameters for ReverseJournalEntry.
 type ReverseJournalEntryParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
 }
 
 // ProvisionOrganizationJSONRequestBody defines body for ProvisionOrganization for application/json ContentType.
 type ProvisionOrganizationJSONRequestBody ProvisionOrganizationJSONBody
 
 // ReverseOpenItemApplicationJSONRequestBody defines body for ReverseOpenItemApplication for application/json ContentType.
-type ReverseOpenItemApplicationJSONRequestBody ReverseOpenItemApplicationJSONBody
+type ReverseOpenItemApplicationJSONRequestBody = OpenItemApplicationReversalCommand
 
 // ApplyOpenItemJSONRequestBody defines body for ApplyOpenItem for application/json ContentType.
-type ApplyOpenItemJSONRequestBody ApplyOpenItemJSONBody
+type ApplyOpenItemJSONRequestBody = OpenItemApplicationCommand
 
 // CreatePeriodJSONRequestBody defines body for CreatePeriod for application/json ContentType.
 type CreatePeriodJSONRequestBody = PeriodInput
@@ -410,7 +573,7 @@ type TransitionPeriodJSONRequestBody TransitionPeriodJSONBody
 type SubmitPostingCommandJSONRequestBody = PostingCommand
 
 // ReverseJournalEntryJSONRequestBody defines body for ReverseJournalEntry for application/json ContentType.
-type ReverseJournalEntryJSONRequestBody ReverseJournalEntryJSONBody
+type ReverseJournalEntryJSONRequestBody = ReversalCommand
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -491,6 +654,8 @@ type ClientInterface interface {
 
 	// ProvisionOrganizationWithBody Crea de forma idempotente el schema contable de una organización.
 	//
+	// Endpoint de control plane servido exclusivamente por accounting-admin; no forma parte del runtime contable. Requiere JWT interno con audiencia accounting-provisioning y Cloud Run IAM en despliegues gestionados.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /internal/v1/organizations/{organizationId} (the `ProvisionOrganization` operationId).
@@ -498,13 +663,15 @@ type ClientInterface interface {
 
 	// ProvisionOrganization Crea de forma idempotente el schema contable de una organización.
 	//
+	// Endpoint de control plane servido exclusivamente por accounting-admin; no forma parte del runtime contable. Requiere JWT interno con audiencia accounting-provisioning y Cloud Run IAM en despliegues gestionados.
+	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PUT /internal/v1/organizations/{organizationId} (the `ProvisionOrganization` operationId).
 	ProvisionOrganization(ctx context.Context, organizationId OrganizationId, params *ProvisionOrganizationParams, body ProvisionOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListAccounts performs a GET /internal/v1/organizations/{organizationId}/accounts (the `ListAccounts` operationId) request.
-	ListAccounts(ctx context.Context, organizationId OrganizationId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListAccounts(ctx context.Context, organizationId OrganizationId, params *ListAccountsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ReverseOpenItemApplicationWithBody Desaplica de forma inmutable una aplicación antes de revertir su documento.
 	//
@@ -529,7 +696,7 @@ type ClientInterface interface {
 	ApplyOpenItem(ctx context.Context, organizationId OrganizationId, params *ApplyOpenItemParams, body ApplyOpenItemJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListPeriods performs a GET /internal/v1/organizations/{organizationId}/periods (the `ListPeriods` operationId) request.
-	ListPeriods(ctx context.Context, organizationId OrganizationId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListPeriods(ctx context.Context, organizationId OrganizationId, params *ListPeriodsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreatePeriodWithBody performs a POST /internal/v1/organizations/{organizationId}/periods (the `CreatePeriod` operationId) request,
 	// with any type of body and a specified content type.
@@ -572,6 +739,9 @@ type ClientInterface interface {
 	// Takes a body of the `application/json` content type.
 	ReverseJournalEntry(ctx context.Context, organizationId OrganizationId, params *ReverseJournalEntryParams, body ReverseJournalEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// AccountingMetrics performs a GET /metrics (the `AccountingMetrics` operationId) request.
+	AccountingMetrics(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// AccountingReadiness performs a GET /readyz (the `AccountingReadiness` operationId) request.
 	AccountingReadiness(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
@@ -591,6 +761,8 @@ func (c *Client) AccountingHealth(ctx context.Context, reqEditors ...RequestEdit
 
 // ProvisionOrganizationWithBody Crea de forma idempotente el schema contable de una organización.
 //
+// Endpoint de control plane servido exclusivamente por accounting-admin; no forma parte del runtime contable. Requiere JWT interno con audiencia accounting-provisioning y Cloud Run IAM en despliegues gestionados.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PUT /internal/v1/organizations/{organizationId} (the `ProvisionOrganization` operationId).
@@ -608,6 +780,8 @@ func (c *Client) ProvisionOrganizationWithBody(ctx context.Context, organization
 
 // ProvisionOrganization Crea de forma idempotente el schema contable de una organización.
 //
+// Endpoint de control plane servido exclusivamente por accounting-admin; no forma parte del runtime contable. Requiere JWT interno con audiencia accounting-provisioning y Cloud Run IAM en despliegues gestionados.
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with PUT /internal/v1/organizations/{organizationId} (the `ProvisionOrganization` operationId).
@@ -624,8 +798,8 @@ func (c *Client) ProvisionOrganization(ctx context.Context, organizationId Organ
 }
 
 // ListAccounts performs a GET /internal/v1/organizations/{organizationId}/accounts (the `ListAccounts` operationId) request.
-func (c *Client) ListAccounts(ctx context.Context, organizationId OrganizationId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListAccountsRequest(c.Server, organizationId)
+func (c *Client) ListAccounts(ctx context.Context, organizationId OrganizationId, params *ListAccountsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAccountsRequest(c.Server, organizationId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -699,8 +873,8 @@ func (c *Client) ApplyOpenItem(ctx context.Context, organizationId OrganizationI
 }
 
 // ListPeriods performs a GET /internal/v1/organizations/{organizationId}/periods (the `ListPeriods` operationId) request.
-func (c *Client) ListPeriods(ctx context.Context, organizationId OrganizationId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListPeriodsRequest(c.Server, organizationId)
+func (c *Client) ListPeriods(ctx context.Context, organizationId OrganizationId, params *ListPeriodsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPeriodsRequest(c.Server, organizationId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -842,6 +1016,19 @@ func (c *Client) ReverseJournalEntry(ctx context.Context, organizationId Organiz
 	return c.Client.Do(req)
 }
 
+// AccountingMetrics performs a GET /metrics (the `AccountingMetrics` operationId) request.
+func (c *Client) AccountingMetrics(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAccountingMetricsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // AccountingReadiness performs a GET /readyz (the `AccountingReadiness` operationId) request.
 func (c *Client) AccountingReadiness(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAccountingReadinessRequest(c.Server)
@@ -937,13 +1124,40 @@ func NewProvisionOrganizationRequestWithBody(server string, organizationId Organ
 
 		req.Header.Set("Idempotency-Key", headerParam0)
 
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam1)
+
+		var headerParam2 string
+
+		headerParam2, err = runtime.StyleParamWithOptions("simple", false, "X-Request-ID", params.XRequestID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Request-ID", headerParam2)
+
+		var headerParam3 string
+
+		headerParam3, err = runtime.StyleParamWithOptions("simple", false, "X-Payload-Digest", params.XPayloadDigest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Payload-Digest", headerParam3)
+
 	}
 
 	return req, nil
 }
 
 // NewListAccountsRequest constructs an http.Request for the ListAccounts method
-func NewListAccountsRequest(server string, organizationId OrganizationId) (*http.Request, error) {
+func NewListAccountsRequest(server string, organizationId OrganizationId, params *ListAccountsParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -971,6 +1185,19 @@ func NewListAccountsRequest(server string, organizationId OrganizationId) (*http
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam0)
+
 	}
 
 	return req, nil
@@ -1030,6 +1257,15 @@ func NewReverseOpenItemApplicationRequestWithBody(server string, organizationId 
 		}
 
 		req.Header.Set("Idempotency-Key", headerParam0)
+
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam1)
 
 	}
 
@@ -1091,13 +1327,22 @@ func NewApplyOpenItemRequestWithBody(server string, organizationId OrganizationI
 
 		req.Header.Set("Idempotency-Key", headerParam0)
 
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam1)
+
 	}
 
 	return req, nil
 }
 
 // NewListPeriodsRequest constructs an http.Request for the ListPeriods method
-func NewListPeriodsRequest(server string, organizationId OrganizationId) (*http.Request, error) {
+func NewListPeriodsRequest(server string, organizationId OrganizationId, params *ListPeriodsParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1125,6 +1370,19 @@ func NewListPeriodsRequest(server string, organizationId OrganizationId) (*http.
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam0)
+
 	}
 
 	return req, nil
@@ -1184,6 +1442,15 @@ func NewCreatePeriodRequestWithBody(server string, organizationId OrganizationId
 		}
 
 		req.Header.Set("Idempotency-Key", headerParam0)
+
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam1)
 
 	}
 
@@ -1252,6 +1519,15 @@ func NewTransitionPeriodRequestWithBody(server string, organizationId Organizati
 
 		req.Header.Set("Idempotency-Key", headerParam0)
 
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam1)
+
 	}
 
 	return req, nil
@@ -1311,6 +1587,15 @@ func NewSubmitPostingCommandRequestWithBody(server string, organizationId Organi
 		}
 
 		req.Header.Set("Idempotency-Key", headerParam0)
+
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam1)
 
 	}
 
@@ -1378,6 +1663,19 @@ func NewGetReportRequest(server string, organizationId OrganizationId, report Ge
 		return nil, err
 	}
 
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam0)
+
+	}
+
 	return req, nil
 }
 
@@ -1436,6 +1734,42 @@ func NewReverseJournalEntryRequestWithBody(server string, organizationId Organiz
 
 		req.Header.Set("Idempotency-Key", headerParam0)
 
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam1)
+
+	}
+
+	return req, nil
+}
+
+// NewAccountingMetricsRequest constructs an http.Request for the AccountingMetrics method
+func NewAccountingMetricsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/metrics")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
 	}
 
 	return req, nil
@@ -1519,12 +1853,16 @@ type ClientWithResponsesInterface interface {
 
 	// ProvisionOrganizationWithBodyWithResponse Crea de forma idempotente el schema contable de una organización.
 	//
+	// Endpoint de control plane servido exclusivamente por accounting-admin; no forma parte del runtime contable. Requiere JWT interno con audiencia accounting-provisioning y Cloud Run IAM en despliegues gestionados.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /internal/v1/organizations/{organizationId} (the `ProvisionOrganization` operationId).
 	ProvisionOrganizationWithBodyWithResponse(ctx context.Context, organizationId OrganizationId, params *ProvisionOrganizationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ProvisionOrganizationResponse, error)
 
 	// ProvisionOrganizationWithResponse Crea de forma idempotente el schema contable de una organización.
+	//
+	// Endpoint de control plane servido exclusivamente por accounting-admin; no forma parte del runtime contable. Requiere JWT interno con audiencia accounting-provisioning y Cloud Run IAM en despliegues gestionados.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1534,7 +1872,7 @@ type ClientWithResponsesInterface interface {
 	// ListAccountsWithResponse performs a GET /internal/v1/organizations/{organizationId}/accounts (the `ListAccounts` operationId) request.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	ListAccountsWithResponse(ctx context.Context, organizationId OrganizationId, reqEditors ...RequestEditorFn) (*ListAccountsResponse, error)
+	ListAccountsWithResponse(ctx context.Context, organizationId OrganizationId, params *ListAccountsParams, reqEditors ...RequestEditorFn) (*ListAccountsResponse, error)
 
 	// ReverseOpenItemApplicationWithBodyWithResponse Desaplica de forma inmutable una aplicación antes de revertir su documento.
 	//
@@ -1563,7 +1901,7 @@ type ClientWithResponsesInterface interface {
 	// ListPeriodsWithResponse performs a GET /internal/v1/organizations/{organizationId}/periods (the `ListPeriods` operationId) request.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	ListPeriodsWithResponse(ctx context.Context, organizationId OrganizationId, reqEditors ...RequestEditorFn) (*ListPeriodsResponse, error)
+	ListPeriodsWithResponse(ctx context.Context, organizationId OrganizationId, params *ListPeriodsParams, reqEditors ...RequestEditorFn) (*ListPeriodsResponse, error)
 
 	// CreatePeriodWithBodyWithResponse performs a POST /internal/v1/organizations/{organizationId}/periods (the `CreatePeriod` operationId) request,
 	// with any type of body and a specified content type.
@@ -1614,6 +1952,11 @@ type ClientWithResponsesInterface interface {
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	ReverseJournalEntryWithResponse(ctx context.Context, organizationId OrganizationId, params *ReverseJournalEntryParams, body ReverseJournalEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*ReverseJournalEntryResponse, error)
 
+	// AccountingMetricsWithResponse performs a GET /metrics (the `AccountingMetrics` operationId) request.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	AccountingMetricsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*AccountingMetricsResponse, error)
+
 	// AccountingReadinessWithResponse performs a GET /readyz (the `AccountingReadiness` operationId) request.
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -1623,6 +1966,13 @@ type ClientWithResponsesInterface interface {
 type AccountingHealthResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *HealthStatus
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r AccountingHealthResponse) GetJSON200() *HealthStatus {
+	return r.JSON200
 }
 
 // GetBody returns the raw response body bytes
@@ -1657,13 +2007,62 @@ func (r AccountingHealthResponse) ContentType() string {
 type ProvisionOrganizationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ProvisioningResult
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *ProvisioningResult
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *InvalidRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
 	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
 	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *DomainError
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *InternalError
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *ServiceUnavailable
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ProvisionOrganizationResponse) GetJSON200() *ProvisioningResult {
+	return r.JSON200
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r ProvisionOrganizationResponse) GetJSON201() *ProvisioningResult {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ProvisionOrganizationResponse) GetApplicationproblemJSON400() *InvalidRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ProvisionOrganizationResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
 }
 
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r ProvisionOrganizationResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ProvisionOrganizationResponse) GetApplicationproblemJSON422() *DomainError {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r ProvisionOrganizationResponse) GetApplicationproblemJSON500() *InternalError {
+	return r.ApplicationproblemJSON500
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r ProvisionOrganizationResponse) GetApplicationproblemJSON503() *ServiceUnavailable {
+	return r.ApplicationproblemJSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -1700,11 +2099,39 @@ type ListAccountsResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]Account
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *InternalError
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *ServiceUnavailable
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r ListAccountsResponse) GetJSON200() *[]Account {
 	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListAccountsResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r ListAccountsResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r ListAccountsResponse) GetApplicationproblemJSON500() *InternalError {
+	return r.ApplicationproblemJSON500
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r ListAccountsResponse) GetApplicationproblemJSON503() *ServiceUnavailable {
+	return r.ApplicationproblemJSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -1743,10 +2170,18 @@ type ReverseOpenItemApplicationResponse struct {
 	JSON200 *AccountingEvent
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *AccountingEvent
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *InvalidRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
 	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
 	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *DomainError
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *InternalError
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *ServiceUnavailable
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -1759,6 +2194,16 @@ func (r ReverseOpenItemApplicationResponse) GetJSON201() *AccountingEvent {
 	return r.JSON201
 }
 
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ReverseOpenItemApplicationResponse) GetApplicationproblemJSON400() *InvalidRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ReverseOpenItemApplicationResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r ReverseOpenItemApplicationResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
@@ -1767,6 +2212,16 @@ func (r ReverseOpenItemApplicationResponse) GetApplicationproblemJSON409() *Conf
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
 func (r ReverseOpenItemApplicationResponse) GetApplicationproblemJSON422() *DomainError {
 	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r ReverseOpenItemApplicationResponse) GetApplicationproblemJSON500() *InternalError {
+	return r.ApplicationproblemJSON500
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r ReverseOpenItemApplicationResponse) GetApplicationproblemJSON503() *ServiceUnavailable {
+	return r.ApplicationproblemJSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -1805,8 +2260,18 @@ type ApplyOpenItemResponse struct {
 	JSON200 *AccountingEvent
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *AccountingEvent
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *InvalidRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *DomainError
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *InternalError
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *ServiceUnavailable
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -1819,9 +2284,34 @@ func (r ApplyOpenItemResponse) GetJSON201() *AccountingEvent {
 	return r.JSON201
 }
 
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ApplyOpenItemResponse) GetApplicationproblemJSON400() *InvalidRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ApplyOpenItemResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r ApplyOpenItemResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
 func (r ApplyOpenItemResponse) GetApplicationproblemJSON422() *DomainError {
 	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r ApplyOpenItemResponse) GetApplicationproblemJSON500() *InternalError {
+	return r.ApplicationproblemJSON500
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r ApplyOpenItemResponse) GetApplicationproblemJSON503() *ServiceUnavailable {
+	return r.ApplicationproblemJSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -1858,11 +2348,39 @@ type ListPeriodsResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]Period
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *InternalError
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *ServiceUnavailable
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r ListPeriodsResponse) GetJSON200() *[]Period {
 	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListPeriodsResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r ListPeriodsResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r ListPeriodsResponse) GetApplicationproblemJSON500() *InternalError {
+	return r.ApplicationproblemJSON500
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r ListPeriodsResponse) GetApplicationproblemJSON503() *ServiceUnavailable {
+	return r.ApplicationproblemJSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -1897,13 +2415,62 @@ func (r ListPeriodsResponse) ContentType() string {
 type CreatePeriodResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Period
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *Period
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *InvalidRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *DomainError
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *InternalError
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *ServiceUnavailable
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CreatePeriodResponse) GetJSON200() *Period {
+	return r.JSON200
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
 func (r CreatePeriodResponse) GetJSON201() *Period {
 	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CreatePeriodResponse) GetApplicationproblemJSON400() *InvalidRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreatePeriodResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CreatePeriodResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreatePeriodResponse) GetApplicationproblemJSON422() *DomainError {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r CreatePeriodResponse) GetApplicationproblemJSON500() *InternalError {
+	return r.ApplicationproblemJSON500
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r CreatePeriodResponse) GetApplicationproblemJSON503() *ServiceUnavailable {
+	return r.ApplicationproblemJSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -1940,8 +2507,18 @@ type TransitionPeriodResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *Period
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *InvalidRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *DomainError
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *InternalError
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *ServiceUnavailable
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -1949,9 +2526,34 @@ func (r TransitionPeriodResponse) GetJSON200() *Period {
 	return r.JSON200
 }
 
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r TransitionPeriodResponse) GetApplicationproblemJSON400() *InvalidRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r TransitionPeriodResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r TransitionPeriodResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
 func (r TransitionPeriodResponse) GetApplicationproblemJSON422() *DomainError {
 	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r TransitionPeriodResponse) GetApplicationproblemJSON500() *InternalError {
+	return r.ApplicationproblemJSON500
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r TransitionPeriodResponse) GetApplicationproblemJSON503() *ServiceUnavailable {
+	return r.ApplicationproblemJSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -1990,10 +2592,18 @@ type SubmitPostingCommandResponse struct {
 	JSON200 *AccountingEvent
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *AccountingEvent
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *InvalidRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
 	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
 	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *DomainError
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *InternalError
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *ServiceUnavailable
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -2006,6 +2616,16 @@ func (r SubmitPostingCommandResponse) GetJSON201() *AccountingEvent {
 	return r.JSON201
 }
 
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SubmitPostingCommandResponse) GetApplicationproblemJSON400() *InvalidRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SubmitPostingCommandResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r SubmitPostingCommandResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
@@ -2014,6 +2634,16 @@ func (r SubmitPostingCommandResponse) GetApplicationproblemJSON409() *Conflict {
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
 func (r SubmitPostingCommandResponse) GetApplicationproblemJSON422() *DomainError {
 	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r SubmitPostingCommandResponse) GetApplicationproblemJSON500() *InternalError {
+	return r.ApplicationproblemJSON500
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r SubmitPostingCommandResponse) GetApplicationproblemJSON503() *ServiceUnavailable {
+	return r.ApplicationproblemJSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -2050,11 +2680,53 @@ type GetReportResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *map[string]interface{}
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *InvalidRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *DomainError
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *InternalError
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *ServiceUnavailable
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetReportResponse) GetJSON200() *map[string]interface{} {
 	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetReportResponse) GetApplicationproblemJSON400() *InvalidRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetReportResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r GetReportResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r GetReportResponse) GetApplicationproblemJSON422() *DomainError {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r GetReportResponse) GetApplicationproblemJSON500() *InternalError {
+	return r.ApplicationproblemJSON500
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r GetReportResponse) GetApplicationproblemJSON503() *ServiceUnavailable {
+	return r.ApplicationproblemJSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -2093,8 +2765,18 @@ type ReverseJournalEntryResponse struct {
 	JSON200 *AccountingEvent
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *AccountingEvent
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *InvalidRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *DomainError
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *InternalError
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *ServiceUnavailable
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -2107,9 +2789,34 @@ func (r ReverseJournalEntryResponse) GetJSON201() *AccountingEvent {
 	return r.JSON201
 }
 
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ReverseJournalEntryResponse) GetApplicationproblemJSON400() *InvalidRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ReverseJournalEntryResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r ReverseJournalEntryResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
 func (r ReverseJournalEntryResponse) GetApplicationproblemJSON422() *DomainError {
 	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r ReverseJournalEntryResponse) GetApplicationproblemJSON500() *InternalError {
+	return r.ApplicationproblemJSON500
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r ReverseJournalEntryResponse) GetApplicationproblemJSON503() *ServiceUnavailable {
+	return r.ApplicationproblemJSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -2141,11 +2848,52 @@ func (r ReverseJournalEntryResponse) ContentType() string {
 	return ""
 }
 
+type AccountingMetricsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// GetBody returns the raw response body bytes
+func (r AccountingMetricsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r AccountingMetricsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AccountingMetricsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r AccountingMetricsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type AccountingReadinessResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ReadinessStatus
 	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
 	ApplicationproblemJSON503 *ServiceUnavailable
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r AccountingReadinessResponse) GetJSON200() *ReadinessStatus {
+	return r.JSON200
 }
 
 // GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
@@ -2195,6 +2943,8 @@ func (c *ClientWithResponses) AccountingHealthWithResponse(ctx context.Context, 
 
 // ProvisionOrganizationWithBodyWithResponse Crea de forma idempotente el schema contable de una organización.
 //
+// Endpoint de control plane servido exclusivamente por accounting-admin; no forma parte del runtime contable. Requiere JWT interno con audiencia accounting-provisioning y Cloud Run IAM en despliegues gestionados.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /internal/v1/organizations/{organizationId} (the `ProvisionOrganization` operationId).
@@ -2207,6 +2957,8 @@ func (c *ClientWithResponses) ProvisionOrganizationWithBodyWithResponse(ctx cont
 }
 
 // ProvisionOrganizationWithResponse Crea de forma idempotente el schema contable de una organización.
+//
+// Endpoint de control plane servido exclusivamente por accounting-admin; no forma parte del runtime contable. Requiere JWT interno con audiencia accounting-provisioning y Cloud Run IAM en despliegues gestionados.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2222,8 +2974,8 @@ func (c *ClientWithResponses) ProvisionOrganizationWithResponse(ctx context.Cont
 // ListAccountsWithResponse performs a GET /internal/v1/organizations/{organizationId}/accounts (the `ListAccounts` operationId) request.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) ListAccountsWithResponse(ctx context.Context, organizationId OrganizationId, reqEditors ...RequestEditorFn) (*ListAccountsResponse, error) {
-	rsp, err := c.ListAccounts(ctx, organizationId, reqEditors...)
+func (c *ClientWithResponses) ListAccountsWithResponse(ctx context.Context, organizationId OrganizationId, params *ListAccountsParams, reqEditors ...RequestEditorFn) (*ListAccountsResponse, error) {
+	rsp, err := c.ListAccounts(ctx, organizationId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2281,8 +3033,8 @@ func (c *ClientWithResponses) ApplyOpenItemWithResponse(ctx context.Context, org
 // ListPeriodsWithResponse performs a GET /internal/v1/organizations/{organizationId}/periods (the `ListPeriods` operationId) request.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) ListPeriodsWithResponse(ctx context.Context, organizationId OrganizationId, reqEditors ...RequestEditorFn) (*ListPeriodsResponse, error) {
-	rsp, err := c.ListPeriods(ctx, organizationId, reqEditors...)
+func (c *ClientWithResponses) ListPeriodsWithResponse(ctx context.Context, organizationId OrganizationId, params *ListPeriodsParams, reqEditors ...RequestEditorFn) (*ListPeriodsResponse, error) {
+	rsp, err := c.ListPeriods(ctx, organizationId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2392,6 +3144,17 @@ func (c *ClientWithResponses) ReverseJournalEntryWithResponse(ctx context.Contex
 	return ParseReverseJournalEntryResponse(rsp)
 }
 
+// AccountingMetricsWithResponse performs a GET /metrics (the `AccountingMetrics` operationId) request.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) AccountingMetricsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*AccountingMetricsResponse, error) {
+	rsp, err := c.AccountingMetrics(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAccountingMetricsResponse(rsp)
+}
+
 // AccountingReadinessWithResponse performs a GET /readyz (the `AccountingReadiness` operationId) request.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -2416,6 +3179,16 @@ func ParseAccountingHealthResponse(rsp *http.Response) (*AccountingHealthRespons
 		HTTPResponse: rsp,
 	}
 
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest HealthStatus
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
 	return response, nil
 }
 
@@ -2433,11 +3206,33 @@ func ParseProvisionOrganizationResponse(rsp *http.Response) (*ProvisionOrganizat
 	}
 
 	switch {
-	case rsp.StatusCode == 200:
-		break // No content-type
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ProvisioningResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
-	case rsp.StatusCode == 201:
-		break // No content-type
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest ProvisioningResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest InvalidRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest Conflict
@@ -2445,6 +3240,27 @@ func ParseProvisionOrganizationResponse(rsp *http.Response) (*ProvisionOrganizat
 			return nil, err
 		}
 		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest DomainError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
 
 	}
 
@@ -2471,6 +3287,34 @@ func ParseListAccountsResponse(rsp *http.Response) (*ListAccountsResponse, error
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
 
 	}
 
@@ -2505,6 +3349,20 @@ func ParseReverseOpenItemApplicationResponse(rsp *http.Response) (*ReverseOpenIt
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest InvalidRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest Conflict
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2518,6 +3376,20 @@ func ParseReverseOpenItemApplicationResponse(rsp *http.Response) (*ReverseOpenIt
 			return nil, err
 		}
 		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
 
 	}
 
@@ -2552,12 +3424,47 @@ func ParseApplyOpenItemResponse(rsp *http.Response) (*ApplyOpenItemResponse, err
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest InvalidRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest DomainError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
 
 	}
 
@@ -2585,6 +3492,34 @@ func ParseListPeriodsResponse(rsp *http.Response) (*ListPeriodsResponse, error) 
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
+
 	}
 
 	return response, nil
@@ -2604,12 +3539,61 @@ func ParseCreatePeriodResponse(rsp *http.Response) (*CreatePeriodResponse, error
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Period
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest Period
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest InvalidRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest DomainError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
 
 	}
 
@@ -2637,12 +3621,47 @@ func ParseTransitionPeriodResponse(rsp *http.Response) (*TransitionPeriodRespons
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest InvalidRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest DomainError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
 
 	}
 
@@ -2677,6 +3696,20 @@ func ParseSubmitPostingCommandResponse(rsp *http.Response) (*SubmitPostingComman
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest InvalidRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest Conflict
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2690,6 +3723,20 @@ func ParseSubmitPostingCommandResponse(rsp *http.Response) (*SubmitPostingComman
 			return nil, err
 		}
 		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
 
 	}
 
@@ -2716,6 +3763,48 @@ func ParseGetReportResponse(rsp *http.Response) (*GetReportResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest InvalidRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest DomainError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
 
 	}
 
@@ -2750,6 +3839,27 @@ func ParseReverseJournalEntryResponse(rsp *http.Response) (*ReverseJournalEntryR
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest InvalidRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest DomainError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2757,6 +3867,36 @@ func ParseReverseJournalEntryResponse(rsp *http.Response) (*ReverseJournalEntryR
 		}
 		response.ApplicationproblemJSON422 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseAccountingMetricsResponse parses an HTTP response from a AccountingMetricsWithResponse call
+func ParseAccountingMetricsResponse(rsp *http.Response) (*AccountingMetricsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AccountingMetricsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
 	}
 
 	return response, nil
@@ -2776,8 +3916,12 @@ func ParseAccountingReadinessResponse(rsp *http.Response) (*AccountingReadinessR
 	}
 
 	switch {
-	case rsp.StatusCode == 200:
-		break // No content-type
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ReadinessStatus
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
 		var dest ServiceUnavailable

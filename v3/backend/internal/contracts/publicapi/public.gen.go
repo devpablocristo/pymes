@@ -13,6 +13,162 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AccountingAdjustmentStatus.
+const (
+	AccountingAdjustmentStatusPending      AccountingAdjustmentStatus = "pending"
+	AccountingAdjustmentStatusPeriodLocked AccountingAdjustmentStatus = "period_locked"
+	AccountingAdjustmentStatusPosted       AccountingAdjustmentStatus = "posted"
+)
+
+// Valid indicates whether the value is a known member of the AccountingAdjustmentStatus enum.
+func (e AccountingAdjustmentStatus) Valid() bool {
+	switch e {
+	case AccountingAdjustmentStatusPending:
+		return true
+	case AccountingAdjustmentStatusPeriodLocked:
+		return true
+	case AccountingAdjustmentStatusPosted:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountingFailureFailureCode.
+const (
+	AccountingFailureFailureCodePERIODLOCKED AccountingFailureFailureCode = "PERIOD_LOCKED"
+)
+
+// Valid indicates whether the value is a known member of the AccountingFailureFailureCode enum.
+func (e AccountingFailureFailureCode) Valid() bool {
+	switch e {
+	case AccountingFailureFailureCodePERIODLOCKED:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountingFailureSourceKind.
+const (
+	AccountingFailureSourceKindAccountingApplication AccountingFailureSourceKind = "accounting_application"
+	AccountingFailureSourceKindAccountingReversal    AccountingFailureSourceKind = "accounting_reversal"
+	AccountingFailureSourceKindPayment               AccountingFailureSourceKind = "payment"
+	AccountingFailureSourceKindPurchase              AccountingFailureSourceKind = "purchase"
+	AccountingFailureSourceKindSale                  AccountingFailureSourceKind = "sale"
+)
+
+// Valid indicates whether the value is a known member of the AccountingFailureSourceKind enum.
+func (e AccountingFailureSourceKind) Valid() bool {
+	switch e {
+	case AccountingFailureSourceKindAccountingApplication:
+		return true
+	case AccountingFailureSourceKindAccountingReversal:
+		return true
+	case AccountingFailureSourceKindPayment:
+		return true
+	case AccountingFailureSourceKindPurchase:
+		return true
+	case AccountingFailureSourceKindSale:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountingFailureStatus.
+const (
+	AdjustmentPending  AccountingFailureStatus = "adjustment_pending"
+	AwaitingAdjustment AccountingFailureStatus = "awaiting_adjustment"
+	Resolved           AccountingFailureStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the AccountingFailureStatus enum.
+func (e AccountingFailureStatus) Valid() bool {
+	switch e {
+	case AdjustmentPending:
+		return true
+	case AwaitingAdjustment:
+		return true
+	case Resolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountingFailureRefCode.
+const (
+	AccountingFailureRefCodePERIODLOCKED AccountingFailureRefCode = "PERIOD_LOCKED"
+)
+
+// Valid indicates whether the value is a known member of the AccountingFailureRefCode enum.
+func (e AccountingFailureRefCode) Valid() bool {
+	switch e {
+	case AccountingFailureRefCodePERIODLOCKED:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ErrorCode.
+const (
+	ErrorCodeACCOUNTINGADJUSTMENTNOTALLOWED ErrorCode = "ACCOUNTING_ADJUSTMENT_NOT_ALLOWED"
+	ErrorCodeAUTHNOTCONFIGURED              ErrorCode = "AUTH_NOT_CONFIGURED"
+	ErrorCodeCOMMANDREJECTED                ErrorCode = "COMMAND_REJECTED"
+	ErrorCodeDOCUMENTNOTREVERSIBLE          ErrorCode = "DOCUMENT_NOT_REVERSIBLE"
+	ErrorCodeFORBIDDEN                      ErrorCode = "FORBIDDEN"
+	ErrorCodeIDEMPOTENCYKEYREQUIRED         ErrorCode = "IDEMPOTENCY_KEY_REQUIRED"
+	ErrorCodeIDEMPOTENCYKEYREUSED           ErrorCode = "IDEMPOTENCY_KEY_REUSED"
+	ErrorCodeINVALIDAPPLICATIONDOCUMENT     ErrorCode = "INVALID_APPLICATION_DOCUMENT"
+	ErrorCodeINVALIDSOURCEDOCUMENT          ErrorCode = "INVALID_SOURCE_DOCUMENT"
+	ErrorCodeNOTFOUND                       ErrorCode = "NOT_FOUND"
+	ErrorCodeOPENITEMAMOUNTEXCEEDED         ErrorCode = "OPEN_ITEM_AMOUNT_EXCEEDED"
+	ErrorCodeORGNOTPROVISIONED              ErrorCode = "ORG_NOT_PROVISIONED"
+	ErrorCodePERIODLOCKED                   ErrorCode = "PERIOD_LOCKED"
+	ErrorCodeSOURCEVERSIONREQUIRED          ErrorCode = "SOURCE_VERSION_REQUIRED"
+	ErrorCodeVALIDATIONERROR                ErrorCode = "VALIDATION_ERROR"
+)
+
+// Valid indicates whether the value is a known member of the ErrorCode enum.
+func (e ErrorCode) Valid() bool {
+	switch e {
+	case ErrorCodeACCOUNTINGADJUSTMENTNOTALLOWED:
+		return true
+	case ErrorCodeAUTHNOTCONFIGURED:
+		return true
+	case ErrorCodeCOMMANDREJECTED:
+		return true
+	case ErrorCodeDOCUMENTNOTREVERSIBLE:
+		return true
+	case ErrorCodeFORBIDDEN:
+		return true
+	case ErrorCodeIDEMPOTENCYKEYREQUIRED:
+		return true
+	case ErrorCodeIDEMPOTENCYKEYREUSED:
+		return true
+	case ErrorCodeINVALIDAPPLICATIONDOCUMENT:
+		return true
+	case ErrorCodeINVALIDSOURCEDOCUMENT:
+		return true
+	case ErrorCodeNOTFOUND:
+		return true
+	case ErrorCodeOPENITEMAMOUNTEXCEEDED:
+		return true
+	case ErrorCodeORGNOTPROVISIONED:
+		return true
+	case ErrorCodePERIODLOCKED:
+		return true
+	case ErrorCodeSOURCEVERSIONREQUIRED:
+		return true
+	case ErrorCodeVALIDATIONERROR:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PartyKind.
 const (
 	PartyKindBoth     PartyKind = "both"
@@ -75,14 +231,20 @@ func (e PaymentDirection) Valid() bool {
 
 // Defines values for PaymentStatus.
 const (
-	PaymentStatusConfirmed PaymentStatus = "confirmed"
-	PaymentStatusPosted    PaymentStatus = "posted"
-	PaymentStatusReversed  PaymentStatus = "reversed"
+	PaymentStatusAccountingAdjustmentPending  PaymentStatus = "accounting_adjustment_pending"
+	PaymentStatusAccountingAdjustmentRequired PaymentStatus = "accounting_adjustment_required"
+	PaymentStatusConfirmed                    PaymentStatus = "confirmed"
+	PaymentStatusPosted                       PaymentStatus = "posted"
+	PaymentStatusReversed                     PaymentStatus = "reversed"
 )
 
 // Valid indicates whether the value is a known member of the PaymentStatus enum.
 func (e PaymentStatus) Valid() bool {
 	switch e {
+	case PaymentStatusAccountingAdjustmentPending:
+		return true
+	case PaymentStatusAccountingAdjustmentRequired:
+		return true
 	case PaymentStatusConfirmed:
 		return true
 	case PaymentStatusPosted:
@@ -132,16 +294,22 @@ func (e PaymentInputDirection) Valid() bool {
 
 // Defines values for PurchaseStatus.
 const (
-	PurchaseStatusConfirmed     PurchaseStatus = "confirmed"
-	PurchaseStatusPaid          PurchaseStatus = "paid"
-	PurchaseStatusPartiallyPaid PurchaseStatus = "partially_paid"
-	PurchaseStatusPosted        PurchaseStatus = "posted"
-	PurchaseStatusReversed      PurchaseStatus = "reversed"
+	PurchaseStatusAccountingAdjustmentPending  PurchaseStatus = "accounting_adjustment_pending"
+	PurchaseStatusAccountingAdjustmentRequired PurchaseStatus = "accounting_adjustment_required"
+	PurchaseStatusConfirmed                    PurchaseStatus = "confirmed"
+	PurchaseStatusPaid                         PurchaseStatus = "paid"
+	PurchaseStatusPartiallyPaid                PurchaseStatus = "partially_paid"
+	PurchaseStatusPosted                       PurchaseStatus = "posted"
+	PurchaseStatusReversed                     PurchaseStatus = "reversed"
 )
 
 // Valid indicates whether the value is a known member of the PurchaseStatus enum.
 func (e PurchaseStatus) Valid() bool {
 	switch e {
+	case PurchaseStatusAccountingAdjustmentPending:
+		return true
+	case PurchaseStatusAccountingAdjustmentRequired:
+		return true
 	case PurchaseStatusConfirmed:
 		return true
 	case PurchaseStatusPaid:
@@ -177,13 +345,19 @@ func (e ReversalDocumentKind) Valid() bool {
 
 // Defines values for ReversalStatus.
 const (
-	ReversalStatusRequested ReversalStatus = "requested"
-	ReversalStatusReversed  ReversalStatus = "reversed"
+	ReversalStatusAccountingAdjustmentPending  ReversalStatus = "accounting_adjustment_pending"
+	ReversalStatusAccountingAdjustmentRequired ReversalStatus = "accounting_adjustment_required"
+	ReversalStatusRequested                    ReversalStatus = "requested"
+	ReversalStatusReversed                     ReversalStatus = "reversed"
 )
 
 // Valid indicates whether the value is a known member of the ReversalStatus enum.
 func (e ReversalStatus) Valid() bool {
 	switch e {
+	case ReversalStatusAccountingAdjustmentPending:
+		return true
+	case ReversalStatusAccountingAdjustmentRequired:
+		return true
 	case ReversalStatusRequested:
 		return true
 	case ReversalStatusReversed:
@@ -231,19 +405,25 @@ func (e SaleFiscalEnvironment) Valid() bool {
 
 // Defines values for SaleStatus.
 const (
-	SaleStatusAuthorizedPendingPosting SaleStatus = "authorized_pending_posting"
-	SaleStatusFiscalPending            SaleStatus = "fiscal_pending"
-	SaleStatusFiscalRejected           SaleStatus = "fiscal_rejected"
-	SaleStatusFiscalUncertain          SaleStatus = "fiscal_uncertain"
-	SaleStatusPaid                     SaleStatus = "paid"
-	SaleStatusPartiallyPaid            SaleStatus = "partially_paid"
-	SaleStatusPosted                   SaleStatus = "posted"
-	SaleStatusReversed                 SaleStatus = "reversed"
+	SaleStatusAccountingAdjustmentPending  SaleStatus = "accounting_adjustment_pending"
+	SaleStatusAccountingAdjustmentRequired SaleStatus = "accounting_adjustment_required"
+	SaleStatusAuthorizedPendingPosting     SaleStatus = "authorized_pending_posting"
+	SaleStatusFiscalPending                SaleStatus = "fiscal_pending"
+	SaleStatusFiscalRejected               SaleStatus = "fiscal_rejected"
+	SaleStatusFiscalUncertain              SaleStatus = "fiscal_uncertain"
+	SaleStatusPaid                         SaleStatus = "paid"
+	SaleStatusPartiallyPaid                SaleStatus = "partially_paid"
+	SaleStatusPosted                       SaleStatus = "posted"
+	SaleStatusReversed                     SaleStatus = "reversed"
 )
 
 // Valid indicates whether the value is a known member of the SaleStatus enum.
 func (e SaleStatus) Valid() bool {
 	switch e {
+	case SaleStatusAccountingAdjustmentPending:
+		return true
+	case SaleStatusAccountingAdjustmentRequired:
+		return true
 	case SaleStatusAuthorizedPendingPosting:
 		return true
 	case SaleStatusFiscalPending:
@@ -361,11 +541,125 @@ func (e SaleInputFiscalEnvironment) Valid() bool {
 	}
 }
 
+// Defines values for VatBreakdownItemRate.
+const (
+	N0   VatBreakdownItemRate = "0"
+	N105 VatBreakdownItemRate = "10.5"
+	N21  VatBreakdownItemRate = "21"
+	N25  VatBreakdownItemRate = "2.5"
+	N27  VatBreakdownItemRate = "27"
+	N5   VatBreakdownItemRate = "5"
+)
+
+// Valid indicates whether the value is a known member of the VatBreakdownItemRate enum.
+func (e VatBreakdownItemRate) Valid() bool {
+	switch e {
+	case N0:
+		return true
+	case N105:
+		return true
+	case N21:
+		return true
+	case N25:
+		return true
+	case N27:
+		return true
+	case N5:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetReadyz503JSONResponseBodyStatus.
+const (
+	NotReady GetReadyz503JSONResponseBodyStatus = "not_ready"
+)
+
+// Valid indicates whether the value is a known member of the GetReadyz503JSONResponseBodyStatus enum.
+func (e GetReadyz503JSONResponseBodyStatus) Valid() bool {
+	switch e {
+	case NotReady:
+		return true
+	default:
+		return false
+	}
+}
+
+// AccountingAdjustment defines model for AccountingAdjustment.
+type AccountingAdjustment struct {
+	CorrelationId string    `json:"correlation_id"`
+	CreatedAt     time.Time `json:"created_at"`
+
+	// EffectiveAt Fecha elegida por owner/admin dentro de un período contable abierto.
+	EffectiveAt    time.Time                  `json:"effective_at"`
+	FailureId      openapi_types.UUID         `json:"failure_id"`
+	Id             string                     `json:"id"`
+	OrganizationId string                     `json:"organization_id"`
+	Reason         string                     `json:"reason"`
+	Status         AccountingAdjustmentStatus `json:"status"`
+	UpdatedAt      time.Time                  `json:"updated_at"`
+}
+
+// AccountingAdjustmentStatus defines model for AccountingAdjustment.Status.
+type AccountingAdjustmentStatus string
+
+// AccountingAdjustmentInput defines model for AccountingAdjustmentInput.
+type AccountingAdjustmentInput struct {
+	// EffectiveAt Fecha elegida por owner/admin dentro de un período contable abierto.
+	EffectiveAt time.Time `json:"effective_at"`
+	Id          string    `json:"id"`
+	Reason      string    `json:"reason"`
+}
+
+// AccountingFailure defines model for AccountingFailure.
+type AccountingFailure struct {
+	CorrelationId     string                       `json:"correlation_id"`
+	CreatedAt         time.Time                    `json:"created_at"`
+	FailedEffectiveAt time.Time                    `json:"failed_effective_at"`
+	FailureCode       AccountingFailureFailureCode `json:"failure_code"`
+	Id                openapi_types.UUID           `json:"id"`
+	OrganizationId    string                       `json:"organization_id"`
+	SourceId          string                       `json:"source_id"`
+	SourceKind        AccountingFailureSourceKind  `json:"source_kind"`
+	Status            AccountingFailureStatus      `json:"status"`
+	UpdatedAt         time.Time                    `json:"updated_at"`
+}
+
+// AccountingFailureFailureCode defines model for AccountingFailure.FailureCode.
+type AccountingFailureFailureCode string
+
+// AccountingFailureSourceKind defines model for AccountingFailure.SourceKind.
+type AccountingFailureSourceKind string
+
+// AccountingFailureStatus defines model for AccountingFailure.Status.
+type AccountingFailureStatus string
+
+// AccountingFailureRef defines model for AccountingFailureRef.
+type AccountingFailureRef struct {
+	Code AccountingFailureRefCode `json:"code"`
+	Id   openapi_types.UUID       `json:"id"`
+}
+
+// AccountingFailureRefCode defines model for AccountingFailureRef.Code.
+type AccountingFailureRefCode string
+
+// Error defines model for Error.
+type Error struct {
+	Code ErrorCode `json:"code"`
+}
+
+// ErrorCode defines model for Error.Code.
+type ErrorCode string
+
 // Money defines model for Money.
 type Money struct {
 	Amount   string `json:"amount"`
 	Currency string `json:"currency"`
 }
+
+// NonNegativeDecimal Decimal base diez exacto, sin exponente ni JSON number.
+type NonNegativeDecimal = string
 
 // Party defines model for Party.
 type Party struct {
@@ -392,14 +686,15 @@ type PartyInputKind string
 
 // Payment defines model for Payment.
 type Payment struct {
-	Direction      PaymentDirection `json:"direction"`
-	Id             string           `json:"id"`
-	JournalEntryId *string          `json:"journal_entry_id,omitempty"`
-	OpenItemId     *string          `json:"open_item_id,omitempty"`
-	OrganizationId string           `json:"organization_id"`
-	PartyRef       string           `json:"party_ref"`
-	Status         PaymentStatus    `json:"status"`
-	Total          Money            `json:"total"`
+	AccountingFailure *AccountingFailureRef `json:"accounting_failure,omitempty"`
+	Direction         PaymentDirection      `json:"direction"`
+	Id                string                `json:"id"`
+	JournalEntryId    *string               `json:"journal_entry_id,omitempty"`
+	OpenItemId        *string               `json:"open_item_id,omitempty"`
+	OrganizationId    string                `json:"organization_id"`
+	PartyRef          string                `json:"party_ref"`
+	Status            PaymentStatus         `json:"status"`
+	Total             Money                 `json:"total"`
 }
 
 // PaymentDirection defines model for Payment.Direction.
@@ -429,42 +724,74 @@ type PaymentInputApplicationsDocumentKind string
 // PaymentInputDirection defines model for PaymentInput.Direction.
 type PaymentInputDirection string
 
-// Purchase defines model for Purchase.
+// PositiveDecimal Decimal base diez exacto estrictamente mayor que cero.
+type PositiveDecimal = string
+
+// Purchase total conserva el importe y moneda originales. exchange_rate es obligatorio cuando total.currency no es ARS.
 type Purchase struct {
-	ExternalDocumentRef string         `json:"external_document_ref"`
-	Id                  string         `json:"id"`
-	JournalEntryId      *string        `json:"journal_entry_id,omitempty"`
-	OpenItemId          *string        `json:"open_item_id,omitempty"`
-	OrganizationId      string         `json:"organization_id"`
-	SnapshotDigest      string         `json:"snapshot_digest"`
-	Status              PurchaseStatus `json:"status"`
-	SupplierRef         string         `json:"supplier_ref"`
-	Total               Money          `json:"total"`
+	AccountingFailure *AccountingFailureRef `json:"accounting_failure,omitempty"`
+
+	// ExchangeRate Decimal base diez exacto estrictamente mayor que cero.
+	ExchangeRate *PositiveDecimal `json:"exchange_rate,omitempty"`
+
+	// ExemptAmount Decimal base diez exacto, sin exponente ni JSON number.
+	ExemptAmount        NonNegativeDecimal `json:"exempt_amount"`
+	ExternalDocumentRef string             `json:"external_document_ref"`
+	Id                  string             `json:"id"`
+
+	// IssueDate Fecha contable persistida del comprobante.
+	IssueDate      openapi_types.Date `json:"issue_date"`
+	JournalEntryId *string            `json:"journal_entry_id,omitempty"`
+
+	// NetAmount Decimal base diez exacto, sin exponente ni JSON number.
+	NetAmount      NonNegativeDecimal `json:"net_amount"`
+	OpenItemId     *string            `json:"open_item_id,omitempty"`
+	OrganizationId string             `json:"organization_id"`
+	SnapshotDigest string             `json:"snapshot_digest"`
+	Status         PurchaseStatus     `json:"status"`
+	SupplierRef    string             `json:"supplier_ref"`
+	Total          Money              `json:"total"`
+	VatBreakdown   []VatBreakdownItem `json:"vat_breakdown"`
 }
 
 // PurchaseStatus defines model for Purchase.Status.
 type PurchaseStatus string
 
-// PurchaseInput defines model for PurchaseInput.
+// PurchaseInput amount es el total del comprobante. Debe ser igual a net_amount + exempt_amount + la suma de vat_breakdown.tax_amount. exchange_rate es obligatorio y debe ser mayor que cero cuando currency no es ARS.
 type PurchaseInput struct {
-	Amount              string `json:"amount"`
-	Currency            string `json:"currency"`
-	ExternalDocumentRef string `json:"external_document_ref"`
-	Id                  string `json:"id"`
-	SupplierRef         string `json:"supplier_ref"`
+	// Amount Decimal base diez exacto, sin exponente ni JSON number.
+	Amount   NonNegativeDecimal `json:"amount"`
+	Currency string             `json:"currency"`
+
+	// ExchangeRate Decimal base diez exacto estrictamente mayor que cero.
+	ExchangeRate *PositiveDecimal `json:"exchange_rate,omitempty"`
+
+	// ExemptAmount Decimal base diez exacto, sin exponente ni JSON number.
+	ExemptAmount        NonNegativeDecimal `json:"exempt_amount"`
+	ExternalDocumentRef string             `json:"external_document_ref"`
+	Id                  string             `json:"id"`
+
+	// IssueDate Fecha contable del comprobante; determina el período del asiento.
+	IssueDate openapi_types.Date `json:"issue_date"`
+
+	// NetAmount Decimal base diez exacto, sin exponente ni JSON number.
+	NetAmount    NonNegativeDecimal `json:"net_amount"`
+	SupplierRef  string             `json:"supplier_ref"`
+	VatBreakdown []VatBreakdownItem `json:"vat_breakdown"`
 }
 
 // Reversal defines model for Reversal.
 type Reversal struct {
-	DocumentId             string               `json:"document_id"`
-	DocumentKind           ReversalDocumentKind `json:"document_kind"`
-	EffectiveAt            time.Time            `json:"effective_at"`
-	Id                     string               `json:"id"`
-	OrganizationId         string               `json:"organization_id"`
-	OriginalJournalEntryId string               `json:"original_journal_entry_id"`
-	Reason                 string               `json:"reason"`
-	ReversalJournalEntryId *string              `json:"reversal_journal_entry_id,omitempty"`
-	Status                 ReversalStatus       `json:"status"`
+	AccountingFailure      *AccountingFailureRef `json:"accounting_failure,omitempty"`
+	DocumentId             string                `json:"document_id"`
+	DocumentKind           ReversalDocumentKind  `json:"document_kind"`
+	EffectiveAt            time.Time             `json:"effective_at"`
+	Id                     string                `json:"id"`
+	OrganizationId         string                `json:"organization_id"`
+	OriginalJournalEntryId string                `json:"original_journal_entry_id"`
+	Reason                 string                `json:"reason"`
+	ReversalJournalEntryId *string               `json:"reversal_journal_entry_id,omitempty"`
+	Status                 ReversalStatus        `json:"status"`
 }
 
 // ReversalDocumentKind defines model for Reversal.DocumentKind.
@@ -487,6 +814,7 @@ type ReversalInputDocumentKind string
 
 // Sale defines model for Sale.
 type Sale struct {
+	AccountingFailure *AccountingFailureRef `json:"accounting_failure,omitempty"`
 	Cae               *string               `json:"cae,omitempty"`
 	FiscalEnvironment SaleFiscalEnvironment `json:"fiscal_environment"`
 	Id                string                `json:"id"`
@@ -523,6 +851,9 @@ type SaleInput struct {
 	Currency      string                `json:"currency"`
 	DocumentType  SaleInputDocumentType `json:"document_type"`
 
+	// ExchangeRate Obligatorio para USD/EUR; cotización contra ARS con hasta seis decimales.
+	ExchangeRate *PositiveDecimal `json:"exchange_rate,omitempty"`
+
 	// Fiscal Snapshot fiscal inmutable; Pymes agrega identidad, numeración y digest antes de llamar al adaptador.
 	Fiscal struct {
 		Environment SaleInputFiscalEnvironment `json:"environment"`
@@ -545,8 +876,107 @@ type SaleInputDocumentType string
 // SaleInputFiscalEnvironment defines model for SaleInput.Fiscal.Environment.
 type SaleInputFiscalEnvironment string
 
+// VatBreakdownItem defines model for VatBreakdownItem.
+type VatBreakdownItem struct {
+	// BaseAmount Decimal base diez exacto, sin exponente ni JSON number.
+	BaseAmount NonNegativeDecimal `json:"base_amount"`
+
+	// Rate Alícuota IVA expresada como string exacta.
+	Rate VatBreakdownItemRate `json:"rate"`
+
+	// TaxAmount Decimal base diez exacto, sin exponente ni JSON number.
+	TaxAmount NonNegativeDecimal `json:"tax_amount"`
+}
+
+// VatBreakdownItemRate Alícuota IVA expresada como string exacta.
+type VatBreakdownItemRate string
+
+// IdempotencyKey defines model for IdempotencyKey.
+type IdempotencyKey = string
+
 // OrganizationId defines model for OrganizationId.
 type OrganizationId = string
+
+// SourceVersion defines model for SourceVersion.
+type SourceVersion = int
+
+// AuthUnavailable defines model for AuthUnavailable.
+type AuthUnavailable = Error
+
+// DomainError defines model for DomainError.
+type DomainError = Error
+
+// Forbidden defines model for Forbidden.
+type Forbidden = Error
+
+// IdempotencyConflict defines model for IdempotencyConflict.
+type IdempotencyConflict = Error
+
+// InvalidCommand defines model for InvalidCommand.
+type InvalidCommand = Error
+
+// NotFound defines model for NotFound.
+type NotFound = Error
+
+// CreateAccountingAdjustmentParams defines parameters for CreateAccountingAdjustment.
+type CreateAccountingAdjustmentParams struct {
+	// IdempotencyKey Clave pública estable. Queda vinculada a organización, operación, source ID y source version.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XSourceVersion Versión positiva del snapshot de origen incluida en la identidad idempotente.
+	XSourceVersion SourceVersion `json:"X-Source-Version"`
+}
+
+// CreatePartyParams defines parameters for CreateParty.
+type CreatePartyParams struct {
+	// IdempotencyKey Clave pública estable. Queda vinculada a organización, operación, source ID y source version.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XSourceVersion Versión positiva del snapshot de origen incluida en la identidad idempotente.
+	XSourceVersion SourceVersion `json:"X-Source-Version"`
+}
+
+// CreatePaymentParams defines parameters for CreatePayment.
+type CreatePaymentParams struct {
+	// IdempotencyKey Clave pública estable. Queda vinculada a organización, operación, source ID y source version.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XSourceVersion Versión positiva del snapshot de origen incluida en la identidad idempotente.
+	XSourceVersion SourceVersion `json:"X-Source-Version"`
+}
+
+// CreatePurchaseParams defines parameters for CreatePurchase.
+type CreatePurchaseParams struct {
+	// IdempotencyKey Clave pública estable. Queda vinculada a organización, operación, source ID y source version.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XSourceVersion Versión positiva del snapshot de origen incluida en la identidad idempotente.
+	XSourceVersion SourceVersion `json:"X-Source-Version"`
+}
+
+// CreateAccountingReversalParams defines parameters for CreateAccountingReversal.
+type CreateAccountingReversalParams struct {
+	// IdempotencyKey Clave pública estable. Queda vinculada a organización, operación, source ID y source version.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XSourceVersion Versión positiva del snapshot de origen incluida en la identidad idempotente.
+	XSourceVersion SourceVersion `json:"X-Source-Version"`
+}
+
+// CreateSaleParams defines parameters for CreateSale.
+type CreateSaleParams struct {
+	// IdempotencyKey Clave pública estable. Queda vinculada a organización, operación, source ID y source version.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XSourceVersion Versión positiva del snapshot de origen incluida en la identidad idempotente.
+	XSourceVersion SourceVersion `json:"X-Source-Version"`
+}
+
+// GetReadyz503JSONResponseBodyStatus defines parameters for GetReadyz.
+type GetReadyz503JSONResponseBodyStatus string
+
+// CreateAccountingAdjustmentJSONRequestBody defines body for CreateAccountingAdjustment for application/json ContentType.
+type CreateAccountingAdjustmentJSONRequestBody = AccountingAdjustmentInput
 
 // CreatePartyJSONRequestBody defines body for CreateParty for application/json ContentType.
 type CreatePartyJSONRequestBody = PartyInput
@@ -565,30 +995,36 @@ type CreateSaleJSONRequestBody = SaleInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// GetAccountingFailure Consulta un PERIOD_LOCKED recuperable de la organización.
+	// (GET /api/v1/organizations/{organizationId}/accounting-failures/{failureId})
+	GetAccountingFailure(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, failureId openapi_types.UUID)
+	// CreateAccountingAdjustment Solicita explícitamente contabilizar en un período abierto autorizado.
+	// (POST /api/v1/organizations/{organizationId}/accounting-failures/{failureId}/adjustments)
+	CreateAccountingAdjustment(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, failureId openapi_types.UUID, params CreateAccountingAdjustmentParams)
 
 	// (POST /api/v1/organizations/{organizationId}/parties)
-	CreateParty(w http.ResponseWriter, r *http.Request, organizationId OrganizationId)
+	CreateParty(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, params CreatePartyParams)
 
 	// (GET /api/v1/organizations/{organizationId}/parties/{partyId})
 	GetParty(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, partyId string)
 
 	// (POST /api/v1/organizations/{organizationId}/payments)
-	CreatePayment(w http.ResponseWriter, r *http.Request, organizationId OrganizationId)
+	CreatePayment(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, params CreatePaymentParams)
 
 	// (GET /api/v1/organizations/{organizationId}/payments/{paymentId})
 	GetPayment(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, paymentId string)
 
 	// (POST /api/v1/organizations/{organizationId}/purchases)
-	CreatePurchase(w http.ResponseWriter, r *http.Request, organizationId OrganizationId)
+	CreatePurchase(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, params CreatePurchaseParams)
 
 	// (GET /api/v1/organizations/{organizationId}/purchases/{purchaseId})
 	GetPurchase(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, purchaseId string)
 
 	// (POST /api/v1/organizations/{organizationId}/reversals)
-	CreateAccountingReversal(w http.ResponseWriter, r *http.Request, organizationId OrganizationId)
+	CreateAccountingReversal(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, params CreateAccountingReversalParams)
 
 	// (POST /api/v1/organizations/{organizationId}/sales)
-	CreateSale(w http.ResponseWriter, r *http.Request, organizationId OrganizationId)
+	CreateSale(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, params CreateSaleParams)
 
 	// (GET /api/v1/organizations/{organizationId}/sales/{saleId})
 	GetSale(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, saleId string)
@@ -604,8 +1040,20 @@ type ServerInterface interface {
 
 type Unimplemented struct{}
 
+// GetAccountingFailure Consulta un PERIOD_LOCKED recuperable de la organización.
+// (GET /api/v1/organizations/{organizationId}/accounting-failures/{failureId})
+func (_ Unimplemented) GetAccountingFailure(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, failureId openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateAccountingAdjustment Solicita explícitamente contabilizar en un período abierto autorizado.
+// (POST /api/v1/organizations/{organizationId}/accounting-failures/{failureId}/adjustments)
+func (_ Unimplemented) CreateAccountingAdjustment(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, failureId openapi_types.UUID, params CreateAccountingAdjustmentParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (POST /api/v1/organizations/{organizationId}/parties)
-func (_ Unimplemented) CreateParty(w http.ResponseWriter, r *http.Request, organizationId OrganizationId) {
+func (_ Unimplemented) CreateParty(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, params CreatePartyParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -615,7 +1063,7 @@ func (_ Unimplemented) GetParty(w http.ResponseWriter, r *http.Request, organiza
 }
 
 // (POST /api/v1/organizations/{organizationId}/payments)
-func (_ Unimplemented) CreatePayment(w http.ResponseWriter, r *http.Request, organizationId OrganizationId) {
+func (_ Unimplemented) CreatePayment(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, params CreatePaymentParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -625,7 +1073,7 @@ func (_ Unimplemented) GetPayment(w http.ResponseWriter, r *http.Request, organi
 }
 
 // (POST /api/v1/organizations/{organizationId}/purchases)
-func (_ Unimplemented) CreatePurchase(w http.ResponseWriter, r *http.Request, organizationId OrganizationId) {
+func (_ Unimplemented) CreatePurchase(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, params CreatePurchaseParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -635,12 +1083,12 @@ func (_ Unimplemented) GetPurchase(w http.ResponseWriter, r *http.Request, organ
 }
 
 // (POST /api/v1/organizations/{organizationId}/reversals)
-func (_ Unimplemented) CreateAccountingReversal(w http.ResponseWriter, r *http.Request, organizationId OrganizationId) {
+func (_ Unimplemented) CreateAccountingReversal(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, params CreateAccountingReversalParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // (POST /api/v1/organizations/{organizationId}/sales)
-func (_ Unimplemented) CreateSale(w http.ResponseWriter, r *http.Request, organizationId OrganizationId) {
+func (_ Unimplemented) CreateSale(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, params CreateSaleParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -668,6 +1116,127 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
+// GetAccountingFailure operation middleware
+func (siw *ServerInterfaceWrapper) GetAccountingFailure(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "organizationId" -------------
+	var organizationId OrganizationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "organizationId", chi.URLParam(r, "organizationId"), &organizationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "organizationId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "failureId" -------------
+	var failureId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "failureId", chi.URLParam(r, "failureId"), &failureId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "failureId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAccountingFailure(w, r, organizationId, failureId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAccountingAdjustment operation middleware
+func (siw *ServerInterfaceWrapper) CreateAccountingAdjustment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "organizationId" -------------
+	var organizationId OrganizationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "organizationId", chi.URLParam(r, "organizationId"), &organizationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "organizationId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "failureId" -------------
+	var failureId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "failureId", chi.URLParam(r, "failureId"), &failureId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "failureId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAccountingAdjustmentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "X-Source-Version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Source-Version")]; found {
+		var XSourceVersion SourceVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Source-Version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Source-Version", valueList[0], &XSourceVersion, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Source-Version", Err: err})
+			return
+		}
+
+		params.XSourceVersion = XSourceVersion
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Source-Version is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Source-Version", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAccountingAdjustment(w, r, organizationId, failureId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateParty operation middleware
 func (siw *ServerInterfaceWrapper) CreateParty(w http.ResponseWriter, r *http.Request) {
 
@@ -683,8 +1252,59 @@ func (siw *ServerInterfaceWrapper) CreateParty(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreatePartyParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "X-Source-Version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Source-Version")]; found {
+		var XSourceVersion SourceVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Source-Version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Source-Version", valueList[0], &XSourceVersion, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Source-Version", Err: err})
+			return
+		}
+
+		params.XSourceVersion = XSourceVersion
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Source-Version is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Source-Version", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateParty(w, r, organizationId)
+		siw.Handler.CreateParty(w, r, organizationId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -744,8 +1364,59 @@ func (siw *ServerInterfaceWrapper) CreatePayment(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreatePaymentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "X-Source-Version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Source-Version")]; found {
+		var XSourceVersion SourceVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Source-Version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Source-Version", valueList[0], &XSourceVersion, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Source-Version", Err: err})
+			return
+		}
+
+		params.XSourceVersion = XSourceVersion
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Source-Version is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Source-Version", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreatePayment(w, r, organizationId)
+		siw.Handler.CreatePayment(w, r, organizationId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -805,8 +1476,59 @@ func (siw *ServerInterfaceWrapper) CreatePurchase(w http.ResponseWriter, r *http
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreatePurchaseParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "X-Source-Version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Source-Version")]; found {
+		var XSourceVersion SourceVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Source-Version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Source-Version", valueList[0], &XSourceVersion, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Source-Version", Err: err})
+			return
+		}
+
+		params.XSourceVersion = XSourceVersion
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Source-Version is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Source-Version", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreatePurchase(w, r, organizationId)
+		siw.Handler.CreatePurchase(w, r, organizationId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -866,8 +1588,59 @@ func (siw *ServerInterfaceWrapper) CreateAccountingReversal(w http.ResponseWrite
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAccountingReversalParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "X-Source-Version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Source-Version")]; found {
+		var XSourceVersion SourceVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Source-Version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Source-Version", valueList[0], &XSourceVersion, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Source-Version", Err: err})
+			return
+		}
+
+		params.XSourceVersion = XSourceVersion
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Source-Version is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Source-Version", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateAccountingReversal(w, r, organizationId)
+		siw.Handler.CreateAccountingReversal(w, r, organizationId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -892,8 +1665,59 @@ func (siw *ServerInterfaceWrapper) CreateSale(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateSaleParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "X-Source-Version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Source-Version")]; found {
+		var XSourceVersion SourceVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Source-Version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Source-Version", valueList[0], &XSourceVersion, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Source-Version", Err: err})
+			return
+		}
+
+		params.XSourceVersion = XSourceVersion
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Source-Version is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Source-Version", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateSale(w, r, organizationId)
+		siw.Handler.CreateSale(w, r, organizationId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1108,6 +1932,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/organizations/{organizationId}/reversals", wrapper.CreateAccountingReversal)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/organizations/{organizationId}/accounting-failures/{failureId}", wrapper.GetAccountingFailure)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/organizations/{organizationId}/accounting-failures/{failureId}/adjustments", wrapper.CreateAccountingAdjustment)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/organizations/{organizationId}/sales/{saleId}", wrapper.GetSale)

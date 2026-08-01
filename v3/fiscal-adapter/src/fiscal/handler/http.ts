@@ -37,10 +37,18 @@ export function createFiscalHTTPServer(application: FiscalApplication, authorize
       }
     }
 
-    const correlationId = header(request, "x-correlation-id") ?? header(request, "idempotency-key") ?? "missing-correlation-id";
+    const correlationHeader = header(request, "x-correlation-id");
+    const correlationId = correlationHeader ?? header(request, "idempotency-key") ?? "missing-correlation-id";
     if (request.method === "GET" && request.url === "/internal/v1/catalogs/document-types") {
       try {
-        await authorizer.authorize(header(request, "authorization"), "fiscal");
+        if (correlationHeader === undefined) throw new FiscalError("VALIDATION_ERROR");
+        const identity = await authorizer.authorize(
+          header(request, "authorization"),
+          "fiscal",
+          undefined,
+          correlationHeader,
+        );
+        if (identity.correlationId !== correlationHeader) throw new FiscalError("UNAUTHORIZED_SERVICE");
         return respond(response, 200, documentTypes.map((code) => ({
           code,
           letter: code.at(-1),
@@ -57,10 +65,16 @@ export function createFiscalHTTPServer(application: FiscalApplication, authorize
     try {
       const organizationId = decodeURIComponent(match[1]);
       const requestId = match[2] === undefined ? undefined : decodeURIComponent(match[2]);
-      await authorizer.authorize(header(request, "authorization"), "fiscal", organizationId);
       const idempotencyKey = header(request, "idempotency-key");
-      if (idempotencyKey === undefined) throw new FiscalError("VALIDATION_ERROR");
-      const context = { idempotencyKey, correlationId };
+      if (idempotencyKey === undefined || correlationHeader === undefined) throw new FiscalError("VALIDATION_ERROR");
+      const identity = await authorizer.authorize(
+        header(request, "authorization"),
+        "fiscal",
+        organizationId,
+        correlationHeader,
+      );
+      if (identity.correlationId !== correlationHeader) throw new FiscalError("UNAUTHORIZED_SERVICE");
+      const context = { idempotencyKey, correlationId: correlationHeader, identity };
       const fiscalRequest = await readJSON<FiscalRequest>(request, requestId !== undefined);
       if (fiscalRequest !== undefined && fiscalRequest.organization_id !== organizationId) throw new FiscalError("VALIDATION_ERROR");
 

@@ -61,7 +61,9 @@ v3/fiscal-adapter/
 
 open-accounting/internal/
 ├── pymesaccounting/             # dominio, puertos, casos de uso y HTTP privado
-└── database/pymesaccounting/    # adapters PostgreSQL y registro de tenants
+├── database/pymesaccounting/    # adapters PostgreSQL runtime y registro read-only
+├── database/pymesaccountingadmin/ # DDL/provisionamiento fuera del runtime
+└── pymesaccountingadminhttp/    # control plane privado, JWT + Cloud Run IAM
 ```
 
 Los handlers dependen de puertos de casos de uso, los casos de uso de puertos
@@ -78,8 +80,12 @@ flowchart TB
     api --> pgbff[(Pymes PostgreSQL)]
     workers --> fiscal[Servicio Fiscal]
     workers --> accounting[Servicio Accounting]
+    provision[Job provision-org] --> accountingadmin[Accounting admin]
+    workers --> identitykms[Cloud KMS\nfirma Ed25519 interna]
+    provision --> identitykms
     accounting --> pgacc[(PostgreSQL Accounting\nschema por org)]
-    fiscal -. fase ARCA .-> kms[KMS / secret manager]
+    accountingadmin --> pgacc
+    fiscal -. fase ARCA .-> fiscalkms[KMS / secret manager fiscal]
   end
   browser[Browser] --> api
   clerk[Clerk] --> api
@@ -90,12 +96,16 @@ flowchart TB
 Cada base se respalda, migra y restaura de forma independiente. Accounting sólo
 es alcanzable desde workers/API de la red privada; Fiscal es el único workload
 que puede resolver una `credential_ref` y conectar con ARCA.
+`internal-jwt-signing` no es un servicio ni una clave ARCA: firma identidad
+workload→workload ahora. El material fiscal futuro tendrá otro ciclo de vida y
+seguirá siendo accesible sólo por Fiscal.
 
 ## Bounded contexts y fuente única de verdad
 
 | Contexto / entidad | Dueño | Fuente de verdad | Consumidor |
 |---|---|---|---|
 | Identidad, roles, organización, membresía | Pymes v3 + Clerk | directorio v3 / Clerk | ambos servicios por claim firmado |
+| Clave privada de identidad interna | Pymes v3 worker | Cloud KMS Ed25519 por entorno y versión | Fiscal/Accounting reciben sólo JWKS |
 | Parties, clientes, proveedores | Pymes v3 | Pymes DB | contabilidad mediante snapshot/ref. |
 | Venta, compra, notas A/B/C, adjuntos | Pymes v3 | Pymes DB | fiscal y contabilidad |
 | Reserva de punto de venta/tipo/número; estado fiscal; CAE | Pymes v3 | Pymes DB | adaptador fiscal ejecuta, no decide |
@@ -108,6 +118,13 @@ que puede resolver una `credential_ref` y conectar con ARCA.
 Una cuenta comercial nunca se muta en Accounting DB, y un asiento nunca se
 edita en Pymes DB. Correcciones se representan con documentos/órdenes de
 reversa nuevos.
+
+En el borde público, Clerk verifica la sesión y Pymes resuelve una membresía
+local activa antes de autorizar. El principal resultante conserva organización,
+actor, rol, permisos y estados. `owner`/`admin` pueden mutar únicamente una
+organización `ready`; `member`/`viewer` sólo pueden leer. La persistencia repite
+el control `ready` dentro de la transacción tenant para evitar que otro adapter
+o una carrera de estado eludan el BFF.
 
 ## Estados
 
@@ -170,20 +187,25 @@ tokens, certificados ni datos personales innecesarios.
 
 ## Credencial interna
 
-JWT Ed25519 de servicio de vida máxima 5 minutos, firmado por el IAM de v3. El
-entorno local inyecta una clave pública fija; producción debe publicar el mismo
-material como JWKS rotado y aplicar mTLS en la malla/ingress privado. Claims:
+JWT Ed25519 de servicio de vida máxima 5 minutos. Desarrollo usa una semilla
+fija local; producción rechaza esa variable y firma con una versión numérica
+explícita de Cloud KMS `EC_SIGN_ED25519`. El arranque comprueba CRC32C, algoritmo,
+nombre, clave pública y una firma de desafío. El `kid` es el hash estable de la
+clave pública y el JWKS puede contener la clave activa más las anteriores
+durante la ventana de rotación. Cloud Run IAM protege además el transporte
+privado. Claims:
 
 ```json
-{"iss":"pymes-v3","aud":"accounting|fiscal","sub":"worker:fiscal",
- "org_id":"org_…","actor_id":"usr_…","roles":["fiscal:issue"],
- "request_id":"req_…","jti":"…","iat":0,"exp":0,"kid":"…"}
+{"iss":"pymes-v3","aud":"accounting|fiscal","sub":"worker:outbox",
+ "org_id":"org_…","actor_id":"usr_…","delegated_actor_id":"usr_…",
+ "roles":["service"],"request_id":"req_…","correlation_id":"corr_…",
+ "jti":"…","iat":0,"exp":0,"kid":"ed25519-…"}
 ```
 
 El `org_id` es obligatorio y se compara con el path y el payload. La identidad
-del usuario es trazabilidad, no autorización delegada: las políticas admitidas
-son de servicio y de organización. mTLS entre workloads complementa, no
-reemplaza, el JWT.
+del usuario propagada desde el principal local aporta trazabilidad; no cambia
+el subject de workload y nunca cruza organización. Dentro de los servicios
+privados la autorización sigue siendo de workload y organización.
 
 ## Eventos y errores comunes
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	clerk "github.com/devpablocristo/platform/sdks/clerk/go"
+	identitydomain "github.com/devpablocristo/pymes/v3/backend/internal/identity/domain"
 	"github.com/devpablocristo/pymes/v3/backend/internal/identity/usecases"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,30 +19,45 @@ type Postgres struct{ pool *pgxpool.Pool }
 
 func New(pool *pgxpool.Pool) *Postgres { return &Postgres{pool: pool} }
 
-func (r *Postgres) ResolveClerkMembership(ctx context.Context, clerkOrganizationID, clerkUserID string) (string, error) {
+func (r *Postgres) ResolveClerkMembership(ctx context.Context, clerkOrganizationID, clerkUserID string) (identitydomain.Principal, error) {
 	if clerkOrganizationID == "" || clerkUserID == "" {
-		return "", fmt.Errorf("organization membership is required")
+		return identitydomain.Principal{}, fmt.Errorf("organization membership is required")
 	}
 	var organizationID string
 	if err := r.pool.QueryRow(ctx, `SELECT org_id FROM app.organization_identities WHERE provider='clerk' AND provider_organization_id=$1`, clerkOrganizationID).Scan(&organizationID); err != nil {
-		return "", fmt.Errorf("resolve clerk organization: %w", err)
+		return identitydomain.Principal{}, fmt.Errorf("resolve clerk organization: %w", err)
 	}
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return "", err
+		return identitydomain.Principal{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err = tx.Exec(ctx, "SELECT set_config('app.org_id',$1,true)", organizationID); err != nil {
-		return "", err
+		return identitydomain.Principal{}, err
 	}
-	var active bool
-	if err = tx.QueryRow(ctx, `SELECT status='active' FROM app.memberships WHERE org_id=$1 AND provider='clerk' AND provider_user_id=$2`, organizationID, clerkUserID).Scan(&active); err != nil || !active {
-		return "", fmt.Errorf("resolve clerk membership: %w", err)
+	principal := identitydomain.Principal{OrganizationID: organizationID, ActorID: clerkUserID}
+	var role, permissionsJSON string
+	if err = tx.QueryRow(ctx, `
+		SELECT m.role,m.permissions::text,m.status,o.status
+		FROM app.memberships m
+		JOIN app.organizations o ON o.id=m.org_id
+		WHERE m.org_id=$1 AND m.provider='clerk' AND m.provider_user_id=$2`,
+		organizationID, clerkUserID).Scan(
+		&role, &permissionsJSON, &principal.MembershipStatus, &principal.OrganizationStatus,
+	); err != nil {
+		return identitydomain.Principal{}, fmt.Errorf("resolve clerk membership: %w", err)
+	}
+	if principal.MembershipStatus != "active" {
+		return identitydomain.Principal{}, fmt.Errorf("resolve clerk membership: inactive")
+	}
+	principal.Role = identitydomain.Role(role)
+	if err = json.Unmarshal([]byte(permissionsJSON), &principal.Permissions); err != nil {
+		return identitydomain.Principal{}, fmt.Errorf("resolve clerk permissions: %w", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
-		return "", err
+		return identitydomain.Principal{}, err
 	}
-	return organizationID, nil
+	return principal, nil
 }
 
 func (r *Postgres) Receive(ctx context.Context, event usecases.Event) (bool, error) {

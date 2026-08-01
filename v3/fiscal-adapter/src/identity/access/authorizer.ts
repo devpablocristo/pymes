@@ -7,6 +7,7 @@ export class InsecureLocalAuthorizer implements InternalAuthorizer {
     _authorization: string | undefined,
     audience: "fiscal",
     expectedOrganizationId?: string,
+    expectedCorrelationId?: string,
   ): Promise<InternalIdentity> {
     if (audience !== "fiscal") throw new Error("UNAUTHORIZED_SERVICE");
     return {
@@ -15,6 +16,7 @@ export class InsecureLocalAuthorizer implements InternalAuthorizer {
       organizationId: expectedOrganizationId ?? "catalog",
       roles: ["service"],
       requestId: "insecure-local",
+      correlationId: expectedCorrelationId ?? "insecure-local",
       tokenId: "insecure-local",
     };
   }

@@ -1,29 +1,36 @@
 FROM golang:1.26.5 AS build
 WORKDIR /src/backend
-COPY backend/go.mod ./
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ ./
 RUN CGO_ENABLED=0 go build -o /out/api ./cmd/api && \
     CGO_ENABLED=0 go build -o /out/worker ./cmd/worker && \
+    CGO_ENABLED=0 go build -o /out/migrate ./cmd/migrate && \
     CGO_ENABLED=0 go build -o /out/provision-org ./cmd/provision-org && \
     CGO_ENABLED=0 go build -o /out/fake-service ./cmd/fake-service && \
     CGO_ENABLED=0 go build -o /out/healthcheck ./cmd/healthcheck
 
-FROM gcr.io/distroless/static-debian12 AS api
+FROM gcr.io/distroless/static-debian12:nonroot AS api
 COPY --from=build /out/api /api
 COPY --from=build /out/healthcheck /healthcheck
 ENTRYPOINT ["/api"]
 
-FROM gcr.io/distroless/static-debian12 AS worker
+FROM gcr.io/distroless/static-debian12:nonroot AS worker
 COPY --from=build /out/worker /worker
 COPY --from=build /out/healthcheck /healthcheck
 ENTRYPOINT ["/worker"]
 
-FROM gcr.io/distroless/static-debian12 AS provision-org
+FROM gcr.io/distroless/static-debian12:nonroot AS migrate
+COPY --from=build /out/migrate /migrate
+COPY db/migrations /migrations
+ENV PYMES_MIGRATIONS_DIR=/migrations
+ENTRYPOINT ["/migrate"]
+
+FROM gcr.io/distroless/static-debian12:nonroot AS provision-org
 COPY --from=build /out/provision-org /provision-org
 ENTRYPOINT ["/provision-org"]
 
-FROM gcr.io/distroless/static-debian12 AS fake-service
+FROM gcr.io/distroless/static-debian12:nonroot AS fake-service
 COPY --from=build /out/fake-service /fake-service
 COPY --from=build /out/healthcheck /healthcheck
 ENTRYPOINT ["/fake-service"]
@@ -48,3 +55,8 @@ COPY --from=fiscal-build --chown=node:node /src/fiscal-adapter/dist ./dist
 COPY --from=fiscal-deps --chown=node:node /src/fiscal-adapter/node_modules ./node_modules
 COPY --from=fiscal-deps --chown=node:node /src/fiscal-adapter/package.json ./package.json
 ENTRYPOINT ["node", "dist/src/cmd/api.js"]
+
+FROM postgres:16-alpine AS fiscal-migrate
+COPY fiscal-adapter/migrations /migrations
+USER postgres
+ENTRYPOINT ["sh", "-ec", "for file in /migrations/*.sql; do psql \"$FISCAL_DATABASE_URL\" -v ON_ERROR_STOP=1 -f \"$file\"; done"]

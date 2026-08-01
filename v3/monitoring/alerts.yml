@@ -1,0 +1,45 @@
+groups:
+  - name: pymes-v3-delivery
+    rules:
+      - alert: PymesWorkerMetricsAbsent
+        expr: absent(pymes_outbox_pending)
+        for: 3m
+        labels:
+          severity: page
+        annotations:
+          summary: "Pymes v3 worker metrics heartbeat is absent"
+      - alert: PymesOutboxBacklog
+        expr: pymes_outbox_pending > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pymes v3 outbox has remained non-empty"
+      - alert: PymesOutboxDeadLetters
+        expr: pymes_outbox_dead_letters > 0
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Pymes v3 has delivery commands in the dead-letter queue"
+      - alert: PymesOutboxOldestEvent
+        expr: pymes_outbox_oldest_age_seconds > 300
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pymes v3 outbox has an event older than five minutes"
+      - alert: PymesFiscalUncertain
+        expr: pymes_fiscal_uncertain > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pymes v3 needs fiscal reconciliation"
+      - alert: PymesDependencyCircuitOpen
+        expr: pymes_dependency_circuit_open > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "A private Pymes v3 dependency circuit is open"

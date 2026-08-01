@@ -15,21 +15,47 @@ paths:
       security: []
       operationId: accountingHealth
       responses:
-        '200': { description: Process healthy }
+        '200':
+          description: Process healthy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthStatus' }
   /readyz:
     get:
       security: []
       operationId: accountingReadiness
       responses:
-        '200': { description: PostgreSQL ready }
+        '200':
+          description: PostgreSQL ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReadinessStatus' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /metrics:
+    get:
+      security: []
+      operationId: accountingMetrics
+      responses:
+        '200':
+          description: Métricas Prometheus del servicio contable.
+          content:
+            text/plain:
+              schema: { type: string }
   /internal/v1/organizations/{organizationId}:
     put:
       operationId: provisionOrganization
       summary: Crea de forma idempotente el schema contable de una organización.
+      description: >-
+        Endpoint de control plane servido exclusivamente por accounting-admin;
+        no forma parte del runtime contable. Requiere JWT interno con audiencia
+        accounting-provisioning y Cloud Run IAM en despliegues gestionados.
+      x-internal-audience: accounting-provisioning
       parameters:
         - $ref: '#/components/parameters/OrganizationId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/PayloadDigest'
       requestBody:
         required: true
         content:
@@ -41,9 +67,14 @@ paths:
                 organization_id: { type: string }
                 display_name: { type: string }
       responses:
-        '201': { description: Schema provisionado }
-        '200': { description: Provisionamiento ya completado }
+        '201': { description: Schema provisionado, content: { application/json: { schema: { $ref: '#/components/schemas/ProvisioningResult' } } } }
+        '200': { description: Provisionamiento ya completado, content: { application/json: { schema: { $ref: '#/components/schemas/ProvisioningResult' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /internal/v1/organizations/{organizationId}/posting-commands:
     post:
       operationId: submitPostingCommand
@@ -51,6 +82,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content:
@@ -59,55 +91,54 @@ paths:
       responses:
         '201': { description: Posteado, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
         '200': { description: Duplicado semánticamente idéntico, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/DomainError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /internal/v1/organizations/{organizationId}/reversals:
     post:
       operationId: reverseJournalEntry
       parameters:
         - $ref: '#/components/parameters/OrganizationId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [command_id, original_journal_entry_id, effective_at, reason]
-              properties:
-                command_id: { $ref: '#/components/schemas/UUID' }
-                original_journal_entry_id: { $ref: '#/components/schemas/UUID' }
-                effective_at: { type: string, format: date-time }
-                reason: { type: string, minLength: 1, maxLength: 500 }
-                source_document_ref: { $ref: '#/components/schemas/SourceRef' }
+            schema: { $ref: '#/components/schemas/ReversalCommand' }
       responses:
         '201': { description: Reversa creada, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
         '200': { description: Duplicado, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/DomainError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /internal/v1/organizations/{organizationId}/open-item-applications:
     post:
       operationId: applyOpenItem
       parameters:
         - $ref: '#/components/parameters/OrganizationId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [command_id, debit_open_item_id, credit_open_item_id, amount, applied_at]
-              properties:
-                command_id: { $ref: '#/components/schemas/UUID' }
-                debit_open_item_id: { $ref: '#/components/schemas/UUID' }
-                credit_open_item_id: { $ref: '#/components/schemas/UUID' }
-                amount: { $ref: '#/components/schemas/Money' }
-                applied_at: { type: string, format: date-time }
-                source_document_ref: { $ref: '#/components/schemas/SourceRef' }
+            schema: { $ref: '#/components/schemas/OpenItemApplicationCommand' }
       responses:
         '201': { description: Aplicación creada, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
         '200': { description: Duplicado, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/DomainError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /internal/v1/organizations/{organizationId}/open-item-application-reversals:
     post:
       operationId: reverseOpenItemApplication
@@ -115,47 +146,65 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [command_id, application_id, reversed_at, reason]
-              properties:
-                command_id: { $ref: '#/components/schemas/UUID' }
-                application_id: { $ref: '#/components/schemas/UUID' }
-                reversed_at: { type: string, format: date-time }
-                reason: { type: string, minLength: 1, maxLength: 500 }
+            schema: { $ref: '#/components/schemas/OpenItemApplicationReversalCommand' }
       responses:
         '201': { description: Aplicación revertida, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
         '200': { description: Duplicado, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingEvent' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/DomainError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /internal/v1/organizations/{organizationId}/accounts:
     get:
       operationId: listAccounts
-      parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - { $ref: '#/components/parameters/CorrelationId' }
       responses:
         '200':
           description: Plan de cuentas activo.
           content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Account' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /internal/v1/organizations/{organizationId}/periods:
     get:
       operationId: listPeriods
-      parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - { $ref: '#/components/parameters/CorrelationId' }
       responses:
         '200': { description: Períodos del ejercicio, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Period' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     post:
       operationId: createPeriod
       parameters:
         - $ref: '#/components/parameters/OrganizationId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/PeriodInput' } } }
       responses:
         '201': { description: Período abierto, content: { application/json: { schema: { $ref: '#/components/schemas/Period' } } } }
+        '200': { description: Período ya creado por un comando idéntico, content: { application/json: { schema: { $ref: '#/components/schemas/Period' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /internal/v1/organizations/{organizationId}/periods/{periodId}/transitions:
     post:
       operationId: transitionPeriod
@@ -166,6 +215,7 @@ paths:
           required: true
           schema: { type: string, format: uuid }
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content:
@@ -176,7 +226,12 @@ paths:
               properties: { target_status: { type: string, enum: [soft_closed, locked] } }
       responses:
         '200': { description: Período actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/Period' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/DomainError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /internal/v1/organizations/{organizationId}/reports/{report}:
     get:
       operationId: getReport
@@ -190,15 +245,26 @@ paths:
           in: query
           required: true
           schema: { type: string, format: date }
+        - $ref: '#/components/parameters/CorrelationId'
       responses:
         '200': { description: Reporte versionado, content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 components:
   securitySchemes:
     internalBearer:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT de servicio corto, con aud=accounting y org_id coincidente.
+      description: >-
+        JWT Ed25519 de servicio de hasta cinco minutos. El header JOSE exige
+        alg=EdDSA y kid presente en el JWKS activo; iss, aud, org_id, iat, exp,
+        jti y request_id son obligatorios. aud=accounting en runtime y
+        aud=accounting-provisioning en el control plane.
   parameters:
     OrganizationId:
       name: organizationId
@@ -210,9 +276,29 @@ components:
       in: header
       required: true
       schema: { type: string, minLength: 16, maxLength: 128 }
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: true
+      description: Identificador estable propagado de extremo a extremo.
+      schema: { type: string, minLength: 1, maxLength: 255 }
+    RequestId:
+      name: X-Request-ID
+      in: header
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 255 }
+    PayloadDigest:
+      name: X-Payload-Digest
+      in: header
+      required: true
+      description: SHA-256 hexadecimal minúsculo del JSON canónico exacto.
+      schema: { type: string, pattern: '^[0-9a-f]{64}$' }
   responses:
+    InvalidRequest:
+      description: JSON, parámetros o metadatos de comando inválidos.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Error' } } }
     Conflict:
-      description: La clave existe con distinto payload o la fuente ya fue posteada.
+      description: La clave idempotente existe con distinto payload o la organización no está provisionada.
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/Error' } } }
     DomainError:
       description: Regla contable inválida o período bloqueado.
@@ -223,15 +309,39 @@ components:
     ServiceUnavailable:
       description: Dependencia durable no disponible.
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/Error' } } }
+    InternalError:
+      description: Fallo interno no atribuible al comando.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Error' } } }
   schemas:
+    HealthStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, const: ok }
+    ReadinessStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, const: ready }
+    ProvisioningResult:
+      type: object
+      additionalProperties: false
+      required: [organization_id, status]
+      properties:
+        organization_id: { type: string }
+        status: { type: string, const: ready }
     UUID: { type: string, format: uuid }
     InternalCredential:
       type: object
-      description: Claims verificadas del JWT de servicio; el token no se envía en JSON.
-      required: [iss, aud, sub, org_id, request_id, jti, iat, exp]
+      description: >-
+        Identidad verificada del JWT de servicio; el token no se envía en JSON.
+        kid proviene del header JOSE protegido y selecciona una clave del JWKS.
+      required: [iss, aud, sub, org_id, roles, request_id, jti, iat, exp, kid]
       properties:
         iss: { type: string, const: pymes-v3 }
-        aud: { type: string, const: accounting }
+        aud: { type: string, enum: [accounting, accounting-provisioning] }
         sub: { type: string, example: 'worker:accounting-posting' }
         org_id: { type: string }
         actor_id: { type: string, description: Sólo trazabilidad. }
@@ -240,7 +350,7 @@ components:
         jti: { type: string }
         iat: { type: integer }
         exp: { type: integer }
-        kid: { type: string }
+        kid: { type: string, description: Identificador del header JOSE protegido. }
     Decimal:
       type: string
       pattern: '^-?[0-9]+(\\.[0-9]+)?$'
@@ -271,13 +381,93 @@ components:
         memo: { type: string, maxLength: 500 }
         open_item: { type: boolean, default: false }
         party_ref: { type: string, description: Referencia opaca de Pymes }
-    PostingCommand:
+    ReversalCommand:
       type: object
-      required: [command_id, organization_id, source, effective_at, description, lines]
+      required: [command_id, organization_id, idempotency_key, correlation_id, source_version, snapshot_digest, original_journal_entry_id, effective_at, reason]
       properties:
         command_id: { $ref: '#/components/schemas/UUID' }
         organization_id: { type: string }
+        idempotency_key: { type: string, minLength: 16, maxLength: 128 }
+        correlation_id: { type: string, minLength: 1, maxLength: 255 }
+        source_version: { type: integer, minimum: 1 }
+        snapshot_digest:
+          type: string
+          pattern: '^[A-Fa-f0-9]{64}$'
+          description: Hash SHA-256 hexadecimal del comando fuente congelado.
+        original_journal_entry_id: { $ref: '#/components/schemas/UUID' }
+        effective_at: { type: string, format: date-time }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+        source_document_ref: { $ref: '#/components/schemas/SourceRef' }
+    OpenItemApplicationCommand:
+      type: object
+      required: [command_id, organization_id, idempotency_key, correlation_id, source_version, snapshot_digest, debit_open_item_id, credit_open_item_id, amount, applied_at]
+      properties:
+        command_id: { $ref: '#/components/schemas/UUID' }
+        organization_id: { type: string }
+        idempotency_key: { type: string, minLength: 16, maxLength: 128 }
+        correlation_id: { type: string, minLength: 1, maxLength: 255 }
+        source_version: { type: integer, minimum: 1 }
+        snapshot_digest:
+          type: string
+          pattern: '^[A-Fa-f0-9]{64}$'
+          description: Hash SHA-256 hexadecimal de la aplicación fuente congelada.
+        debit_open_item_id: { $ref: '#/components/schemas/UUID' }
+        credit_open_item_id: { $ref: '#/components/schemas/UUID' }
+        amount: { $ref: '#/components/schemas/Money' }
+        applied_at: { type: string, format: date-time }
+        source_document_ref: { $ref: '#/components/schemas/SourceRef' }
+    OpenItemApplicationReversalCommand:
+      type: object
+      required: [command_id, organization_id, idempotency_key, correlation_id, source_version, snapshot_digest, application_id, reversed_at, reason]
+      properties:
+        command_id: { $ref: '#/components/schemas/UUID' }
+        organization_id: { type: string }
+        idempotency_key: { type: string, minLength: 16, maxLength: 128 }
+        correlation_id: { type: string, minLength: 1, maxLength: 255 }
+        source_version: { type: integer, minimum: 1 }
+        snapshot_digest:
+          type: string
+          pattern: '^[A-Fa-f0-9]{64}$'
+          description: Hash SHA-256 hexadecimal de la reversa fuente congelada.
+        application_id: { $ref: '#/components/schemas/UUID' }
+        reversed_at: { type: string, format: date-time }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    PostingCommand:
+      type: object
+      description: >-
+        idempotency_key y correlation_id deben coincidir con sus headers.
+        source_version y snapshot_digest deben coincidir con source.version y
+        source.digest; el servicio rechaza cualquier divergencia.
+      required:
+        - command_id
+        - organization_id
+        - idempotency_key
+        - correlation_id
+        - source_version
+        - snapshot_digest
+        - source
+        - effective_at
+        - description
+        - lines
+      properties:
+        command_id: { $ref: '#/components/schemas/UUID' }
+        organization_id: { type: string }
+        idempotency_key: { type: string, minLength: 16, maxLength: 128 }
+        correlation_id: { type: string, minLength: 1, maxLength: 255 }
+        source_version: { type: integer, minimum: 1 }
+        snapshot_digest:
+          type: string
+          pattern: '^[A-Fa-f0-9]{64}$'
+          description: Hash SHA-256 hexadecimal del snapshot fuente congelado.
         source: { $ref: '#/components/schemas/SourceRef' }
+        related_source:
+          allOf:
+            - { $ref: '#/components/schemas/SourceRef' }
+          description: Documento original asociado a una nota de crédito o débito.
+        original_journal_entry_id:
+          type: string
+          minLength: 1
+          description: Asiento del documento original; vínculo auditable, no una orden de reversa.
         effective_at: { type: string, format: date-time }
         description: { type: string, minLength: 1, maxLength: 500 }
         journal: { type: string, default: general }
@@ -288,11 +478,27 @@ components:
           items: { $ref: '#/components/schemas/PostingLine' }
     AccountingEvent:
       type: object
-      required: [event_id, command_id, status, organization_id, occurred_at]
+      required:
+        - event_id
+        - command_id
+        - organization_id
+        - idempotency_key
+        - correlation_id
+        - source_version
+        - snapshot_digest
+        - status
+        - occurred_at
       properties:
         event_id: { $ref: '#/components/schemas/UUID' }
         command_id: { $ref: '#/components/schemas/UUID' }
         organization_id: { type: string }
+        idempotency_key: { type: string, minLength: 16, maxLength: 128 }
+        correlation_id: { type: string, minLength: 1, maxLength: 255 }
+        source_version: { type: integer, minimum: 1 }
+        snapshot_digest:
+          type: string
+          pattern: '^[A-Fa-f0-9]{64}$'
+          description: Hash SHA-256 hexadecimal del snapshot procesado.
         status: { type: string, enum: [posted, duplicate, rejected, reversed, applied] }
         journal_entry_id: { $ref: '#/components/schemas/UUID' }
         open_item_ids:
@@ -301,7 +507,6 @@ components:
         application_id: { $ref: '#/components/schemas/UUID' }
         source: { $ref: '#/components/schemas/SourceRef' }
         occurred_at: { type: string, format: date-time }
-        correlation_id: { type: string }
     Account:
       type: object
       required: [code, name, active]
@@ -328,7 +533,7 @@ components:
       type: object
       required: [code, title, correlation_id]
       properties:
-        code: { type: string, enum: [ORG_NOT_PROVISIONED, UNAUTHORIZED_SERVICE, IDEMPOTENCY_KEY_REUSED, UNBALANCED_POSTING, ACCOUNT_INACTIVE, PERIOD_LOCKED, PERIOD_OVERLAP, SOURCE_ALREADY_POSTED, OPEN_ITEM_NOT_FOUND, OPEN_ITEM_CURRENCY_MISMATCH, OPEN_ITEM_AMOUNT_EXCEEDED, VALIDATION_ERROR, SERVICE_UNAVAILABLE, INTERNAL_ERROR] }
+        code: { type: string, enum: [ORG_NOT_PROVISIONED, UNAUTHORIZED_SERVICE, IDEMPOTENCY_KEY_REUSED, UNBALANCED_POSTING, ACCOUNT_INACTIVE, PERIOD_LOCKED, PERIOD_OVERLAP, OPEN_ITEM_NOT_FOUND, OPEN_ITEM_CURRENCY_MISMATCH, OPEN_ITEM_AMOUNT_EXCEEDED, VALIDATION_ERROR, SERVICE_UNAVAILABLE, INTERNAL_ERROR] }
         title: { type: string }
         detail: { type: string }
         correlation_id: { type: string }

@@ -10,11 +10,21 @@ Sólo existe el modo `mock`; no hay dependencia, import ni conexión ARCA. El
 proceso falla al iniciar si no se seleccionan explícitamente:
 
 ```sh
-FISCAL_ADAPTER_MODE=mock FISCAL_ALLOW_INSECURE_LOCAL=true npm start
+PYMES_ENVIRONMENT=development \
+FISCAL_ADAPTER_MODE=mock \
+FISCAL_ALLOW_INSECURE_LOCAL=true \
+npm start
 ```
 
 `FISCAL_MOCK_SCENARIO` admite `authorized`, `rejected`,
 `timeout_before_processing` y `response_lost_after_processing`.
+
+El modo autenticado exige `PYMES_INTERNAL_ISSUER` y
+`PYMES_INTERNAL_JWKS_JSON`. El JWKS usa claves públicas `OKP`/`Ed25519`,
+`alg=EdDSA`, un `kid` único y puede contener la clave anterior y la siguiente
+durante una rotación. `FISCAL_ALLOW_INSECURE_LOCAL` y la compatibilidad con
+`PYMES_INTERNAL_PUBLIC_KEY_B64` requieren opt-in y
+`PYMES_ENVIRONMENT=development|test`; ambas fallan en producción.
 
 ## Arquitectura
 

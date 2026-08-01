@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/devpablocristo/pymes/v3/backend/internal/observability"
 )
 
 var ErrCircuitOpen = errors.New("dependency circuit is open")
@@ -30,7 +32,7 @@ func NewServiceHTTPClient() *ServiceHTTPClient {
 	}
 	return &ServiceHTTPClient{client: &http.Client{
 		Timeout:   10 * time.Second,
-		Transport: breaker,
+		Transport: observability.Transport(breaker),
 	}, breaker: breaker}
 }
 

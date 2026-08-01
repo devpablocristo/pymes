@@ -2,7 +2,7 @@
 
 | Etapa | Estado | Evidencia / próximo alcance |
 |---|---|---|
-| 0. Fundaciones | completa | Hexagonal, CI, Clerk, RLS, provisionamiento, JWT Ed25519, outbox, métricas y contratos generados. KMS fiscal pertenece a la fase ARCA diferida. |
+| 0. Fundaciones | completa en código | Hexagonal, CI, Clerk, RLS, provisionamiento, JWT Ed25519 con signer Cloud KMS productivo, outbox, métricas y contratos generados. Aplicar KMS interno es una tarea operativa; KMS fiscal pertenece a ARCA diferida. |
 | 1. Núcleo contable | completa | Binario OA headless, schema explícito, decimal exacto, períodos, posteos, reversas, partidas, aplicaciones y reportes. |
 | 2. Fiscal mock | completa | PostgreSQL durable; A/B/C, NC/ND, IVA, moneda extranjera, timeout, respuesta perdida y consulta exacta. |
 | 2. Fiscal ARCA real | diferida por decisión explícita | WSAA/WSFEv1, certificados/KMS, homologación y SDK publicado. |

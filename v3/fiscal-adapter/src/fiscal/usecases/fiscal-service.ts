@@ -6,11 +6,13 @@ import {
   type FiscalResult,
 } from "../domain/fiscal.js";
 import type { AuthorityDecision, FiscalAuthority } from "../ports/authority.js";
-import type { FiscalLedger, FiscalRecord } from "../ports/ledger.js";
+import type { InternalIdentity } from "../ports/internal-authorizer.js";
+import type { FiscalAuditMetadata, FiscalLedger, FiscalRecord } from "../ports/ledger.js";
 
 export interface RequestContext {
   idempotencyKey: string;
   correlationId: string;
+  identity: InternalIdentity;
 }
 
 export class FiscalService {
@@ -22,14 +24,21 @@ export class FiscalService {
 
   async authorize(request: FiscalRequest, context: RequestContext): Promise<FiscalResult> {
     validateRequest(request);
-    validateContext(context);
+    validateContext(context, request.organization_id);
+    validateMetadata(request, context);
     const payloadHash = hashPayload(request);
     const existing = await this.findExisting(request, context.idempotencyKey, payloadHash);
     if (existing !== undefined) return structuredClone(existing.result);
 
     const decision = await this.authority.authorize(structuredClone(request));
-    const result = this.toResult(request, decision, context.correlationId);
-    await this.ledger.save({ idempotencyKey: context.idempotencyKey, payloadHash, request: structuredClone(request), result });
+    const result = this.toResult(request, decision, context);
+    await this.ledger.save({
+      idempotencyKey: context.idempotencyKey,
+      payloadHash,
+      audit: auditMetadata(context.identity),
+      request: structuredClone(request),
+      result,
+    });
     return structuredClone(result);
   }
 
@@ -39,23 +48,25 @@ export class FiscalService {
     suppliedRequest: FiscalRequest | undefined,
     context: RequestContext,
   ): Promise<FiscalResult> {
-    validateContext(context);
+    validateContext(context, organizationId);
     const recorded = await this.ledger.findByRequest(organizationId, requestId);
     const request = suppliedRequest ?? recorded?.request;
     if (request === undefined || request.organization_id !== organizationId || request.request_id !== requestId) {
       throw new FiscalError("VALIDATION_ERROR");
     }
     validateRequest(request);
+    validateMetadata(request, context);
     const payloadHash = hashPayload(request);
     if (recorded !== undefined && recorded.payloadHash !== payloadHash) {
       throw new FiscalError("IDEMPOTENCY_KEY_REUSED");
     }
 
     const decision = await this.authority.consult(structuredClone(request));
-    const result = this.toResult(request, decision, context.correlationId);
+    const result = this.toResult(request, decision, context);
     await this.ledger.save({
       idempotencyKey: recorded?.idempotencyKey ?? context.idempotencyKey,
       payloadHash,
+      audit: recorded?.audit ?? auditMetadata(context.identity),
       request: structuredClone(request),
       result,
     });
@@ -73,33 +84,86 @@ export class FiscalService {
     return byKey ?? byRequest;
   }
 
-  private toResult(request: FiscalRequest, decision: AuthorityDecision, correlationId: string): FiscalResult {
+  private toResult(request: FiscalRequest, decision: AuthorityDecision, context: RequestContext): FiscalResult {
     return {
       request_id: request.request_id,
       organization_id: request.organization_id,
+      idempotency_key: context.idempotencyKey,
+      correlation_id: context.correlationId,
+      source_version: request.source_version,
       status: decision.status,
       ...(decision.status === "authorized" ? { cae: decision.cae, cae_expires_on: decision.cae_expires_on, artifact_ref: decision.artifact_ref } : {}),
       ...(decision.status === "rejected" || decision.status === "uncertain" ? { authority_messages: decision.messages } : {}),
       ...(decision.status !== "not_found" ? { authority_result_code: decision.result_code } : {}),
       snapshot_digest: request.snapshot_digest,
       observed_at: this.now().toISOString(),
-      correlation_id: correlationId,
     };
   }
 }
 
-function validateContext(context: RequestContext): void {
-  if (context.idempotencyKey.length < 8 || context.idempotencyKey.length > 128 || context.correlationId.length < 1) {
+function validateContext(context: RequestContext, organizationId: string): void {
+  const identity = context.identity;
+  if (
+    context.idempotencyKey.length < 8 ||
+    context.idempotencyKey.length > 128 ||
+    !opaqueReference(context.correlationId) ||
+    identity.organizationId !== organizationId ||
+    identity.correlationId !== context.correlationId ||
+    !opaqueReference(identity.issuer) ||
+    !opaqueReference(identity.subject) ||
+    !opaqueReference(identity.requestId) ||
+    !opaqueReference(identity.tokenId) ||
+    !optionalOpaqueReference(identity.actorId) ||
+    !optionalOpaqueReference(identity.delegatedActorId) ||
+    (identity.delegatedActorId !== undefined && identity.actorId === undefined) ||
+    !Array.isArray(identity.roles) ||
+    !identity.roles.includes("service")
+  ) {
     throw new FiscalError("VALIDATION_ERROR");
   }
+}
+
+function validateMetadata(request: FiscalRequest, context: RequestContext): void {
+  if (request.idempotency_key !== context.idempotencyKey || request.correlation_id !== context.correlationId) {
+    throw new FiscalError("VALIDATION_ERROR");
+  }
+}
+
+function auditMetadata(identity: InternalIdentity): FiscalAuditMetadata {
+  return {
+    correlationId: identity.correlationId,
+    ...(identity.actorId === undefined ? {} : { actorRef: identity.actorId }),
+    ...(identity.delegatedActorId === undefined ? {} : { delegatedActorRef: identity.delegatedActorId }),
+    workloadIssuer: identity.issuer,
+    workloadSubject: identity.subject,
+    workloadRequestId: identity.requestId,
+    workloadTokenId: identity.tokenId,
+  };
 }
 
 export function validateRequest(request: FiscalRequest): void {
   const currencies = new Set(["ARS", "USD", "EUR"]);
   const vatRates = new Set(["0", "2.5", "5", "10.5", "21", "27"]);
+  const raw = request as unknown as Record<string, unknown>;
+  const bodyIdentityKeys = [
+    "actor_id",
+    "delegated_actor_id",
+    "workload_subject",
+    "workload_request_id",
+    "workload_token_id",
+    "jti",
+  ];
   if (
+    bodyIdentityKeys.some((key) => Object.hasOwn(raw, key)) ||
     request.request_id.length < 1 ||
     request.organization_id.length < 1 ||
+    typeof request.idempotency_key !== "string" ||
+    request.idempotency_key.length < 8 ||
+    request.idempotency_key.length > 128 ||
+    typeof request.correlation_id !== "string" ||
+    request.correlation_id.length < 1 ||
+    !Number.isSafeInteger(request.source_version) ||
+    request.source_version < 1 ||
     request.credential_ref.length < 1 ||
     (request.environment !== "homologation" && request.environment !== "production") ||
     !Number.isSafeInteger(request.point_of_sale) ||
@@ -184,6 +248,14 @@ function decimalSumEquals(total: string, ...parts: string[]): boolean {
 
 function hashPayload(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
+}
+
+function opaqueReference(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9:_./-]{1,255}$/.test(value);
+}
+
+function optionalOpaqueReference(value: unknown): value is string | undefined {
+  return value === undefined || opaqueReference(value);
 }
 
 function canonical(value: unknown): unknown {

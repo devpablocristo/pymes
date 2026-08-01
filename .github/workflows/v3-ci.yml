@@ -5,12 +5,14 @@ on:
     paths:
       - "v3/**"
       - "AGENTS.md"
+      - ".github/dependencies/open-accounting.env"
       - ".github/workflows/v3-ci.yml"
   push:
     branches: [main]
     paths:
       - "v3/**"
       - "AGENTS.md"
+      - ".github/dependencies/open-accounting.env"
       - ".github/workflows/v3-ci.yml"
 
 permissions:
@@ -27,13 +29,41 @@ jobs:
     steps:
       - name: Checkout Pymes
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Read and validate Open Accounting pin
+        id: accounting-pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          pin_file=".github/dependencies/open-accounting.env"
+          repository="$(sed -n 's/^OPEN_ACCOUNTING_REPOSITORY=//p' "${pin_file}")"
+          revision="$(sed -n 's/^OPEN_ACCOUNTING_REF=//p' "${pin_file}")"
+          if [[ ! "${repository}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            echo "invalid Open Accounting repository pin" >&2
+            exit 1
+          fi
+          if [[ ! "${revision}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Open Accounting must be pinned to one full commit SHA" >&2
+            exit 1
+          fi
+          echo "repository=${repository}" >>"${GITHUB_OUTPUT}"
+          echo "revision=${revision}" >>"${GITHUB_OUTPUT}"
 
       - name: Checkout Open Accounting fork
         uses: actions/checkout@v4
         with:
-          repository: devpablocristo/open-accounting
-          ref: 9225fbaa7b48398e1ec4601e3cdacd4937ceb7b4
+          repository: ${{ steps.accounting-pin.outputs.repository }}
+          ref: ${{ steps.accounting-pin.outputs.revision }}
           path: .deps/open-accounting
+          persist-credentials: false
+
+      - name: Verify exact Open Accounting revision
+        working-directory: .deps/open-accounting
+        env:
+          EXPECTED_REVISION: ${{ steps.accounting-pin.outputs.revision }}
+        run: test "$(git rev-parse HEAD)" = "${EXPECTED_REVISION}"
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -61,4 +91,4 @@ jobs:
         working-directory: v3
         env:
           ACCOUNTING_BUILD_CONTEXT: ${{ github.workspace }}/.deps/open-accounting
-        run: docker compose down
+        run: docker compose down --volumes --remove-orphans

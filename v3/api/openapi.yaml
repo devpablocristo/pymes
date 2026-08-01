@@ -16,81 +16,235 @@ paths:
       security: []
       responses:
         '200': { description: Ready }
+        '503':
+          description: PostgreSQL o una dependencia obligatoria no está lista.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, const: not_ready }
+  /api/v1/webhooks/clerk:
+    post:
+      operationId: clerkWebhook
+      summary: Recibe eventos Clerk firmados para sincronizar identidad y organizaciones.
+      description: >-
+        Endpoint público exclusivamente para Clerk. La firma Svix se verifica
+        sobre el cuerpo crudo antes de persistir el evento en el inbox IAM. Esta
+        operación queda excluida del servidor comercial generado y se monta con
+        su handler especializado.
+      security: []
+      parameters:
+        - name: svix-id
+          in: header
+          required: true
+          description: Identificador único del mensaje firmado por Clerk/Svix.
+          schema: { type: string, minLength: 1 }
+        - name: svix-timestamp
+          in: header
+          required: true
+          description: Timestamp incluido en la firma Clerk/Svix.
+          schema: { type: string, minLength: 1 }
+        - name: svix-signature
+          in: header
+          required: true
+          description: Firma Clerk/Svix verificada sobre el cuerpo HTTP crudo.
+          schema: { type: string, minLength: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '204': { description: Evento verificado y aceptado, headers: { Cache-Control: { schema: { type: string, const: no-store } } } }
+        '400':
+          description: Cuerpo ausente, demasiado grande o evento inválido.
+          content:
+            text/plain:
+              schema: { type: string, pattern: '^WEBHOOK_INVALID_PAYLOAD\n?$' }
+        '401':
+          description: Firma Svix inválida.
+          content:
+            text/plain:
+              schema: { type: string, pattern: '^WEBHOOK_INVALID_SIGNATURE\n?$' }
+        '503':
+          description: Verificador no configurado o inbox IAM no disponible.
+          content:
+            text/plain:
+              schema: { type: string, pattern: '^(AUTH_NOT_CONFIGURED|IAM_UNAVAILABLE)\n?$' }
   /api/v1/organizations/{organizationId}/sales:
     post:
       operationId: createSale
-      parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/SourceVersion' }
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/SaleInput' } } }
       responses:
         '201': { description: Sale accepted for fiscal processing, content: { application/json: { schema: { $ref: '#/components/schemas/Sale' } } } }
+        '400': { $ref: '#/components/responses/InvalidCommand' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
   /api/v1/organizations/{organizationId}/parties:
     post:
       operationId: createParty
-      parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/SourceVersion' }
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/PartyInput' } } }
       responses:
         '201': { description: Party created, content: { application/json: { schema: { $ref: '#/components/schemas/Party' } } } }
+        '400': { $ref: '#/components/responses/InvalidCommand' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
   /api/v1/organizations/{organizationId}/parties/{partyId}:
     get:
       operationId: getParty
       parameters: [{ $ref: '#/components/parameters/OrganizationId' }, { name: partyId, in: path, required: true, schema: { type: string } }]
       responses:
         '200': { description: Party, content: { application/json: { schema: { $ref: '#/components/schemas/Party' } } } }
-        '404': { description: Not found }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
   /api/v1/organizations/{organizationId}/purchases:
     post:
       operationId: createPurchase
-      parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/SourceVersion' }
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/PurchaseInput' } } }
       responses:
         '201': { description: Purchase accepted for accounting, content: { application/json: { schema: { $ref: '#/components/schemas/Purchase' } } } }
+        '400': { $ref: '#/components/responses/InvalidCommand' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
   /api/v1/organizations/{organizationId}/purchases/{purchaseId}:
     get:
       operationId: getPurchase
       parameters: [{ $ref: '#/components/parameters/OrganizationId' }, { name: purchaseId, in: path, required: true, schema: { type: string } }]
       responses:
         '200': { description: Purchase, content: { application/json: { schema: { $ref: '#/components/schemas/Purchase' } } } }
-        '404': { description: Not found }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
   /api/v1/organizations/{organizationId}/payments:
     post:
       operationId: createPayment
-      parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/SourceVersion' }
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/PaymentInput' } } }
       responses:
         '201': { description: Payment and applications accepted for accounting, content: { application/json: { schema: { $ref: '#/components/schemas/Payment' } } } }
+        '400': { $ref: '#/components/responses/InvalidCommand' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
   /api/v1/organizations/{organizationId}/payments/{paymentId}:
     get:
       operationId: getPayment
       parameters: [{ $ref: '#/components/parameters/OrganizationId' }, { name: paymentId, in: path, required: true, schema: { type: string } }]
       responses:
         '200': { description: Payment, content: { application/json: { schema: { $ref: '#/components/schemas/Payment' } } } }
-        '404': { description: Not found }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
   /api/v1/organizations/{organizationId}/reversals:
     post:
       operationId: createAccountingReversal
       description: Revierte compras o pagos. Las ventas fiscales se corrigen creando NC/ND asociadas.
-      parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/SourceVersion' }
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/ReversalInput' } } }
       responses:
         '201': { description: Reversal accepted for accounting, content: { application/json: { schema: { $ref: '#/components/schemas/Reversal' } } } }
-        '422': { description: Document is not reversible }
+        '400': { $ref: '#/components/responses/InvalidCommand' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/v1/organizations/{organizationId}/accounting-failures/{failureId}:
+    get:
+      operationId: getAccountingFailure
+      summary: Consulta un PERIOD_LOCKED recuperable de la organización.
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - name: failureId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Fallo contable y estado de recuperación, sin exponer el comando privado.
+          content: { application/json: { schema: { $ref: '#/components/schemas/AccountingFailure' } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/v1/organizations/{organizationId}/accounting-failures/{failureId}/adjustments:
+    post:
+      operationId: createAccountingAdjustment
+      summary: Solicita explícitamente contabilizar en un período abierto autorizado.
+      description: >-
+        Sólo owner/admin. No cambia el documento fuente ni un asiento existente:
+        crea un nuevo comando contable idempotente que conserva el snapshot
+        original y reemplaza únicamente la fecha efectiva.
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - name: failureId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/SourceVersion' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccountingAdjustmentInput' }
+      responses:
+        '201':
+          description: Ajuste aceptado y escrito en el outbox transaccional.
+          content: { application/json: { schema: { $ref: '#/components/schemas/AccountingAdjustment' } } }
+        '400': { $ref: '#/components/responses/InvalidCommand' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
   /api/v1/organizations/{organizationId}/sales/{saleId}:
     get:
       operationId: getSale
       parameters: [{ $ref: '#/components/parameters/OrganizationId' }, { name: saleId, in: path, required: true, schema: { type: string } }]
       responses:
         '200': { description: Sale, content: { application/json: { schema: { $ref: '#/components/schemas/Sale' } } } }
-        '404': { description: Not found }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
 components:
   securitySchemes:
     clerkBearer:
@@ -100,13 +254,163 @@ components:
       description: JWT de sesión Clerk validado por el BFF.
   parameters:
     OrganizationId: { name: organizationId, in: path, required: true, schema: { type: string } }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Clave pública estable. Queda vinculada a organización, operación, source ID y source version.
+      schema: { type: string, minLength: 1, maxLength: 255 }
+    SourceVersion:
+      name: X-Source-Version
+      in: header
+      required: true
+      description: Versión positiva del snapshot de origen incluida en la identidad idempotente.
+      schema: { type: integer, minimum: 1 }
+  responses:
+    InvalidCommand:
+      description: Comando inválido o cabeceras idempotentes ausentes.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    IdempotencyConflict:
+      description: La clave o identidad del comando ya fue usada con otro payload.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: La sesión Clerk no pertenece a la organización o el rol no autoriza la operación.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    DomainError:
+      description: La organización no está lista o una regla comercial impide el comando.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: El recurso no existe en la organización autenticada.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    AuthUnavailable:
+      description: Clerk/IAM no está configurado en el BFF.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
   schemas:
+    Error:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          enum:
+            - AUTH_NOT_CONFIGURED
+            - FORBIDDEN
+            - ORG_NOT_PROVISIONED
+            - NOT_FOUND
+            - IDEMPOTENCY_KEY_REQUIRED
+            - SOURCE_VERSION_REQUIRED
+            - IDEMPOTENCY_KEY_REUSED
+            - DOCUMENT_NOT_REVERSIBLE
+            - INVALID_APPLICATION_DOCUMENT
+            - INVALID_SOURCE_DOCUMENT
+            - OPEN_ITEM_AMOUNT_EXCEEDED
+            - PERIOD_LOCKED
+            - ACCOUNTING_ADJUSTMENT_NOT_ALLOWED
+            - VALIDATION_ERROR
+            - COMMAND_REJECTED
+    AccountingFailureRef:
+      type: object
+      readOnly: true
+      required: [id, code]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, const: PERIOD_LOCKED }
+    AccountingFailure:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - organization_id
+        - source_kind
+        - source_id
+        - failed_effective_at
+        - status
+        - failure_code
+        - correlation_id
+        - created_at
+        - updated_at
+      properties:
+        id: { type: string, format: uuid }
+        organization_id: { type: string }
+        source_kind:
+          type: string
+          enum: [sale, purchase, payment, accounting_application, accounting_reversal]
+        source_id: { type: string }
+        failed_effective_at: { type: string, format: date-time }
+        status:
+          type: string
+          enum: [awaiting_adjustment, adjustment_pending, resolved]
+        failure_code: { type: string, const: PERIOD_LOCKED }
+        correlation_id: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    AccountingAdjustmentInput:
+      type: object
+      additionalProperties: false
+      required: [id, effective_at, reason]
+      properties:
+        id: { type: string, minLength: 1, maxLength: 255 }
+        effective_at:
+          type: string
+          format: date-time
+          description: Fecha elegida por owner/admin dentro de un período contable abierto.
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    AccountingAdjustment:
+      allOf:
+        - { $ref: '#/components/schemas/AccountingAdjustmentInput' }
+        - type: object
+          additionalProperties: false
+          required:
+            - organization_id
+            - failure_id
+            - status
+            - correlation_id
+            - created_at
+            - updated_at
+          properties:
+            organization_id: { type: string }
+            failure_id: { type: string, format: uuid }
+            status: { type: string, enum: [pending, period_locked, posted] }
+            correlation_id: { type: string }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
     Money:
       type: object
       required: [amount, currency]
       properties:
         amount: { type: string, pattern: '^-?[0-9]+(\\.[0-9]+)?$' }
         currency: { type: string, pattern: '^[A-Z]{3}$' }
+    NonNegativeDecimal:
+      type: string
+      pattern: '^(0|[1-9][0-9]*)(\.[0-9]+)?$'
+      description: Decimal base diez exacto, sin exponente ni JSON number.
+    PositiveDecimal:
+      type: string
+      pattern: '^([1-9][0-9]*)(\.[0-9]+)?$|^0\.(0*[1-9][0-9]*)$'
+      description: Decimal base diez exacto estrictamente mayor que cero.
+    VatBreakdownItem:
+      type: object
+      additionalProperties: false
+      required: [rate, base_amount, tax_amount]
+      properties:
+        rate:
+          type: string
+          enum: ['0', '2.5', '5', '10.5', '21', '27']
+          description: Alícuota IVA expresada como string exacta.
+        base_amount: { $ref: '#/components/schemas/NonNegativeDecimal' }
+        tax_amount: { $ref: '#/components/schemas/NonNegativeDecimal' }
     SaleInput:
       type: object
       required: [id, recipient_ref, point_of_sale, document_type, amount, currency, credential_ref, fiscal]
@@ -117,6 +421,9 @@ components:
         document_type: { type: string, enum: [FA, NDA, NCA, FB, NDB, NCB, FC, NDC, NCC] }
         amount: { type: string, pattern: '^[0-9]+(\\.[0-9]+)?$' }
         currency: { type: string, pattern: '^[A-Z]{3}$' }
+        exchange_rate:
+          $ref: '#/components/schemas/PositiveDecimal'
+          description: Obligatorio para USD/EUR; cotización contra ARS con hasta seis decimales.
         credential_ref: { type: string, writeOnly: true }
         source_document_id:
           type: string
@@ -131,6 +438,13 @@ components:
             totals: { type: object }
             recipient: { type: object }
             lines: { type: array, minItems: 1, items: { type: object } }
+      allOf:
+        - if:
+            required: [currency]
+            properties:
+              currency: { not: { const: ARS } }
+          then:
+            required: [exchange_rate]
     Sale:
       type: object
       required: [id, organization_id, recipient_ref, voucher, fiscal_environment, total, status, snapshot_digest]
@@ -151,12 +465,13 @@ components:
               description: Número reservado atómicamente por Pymes.
         fiscal_environment: { type: string, enum: [homologation, production] }
         total: { $ref: '#/components/schemas/Money' }
-        status: { type: string, enum: [fiscal_pending, fiscal_uncertain, fiscal_rejected, authorized_pending_posting, posted, partially_paid, paid, reversed] }
+        status: { type: string, enum: [fiscal_pending, fiscal_uncertain, fiscal_rejected, authorized_pending_posting, accounting_adjustment_required, accounting_adjustment_pending, posted, partially_paid, paid, reversed] }
         snapshot_digest: { type: string }
         source_document_id: { type: string }
         cae: { type: string, readOnly: true }
         journal_entry_id: { type: string, readOnly: true }
         open_item_id: { type: string, readOnly: true }
+        accounting_failure: { $ref: '#/components/schemas/AccountingFailureRef' }
     PartyInput:
       type: object
       required: [id, kind, display_name]
@@ -173,26 +488,71 @@ components:
           properties: { organization_id: { type: string } }
     PurchaseInput:
       type: object
-      required: [id, supplier_ref, external_document_ref, amount, currency]
+      description: >-
+        amount es el total del comprobante. Debe ser igual a net_amount +
+        exempt_amount + la suma de vat_breakdown.tax_amount. exchange_rate es
+        obligatorio y debe ser mayor que cero cuando currency no es ARS.
+      required: [id, supplier_ref, external_document_ref, issue_date, amount, currency, net_amount, exempt_amount, vat_breakdown]
       properties:
         id: { type: string }
         supplier_ref: { type: string }
         external_document_ref: { type: string }
-        amount: { type: string, pattern: '^[0-9]+(\.[0-9]+)?$' }
+        issue_date:
+          type: string
+          format: date
+          description: Fecha contable del comprobante; determina el período del asiento.
+        amount: { $ref: '#/components/schemas/NonNegativeDecimal' }
         currency: { type: string, pattern: '^[A-Z]{3}$' }
+        net_amount: { $ref: '#/components/schemas/NonNegativeDecimal' }
+        exempt_amount: { $ref: '#/components/schemas/NonNegativeDecimal' }
+        vat_breakdown:
+          type: array
+          items: { $ref: '#/components/schemas/VatBreakdownItem' }
+        exchange_rate: { $ref: '#/components/schemas/PositiveDecimal' }
+      allOf:
+        - if:
+            required: [currency]
+            properties:
+              currency: { not: { const: ARS } }
+          then:
+            required: [exchange_rate]
     Purchase:
       type: object
-      required: [id, organization_id, supplier_ref, external_document_ref, total, status, snapshot_digest]
+      description: >-
+        total conserva el importe y moneda originales. exchange_rate es
+        obligatorio cuando total.currency no es ARS.
+      required: [id, organization_id, supplier_ref, external_document_ref, issue_date, total, net_amount, exempt_amount, vat_breakdown, status, snapshot_digest]
       properties:
         id: { type: string }
         organization_id: { type: string }
         supplier_ref: { type: string }
         external_document_ref: { type: string }
+        issue_date:
+          type: string
+          format: date
+          description: Fecha contable persistida del comprobante.
         total: { $ref: '#/components/schemas/Money' }
-        status: { type: string, enum: [confirmed, posted, partially_paid, paid, reversed] }
+        net_amount: { $ref: '#/components/schemas/NonNegativeDecimal' }
+        exempt_amount: { $ref: '#/components/schemas/NonNegativeDecimal' }
+        vat_breakdown:
+          type: array
+          items: { $ref: '#/components/schemas/VatBreakdownItem' }
+        exchange_rate: { $ref: '#/components/schemas/PositiveDecimal' }
+        status: { type: string, enum: [confirmed, accounting_adjustment_required, accounting_adjustment_pending, posted, partially_paid, paid, reversed] }
         snapshot_digest: { type: string }
         journal_entry_id: { type: string, readOnly: true }
         open_item_id: { type: string, readOnly: true }
+        accounting_failure: { $ref: '#/components/schemas/AccountingFailureRef' }
+      allOf:
+        - if:
+            required: [total]
+            properties:
+              total:
+                required: [currency]
+                properties:
+                  currency: { not: { const: ARS } }
+          then:
+            required: [exchange_rate]
     PaymentInput:
       type: object
       required: [id, direction, party_ref, amount, currency, applications]
@@ -221,9 +581,10 @@ components:
         direction: { type: string, enum: [receipt, disbursement] }
         party_ref: { type: string }
         total: { $ref: '#/components/schemas/Money' }
-        status: { type: string, enum: [confirmed, posted, reversed] }
+        status: { type: string, enum: [confirmed, accounting_adjustment_required, accounting_adjustment_pending, posted, reversed] }
         journal_entry_id: { type: string, readOnly: true }
         open_item_id: { type: string, readOnly: true }
+        accounting_failure: { $ref: '#/components/schemas/AccountingFailureRef' }
     ReversalInput:
       type: object
       required: [id, document_kind, document_id, effective_at, reason]
@@ -240,6 +601,7 @@ components:
           required: [organization_id, status, original_journal_entry_id]
           properties:
             organization_id: { type: string }
-            status: { type: string, enum: [requested, reversed] }
+            status: { type: string, enum: [requested, accounting_adjustment_required, accounting_adjustment_pending, reversed] }
             original_journal_entry_id: { type: string }
             reversal_journal_entry_id: { type: string, readOnly: true }
+            accounting_failure: { $ref: '#/components/schemas/AccountingFailureRef' }

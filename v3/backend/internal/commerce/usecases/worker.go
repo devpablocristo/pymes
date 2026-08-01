@@ -2,11 +2,9 @@ package usecases
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/commerce/domain"
@@ -18,30 +16,33 @@ import (
 type RelayStore interface {
 	Lease(context.Context, int, time.Duration) ([]domain.Event, error)
 	Retry(context.Context, domain.Event) error
+	DeadLetter(context.Context, domain.Event, string) error
 	MarkPublished(context.Context, domain.Event) error
 	GetSale(context.Context, string, string) (domain.Sale, error)
 	ApplyFiscalResult(context.Context, domain.Sale, domain.FiscalResult) error
-	MarkSalePosted(context.Context, string, string, string, string) error
+	MarkSalePosted(context.Context, domain.Sale, domain.AccountingEvent) error
 	GetPurchase(context.Context, string, string) (domain.Purchase, error)
-	MarkPurchasePosted(context.Context, string, string, string, string) error
+	MarkPurchasePosted(context.Context, domain.Purchase, domain.AccountingEvent) error
 	GetPayment(context.Context, string, string) (domain.Payment, error)
-	MarkPaymentPosted(context.Context, string, string, string, string) error
+	MarkPaymentPosted(context.Context, domain.Payment, domain.AccountingEvent) error
 	GetAccountingApplication(context.Context, string, string) (domain.PendingAccountingApplication, error)
-	MarkAccountingApplicationApplied(context.Context, string, string, string) error
+	MarkAccountingApplicationApplied(context.Context, domain.PendingAccountingApplication, domain.AccountingEvent) error
 	ListAppliedAccountingApplications(context.Context, string, string, string) ([]domain.PendingAccountingApplication, error)
-	MarkAccountingApplicationReversed(context.Context, string, string) error
+	MarkAccountingApplicationReversed(context.Context, domain.PendingAccountingApplication, domain.AccountingEvent) error
 	GetAccountingReversal(context.Context, string, string) (domain.AccountingReversal, error)
-	MarkAccountingReversalCompleted(context.Context, domain.AccountingReversal, string) error
+	MarkAccountingReversalCompleted(context.Context, domain.AccountingReversal, domain.AccountingEvent) error
 	ListUncertainSales(context.Context, int) ([]domain.PendingFiscal, error)
+	ReserveFiscalConsultAttempt(context.Context, string, string) (int, error)
 }
 
 // DurableWorker relays commerce commands at-least-once. Private services must
 // treat a repeated command identifier as a duplicate.
 type DurableWorker struct {
-	Store      RelayStore
-	Fiscal     domain.FiscalClient
-	Accounting domain.AccountingClient
-	LeaseFor   time.Duration
+	Store       RelayStore
+	Fiscal      domain.FiscalClient
+	Accounting  domain.AccountingClient
+	LeaseFor    time.Duration
+	MaxAttempts int
 }
 
 func (w DurableWorker) DispatchOnce(ctx context.Context) error {
@@ -57,7 +58,18 @@ func (w DurableWorker) DispatchOnce(ctx context.Context) error {
 		return err
 	}
 	for _, event := range events {
-		if err := w.handle(ctx, event); err != nil {
+		deliveryContext := outboxDeliveryContext(ctx, event)
+		if err := w.handle(deliveryContext, event); err != nil {
+			maxAttempts := w.MaxAttempts
+			if maxAttempts <= 0 {
+				maxAttempts = 10
+			}
+			if event.Attempts >= maxAttempts {
+				if deadLetterErr := w.Store.DeadLetter(ctx, event, "DELIVERY_FAILED"); deadLetterErr != nil {
+					return fmt.Errorf("dead-letter %s: %w (delivery: %v)", event.ID, deadLetterErr, err)
+				}
+				continue
+			}
 			if retryErr := w.Store.Retry(ctx, event); retryErr != nil {
 				return fmt.Errorf("handle %s: %w (retry: %v)", event.ID, err, retryErr)
 			}
@@ -71,6 +83,9 @@ func (w DurableWorker) DispatchOnce(ctx context.Context) error {
 }
 
 func (w DurableWorker) handle(ctx context.Context, event domain.Event) error {
+	if event.Topic == "AccountingAdjustmentRequested" {
+		return w.applyAccountingAdjustment(ctx, event)
+	}
 	if event.Topic == "PurchasePostingRequested" {
 		return w.postPurchase(ctx, event)
 	}
@@ -94,13 +109,32 @@ func (w DurableWorker) handle(ctx context.Context, event domain.Event) error {
 	if err != nil {
 		return err
 	}
+	if err := requireEventOrganization(event, sale.OrganizationID); err != nil {
+		return err
+	}
 	switch event.Topic {
 	case "FiscalAuthorizationRequested":
 		if sale.Status != domain.SaleFiscalPending && sale.Status != domain.SaleFiscalUncertain {
 			return nil
 		}
-		result, err := w.Fiscal.Authorize(ctx, domain.FiscalRequest{RequestID: "fiscal:" + sale.ID + ":1", OrganizationID: sale.OrganizationID, CredentialRef: payload.CredentialRef, Voucher: sale.Voucher, Total: sale.Total, SnapshotDigest: sale.SnapshotDigest, CorrelationID: sale.CorrelationID, FiscalSnapshot: sale.FiscalSnapshot})
+		sourceVersion := persistedSourceVersion(sale.Origin)
+		request := domain.FiscalRequest{
+			RequestID:      fmt.Sprintf("fiscal-authorize:%s:%d", sale.ID, sourceVersion),
+			OrganizationID: sale.OrganizationID,
+			IdempotencyKey: internalIdempotencyKey(sale.OrganizationID, "fiscal.authorize", sale.ID, sourceVersion),
+			SourceVersion:  sourceVersion,
+			CredentialRef:  payload.CredentialRef,
+			Voucher:        sale.Voucher,
+			Total:          sale.Total,
+			SnapshotDigest: sale.SnapshotDigest,
+			CorrelationID:  persistedCorrelationID(sale.Origin, sale.CorrelationID),
+			FiscalSnapshot: sale.FiscalSnapshot,
+		}
+		result, err := w.Fiscal.Authorize(ctx, request)
 		if err != nil {
+			return err
+		}
+		if err := validateFiscalResult(request, result); err != nil {
 			return err
 		}
 		return w.Store.ApplyFiscalResult(ctx, sale, result)
@@ -108,34 +142,41 @@ func (w DurableWorker) handle(ctx context.Context, event domain.Event) error {
 		if sale.Status != domain.SaleAuthorizedPendingPosting {
 			return nil
 		}
-		zero := domain.Money{Amount: "0", Currency: sale.Total.Currency}
-		lines := []domain.PostingLine{
-			{AccountCode: "1200", Debit: sale.Total, Credit: zero, OpenItem: true, PartyRef: sale.RecipientRef},
-			{AccountCode: "4100", Debit: zero, Credit: sale.Total},
-		}
-		sourceType := "sales_invoice"
-		if strings.HasPrefix(sale.Voucher.DocumentType, "NC") {
-			sourceType = "sales_credit_note"
-			lines = []domain.PostingLine{
-				{AccountCode: "4100", Debit: sale.Total, Credit: zero},
-				{AccountCode: "1200", Debit: zero, Credit: sale.Total, OpenItem: true, PartyRef: sale.RecipientRef},
+		var original *domain.Sale
+		if sale.SourceDocumentID != "" {
+			value, err := w.Store.GetSale(ctx, sale.OrganizationID, sale.SourceDocumentID)
+			if err != nil {
+				return err
 			}
-		} else if strings.HasPrefix(sale.Voucher.DocumentType, "ND") {
-			sourceType = "sales_debit_note"
+			original = &value
 		}
-		command := domain.PostingCommand{CommandID: accountingCommandID("posting", sale.ID, 1), OrganizationID: sale.OrganizationID, SourceType: sourceType, SourceID: sale.ID, SourceVersion: 1, SnapshotDigest: sale.SnapshotDigest, CorrelationID: sale.CorrelationID, EffectiveAt: sale.CreatedAt, Description: "Venta " + sale.ID, Lines: lines}
+		command, err := buildSalePostingCommand(sale, original)
+		if err != nil {
+			return err
+		}
 		result, err := w.Accounting.Post(ctx, command)
 		if err != nil {
+			if errors.Is(err, domain.ErrPeriodLocked) {
+				return w.recordAccountingPeriodLocked(
+					ctx, event, "sale", sale.ID, "posting",
+					command, command.EffectiveAt, command.SnapshotDigest,
+				)
+			}
+			return err
+		}
+		if err := validateAccountingEvent(
+			result, command.CommandID, command.OrganizationID, command.IdempotencyKey,
+			command.SourceVersion, command.SnapshotDigest, command.CorrelationID,
+		); err != nil {
 			return err
 		}
 		if result.Status != "posted" && result.Status != "duplicate" {
 			return fmt.Errorf("accounting rejected command")
 		}
-		openItemID, err := singleOpenItem(result)
-		if err != nil {
+		if _, err := singleOpenItem(result); err != nil {
 			return err
 		}
-		return w.Store.MarkSalePosted(ctx, sale.OrganizationID, sale.ID, result.JournalEntryID, openItemID)
+		return w.Store.MarkSalePosted(ctx, sale, result)
 	default:
 		return fmt.Errorf("unknown outbox topic %q", event.Topic)
 	}
@@ -152,6 +193,9 @@ func (w DurableWorker) postPayment(ctx context.Context, event domain.Event) erro
 	if err != nil {
 		return err
 	}
+	if err := requireEventOrganization(event, payment.OrganizationID); err != nil {
+		return err
+	}
 	if payment.Status != "confirmed" {
 		return nil
 	}
@@ -166,9 +210,31 @@ func (w DurableWorker) postPayment(ctx context.Context, event domain.Event) erro
 		lines = []domain.PostingLine{{AccountCode: debit, Debit: payment.Total, Credit: zero, OpenItem: true, PartyRef: payment.PartyRef}, {AccountCode: credit, Debit: zero, Credit: payment.Total}}
 		openIndex = 0
 	}
-	command := domain.PostingCommand{CommandID: accountingCommandID("payment", payment.ID, 1), OrganizationID: payment.OrganizationID, SourceType: "payment_" + payment.Direction, SourceID: payment.ID, SourceVersion: 1, SnapshotDigest: hashPayment(payment), CorrelationID: payment.CorrelationID, EffectiveAt: payment.CreatedAt, Description: "Pago " + payment.ID, Lines: lines}
+	if payment.SnapshotDigest == "" {
+		return fmt.Errorf("payment %s has no persisted snapshot digest", payment.ID)
+	}
+	sourceVersion := persistedSourceVersion(payment.Origin)
+	command := domain.PostingCommand{
+		CommandID: accountingCommandID("payment", payment.ID, sourceVersion), OrganizationID: payment.OrganizationID,
+		IdempotencyKey: internalIdempotencyKey(payment.OrganizationID, "accounting.post", payment.ID, sourceVersion),
+		SourceType:     "payment_" + payment.Direction, SourceID: payment.ID, SourceVersion: sourceVersion,
+		SnapshotDigest: payment.SnapshotDigest, CorrelationID: persistedCorrelationID(payment.Origin, payment.CorrelationID),
+		EffectiveAt: payment.CreatedAt, Description: "Pago " + payment.ID, Lines: lines,
+	}
 	result, err := w.Accounting.Post(ctx, command)
 	if err != nil {
+		if errors.Is(err, domain.ErrPeriodLocked) {
+			return w.recordAccountingPeriodLocked(
+				ctx, event, "payment", payment.ID, "posting",
+				command, command.EffectiveAt, command.SnapshotDigest,
+			)
+		}
+		return err
+	}
+	if err := validateAccountingEvent(
+		result, command.CommandID, command.OrganizationID, command.IdempotencyKey,
+		command.SourceVersion, command.SnapshotDigest, command.CorrelationID,
+	); err != nil {
 		return err
 	}
 	if result.Status != "posted" && result.Status != "duplicate" {
@@ -177,7 +243,7 @@ func (w DurableWorker) postPayment(ctx context.Context, event domain.Event) erro
 	if len(result.OpenItemIDs) != 1 {
 		return fmt.Errorf("accounting payment returned %d open items (line %d)", len(result.OpenItemIDs), openIndex)
 	}
-	return w.Store.MarkPaymentPosted(ctx, payment.OrganizationID, payment.ID, result.JournalEntryID, result.OpenItemIDs[0])
+	return w.Store.MarkPaymentPosted(ctx, payment, result)
 }
 
 func (w DurableWorker) postPurchase(ctx context.Context, event domain.Event) error {
@@ -191,23 +257,39 @@ func (w DurableWorker) postPurchase(ctx context.Context, event domain.Event) err
 	if err != nil {
 		return err
 	}
+	if err := requireEventOrganization(event, purchase.OrganizationID); err != nil {
+		return err
+	}
 	if purchase.Status != "confirmed" {
 		return nil
 	}
-	zero := domain.Money{Amount: "0", Currency: purchase.Total.Currency}
-	command := domain.PostingCommand{CommandID: accountingCommandID("purchase", purchase.ID, 1), OrganizationID: purchase.OrganizationID, SourceType: "purchase_invoice", SourceID: purchase.ID, SourceVersion: 1, SnapshotDigest: purchase.SnapshotDigest, CorrelationID: purchase.CorrelationID, EffectiveAt: purchase.CreatedAt, Description: "Compra " + purchase.ExternalDocumentRef, Lines: []domain.PostingLine{{AccountCode: "5100", Debit: purchase.Total, Credit: zero}, {AccountCode: "2100", Debit: zero, Credit: purchase.Total, OpenItem: true, PartyRef: purchase.SupplierRef}}}
+	command, err := buildPurchasePostingCommand(purchase)
+	if err != nil {
+		return err
+	}
 	result, err := w.Accounting.Post(ctx, command)
 	if err != nil {
+		if errors.Is(err, domain.ErrPeriodLocked) {
+			return w.recordAccountingPeriodLocked(
+				ctx, event, "purchase", purchase.ID, "posting",
+				command, command.EffectiveAt, command.SnapshotDigest,
+			)
+		}
+		return err
+	}
+	if err := validateAccountingEvent(
+		result, command.CommandID, command.OrganizationID, command.IdempotencyKey,
+		command.SourceVersion, command.SnapshotDigest, command.CorrelationID,
+	); err != nil {
 		return err
 	}
 	if result.Status != "posted" && result.Status != "duplicate" {
 		return fmt.Errorf("accounting rejected purchase")
 	}
-	openItemID, err := singleOpenItem(result)
-	if err != nil {
+	if _, err := singleOpenItem(result); err != nil {
 		return err
 	}
-	return w.Store.MarkPurchasePosted(ctx, purchase.OrganizationID, purchase.ID, result.JournalEntryID, openItemID)
+	return w.Store.MarkPurchasePosted(ctx, purchase, result)
 }
 
 func (w DurableWorker) applyOpenItem(ctx context.Context, event domain.Event) error {
@@ -221,21 +303,46 @@ func (w DurableWorker) applyOpenItem(ctx context.Context, event domain.Event) er
 	if err != nil {
 		return err
 	}
+	if err := requireEventOrganization(event, value.OrganizationID); err != nil {
+		return err
+	}
 	if value.Status != "pending" {
 		return nil
 	}
-	result, err := w.Accounting.ApplyOpenItem(ctx, domain.AccountingApplicationCommand{
+	sourceVersion := persistedSourceVersion(value.Origin)
+	snapshotDigest := value.SnapshotDigest
+	if snapshotDigest == "" {
+		snapshotDigest = commandSnapshotDigest(struct {
+			ID, DebitOpenItemID, CreditOpenItemID, Amount, Currency string
+		}{value.ID, value.DebitOpenItemID, value.CreditOpenItemID, value.Amount.Amount, value.Amount.Currency})
+	}
+	command := domain.AccountingApplicationCommand{
 		CommandID: value.ID, OrganizationID: value.OrganizationID, DebitOpenItemID: value.DebitOpenItemID,
 		CreditOpenItemID: value.CreditOpenItemID, Amount: value.Amount, AppliedAt: event.AvailableAt,
-		CorrelationID: value.CorrelationID,
-	})
+		IdempotencyKey: internalIdempotencyKey(value.OrganizationID, "accounting.apply", value.ID, sourceVersion),
+		SourceVersion:  sourceVersion, SnapshotDigest: snapshotDigest,
+		CorrelationID: persistedCorrelationID(value.Origin, value.CorrelationID),
+	}
+	result, err := w.Accounting.ApplyOpenItem(ctx, command)
 	if err != nil {
+		if errors.Is(err, domain.ErrPeriodLocked) {
+			return w.recordAccountingPeriodLocked(
+				ctx, event, "accounting_application", value.ID, "application",
+				command, command.AppliedAt, command.SnapshotDigest,
+			)
+		}
+		return err
+	}
+	if err := validateAccountingEvent(
+		result, command.CommandID, command.OrganizationID, command.IdempotencyKey,
+		command.SourceVersion, command.SnapshotDigest, command.CorrelationID,
+	); err != nil {
 		return err
 	}
 	if result.Status != "applied" && result.Status != "duplicate" {
 		return fmt.Errorf("accounting rejected open-item application")
 	}
-	return w.Store.MarkAccountingApplicationApplied(ctx, value.OrganizationID, value.ID, result.ApplicationID)
+	return w.Store.MarkAccountingApplicationApplied(ctx, value, result)
 }
 
 func (w DurableWorker) reverseAccounting(ctx context.Context, event domain.Event) error {
@@ -249,6 +356,9 @@ func (w DurableWorker) reverseAccounting(ctx context.Context, event domain.Event
 	if err != nil {
 		return err
 	}
+	if err := requireEventOrganization(event, value.OrganizationID); err != nil {
+		return err
+	}
 	if value.Status != "requested" {
 		return nil
 	}
@@ -256,39 +366,86 @@ func (w DurableWorker) reverseAccounting(ctx context.Context, event domain.Event
 	if err != nil {
 		return err
 	}
+	sourceVersion := persistedSourceVersion(value.Origin)
+	correlationID := persistedCorrelationID(value.Origin, value.CorrelationID)
 	for _, application := range applications {
-		result, err := w.Accounting.ReverseOpenItemApplication(ctx, domain.AccountingApplicationReversalCommand{
-			CommandID:      accountingCommandID("application-reversal", application.ID, 1),
-			OrganizationID: value.OrganizationID, ApplicationID: application.ApplicationID,
-			ReversedAt: value.EffectiveAt, Reason: value.Reason, CorrelationID: value.CorrelationID,
-		})
+		if application.OrganizationID != value.OrganizationID {
+			return fmt.Errorf(
+				"ACCOUNTING_APPLICATION_ORGANIZATION_MISMATCH: reversal %s application %s",
+				value.ID,
+				application.ID,
+			)
+		}
+		commandID := accountingCommandID("application-reversal", application.ID, sourceVersion)
+		snapshotDigest := commandSnapshotDigest(struct {
+			ApplicationID, Reason string
+			ReversedAt            time.Time
+		}{application.ApplicationID, value.Reason, value.EffectiveAt})
+		command := domain.AccountingApplicationReversalCommand{
+			CommandID: commandID, OrganizationID: value.OrganizationID,
+			IdempotencyKey: internalIdempotencyKey(value.OrganizationID, "accounting.reverse-application", application.ID, sourceVersion),
+			SourceVersion:  sourceVersion, SnapshotDigest: snapshotDigest,
+			ApplicationID: application.ApplicationID, ReversedAt: value.EffectiveAt,
+			Reason: value.Reason, CorrelationID: correlationID,
+		}
+		result, err := w.Accounting.ReverseOpenItemApplication(ctx, command)
 		if err != nil {
+			if errors.Is(err, domain.ErrPeriodLocked) {
+				return w.recordAccountingPeriodLocked(
+					ctx, event, "accounting_reversal", value.ID,
+					"application_reversal", command, command.ReversedAt,
+					command.SnapshotDigest,
+				)
+			}
+			return err
+		}
+		if err := validateAccountingEvent(
+			result, command.CommandID, command.OrganizationID, command.IdempotencyKey,
+			command.SourceVersion, command.SnapshotDigest, command.CorrelationID,
+		); err != nil {
 			return err
 		}
 		if result.Status != "reversed" && result.Status != "duplicate" {
 			return fmt.Errorf("accounting rejected application reversal")
 		}
-		if err := w.Store.MarkAccountingApplicationReversed(ctx, value.OrganizationID, application.ID); err != nil {
+		if err := w.Store.MarkAccountingApplicationReversed(ctx, application, result); err != nil {
 			return err
 		}
 	}
-	result, err := w.Accounting.Reverse(ctx, domain.ReversalCommand{
-		CommandID: accountingCommandID("journal-reversal", value.ID, 1), OrganizationID: value.OrganizationID,
+	snapshotDigest := value.SnapshotDigest
+	if snapshotDigest == "" {
+		snapshotDigest = commandSnapshotDigest(struct {
+			ID, JournalEntryID, Reason string
+			EffectiveAt                time.Time
+		}{value.ID, value.OriginalJournalEntryID, value.Reason, value.EffectiveAt})
+	}
+	command := domain.ReversalCommand{
+		CommandID: accountingCommandID("journal-reversal", value.ID, sourceVersion), OrganizationID: value.OrganizationID,
+		IdempotencyKey: internalIdempotencyKey(value.OrganizationID, "accounting.reverse", value.ID, sourceVersion),
+		SourceVersion:  sourceVersion, SnapshotDigest: snapshotDigest,
 		OriginalJournalEntryID: value.OriginalJournalEntryID, EffectiveAt: value.EffectiveAt,
-		Reason: value.Reason, CorrelationID: value.CorrelationID,
-	})
+		Reason: value.Reason, CorrelationID: correlationID,
+	}
+	result, err := w.Accounting.Reverse(ctx, command)
 	if err != nil {
+		if errors.Is(err, domain.ErrPeriodLocked) {
+			return w.recordAccountingPeriodLocked(
+				ctx, event, "accounting_reversal", value.ID, "reversal",
+				command, command.EffectiveAt, command.SnapshotDigest,
+			)
+		}
+		return err
+	}
+	if err := validateAccountingEvent(
+		result, command.CommandID, command.OrganizationID, command.IdempotencyKey,
+		command.SourceVersion, command.SnapshotDigest, command.CorrelationID,
+	); err != nil {
 		return err
 	}
 	if result.Status != "reversed" && result.Status != "duplicate" {
 		return fmt.Errorf("accounting rejected journal reversal")
 	}
-	return w.Store.MarkAccountingReversalCompleted(ctx, value, result.JournalEntryID)
-}
-
-func hashPayment(payment domain.Payment) string {
-	value := sha256.Sum256([]byte(payment.ID + ":" + payment.Total.Amount + ":" + payment.Total.Currency + ":" + payment.Direction))
-	return hex.EncodeToString(value[:])
+	return w.Store.MarkAccountingReversalCompleted(ctx, value, result)
 }
 
 func accountingCommandID(operation, sourceID string, version int) string {

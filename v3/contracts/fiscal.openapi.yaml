@@ -12,12 +12,53 @@ servers:
 security:
   - internalBearer: []
 paths:
+  /healthz:
+    get:
+      security: []
+      operationId: fiscalHealth
+      responses:
+        '200':
+          description: Process healthy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthStatus' }
+  /readyz:
+    get:
+      security: []
+      operationId: fiscalReadiness
+      responses:
+        '200':
+          description: PostgreSQL ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReadinessStatus' }
+        '503':
+          description: PostgreSQL no está listo.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotReadyStatus' }
+  /metrics:
+    get:
+      security: []
+      operationId: fiscalMetrics
+      responses:
+        '200':
+          description: Métricas Prometheus sin PII.
+          content:
+            text/plain:
+              schema: { type: string }
+        '503':
+          description: El ledger fiscal no pudo producir métricas.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MetricsUnavailable' }
   /internal/v1/organizations/{organizationId}/authorizations:
     post:
       operationId: requestAuthorization
       parameters:
         - $ref: '#/components/parameters/OrganizationId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content:
@@ -41,6 +82,7 @@ paths:
           required: true
           schema: { type: string }
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: false
         description: >-
@@ -59,6 +101,8 @@ paths:
   /internal/v1/catalogs/document-types:
     get:
       operationId: listDocumentTypes
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
       responses:
         '200':
           description: Catálogo fiscal implementado por el adaptador.
@@ -75,6 +119,7 @@ paths:
                     letter: { type: string, enum: [A, B, C] }
                     kind: { type: string, enum: [invoice, credit_note, debit_note] }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/DomainError' }
         '500': { $ref: '#/components/responses/InternalError' }
 components:
   securitySchemes:
@@ -82,7 +127,11 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT Ed25519 de servicio de hasta cinco minutos, aud=fiscal, org_id coincidente y rol service.
+      description: >-
+        JWT Ed25519 de servicio de hasta cinco minutos. El header JOSE exige
+        alg=EdDSA y kid presente en el JWKS activo; iss, aud=fiscal, org_id,
+        iat, exp, jti, request_id, correlation_id y rol service son
+        obligatorios. X-Correlation-ID debe coincidir byte a byte con el claim.
   parameters:
     OrganizationId:
       name: organizationId
@@ -94,6 +143,12 @@ components:
       in: header
       required: true
       schema: { type: string, minLength: 8, maxLength: 128 }
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: true
+      description: Identificador estable propagado de extremo a extremo.
+      schema: { type: string, minLength: 1, maxLength: 255 }
   responses:
     Unauthorized:
       description: Credencial interna ausente, inválida o destinada a otra organización.
@@ -111,31 +166,97 @@ components:
       description: Fallo interno no atribuible a la solicitud.
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/Error' } } }
   schemas:
+    HealthStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, const: ok }
+    ReadinessStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, const: ready }
+    NotReadyStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, const: not_ready }
+    MetricsUnavailable:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        code: { type: string, const: METRICS_UNAVAILABLE }
     Decimal:
       type: string
-      pattern: '^[0-9]+(\.[0-9]+)?$'
+      pattern: '^(0|[1-9][0-9]*)(\.[0-9]+)?$'
+      description: Decimal base diez exacto, sin signo, exponente ni JSON number.
+    PositiveDecimal:
+      type: string
+      pattern: '^(0\.[0-9]*[1-9][0-9]*|[1-9][0-9]*(\.[0-9]+)?)$'
+      description: Decimal base diez exacto estrictamente mayor que cero.
+    VatRate:
+      type: string
+      pattern: '^(0(\.0+)?|2\.5(0+)?|5(\.0+)?|10\.5(0+)?|21(\.0+)?|27(\.0+)?)$'
+      description: Alícuota IVA soportada por el mock (0; 2,5; 5; 10,5; 21 o 27).
     InternalCredential:
       type: object
-      description: Claims verificadas del JWT de servicio; el token no se envía en JSON.
-      required: [iss, aud, sub, org_id, roles, request_id, jti, iat, exp, kid]
+      description: >-
+        Identidad verificada del JWT de servicio; el token no se envía en JSON.
+        kid proviene del header JOSE protegido y selecciona una clave del JWKS.
+      required: [iss, aud, sub, org_id, roles, request_id, correlation_id, jti, iat, exp, kid]
       properties:
         iss: { type: string, const: pymes-v3 }
         aud: { type: string, const: fiscal }
-        sub: { type: string, example: 'worker:fiscal' }
-        org_id: { type: string }
-        actor_id: { type: string, description: Sólo trazabilidad. }
+        sub: { type: string, pattern: '^[A-Za-z0-9:_./-]{1,255}$', example: 'worker:fiscal' }
+        org_id: { type: string, pattern: '^[A-Za-z0-9:_./-]{1,255}$' }
+        actor_id:
+          type: string
+          pattern: '^[A-Za-z0-9:_./-]{1,255}$'
+          description: Referencia opaca opcional del actor original; nunca PII.
+        delegated_actor_id:
+          type: string
+          pattern: '^[A-Za-z0-9:_./-]{1,255}$'
+          description: Referencia opaca opcional del actor delegado; requiere actor_id.
         roles: { type: array, items: { type: string } }
-        request_id: { type: string }
-        jti: { type: string }
+        request_id: { type: string, pattern: '^[A-Za-z0-9:_./-]{1,255}$' }
+        correlation_id: { type: string, pattern: '^[A-Za-z0-9:_./-]{1,255}$' }
+        jti: { type: string, pattern: '^[A-Za-z0-9:_./-]{1,255}$' }
         iat: { type: integer }
         exp: { type: integer }
-        kid: { type: string }
+        kid: { type: string, description: Identificador del header JOSE protegido. }
     FiscalRequest:
       type: object
-      required: [request_id, organization_id, credential_ref, environment, point_of_sale, document_type, voucher_number, issue_date, currency, totals, recipient, lines, snapshot_digest]
+      description: >-
+        idempotency_key y correlation_id deben coincidir con sus headers.
+        source_version identifica la versión del documento Pymes y
+        snapshot_digest su hash SHA-256 inmutable.
+      required:
+        - request_id
+        - organization_id
+        - idempotency_key
+        - correlation_id
+        - source_version
+        - credential_ref
+        - environment
+        - point_of_sale
+        - document_type
+        - voucher_number
+        - issue_date
+        - currency
+        - totals
+        - recipient
+        - lines
+        - snapshot_digest
       properties:
         request_id: { type: string }
         organization_id: { type: string }
+        idempotency_key: { type: string, minLength: 8, maxLength: 128 }
+        correlation_id: { type: string, minLength: 1, maxLength: 255 }
+        source_version: { type: integer, minimum: 1 }
         credential_ref: { type: string, description: Referencia KMS/secret; jamás certificado o clave. }
         environment: { type: string, enum: [homologation, production] }
         point_of_sale: { type: integer, minimum: 1 }
@@ -143,7 +264,10 @@ components:
         voucher_number: { type: integer, minimum: 1, description: Reservado por Pymes. }
         issue_date: { type: string, format: date }
         currency: { type: string, enum: [ARS, USD, EUR] }
-        exchange_rate: { $ref: '#/components/schemas/Decimal' }
+        exchange_rate:
+          allOf:
+            - { $ref: '#/components/schemas/PositiveDecimal' }
+          description: Obligatorio para USD y EUR.
         totals:
           type: object
           required: [net, vat, exempt, total]
@@ -175,31 +299,51 @@ components:
             required: [description, quantity, unit_price, vat_rate, net]
             properties:
               description: { type: string }
-              quantity: { $ref: '#/components/schemas/Decimal' }
+              quantity: { $ref: '#/components/schemas/PositiveDecimal' }
               unit_price: { $ref: '#/components/schemas/Decimal' }
-              vat_rate: { $ref: '#/components/schemas/Decimal' }
+              vat_rate: { $ref: '#/components/schemas/VatRate' }
               net: { $ref: '#/components/schemas/Decimal' }
-        snapshot_digest: { type: string, description: SHA-256 del documento congelado. }
+        snapshot_digest:
+          type: string
+          pattern: '^[A-Fa-f0-9]{64}$'
+          description: Hash SHA-256 hexadecimal del documento congelado.
+      allOf:
+        - if:
+            required: [currency]
+            properties:
+              currency: { not: { const: ARS } }
+          then:
+            required: [exchange_rate]
+        - if:
+            required: [document_type]
+            properties:
+              document_type: { pattern: '^(NC|ND)' }
+          then:
+            required: [associated_voucher]
     FiscalResult:
       type: object
-      required: [request_id, organization_id, status, snapshot_digest, observed_at, correlation_id]
+      required: [request_id, organization_id, idempotency_key, correlation_id, source_version, snapshot_digest, status, observed_at]
       properties:
         request_id: { type: string }
         organization_id: { type: string }
+        idempotency_key: { type: string, minLength: 8, maxLength: 128 }
+        correlation_id: { type: string, minLength: 1, maxLength: 255 }
+        source_version: { type: integer, minimum: 1 }
         status: { type: string, enum: [authorized, rejected, uncertain, not_found] }
         cae: { type: string }
         cae_expires_on: { type: string, format: date }
         authority_result_code: { type: string }
         authority_messages: { type: array, items: { type: string } }
         artifact_ref: { type: string, description: Referencia privada al XML cifrado, no XML. }
-        snapshot_digest: { type: string }
+        snapshot_digest:
+          type: string
+          pattern: '^[A-Fa-f0-9]{64}$'
         observed_at: { type: string, format: date-time }
-        correlation_id: { type: string }
     Error:
       type: object
       required: [code, title, correlation_id]
       properties:
-        code: { type: string, enum: [ORG_NOT_PROVISIONED, UNAUTHORIZED_SERVICE, IDEMPOTENCY_KEY_REUSED, FISCAL_UNCERTAIN, FISCAL_REJECTED, AUTHORITY_TIMEOUT, CERTIFICATE_UNAVAILABLE, VALIDATION_ERROR, INTERNAL_ERROR] }
+        code: { type: string, enum: [UNAUTHORIZED_SERVICE, IDEMPOTENCY_KEY_REUSED, AUTHORITY_TIMEOUT, VALIDATION_ERROR, INTERNAL_ERROR] }
         title: { type: string }
         detail: { type: string }
         correlation_id: { type: string }

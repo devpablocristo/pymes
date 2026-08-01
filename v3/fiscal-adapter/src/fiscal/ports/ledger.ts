@@ -1,8 +1,19 @@
 import type { FiscalRequest, FiscalResult } from "../domain/fiscal.js";
 
+export interface FiscalAuditMetadata {
+  correlationId: string;
+  actorRef?: string;
+  delegatedActorRef?: string;
+  workloadIssuer: string;
+  workloadSubject: string;
+  workloadRequestId: string;
+  workloadTokenId: string;
+}
+
 export interface FiscalRecord {
   idempotencyKey: string;
   payloadHash: string;
+  audit: FiscalAuditMetadata;
   request: FiscalRequest;
   result: FiscalResult;
 }

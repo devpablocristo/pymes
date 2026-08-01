@@ -258,7 +258,7 @@ export function createHttpSchedulingGateway(baseUrl: string): SchedulingGateway 
         }),
       );
     },
-    async createPublicBooking(organizationSlug, input: BookingInput) {
+    async createPublicBooking(organizationSlug, input) {
       const mutation = publicMutation("public-booking:create");
       return unwrap(
         await client.POST("/api/v1/public/scheduling/{organizationSlug}/bookings", {

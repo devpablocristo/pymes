@@ -113,7 +113,6 @@ export function PublicBookingPage({
         customer,
         start_at: selectedSlot.start_at,
         participants,
-        status: service.confirmation_required ? "pending_confirmation" : "confirmed",
         allocations: selectedSlot.allocations,
         ...(notes ? { notes } : {}),
       });

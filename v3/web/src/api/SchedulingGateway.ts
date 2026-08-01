@@ -10,6 +10,7 @@ import type {
   DateRange,
   PublicActionInput,
   PublicBooking,
+  PublicBookingInput,
   PublicCatalog,
   PublicWaitlistEntry,
   QueueAdvanceInput,
@@ -63,7 +64,7 @@ export interface SchedulingGateway {
   ): Promise<QueueTicket>;
   getPublicCatalog(organizationSlug: string): Promise<PublicCatalog>;
   calculatePublicAvailability(organizationSlug: string, query: AvailabilityQuery): Promise<Slot[]>;
-  createPublicBooking(organizationSlug: string, input: BookingInput): Promise<PublicBooking[]>;
+  createPublicBooking(organizationSlug: string, input: PublicBookingInput): Promise<PublicBooking[]>;
   createPublicWaitlistEntry(organizationSlug: string, input: WaitlistInput): Promise<PublicWaitlistEntry>;
   consumePublicAction(token: string, input: PublicActionInput): Promise<void>;
 }

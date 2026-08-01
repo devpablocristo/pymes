@@ -68,6 +68,33 @@ describe("InMemorySchedulingGateway", () => {
     expect(JSON.stringify(catalog)).not.toMatch(/party|email|phone/i);
   });
 
+  it("decide el estado público desde la configuración del servicio", async () => {
+    const gateway = new InMemorySchedulingGateway();
+    const branch = gateway.branches[0]!;
+    const service = gateway.services.find(
+      (candidate) => candidate.confirmation_required,
+    )!;
+    const day = DateTime.now().plus({ days: 4 }).setZone(branch.timezone);
+    const slots = await gateway.calculatePublicAvailability("centro-norte", {
+      branch_id: branch.id,
+      service_id: service.id,
+      from: day.startOf("day").toUTC().toISO()!,
+      until: day.endOf("day").toUTC().toISO()!,
+      participants: 1,
+    });
+
+    const created = await gateway.createPublicBooking("centro-norte", {
+      branch_id: branch.id,
+      service_id: service.id,
+      customer: { name: "Cliente público" },
+      start_at: slots[0]!.start_at,
+      participants: 1,
+      allocations: slots[0]!.allocations,
+    });
+
+    expect(created[0]!.status).toBe("pending_confirmation");
+  });
+
   it("clasifica los tokens públicos inválidos", async () => {
     const gateway = new InMemorySchedulingGateway();
     await expect(

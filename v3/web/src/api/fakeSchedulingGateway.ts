@@ -11,6 +11,7 @@ import type {
   DateRange,
   PublicActionInput,
   PublicBooking,
+  PublicBookingInput,
   PublicCatalog,
   PublicWaitlistEntry,
   QueueAdvanceInput,
@@ -570,9 +571,24 @@ export class InMemorySchedulingGateway implements SchedulingGateway {
     return this.slots(query);
   }
 
-  async createPublicBooking(organizationSlug: string, input: BookingInput): Promise<PublicBooking[]> {
+  async createPublicBooking(
+    organizationSlug: string,
+    input: PublicBookingInput,
+  ): Promise<PublicBooking[]> {
     await this.getPublicCatalog(organizationSlug);
-    const created = await this.createBooking({ organizationId: "org_e2e", getToken: async () => null }, input);
+    const service = this.services.find((candidate) => candidate.id === input.service_id);
+    if (!service) {
+      throw new SchedulingApiError("NOT_FOUND", "Servicio inexistente", 404);
+    }
+    const created = await this.createBooking(
+      { organizationId: "org_e2e", getToken: async () => null },
+      {
+        ...input,
+        status: service.confirmation_required
+          ? "pending_confirmation"
+          : "confirmed",
+      },
+    );
     return created.map(
       ({
         id,

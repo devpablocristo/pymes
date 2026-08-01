@@ -16,6 +16,7 @@ export type Slot = components["schemas"]["Slot"];
 export type Booking = components["schemas"]["Booking"];
 export type PublicBooking = components["schemas"]["PublicBooking"];
 export type BookingInput = components["schemas"]["BookingInput"];
+export type PublicBookingInput = Omit<BookingInput, "status">;
 export type BookingStatus = Booking["status"];
 export type RescheduleInput = components["schemas"]["RescheduleInput"];
 export type WaitlistEntry = components["schemas"]["WaitlistEntry"];

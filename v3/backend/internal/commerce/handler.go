@@ -615,7 +615,7 @@ func (s *HTTPServer) CreateSale(
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
-	fiscalSnapshot, err := freezeFiscalSnapshot(input.Fiscal, input.Currency, exchangeRate)
+	fiscalSnapshot, err := handlerhelpers.FreezeFiscalSnapshot(input.Fiscal, input.Currency, exchangeRate)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
@@ -645,22 +645,6 @@ func (s *HTTPServer) CreateSale(
 
 func isNote(value string) bool {
 	return strings.HasPrefix(value, "NC") || strings.HasPrefix(value, "ND")
-}
-
-func freezeFiscalSnapshot(fiscal any, currency, exchangeRate string) ([]byte, error) {
-	raw, err := json.Marshal(fiscal)
-	if err != nil {
-		return nil, err
-	}
-	var snapshot map[string]any
-	if err = json.Unmarshal(raw, &snapshot); err != nil {
-		return nil, err
-	}
-	snapshot["currency"] = currency
-	if exchangeRate != "" {
-		snapshot["exchange_rate"] = exchangeRate
-	}
-	return json.Marshal(snapshot)
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

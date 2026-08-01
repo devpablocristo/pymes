@@ -628,6 +628,27 @@ func (e SaleInputDocumentType) Valid() bool {
 	}
 }
 
+// Defines values for SaleInputFiscalConcept.
+const (
+	Products            SaleInputFiscalConcept = "products"
+	ProductsAndServices SaleInputFiscalConcept = "products_and_services"
+	Services            SaleInputFiscalConcept = "services"
+)
+
+// Valid indicates whether the value is a known member of the SaleInputFiscalConcept enum.
+func (e SaleInputFiscalConcept) Valid() bool {
+	switch e {
+	case Products:
+		return true
+	case ProductsAndServices:
+		return true
+	case Services:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SaleInputFiscalEnvironment.
 const (
 	SaleInputFiscalEnvironmentHomologation SaleInputFiscalEnvironment = "homologation"
@@ -1028,11 +1049,18 @@ type SaleInput struct {
 
 	// Fiscal Snapshot fiscal inmutable; Pymes agrega identidad, numeración y digest antes de llamar al adaptador.
 	Fiscal struct {
-		Environment SaleInputFiscalEnvironment `json:"environment"`
-		IssueDate   openapi_types.Date         `json:"issue_date"`
-		Lines       []map[string]interface{}   `json:"lines"`
-		Recipient   map[string]interface{}     `json:"recipient"`
-		Totals      map[string]interface{}     `json:"totals"`
+		// Concept Concepto WSFE; se congela como products cuando el cliente lo omite.
+		Concept       *SaleInputFiscalConcept    `json:"concept,omitempty"`
+		Environment   SaleInputFiscalEnvironment `json:"environment"`
+		IssueDate     openapi_types.Date         `json:"issue_date"`
+		Lines         []map[string]interface{}   `json:"lines"`
+		Recipient     map[string]interface{}     `json:"recipient"`
+		ServicePeriod *struct {
+			From       openapi_types.Date `json:"from"`
+			PaymentDue openapi_types.Date `json:"payment_due"`
+			To         openapi_types.Date `json:"to"`
+		} `json:"service_period,omitempty"`
+		Totals map[string]interface{} `json:"totals"`
 	} `json:"fiscal"`
 	Id           string `json:"id"`
 	PointOfSale  int    `json:"point_of_sale"`
@@ -1044,6 +1072,9 @@ type SaleInput struct {
 
 // SaleInputDocumentType defines model for SaleInput.DocumentType.
 type SaleInputDocumentType string
+
+// SaleInputFiscalConcept Concepto WSFE; se congela como products cuando el cliente lo omite.
+type SaleInputFiscalConcept string
 
 // SaleInputFiscalEnvironment defines model for SaleInput.Fiscal.Environment.
 type SaleInputFiscalEnvironment string

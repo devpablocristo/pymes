@@ -644,6 +644,19 @@ components:
           properties:
             environment: { type: string, enum: [homologation, production] }
             issue_date: { type: string, format: date }
+            concept:
+              type: string
+              enum: [products, services, products_and_services]
+              default: products
+              description: Concepto WSFE; se congela como products cuando el cliente lo omite.
+            service_period:
+              type: object
+              additionalProperties: false
+              required: [from, to, payment_due]
+              properties:
+                from: { type: string, format: date }
+                to: { type: string, format: date }
+                payment_due: { type: string, format: date }
             totals: { type: object }
             recipient: { type: object }
             lines: { type: array, minItems: 1, items: { type: object } }

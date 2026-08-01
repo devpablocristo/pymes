@@ -61,6 +61,7 @@ prefix="pymes-v3-${PYMES_DEPLOY_ENV}"
 export CLOUDSDK_CORE_PROJECT="$project"
 export PYMES_INTERNAL_KMS_KEY_VERSION
 export PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS="${PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS:-}"
+google_calendar_enabled=${PYMES_GOOGLE_CALENDAR_ENABLED:-false}
 api_sa="pymes-v3-api-${PYMES_DEPLOY_ENV}@${project}.iam.gserviceaccount.com"
 web_sa="pymes-v3-web-${PYMES_DEPLOY_ENV}@${project}.iam.gserviceaccount.com"
 worker_sa="pymes-v3-worker-${PYMES_DEPLOY_ENV}@${project}.iam.gserviceaccount.com"
@@ -71,6 +72,45 @@ accounting_admin_sa="pymes-v3-accounting-admin-${PYMES_DEPLOY_ENV}@${project}.ia
 migrate_sa="pymes-v3-migrate-${PYMES_DEPLOY_ENV}@${project}.iam.gserviceaccount.com"
 fiscal_migrate_sa="pymes-v3-fiscal-migrate-${PYMES_DEPLOY_ENV}@${project}.iam.gserviceaccount.com"
 accounting_migrate_sa="pymes-v3-acct-migrate-${PYMES_DEPLOY_ENV}@${project}.iam.gserviceaccount.com"
+
+case "$google_calendar_enabled" in
+  true|false) ;;
+  *) echo "PYMES_GOOGLE_CALENDAR_ENABLED must be true or false" >&2; exit 2 ;;
+esac
+calendar_environment="|PYMES_GOOGLE_CALENDAR_ENABLED=false"
+google_client_secret_name=
+if [[ "$google_calendar_enabled" == "true" ]]; then
+  : "${PYMES_GOOGLE_CLIENT_ID:?set the environment-specific Google OAuth client ID}"
+  : "${PYMES_GOOGLE_REDIRECT_URL:?set the single global BFF Google OAuth callback}"
+  : "${PYMES_CALENDAR_KMS_KEY:?set the environment-specific Calendar token CryptoKey}"
+  google_redirect_pattern='^https://[^/@|?#]+/api/v1/calendars/google/oauth/callback$'
+  if [[ ! "$PYMES_GOOGLE_REDIRECT_URL" =~ $google_redirect_pattern ]]; then
+    echo "PYMES_GOOGLE_REDIRECT_URL must be the global HTTPS BFF callback /api/v1/calendars/google/oauth/callback" >&2
+    exit 2
+  fi
+  for value in "$PYMES_GOOGLE_CLIENT_ID" "$PYMES_GOOGLE_REDIRECT_URL" "$PYMES_CALENDAR_KMS_KEY"; do
+    if [[ "$value" == *"|"* || "$value" == *$'\n'* ]]; then
+      echo "Google Calendar environment values must not contain Cloud Run delimiters or newlines" >&2
+      exit 2
+    fi
+  done
+  expected_calendar_kms_key="projects/${project}/locations/${region}/keyRings/${prefix}/cryptoKeys/calendar-tokens"
+  if [[ "$PYMES_CALENDAR_KMS_KEY" != "$expected_calendar_kms_key" ]]; then
+    echo "PYMES_CALENDAR_KMS_KEY must be $expected_calendar_kms_key" >&2
+    exit 2
+  fi
+  google_client_secret_name="$prefix-google-client-secret"
+  calendar_environment="|PYMES_GOOGLE_CALENDAR_ENABLED=true|PYMES_GOOGLE_CLIENT_ID=$PYMES_GOOGLE_CLIENT_ID|PYMES_GOOGLE_REDIRECT_URL=$PYMES_GOOGLE_REDIRECT_URL|PYMES_CALENDAR_KMS_KEY=$PYMES_CALENDAR_KMS_KEY"
+  echo "GOOGLE_CALENDAR status=enabled callback=global kms=environment-scoped"
+else
+  for variable in PYMES_GOOGLE_CLIENT_ID PYMES_GOOGLE_REDIRECT_URL PYMES_CALENDAR_KMS_KEY; do
+    if [[ -n "${!variable:-}" ]]; then
+      echo "$variable requires PYMES_GOOGLE_CALENDAR_ENABLED=true" >&2
+      exit 2
+    fi
+  done
+  echo "GOOGLE_CALENDAR status=disabled callback=unset"
+fi
 
 version_pattern="^projects/${project}/locations/${region}/keyRings/${prefix}/cryptoKeys/internal-jwt-signing/cryptoKeyVersions/[1-9][0-9]*$"
 if [[ ! "$PYMES_INTERNAL_KMS_KEY_VERSION" =~ $version_pattern ]]; then
@@ -234,6 +274,9 @@ fi
 for secret in "${required_secrets[@]}"; do
   require_secret "$secret"
 done
+if [[ -n "$google_client_secret_name" ]]; then
+  require_secret "$google_client_secret_name"
+fi
 
 secret_ref() {
   printf '%s:%s' "$1" "${secret_versions[$1]}"
@@ -346,9 +389,14 @@ fiscal_url=$(service_url "$fiscal_service")
 accounting_url=$(service_url "$accounting_service")
 accounting_admin_url=$(service_url "$accounting_admin_service")
 api_secrets="PYMES_CLERK_SECRET_KEY=$(secret_ref "$prefix-clerk-secret-key"),PYMES_CLERK_WEBHOOK_SECRET=$(secret_ref "$prefix-clerk-webhook-secret"),PYMES_DATABASE_URL=$(secret_ref "$prefix-database-url")"
-api_environment="PYMES_ENVIRONMENT=production|PYMES_CLERK_ISSUER=$PYMES_CLERK_ISSUER|PYMES_CLERK_AUDIENCE=pymes-v3|PYMES_CLERK_AUTHORIZED_PARTIES=$PYMES_CLERK_AUTHORIZED_PARTIES|PYMES_HTTP_ADDR=:8080${tracing_environment}"
 worker_secrets="PYMES_DATABASE_URL=$(secret_ref "$prefix-worker-database-url")"
-worker_environment="FISCAL_ADAPTER_URL=$fiscal_url|ACCOUNTING_URL=$accounting_url|PYMES_ENVIRONMENT=production|PYMES_INTERNAL_ISSUER=pymes-v3|PYMES_INTERNAL_KMS_KEY_VERSION=$PYMES_INTERNAL_KMS_KEY_VERSION|PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS=$PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS|PYMES_WORKER_HTTP_ADDR=:8080|PYMES_WORKER_INTERVAL_MS=250|PYMES_WORKER_METRICS_INTERVAL=60s${tracing_environment}"
+if [[ -n "$google_client_secret_name" ]]; then
+  google_client_secret_ref=$(secret_ref "$google_client_secret_name")
+  api_secrets="$api_secrets,PYMES_GOOGLE_CLIENT_SECRET=$google_client_secret_ref"
+  worker_secrets="$worker_secrets,PYMES_GOOGLE_CLIENT_SECRET=$google_client_secret_ref"
+fi
+api_environment="PYMES_ENVIRONMENT=production|PYMES_CLERK_ISSUER=$PYMES_CLERK_ISSUER|PYMES_CLERK_AUDIENCE=pymes-v3|PYMES_CLERK_AUTHORIZED_PARTIES=$PYMES_CLERK_AUTHORIZED_PARTIES|PYMES_HTTP_ADDR=:8080${calendar_environment}${tracing_environment}"
+worker_environment="FISCAL_ADAPTER_URL=$fiscal_url|ACCOUNTING_URL=$accounting_url|PYMES_ENVIRONMENT=production|PYMES_INTERNAL_ISSUER=pymes-v3|PYMES_INTERNAL_KMS_KEY_VERSION=$PYMES_INTERNAL_KMS_KEY_VERSION|PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS=$PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS|PYMES_WORKER_HTTP_ADDR=:8080|PYMES_WORKER_INTERVAL_MS=250|PYMES_WORKER_METRICS_INTERVAL=60s${calendar_environment}${tracing_environment}"
 if [[ "$pergo_enabled" == "true" ]]; then
   api_secrets+=",PERGO_WEBHOOK_SECRETS=$(secret_ref "$prefix-pergo-webhook-secrets")"
   api_environment+="|PYMES_PERGO_ENABLED=true|PERGO_WORKSPACE_ID=$pergo_workspace_id"

@@ -41,9 +41,11 @@ require_count() {
 }
 
 run_dry() {
-  local environment="$1" output="$2" endpoint="${3:-}" pergo="${4:-false}"
+  local environment="$1" output="$2" endpoint="${3:-}" google_enabled="${4:-false}" google_redirect_override="${5:-}" pergo="${6:-false}"
   local prefix="pymes-v3-$environment"
   local kms_version="projects/$project/locations/$region/keyRings/$prefix/cryptoKeys/internal-jwt-signing/cryptoKeyVersions/1"
+  local calendar_kms_key="projects/$project/locations/$region/keyRings/$prefix/cryptoKeys/calendar-tokens"
+  local google_redirect="${google_redirect_override:-https://api.$environment.dry-run.invalid/api/v1/calendars/google/oauth/callback}"
   local -a common_environment=(
     "PYMES_CLOUD_RUN_DRY_RUN=true"
     "PYMES_DEPLOY_ENV=$environment"
@@ -63,6 +65,7 @@ run_dry() {
     "PYMES_CLERK_ISSUER=https://clerk.dry-run.invalid"
     "PYMES_CLERK_AUTHORIZED_PARTIES=https://pymes.dry-run.invalid"
     "PYMES_INTERNAL_KMS_KEY_VERSION=$kms_version"
+    "PYMES_GOOGLE_CALENDAR_ENABLED=$google_enabled"
     'PYMES_INTERNAL_JWKS_JSON={"keys":[{"kid":"dry-run-public-key"}]}'
   )
   if [[ "$pergo" == "true" ]]; then
@@ -73,9 +76,19 @@ run_dry() {
       "PYMES_PERGO_CHANNEL=whatsapp_cloud"
     )
   fi
+  if [[ "$google_enabled" == "true" ]]; then
+    common_environment+=(
+      "PYMES_GOOGLE_CLIENT_ID=client-$environment.apps.googleusercontent.com"
+      "PYMES_GOOGLE_REDIRECT_URL=$google_redirect"
+      "PYMES_CALENDAR_KMS_KEY=$calendar_kms_key"
+    )
+  fi
 
   if [[ -n "$endpoint" ]]; then
     env -u GOOGLE_APPLICATION_CREDENTIALS \
+      -u PYMES_GOOGLE_CLIENT_ID \
+      -u PYMES_GOOGLE_REDIRECT_URL \
+      -u PYMES_CALENDAR_KMS_KEY \
       "PATH=$guarded_path" \
       "${common_environment[@]}" \
       PYMES_TRACING_EXPORTER=otlp \
@@ -87,6 +100,9 @@ run_dry() {
       -u PYMES_TRACING_EXPORTER \
       -u OTEL_EXPORTER_OTLP_ENDPOINT \
       -u PYMES_TRACE_SAMPLE_RATIO \
+      -u PYMES_GOOGLE_CLIENT_ID \
+      -u PYMES_GOOGLE_REDIRECT_URL \
+      -u PYMES_CALENDAR_KMS_KEY \
       "PATH=$guarded_path" \
       "${common_environment[@]}" \
       "$deploy_script" >"$output"
@@ -132,6 +148,8 @@ check_environment() {
   local service deploy_line
 
   require_text "$output" "TRACING status=pending exporter=none endpoint=unset"
+  require_text "$output" "GOOGLE_CALENDAR status=disabled callback=unset"
+  require_count "$output" "PYMES_GOOGLE_CALENDAR_ENABLED=false" 2
   forbid_text "$output" "PYMES_TRACING_EXPORTER="
   forbid_text "$output" "OTEL_EXPORTER_OTLP_ENDPOINT="
   forbid_text "$output" "PYMES_TRACE_SAMPLE_RATIO="
@@ -190,15 +208,40 @@ check_environment() {
   require_count "$traced_output" "PYMES_TRACE_SAMPLE_RATIO=0.25" 2
 }
 
+check_google_environment() {
+  local environment="$1" output="$2"
+  local prefix="pymes-v3-$environment"
+  local redirect="https://api.$environment.dry-run.invalid/api/v1/calendars/google/oauth/callback"
+  local kms_key="projects/$project/locations/$region/keyRings/$prefix/cryptoKeys/calendar-tokens"
+  local deploy_line
+
+  require_text "$output" "GOOGLE_CALENDAR status=enabled callback=global kms=environment-scoped"
+  require_count "$output" "PYMES_GOOGLE_CALENDAR_ENABLED=true" 2
+  require_count "$output" "PYMES_GOOGLE_CLIENT_ID=client-$environment.apps.googleusercontent.com" 2
+  require_count "$output" "PYMES_GOOGLE_REDIRECT_URL=$redirect" 2
+  require_count "$output" "PYMES_CALENDAR_KMS_KEY=$kms_key" 2
+  require_count "$output" "PYMES_GOOGLE_CLIENT_SECRET=$prefix-google-client-secret:DRY_RUN" 2
+
+  deploy_line=$(grep -F -- "DRY-RUN gcloud run deploy $prefix-web " "$output") ||
+    fail "missing deploy command for $prefix-web"
+  [[ "$deploy_line" != *"PYMES_GOOGLE_"* &&
+    "$deploy_line" != *"PYMES_CALENDAR_KMS_KEY"* &&
+    "$deploy_line" != *"google-client-secret"* ]] ||
+    fail "the static web received Google OAuth configuration"
+}
+
 for environment in stg prd; do
   output="$scratch_dir/$environment.out"
   traced_output="$scratch_dir/$environment-traced.out"
   pergo_output="$scratch_dir/$environment-pergo.out"
+  google_output="$scratch_dir/$environment-google.out"
   run_dry "$environment" "$output"
   run_dry "$environment" "$traced_output" "https://otel-collector.$environment.dry-run.invalid:4318"
-  run_dry "$environment" "$pergo_output" "" true
+  run_dry "$environment" "$pergo_output" "" false "" true
+  run_dry "$environment" "$google_output" "" true
   check_environment "$environment" "$output" "$traced_output"
   check_pergo_environment "$environment" "$pergo_output"
+  check_google_environment "$environment" "$google_output"
   echo "PASS cloud-run security dry-run environment=$environment resources_created=0"
 done
 
@@ -210,3 +253,12 @@ fi
 require_text "$scratch_dir/credential-endpoint.err" \
   "OTEL_EXPORTER_OTLP_ENDPOINT must be an explicit endpoint without credentials"
 echo "PASS cloud-run tracing endpoint credentials=rejected"
+
+if run_dry stg "$scratch_dir/tenant-google-callback.out" "" true \
+  "https://api.stg.dry-run.invalid/api/v1/organizations/org-a/calendars/google/oauth/callback" \
+  2>"$scratch_dir/tenant-google-callback.err"; then
+  fail "a tenant-specific Google OAuth callback was accepted"
+fi
+require_text "$scratch_dir/tenant-google-callback.err" \
+  "PYMES_GOOGLE_REDIRECT_URL must be the global HTTPS BFF callback"
+echo "PASS Google Calendar callback scope=global tenant_callback=rejected"

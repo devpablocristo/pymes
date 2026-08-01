@@ -43,6 +43,7 @@ de almacenamiento:
 |---|---|
 | API | `clerk-secret-key`, `clerk-webhook-secret`, `pergo-webhook-secrets`, `database-url` |
 | Worker | `worker-database-url`, `pergo-api-key` |
+| API y worker al habilitar Google | `google-client-secret` |
 | Fiscal | `fiscal-credential`, `fiscal-database-url` |
 | Accounting | `accounting-database-url` |
 | Accounting admin | `accounting-admin-database-url` |
@@ -52,6 +53,14 @@ JWT que pudieran existir de una provisión anterior ya no se montan ni se migran
 después de desplegar y verificar KMS deben retirarse sus bindings y deshabilitar
 sus versiones mediante un cambio operativo separado y recuperable. Nunca se
 guardan secretos en Git. La semilla fija de Compose es exclusivamente local.
+
+Google Calendar queda deshabilitado hasta que cada entorno tenga su propio
+cliente OAuth, secreto y CryptoKey `calendar-tokens`. El único redirect
+permitido es
+`https://API_ORIGIN/api/v1/calendars/google/oauth/callback`: no lleva
+organización en el path y nunca apunta a la Web estática. El deployment gate
+rechaza callbacks por tenant, claves de otro entorno y cualquier intento de
+inyectar OAuth/KMS en Web.
 
 ## Firma interna con Cloud KMS
 

@@ -47,6 +47,10 @@ Dentro de Cloud Run se adopta este control compuesto:
    despliega con escala a cero y publica `/healthz` y `/readyz`. El endpoint de
    API y la publishable key de Clerk se fijan al construir la imagen de cada
    entorno; ningún secreto se incorpora al bundle.
+9. Google OAuth inicia y termina en el BFF mediante un callback global,
+   `/api/v1/calendars/google/oauth/callback`. El callback no contiene el tenant:
+   organización y actor se recuperan de un `state` de un solo uso. El client
+   secret se monta sólo en API y worker; nunca en la Web.
 
 HTTPS administrado por Cloud Run + ingress interno + IAM mínimo + JWT interno
 es el equivalente operativo del requisito de mTLS para este runtime. No se
@@ -77,6 +81,11 @@ endpoint OTLP. El gate verifica ingress privado, ausencia de acceso anónimo,
 invoker esperado, aislamiento de URLs internas, Web pública sin SQL/secretos y
 configuración condicional de tracing. El dry-run no consulta GCP, no resuelve
 secretos y no crea recursos.
+
+El mismo gate ejecuta Calendar deshabilitado y habilitado para STG/PRD. En el
+segundo caso exige callback global HTTPS, cliente y CryptoKey por entorno,
+comprueba que API y worker reciban la misma configuración y que Web no reciba
+ninguna credencial Google.
 
 En un despliegue real, el script vuelve a consultar ingress y la política IAM
 de cada servicio privado, además de rechazar permisos `roles/run.invoker`

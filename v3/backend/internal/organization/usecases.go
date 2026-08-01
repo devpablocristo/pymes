@@ -51,6 +51,61 @@ func (queries PublicQueries) ResolvePublicBySlug(
 	return organization, nil
 }
 
+type FeatureStore interface {
+	GetFeatureFlags(context.Context, string) (organizationdomain.FeatureFlags, error)
+	UpdateFeatureFlags(
+		context.Context,
+		organizationdomain.UpdateFeatureFlags,
+	) (organizationdomain.FeatureFlags, error)
+}
+
+// Features is the organization-owned application service. Other contexts
+// consume only their own Enabled port and never import this domain.
+type Features struct {
+	Store FeatureStore
+}
+
+func (features Features) Get(
+	ctx context.Context,
+	organizationID string,
+) (organizationdomain.FeatureFlags, error) {
+	organizationID = strings.TrimSpace(organizationID)
+	if ctx == nil || features.Store == nil || organizationID == "" {
+		return organizationdomain.FeatureFlags{}, fmt.Errorf("VALIDATION_ERROR")
+	}
+	return features.Store.GetFeatureFlags(ctx, organizationID)
+}
+
+func (features Features) Update(
+	ctx context.Context,
+	command organizationdomain.UpdateFeatureFlags,
+) (organizationdomain.FeatureFlags, error) {
+	command.OrganizationID = strings.TrimSpace(command.OrganizationID)
+	command.ActorID = strings.TrimSpace(command.ActorID)
+	if ctx == nil || features.Store == nil || !command.Valid() {
+		return organizationdomain.FeatureFlags{}, fmt.Errorf("VALIDATION_ERROR")
+	}
+	return features.Store.UpdateFeatureFlags(ctx, command)
+}
+
+// Enabled deliberately uses strings at the cross-context seam. The consumer
+// owns the port and feature constant; Pymes domain types never leak outward.
+func (features Features) Enabled(
+	ctx context.Context,
+	organizationID string,
+	featureCode string,
+) (bool, error) {
+	flags, err := features.Get(ctx, organizationID)
+	if err != nil {
+		return false, err
+	}
+	feature, err := organizationdomain.ParseFeature(featureCode)
+	if err != nil {
+		return false, err
+	}
+	return flags.Enabled(feature), nil
+}
+
 type ProvisionOrganizationCommand struct {
 	ID                  string
 	Name                string

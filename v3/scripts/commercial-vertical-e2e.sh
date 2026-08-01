@@ -157,6 +157,33 @@ get_json() {
   fi
 }
 
+enable_fiscal_mock_for_tenant() {
+  feature_token=$1
+  feature_organization=$2
+  feature_output=$3
+  feature_status=$(curl -sS -o "$feature_output" -w '%{http_code}' \
+    -X PUT \
+    "$api_url/api/v1/organizations/$feature_organization/features" \
+    -H "Authorization: Bearer $feature_token" \
+    -H 'Content-Type: application/json' \
+    --data-binary '{
+      "scheduling_enabled":false,
+      "whatsapp_enabled":false,
+      "google_calendar_enabled":false,
+      "fiscal_real_enabled":true,
+      "expected_version":1
+    }')
+  if test "$feature_status" != 200; then
+    echo "enable fiscal feature failed: status=$feature_status body=$(sed -n '1,20p' "$feature_output")" >&2
+    exit 1
+  fi
+}
+
+enable_fiscal_mock_for_tenant \
+  "$token_a" "$organization_a" "$tmp_dir/features-a"
+enable_fiscal_mock_for_tenant \
+  "$token_b" "$organization_b" "$tmp_dir/features-b"
+
 wait_status() {
   wait_token=$1
   wait_path=$2

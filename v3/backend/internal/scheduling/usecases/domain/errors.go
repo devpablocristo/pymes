@@ -20,6 +20,7 @@ const (
 	CodeBookingStateInvalid    ErrorCode = "BOOKING_STATE_INVALID"
 	CodeIdempotencyKeyReused   ErrorCode = "IDEMPOTENCY_KEY_REUSED"
 	CodeForbidden              ErrorCode = "FORBIDDEN"
+	CodeFeatureDisabled        ErrorCode = "FEATURE_DISABLED"
 )
 
 type Error struct {

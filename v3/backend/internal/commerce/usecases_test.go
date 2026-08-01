@@ -14,6 +14,7 @@ type commandStoreStub struct {
 	CommandStore
 	ping        func(context.Context) error
 	createParty func(context.Context, domain.IdempotencyCommand, domain.Party) (domain.Party, error)
+	createSale  func(context.Context, domain.IdempotencyCommand, domain.Sale, string) (domain.Sale, error)
 }
 
 type adjustmentCommandStoreStub struct {
@@ -43,6 +44,14 @@ func (s *adjustmentCommandStoreStub) RequestAccountingAdjustmentIdempotent(
 func (s commandStoreStub) Ping(ctx context.Context) error { return s.ping(ctx) }
 func (s commandStoreStub) CreatePartyIdempotent(ctx context.Context, command domain.IdempotencyCommand, party domain.Party) (domain.Party, error) {
 	return s.createParty(ctx, command, party)
+}
+func (s commandStoreStub) CreateSaleAndQueueFiscalIdempotent(
+	ctx context.Context,
+	command domain.IdempotencyCommand,
+	sale domain.Sale,
+	credentialRef string,
+) (domain.Sale, error) {
+	return s.createSale(ctx, command, sale, credentialRef)
 }
 
 func TestCommandsReadinessChecksDatabasePort(t *testing.T) {
@@ -96,6 +105,43 @@ func TestCreatePartyIdempotentValidatesCanonicalCommandIdentity(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Fatalf("store calls=%d", calls)
+	}
+}
+
+func TestCreateSaleFailsBeforePersistenceWhenFiscalRealIsDisabled(
+	t *testing.T,
+) {
+	t.Parallel()
+	sale := domain.Sale{
+		ID: "sale-1", OrganizationID: "org-1",
+		Total: domain.Money{Amount: "121.00", Currency: "ARS"},
+	}
+	command := domain.IdempotencyCommand{
+		Key: "sale-key", OrganizationID: sale.OrganizationID,
+		Operation: domain.OperationCreateSale, SourceID: sale.ID,
+		SourceVersion: 1, PayloadHash: strings.Repeat("a", 64),
+	}
+	calls := 0
+	commands := Commands{
+		Store: commandStoreStub{createSale: func(
+			context.Context,
+			domain.IdempotencyCommand,
+			domain.Sale,
+			string,
+		) (domain.Sale, error) {
+			calls++
+			return sale, nil
+		}},
+		Features: commerceFeatureGate{enabled: false},
+	}
+	_, err := commands.CreateSaleAndQueueFiscalIdempotent(
+		context.Background(),
+		command,
+		sale,
+		"credential-1",
+	)
+	if !errors.Is(err, domain.ErrFeatureDisabled) || calls != 0 {
+		t.Fatalf("err=%v persistence_calls=%d", err, calls)
 	}
 }
 

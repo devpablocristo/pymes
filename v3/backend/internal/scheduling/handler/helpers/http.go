@@ -50,6 +50,8 @@ func WriteError(w http.ResponseWriter, err error) {
 		status = http.StatusNotFound
 	case domain.CodeForbidden:
 		status = http.StatusForbidden
+	case domain.CodeFeatureDisabled:
+		status = http.StatusForbidden
 	case domain.CodeSlotConflict, domain.CodeResourceConflict, domain.CodeCapacityExceeded,
 		domain.CodeBookingVersionConflict, domain.CodeIdempotencyKeyReused,
 		domain.CodeBookingStateInvalid, domain.CodeHoldExpired:

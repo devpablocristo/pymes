@@ -564,6 +564,53 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/DomainError' }
         '503': { $ref: '#/components/responses/FiscalUnavailable' }
+  /api/v1/organizations/{organizationId}/features:
+    get:
+      operationId: getOrganizationFeatures
+      summary: Consulta los rollouts habilitados para la organización autenticada.
+      description: >-
+        Devuelve únicamente configuración de producto. No expone credenciales,
+        secretos ni configuración interna de los proveedores.
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+      responses:
+        '200':
+          description: Configuración tenant y versión optimista.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrganizationFeatureFlags' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+    put:
+      operationId: updateOrganizationFeatures
+      summary: Reemplaza atómicamente los cuatro rollouts de una organización.
+      description: >-
+        Requiere owner/admin, organización ready y expected_version. Todos los
+        flags tienen default seguro false y el cambio queda auditado.
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrganizationFeatureFlagsUpdate' }
+      responses:
+        '200':
+          description: Configuración actualizada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrganizationFeatureFlags' }
+        '400': { $ref: '#/components/responses/InvalidCommand' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: expected_version no coincide con la versión actual.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
 components:
   securitySchemes:
     clerkBearer:
@@ -678,9 +725,47 @@ components:
             - OAUTH_PROVIDER_DENIED
             - OAUTH_STATE_INVALID
             - OAUTH_STATE_EXPIRED
+            - FEATURE_DISABLED
+            - FEATURE_VERSION_CONFLICT
             - CALENDAR_REAUTH_REQUIRED
             - CALENDAR_PROVIDER_UNAVAILABLE
             - INTERNAL_ERROR
+    OrganizationFeatureFlagsUpdate:
+      type: object
+      additionalProperties: false
+      required:
+        - scheduling_enabled
+        - whatsapp_enabled
+        - google_calendar_enabled
+        - fiscal_real_enabled
+        - expected_version
+      properties:
+        scheduling_enabled: { type: boolean, default: false }
+        whatsapp_enabled: { type: boolean, default: false }
+        google_calendar_enabled: { type: boolean, default: false }
+        fiscal_real_enabled: { type: boolean, default: false }
+        expected_version: { type: integer, format: int64, minimum: 1 }
+    OrganizationFeatureFlags:
+      type: object
+      additionalProperties: false
+      required:
+        - organization_id
+        - scheduling_enabled
+        - whatsapp_enabled
+        - google_calendar_enabled
+        - fiscal_real_enabled
+        - version
+        - updated_at
+        - updated_by
+      properties:
+        organization_id: { type: string, readOnly: true }
+        scheduling_enabled: { type: boolean }
+        whatsapp_enabled: { type: boolean }
+        google_calendar_enabled: { type: boolean }
+        fiscal_real_enabled: { type: boolean }
+        version: { type: integer, format: int64, minimum: 1, readOnly: true }
+        updated_at: { type: string, format: date-time, readOnly: true }
+        updated_by: { type: string, readOnly: true }
     GoogleCalendarOAuthStartInput:
       type: object
       additionalProperties: false

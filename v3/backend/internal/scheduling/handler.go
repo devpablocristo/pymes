@@ -24,6 +24,10 @@ type Authenticator interface {
 	Principal(*http.Request) (domain.Principal, error)
 }
 
+type FeatureGate interface {
+	Enabled(context.Context, string, string) (bool, error)
+}
+
 // SchedulingUsecases is the HTTP adapter-owned input port.
 type SchedulingUsecases interface {
 	CreateBranch(context.Context, domain.Branch) (domain.Branch, error)
@@ -53,6 +57,7 @@ type SchedulingUsecases interface {
 	AdvanceQueueTicket(context.Context, domain.CommandMetadata, string, uuid.UUID, int, domain.QueueStatus) (domain.QueueTicket, error)
 	ListQueue(context.Context, string, uuid.UUID) ([]domain.QueueTicket, error)
 	ResolvePublicOrganization(context.Context, string) (string, error)
+	ResolveActionOrganization(context.Context, string) (string, error)
 	ConsumeBookingAction(context.Context, string, domain.ActionPurpose, domain.CommandMetadata, int, *time.Time, int, string) (domain.Booking, error)
 	ConsumeWaitlistAction(context.Context, string, domain.CommandMetadata, int) (domain.WaitlistEntry, error)
 }
@@ -60,10 +65,15 @@ type SchedulingUsecases interface {
 type HTTPHandler struct {
 	usecases SchedulingUsecases
 	auth     Authenticator
+	features FeatureGate
 }
 
-func NewHTTPHandler(usecases SchedulingUsecases, auth Authenticator) *HTTPHandler {
-	return &HTTPHandler{usecases: usecases, auth: auth}
+func NewHTTPHandler(
+	usecases SchedulingUsecases,
+	auth Authenticator,
+	features FeatureGate,
+) *HTTPHandler {
+	return &HTTPHandler{usecases: usecases, auth: auth, features: features}
 }
 
 func (h *HTTPHandler) Handler() http.Handler {
@@ -364,6 +374,9 @@ func (h *HTTPHandler) publicAvailability(w http.ResponseWriter, request *http.Re
 		httphelpers.WriteError(w, err)
 		return
 	}
+	if !h.requireEnabled(w, request, organizationID) {
+		return
+	}
 	h.availability(w, request, organizationID)
 }
 
@@ -373,6 +386,9 @@ func (h *HTTPHandler) publicCatalog(w http.ResponseWriter, request *http.Request
 	)
 	if err != nil {
 		httphelpers.WriteError(w, err)
+		return
+	}
+	if !h.requireEnabled(w, request, organizationID) {
 		return
 	}
 	result, err := h.usecases.PublicCatalog(request.Context(), organizationID)
@@ -443,6 +459,9 @@ func (h *HTTPHandler) createPublicBooking(w http.ResponseWriter, request *http.R
 	)
 	if err != nil {
 		httphelpers.WriteError(w, err)
+		return
+	}
+	if !h.requireEnabled(w, request, organizationID) {
 		return
 	}
 	h.createBooking(w, request, organizationID, "public:scheduling", true)
@@ -710,6 +729,9 @@ func (h *HTTPHandler) createPublicWaitlist(w http.ResponseWriter, request *http.
 		httphelpers.WriteError(w, err)
 		return
 	}
+	if !h.requireEnabled(w, request, organizationID) {
+		return
+	}
 	h.createWaitlist(w, request, organizationID, "public:scheduling", true)
 }
 
@@ -851,6 +873,17 @@ func (h *HTTPHandler) consumePublicAction(w http.ResponseWriter, request *http.R
 		return
 	}
 	token := chi.URLParam(request, "token")
+	organizationID, err := h.usecases.ResolveActionOrganization(
+		request.Context(),
+		token,
+	)
+	if err != nil {
+		httphelpers.WriteError(w, err)
+		return
+	}
+	if !h.requireEnabled(w, request, organizationID) {
+		return
+	}
 	if input.Purpose == domain.ActionAcceptWaitlist {
 		result, err := h.usecases.ConsumeWaitlistAction(
 			request.Context(), token, metadata, input.ExpectedVersion,
@@ -892,7 +925,52 @@ func (h *HTTPHandler) authorize(
 		httphelpers.WriteProblem(w, http.StatusForbidden, domain.CodeForbidden, "permission is required")
 		return "", domain.Principal{}, false
 	}
+	if !h.requireEnabled(w, request, organizationID) {
+		return "", domain.Principal{}, false
+	}
 	return organizationID, principal, true
+}
+
+func (h *HTTPHandler) requireEnabled(
+	w http.ResponseWriter,
+	request *http.Request,
+	organizationID string,
+) bool {
+	if h.features == nil {
+		httphelpers.WriteError(
+			w,
+			domain.NewError(
+				domain.CodeFeatureDisabled,
+				"scheduling is disabled",
+			),
+		)
+		return false
+	}
+	enabled, err := h.features.Enabled(
+		request.Context(),
+		organizationID,
+		"scheduling_enabled",
+	)
+	if err != nil {
+		httphelpers.WriteProblem(
+			w,
+			http.StatusServiceUnavailable,
+			"INTERNAL_ERROR",
+			"feature configuration is unavailable",
+		)
+		return false
+	}
+	if !enabled {
+		httphelpers.WriteError(
+			w,
+			domain.NewError(
+				domain.CodeFeatureDisabled,
+				"scheduling is disabled",
+			),
+		)
+		return false
+	}
+	return true
 }
 
 func commandMetadata(

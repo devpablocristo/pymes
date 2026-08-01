@@ -212,4 +212,5 @@ var (
 	ErrOAuthStateExpired    = errors.New("OAUTH_STATE_EXPIRED")
 	ErrOAuthStateConsumed   = errors.New("OAUTH_STATE_CONSUMED")
 	ErrOrganizationMismatch = errors.New("CALENDAR_ORGANIZATION_MISMATCH")
+	ErrFeatureDisabled      = errors.New("FEATURE_DISABLED")
 )

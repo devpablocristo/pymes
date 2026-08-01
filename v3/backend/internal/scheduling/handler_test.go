@@ -18,6 +18,19 @@ type authenticatorFake struct {
 	err       error
 }
 
+type schedulingFeatureGateFake struct {
+	enabled bool
+	err     error
+}
+
+func (gate schedulingFeatureGateFake) Enabled(
+	context.Context,
+	string,
+	string,
+) (bool, error) {
+	return gate.enabled, gate.err
+}
+
 func (f authenticatorFake) Principal(*http.Request) (Principal, error) {
 	return f.principal, f.err
 }
@@ -46,6 +59,13 @@ func (f *handlerUsecasesFake) CreateBranch(
 }
 
 func (f *handlerUsecasesFake) ResolvePublicOrganization(
+	context.Context,
+	string,
+) (string, error) {
+	return "secret-org-id", nil
+}
+
+func (f *handlerUsecasesFake) ResolveActionOrganization(
 	context.Context,
 	string,
 ) (string, error) {
@@ -162,7 +182,11 @@ func TestSchedulingHandlerEnforcesTenantAndExplicitPermission(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			usecases := &handlerUsecasesFake{}
-			handler := NewHTTPHandler(usecases, authenticatorFake{principal: test.principal}).Handler()
+			handler := NewHTTPHandler(
+				usecases,
+				authenticatorFake{principal: test.principal},
+				schedulingFeatureGateFake{enabled: true},
+			).Handler()
 			request := httptest.NewRequest(
 				http.MethodPost,
 				"/api/v1/organizations/org_a/scheduling/branches",
@@ -177,8 +201,65 @@ func TestSchedulingHandlerEnforcesTenantAndExplicitPermission(t *testing.T) {
 	}
 }
 
+func TestSchedulingHandlerRejectsEnabledRoleWhenTenantFeatureIsDisabled(
+	t *testing.T,
+) {
+	t.Parallel()
+	usecases := &handlerUsecasesFake{}
+	handler := NewHTTPHandler(
+		usecases,
+		authenticatorFake{principal: Principal{
+			OrganizationID: "org-a", ActorID: "owner-a", Role: "owner",
+			OrganizationStatus: "ready", MembershipStatus: "active",
+			Permissions: []string{domain.PermissionManage},
+		}},
+		schedulingFeatureGateFake{enabled: false},
+	).Handler()
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/organizations/org-a/scheduling/branches",
+		strings.NewReader(`{}`),
+	)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden ||
+		!strings.Contains(response.Body.String(), "FEATURE_DISABLED") ||
+		usecases.created {
+		t.Fatalf(
+			"status=%d body=%s created=%v",
+			response.Code,
+			response.Body,
+			usecases.created,
+		)
+	}
+}
+
+func TestPublicSchedulingFailsClosedForDisabledTenant(t *testing.T) {
+	t.Parallel()
+	handler := NewHTTPHandler(
+		&handlerUsecasesFake{},
+		nil,
+		schedulingFeatureGateFake{enabled: false},
+	).Handler()
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/public/scheduling/acme/catalog",
+		nil,
+	)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden ||
+		!strings.Contains(response.Body.String(), "FEATURE_DISABLED") {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body)
+	}
+}
+
 func TestSchedulingHasNoPublicPhoneLookupAuthenticationRoute(t *testing.T) {
-	handler := NewHTTPHandler(&handlerUsecasesFake{}, nil).Handler()
+	handler := NewHTTPHandler(
+		&handlerUsecasesFake{},
+		nil,
+		schedulingFeatureGateFake{enabled: true},
+	).Handler()
 	request := httptest.NewRequest(
 		http.MethodGet,
 		"/api/v1/public/scheduling/acme/bookings?phone=541155555555",
@@ -193,7 +274,11 @@ func TestSchedulingHasNoPublicPhoneLookupAuthenticationRoute(t *testing.T) {
 
 func TestPublicBookingCannotInjectInternalStatus(t *testing.T) {
 	usecases := &handlerUsecasesFake{}
-	handler := NewHTTPHandler(usecases, nil).Handler()
+	handler := NewHTTPHandler(
+		usecases,
+		nil,
+		schedulingFeatureGateFake{enabled: true},
+	).Handler()
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/api/v1/public/scheduling/acme/bookings",
@@ -261,7 +346,11 @@ func TestPublicCatalogRequiresNoSessionAndDoesNotExposeTenantMetadata(t *testing
 		"/api/v1/public/scheduling/acme/catalog",
 		nil,
 	)
-	NewHTTPHandler(usecases, nil).Handler().ServeHTTP(response, request)
+	NewHTTPHandler(
+		usecases,
+		nil,
+		schedulingFeatureGateFake{enabled: true},
+	).Handler().ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
@@ -304,6 +393,7 @@ func TestSchedulingStatusCustomizationRoutesAndMetadata(t *testing.T) {
 	handler := NewHTTPHandler(
 		usecases,
 		authenticatorFake{principal: principal},
+		schedulingFeatureGateFake{enabled: true},
 	).Handler()
 
 	configure := httptest.NewRequest(

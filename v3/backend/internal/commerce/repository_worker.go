@@ -44,9 +44,14 @@ func (s *Store) ListUncertainSales(ctx context.Context, limit int) ([]domain.Pen
 				       request_id,actor_ref,source_version,correlation_id,created_at,updated_at
 				FROM app.sales
 				WHERE status='fiscal_uncertain'
+				  AND EXISTS (
+				    SELECT 1 FROM app.organization_feature_flags features
+				    WHERE features.org_id=$2 AND features.fiscal_real_enabled
+				  )
 				ORDER BY updated_at
 				LIMIT $1`,
 			limit-len(result),
+			organizationID,
 		)
 		if err != nil {
 			_ = tx.Rollback(ctx)

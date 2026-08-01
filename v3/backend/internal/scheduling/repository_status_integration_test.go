@@ -69,6 +69,36 @@ func TestBookingStatusCustomizationPreservesTenantAndLifecycleInvariants(t *test
 	if err != nil || len(configurations) != 1 || len(configurations[0].Substates) != 1 {
 		t.Fatalf("configurations=%+v err=%v", configurations, err)
 	}
+	updatedConfiguration := configuration
+	updatedConfiguration.Label = "Confirmado"
+	updatedMetadata := testMetadata(
+		organizationID,
+		"configure-status-update-"+suffix,
+		string(configuration.Status),
+	)
+	updatedMetadata.SourceVersion = 2
+	if _, err = repository.ConfigureBookingStatus(
+		ctx,
+		updatedMetadata,
+		updatedConfiguration,
+	); err != nil {
+		t.Fatal(err)
+	}
+	var auditedBeforeLabel string
+	if err = pool.QueryRow(ctx, `
+		SELECT before_state->>'Label'
+		FROM app.scheduling_audit
+		WHERE org_id=$1
+		  AND action='scheduling.booking_status.configured'
+		  AND request_id=$2`,
+		organizationID,
+		updatedMetadata.RequestID,
+	).Scan(&auditedBeforeLabel); err != nil {
+		t.Fatal(err)
+	}
+	if auditedBeforeLabel != configuration.Label {
+		t.Fatalf("audit before label=%q want=%q", auditedBeforeLabel, configuration.Label)
+	}
 
 	booking := testBooking(
 		organizationID,
@@ -154,5 +184,23 @@ func TestBookingStatusCustomizationPreservesTenantAndLifecycleInvariants(t *test
 	}
 	if transitioned.Status != domain.BookingCheckedIn || transitioned.SubstateCode != "" {
 		t.Fatalf("internal transition retained an invalid custom substate: %+v", transitioned)
+	}
+	lateReplay, err := repository.SetBookingSubstate(
+		ctx,
+		substateMetadata,
+		booking.ID,
+		1,
+		"first_visit",
+	)
+	if err != nil ||
+		lateReplay.Status != withSubstate.Status ||
+		lateReplay.SubstateCode != withSubstate.SubstateCode ||
+		lateReplay.Version != withSubstate.Version {
+		t.Fatalf(
+			"late replay changed original response: replay=%+v original=%+v err=%v",
+			lateReplay,
+			withSubstate,
+			err,
+		)
 	}
 }

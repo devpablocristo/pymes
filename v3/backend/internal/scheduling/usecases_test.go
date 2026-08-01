@@ -450,9 +450,33 @@ func TestResizeRevalidatesAndFreezesDurationAndCancellationReason(t *testing.T) 
 		t.Fatal(err)
 	}
 	if algorithms.duration != 90 || resized.DurationMinutes != 90 ||
-		!resized.EndAt.Equal(newStart.Add(90*time.Minute)) {
+		!resized.EndAt.Equal(newStart.Add(90*time.Minute)) ||
+		resized.SubstateCode != "" {
 		t.Fatalf("resize was not revalidated/frozen: booking=%+v duration=%d", resized, algorithms.duration)
 	}
+	repository.current.Status = domain.BookingHeld
+	repository.current.SubstateCode = "awaiting_customer"
+	heldReplacement, err := service.RescheduleBooking(
+		context.Background(),
+		testMetadata(current.OrganizationID, "resize-held", current.ID.String()),
+		RescheduleInput{
+			OrganizationID:  current.OrganizationID,
+			BookingID:       current.ID,
+			ExpectedVersion: 1,
+			StartAt:         newStart.Add(24 * time.Hour),
+			Allocations:     []domain.Allocation{allocation},
+		},
+	)
+	if err != nil ||
+		heldReplacement.Status != domain.BookingPendingConfirmation ||
+		heldReplacement.SubstateCode != "" {
+		t.Fatalf(
+			"held replacement retained incompatible state: booking=%+v err=%v",
+			heldReplacement,
+			err,
+		)
+	}
+	repository.current = current
 	cancelMetadata := testMetadata(current.OrganizationID, "cancel", current.ID.String())
 	cancelled, err := service.TransitionBooking(
 		context.Background(), cancelMetadata, current.OrganizationID,

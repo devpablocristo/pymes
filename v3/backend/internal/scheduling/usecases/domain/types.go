@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -435,7 +436,7 @@ func (c BookingStatusConfiguration) Validate() error {
 		return NewError(CodeValidation, "organization and internal booking status are required")
 	}
 	label := strings.TrimSpace(c.Label)
-	if label == "" || len(label) > 80 {
+	if label == "" || utf8.RuneCountInString(label) > 80 {
 		return NewError(CodeValidation, "booking status label must contain at most 80 characters")
 	}
 	if len(c.Substates) > 50 {
@@ -446,7 +447,8 @@ func (c BookingStatusConfiguration) Validate() error {
 		code := strings.TrimSpace(substate.Code)
 		substateLabel := strings.TrimSpace(substate.Label)
 		if !ValidBookingSubstateCode(code) || substateLabel == "" ||
-			len(substateLabel) > 80 || substate.SortOrder < 0 || substate.SortOrder > 10000 {
+			utf8.RuneCountInString(substateLabel) > 80 ||
+			substate.SortOrder < 0 || substate.SortOrder > 10000 {
 			return NewError(CodeValidation, "booking substate definition is invalid")
 		}
 		if _, duplicate := seen[code]; duplicate {

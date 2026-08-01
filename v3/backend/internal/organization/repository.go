@@ -110,5 +110,134 @@ func (r *Postgres) SyncClerk(ctx context.Context, clerkOrganizationID string, or
 		organization.ID, now); err != nil {
 		return err
 	}
+	if _, err = tx.Exec(
+		ctx,
+		"SELECT set_config('app.org_id',$1,true)",
+		organization.ID,
+	); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `
+		INSERT INTO app.organization_feature_flags (
+		  org_id,scheduling_enabled,whatsapp_enabled,
+		  google_calendar_enabled,fiscal_real_enabled,
+		  version,updated_at,updated_by
+		)
+		VALUES ($1,false,false,false,false,1,$2,'system:provision')
+		ON CONFLICT (org_id) DO NOTHING`,
+		organization.ID, now); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `
+		INSERT INTO app.organization_feature_flag_audit (
+		  org_id,version,scheduling_enabled,whatsapp_enabled,
+		  google_calendar_enabled,fiscal_real_enabled,changed_by,changed_at
+		)
+		SELECT
+		  org_id,version,scheduling_enabled,whatsapp_enabled,
+		  google_calendar_enabled,fiscal_real_enabled,updated_by,updated_at
+		FROM app.organization_feature_flags
+		WHERE org_id=$1
+		ON CONFLICT (org_id,version) DO NOTHING`,
+		organization.ID); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
+}
+
+const featureFlagColumns = `
+	org_id,scheduling_enabled,whatsapp_enabled,google_calendar_enabled,
+	fiscal_real_enabled,version,updated_at,updated_by`
+
+func (r *Postgres) GetFeatureFlags(
+	ctx context.Context,
+	organizationID string,
+) (domain.FeatureFlags, error) {
+	if r == nil || r.pool == nil {
+		return domain.FeatureFlags{}, errors.New("organization database is required")
+	}
+	tx, err := repositoryhelpers.BeginTenant(ctx, r.pool, organizationID)
+	if err != nil {
+		return domain.FeatureFlags{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	flags, err := repositoryhelpers.ScanFeatureFlags(tx.QueryRow(ctx, `
+		SELECT `+featureFlagColumns+`
+		FROM app.organization_feature_flags
+		WHERE org_id=$1`,
+		organizationID,
+	))
+	if err != nil {
+		return domain.FeatureFlags{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return domain.FeatureFlags{}, err
+	}
+	return flags, nil
+}
+
+func (r *Postgres) UpdateFeatureFlags(
+	ctx context.Context,
+	command domain.UpdateFeatureFlags,
+) (domain.FeatureFlags, error) {
+	if r == nil || r.pool == nil || !command.Valid() {
+		return domain.FeatureFlags{}, errors.New("valid organization feature update is required")
+	}
+	tx, err := repositoryhelpers.BeginTenant(
+		ctx,
+		r.pool,
+		command.OrganizationID,
+	)
+	if err != nil {
+		return domain.FeatureFlags{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	now := r.now().UTC()
+	flags, err := repositoryhelpers.ScanFeatureFlags(tx.QueryRow(ctx, `
+		UPDATE app.organization_feature_flags
+		SET scheduling_enabled=$2,
+		    whatsapp_enabled=$3,
+		    google_calendar_enabled=$4,
+		    fiscal_real_enabled=$5,
+		    version=version+1,
+		    updated_at=$6,
+		    updated_by=$7
+		WHERE org_id=$1 AND version=$8
+		RETURNING `+featureFlagColumns,
+		command.OrganizationID,
+		command.SchedulingEnabled,
+		command.WhatsAppEnabled,
+		command.GoogleCalendarEnabled,
+		command.FiscalRealEnabled,
+		now,
+		command.ActorID,
+		command.ExpectedVersion,
+	))
+	if errors.Is(err, domain.ErrUnknown) {
+		return domain.FeatureFlags{}, domain.ErrFeatureVersionConflict
+	}
+	if err != nil {
+		return domain.FeatureFlags{}, err
+	}
+	if _, err = tx.Exec(ctx, `
+		INSERT INTO app.organization_feature_flag_audit (
+		  org_id,version,scheduling_enabled,whatsapp_enabled,
+		  google_calendar_enabled,fiscal_real_enabled,changed_by,changed_at
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+		flags.OrganizationID,
+		flags.Version,
+		flags.SchedulingEnabled,
+		flags.WhatsAppEnabled,
+		flags.GoogleCalendarEnabled,
+		flags.FiscalRealEnabled,
+		flags.UpdatedBy,
+		flags.UpdatedAt,
+	); err != nil {
+		return domain.FeatureFlags{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return domain.FeatureFlags{}, err
+	}
+	return flags, nil
 }

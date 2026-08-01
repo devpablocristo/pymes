@@ -8,10 +8,15 @@ organization_id=${PYMES_NOTIFICATIONS_E2E_ORGANIZATION:-notifications-e2e-$$}
 api_port=${PYMES_API_PORT:-18080}
 pergo_port=${PERGO_FAKE_PORT:-18085}
 database_url=${PYMES_DATABASE_URL:-}
+default_database_url='postgresql://pymes:pymes@127.0.0.1:55434/pymes_v3?sslmode=disable'
 
 psql_app() {
   if [ -n "$database_url" ]; then
     psql "$database_url" "$@"
+    return
+  fi
+  if command -v psql >/dev/null 2>&1; then
+    psql "$default_database_url" "$@"
     return
   fi
   docker compose exec -T postgres psql -U pymes -d pymes_v3 "$@"
@@ -47,6 +52,12 @@ SET whatsapp_enabled=true,
     pergo_channel=EXCLUDED.pergo_channel,
     pergo_sender_identity=EXCLUDED.pergo_sender_identity,
     updated_at=now();
+INSERT INTO app.organization_feature_flags(
+  org_id,whatsapp_enabled,updated_by
+)
+VALUES(:'organization_id',true,'e2e')
+ON CONFLICT (org_id) DO UPDATE
+SET whatsapp_enabled=true,updated_at=now(),updated_by='e2e';
 INSERT INTO app.notifications(
   org_id,id,kind,aggregate_type,aggregate_id,recipient_e164,template_name,
   template_version,locale,variables,body,delivery_channel,sender_identity,
@@ -111,6 +122,12 @@ SET whatsapp_enabled=true,
     pergo_channel=EXCLUDED.pergo_channel,
     pergo_sender_identity=EXCLUDED.pergo_sender_identity,
     updated_at=now();
+INSERT INTO app.organization_feature_flags(
+  org_id,whatsapp_enabled,updated_by
+)
+VALUES(:'organization_id',true,'e2e')
+ON CONFLICT (org_id) DO UPDATE
+SET whatsapp_enabled=true,updated_at=now(),updated_by='e2e';
 INSERT INTO app.outbox(
   id,org_id,topic,payload,payload_hash,idempotency_key,request_id,actor_ref,
   source_version,snapshot_digest,correlation_id,available_at

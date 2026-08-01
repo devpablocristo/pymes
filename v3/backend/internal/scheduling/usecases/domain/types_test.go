@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -63,6 +64,25 @@ func TestBookingStatusConfigurationCannotRedefineInternalStates(t *testing.T) {
 	configuration.Substates[1].Code = configuration.Substates[0].Code
 	if err := configuration.Validate(); ErrorCodeOf(err) != CodeValidation {
 		t.Fatalf("duplicate substate code was accepted: %v", err)
+	}
+}
+
+func TestBookingStatusConfigurationCountsUnicodeCodePoints(t *testing.T) {
+	configuration := BookingStatusConfiguration{
+		OrganizationID: "org-unicode",
+		Status:         BookingConfirmed,
+		Label:          strings.Repeat("á", 80),
+		Substates: []BookingSubstateDefinition{{
+			Code:  "unicode",
+			Label: strings.Repeat("ñ", 80),
+		}},
+	}
+	if err := configuration.Validate(); err != nil {
+		t.Fatalf("80 Unicode code points must be valid: %v", err)
+	}
+	configuration.Label += "á"
+	if ErrorCodeOf(configuration.Validate()) != CodeValidation {
+		t.Fatal("81 Unicode code points must be rejected")
 	}
 }
 

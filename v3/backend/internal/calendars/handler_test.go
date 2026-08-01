@@ -24,6 +24,19 @@ func (auth calendarHandlerAuth) Principal(
 	return auth.principal, auth.err
 }
 
+type calendarFeatureGate struct {
+	enabled bool
+	err     error
+}
+
+func (gate calendarFeatureGate) Enabled(
+	context.Context,
+	string,
+	string,
+) (bool, error) {
+	return gate.enabled, gate.err
+}
+
 type calendarHandlerCommands struct {
 	startInput    StartOAuthInput
 	completeInput CompleteOAuthInput
@@ -78,13 +91,17 @@ func TestCalendarBFFBindsOAuthToVerifiedClerkSessionAndHidesTokens(
 			AccessTokenExpiry: time.Date(2026, 8, 1, 1, 0, 0, 0, time.UTC),
 		},
 	}
-	handler := NewCalendarHTTP(commands, calendarHandlerAuth{
-		principal: identitydomain.Principal{
-			OrganizationID: "org-a", ActorID: "user-a",
-			SessionID: "session-a", Role: identitydomain.RoleOwner,
-			OrganizationStatus: "ready", MembershipStatus: "active",
+	handler := NewCalendarHTTP(
+		commands,
+		calendarHandlerAuth{
+			principal: identitydomain.Principal{
+				OrganizationID: "org-a", ActorID: "user-a",
+				SessionID: "session-a", Role: identitydomain.RoleOwner,
+				OrganizationStatus: "ready", MembershipStatus: "active",
+			},
 		},
-	}).Handler()
+		calendarFeatureGate{enabled: true},
+	).Handler()
 	startRequest := httptest.NewRequest(
 		http.MethodPost,
 		"/api/v1/organizations/org-a/calendars/google/oauth/start",
@@ -158,6 +175,7 @@ func TestCalendarBFFCallbackRejectsTenantHintOutsideClerkSession(t *testing.T) {
 			SessionID: "session-b", Role: identitydomain.RoleOwner,
 			OrganizationStatus: "ready", MembershipStatus: "active",
 		}},
+		calendarFeatureGate{enabled: true},
 	).Handler()
 	request := httptest.NewRequest(
 		http.MethodGet,
@@ -201,6 +219,7 @@ func TestCalendarBFFRejectsCrossTenantAndMemberMutation(t *testing.T) {
 			handler := NewCalendarHTTP(
 				&calendarHandlerCommands{},
 				calendarHandlerAuth{principal: test.principal},
+				calendarFeatureGate{enabled: true},
 			).Handler()
 			request := httptest.NewRequest(
 				http.MethodPost,
@@ -213,5 +232,35 @@ func TestCalendarBFFRejectsCrossTenantAndMemberMutation(t *testing.T) {
 				t.Fatalf("status=%d body=%s", response.Code, response.Body)
 			}
 		})
+	}
+}
+
+func TestCalendarBFFRejectsEnabledRoleWhenTenantFeatureIsDisabled(
+	t *testing.T,
+) {
+	t.Parallel()
+	commands := &calendarHandlerCommands{}
+	handler := NewCalendarHTTP(
+		commands,
+		calendarHandlerAuth{principal: identitydomain.Principal{
+			OrganizationID: "org-a", ActorID: "user-a",
+			SessionID: "session-a", Role: identitydomain.RoleOwner,
+			OrganizationStatus: "ready", MembershipStatus: "active",
+		}},
+		calendarFeatureGate{enabled: false},
+	).Handler()
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/organizations/org-a/calendars/google/oauth/start",
+		strings.NewReader(`{"time_zone":"UTC"}`),
+	)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden ||
+		!strings.Contains(response.Body.String(), `"FEATURE_DISABLED"`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body)
+	}
+	if commands.startInput.OrganizationID != "" {
+		t.Fatalf("disabled feature reached use case: %+v", commands.startInput)
 	}
 }

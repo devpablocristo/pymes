@@ -131,6 +131,7 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 	store := commerce.New(pool)
 	identities := identity.New(pool)
 	organizations := organization.New(pool)
+	features := organization.Features{Store: organizations}
 	fiscalCredentials := commerce.HTTPFiscalClient{
 		BaseURL:        cfg.FiscalURL,
 		Client:         commerce.NewServiceHTTPClient(),
@@ -141,6 +142,7 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 		Store:                 store,
 		AccountingAdjustments: store,
 		FiscalCredentials:     fiscalCredentials,
+		Features:              features,
 		Now:                   store.Clock,
 	}
 	clerkAuthenticator := identity.ClerkAuthenticator{
@@ -177,6 +179,11 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 	schedulingHTTP := scheduling.NewHTTPHandler(
 		schedulingUsecases,
 		scheduling.NewIdentityAuthenticator(clerkAuthenticator),
+		features,
+	).Handler()
+	featureHTTP := organization.NewFeatureHTTP(
+		features,
+		clerkAuthenticator,
 	).Handler()
 	notificationStore := notifications.NewPostgres(pool)
 	var notificationHTTP http.Handler
@@ -195,10 +202,11 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 			notifications.PerGoSignatureVerifier{
 				Secrets: secrets, Tolerance: 5 * time.Minute,
 			},
+			features,
 		).Routes()
 	}
 	calendarHTTP, calendarResource, err := initializeCalendarAPI(
-		ctx, cfg.Calendars, pool, clerkAuthenticator,
+		ctx, cfg.Calendars, pool, clerkAuthenticator, features,
 	)
 	if err != nil {
 		_ = internalTokens.Close()
@@ -210,6 +218,14 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 		}
 	}
 	contextRoutes := []publicContextRoute{
+		{
+			Pattern: "GET /api/v1/organizations/{organizationId}/features",
+			Handler: featureHTTP,
+		},
+		{
+			Pattern: "PUT /api/v1/organizations/{organizationId}/features",
+			Handler: featureHTTP,
+		},
 		{
 			Pattern: "/api/v1/organizations/{organizationId}/scheduling/",
 			Handler: schedulingHTTP,
@@ -327,6 +343,7 @@ func initializeCalendarAPI(
 	cfg config.Calendars,
 	pool *pgxpool.Pool,
 	auth calendars.CalendarAuthenticator,
+	features calendars.HandlerFeatureGate,
 ) (http.Handler, closeResource, error) {
 	if !cfg.Enabled {
 		return nil, nil, nil
@@ -353,6 +370,7 @@ func initializeCalendarAPI(
 	handler := calendars.NewCalendarHTTP(
 		calendars.Commands{Repository: store, Google: provider},
 		auth,
+		features,
 	)
 	return handler.Handler(), resource, nil
 }
@@ -379,6 +397,7 @@ func initializeCalendarWorker(
 	cfg config.Calendars,
 	pool *pgxpool.Pool,
 	leaseFor time.Duration,
+	features calendars.WorkerFeatureGate,
 ) (worker.Dispatcher, closeResource, error) {
 	if !cfg.Enabled {
 		return nil, nil, nil
@@ -407,6 +426,7 @@ func initializeCalendarWorker(
 	return calendars.CalendarWorker{
 		Store:    calendars.NewStore(pool, cipher),
 		Provider: provider,
+		Features: features,
 		LeaseFor: leaseFor,
 	}, resource, nil
 }
@@ -466,6 +486,8 @@ func InitializeWorker(
 	fiscalHTTP := commerce.NewServiceHTTPClient()
 	accountingHTTP := commerce.NewServiceHTTPClient()
 	commerceStore := commerce.New(pool)
+	organizationStore := organization.New(pool)
+	features := organization.Features{Store: organizationStore}
 	commerceDispatcher := commerce.DurableWorker{
 		Store: commerceStore,
 		Fiscal: commerce.HTTPFiscalClient{
@@ -518,6 +540,7 @@ func InitializeWorker(
 				Repository: notificationStore,
 				Routes:     notificationStore,
 			},
+			features,
 		)
 		notificationDispatcher.LeaseFor = cfg.LeaseDuration
 		dispatchers = append(dispatchers, notificationDispatcher)
@@ -527,6 +550,7 @@ func InitializeWorker(
 		cfg.Calendars,
 		pool,
 		cfg.LeaseDuration,
+		features,
 	)
 	if calendarErr != nil {
 		if identity != nil {

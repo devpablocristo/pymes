@@ -51,24 +51,29 @@ func (repository *Postgres) ResolveDeliveryRoute(
 	); err != nil {
 		return domain.DeliveryRoute{}, err
 	}
-	var enabled bool
 	var route domain.DeliveryRoute
 	err = tx.QueryRow(ctx, `
-		SELECT whatsapp_enabled,
-		       COALESCE(pergo_channel,''),
+		SELECT COALESCE(pergo_channel,''),
 		       COALESCE(pergo_sender_identity,'')
 		FROM app.notification_settings
 		WHERE org_id=$1`,
 		organizationID,
-	).Scan(&enabled, &route.Channel, &route.SenderIdentity)
-	if errors.Is(err, pgx.ErrNoRows) || !enabled {
-		return domain.DeliveryRoute{}, domain.ErrDisabled
+	).Scan(&route.Channel, &route.SenderIdentity)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.DeliveryRoute{}, domain.ErrRouteNotConfigured
 	}
 	if err != nil {
 		return domain.DeliveryRoute{}, err
 	}
+	if route.Channel == "" || route.SenderIdentity == "" {
+		return domain.DeliveryRoute{}, domain.ErrRouteNotConfigured
+	}
 	if err = route.Validate(); err != nil {
-		return domain.DeliveryRoute{}, err
+		return domain.DeliveryRoute{}, fmt.Errorf(
+			"%w: %v",
+			domain.ErrRouteNotConfigured,
+			err,
+		)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.DeliveryRoute{}, err
@@ -154,7 +159,7 @@ func (repository *Postgres) create(
 	var enabled bool
 	if err = tx.QueryRow(ctx, `
 		SELECT whatsapp_enabled
-		FROM app.notification_settings
+		FROM app.organization_feature_flags
 		WHERE org_id=$1`,
 		intent.OrganizationID,
 	).Scan(&enabled); err != nil {

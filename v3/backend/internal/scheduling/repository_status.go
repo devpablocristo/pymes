@@ -38,6 +38,23 @@ func (r *PostgresRepository) ConfigureBookingStatus(
 		return stored, nil
 	}
 
+	if err := lockBookingStatusConfiguration(
+		ctx,
+		tx,
+		metadata.OrganizationID,
+		configuration.Status,
+	); err != nil {
+		return domain.BookingStatusConfiguration{}, err
+	}
+	before, err := getBookingStatusConfigurationTx(
+		ctx,
+		tx,
+		metadata.OrganizationID,
+		configuration.Status,
+	)
+	if err != nil {
+		return domain.BookingStatusConfiguration{}, err
+	}
 	now := r.now().UTC()
 	configuration.OrganizationID = metadata.OrganizationID
 	configuration.Label = strings.TrimSpace(configuration.Label)
@@ -83,7 +100,7 @@ func (r *PostgresRepository) ConfigureBookingStatus(
 		metadata,
 		"scheduling.booking_status.configured",
 		string(configuration.Status),
-		nil,
+		before,
 		configuration,
 	); err != nil {
 		return domain.BookingStatusConfiguration{}, err
@@ -190,20 +207,14 @@ func (r *PostgresRepository) SetBookingSubstate(
 		return domain.Booking{}, err
 	}
 	if replayed {
-		var stored struct {
-			BookingID uuid.UUID `json:"booking_id"`
-		}
+		var stored domain.Booking
 		if err := json.Unmarshal(response, &stored); err != nil {
-			return domain.Booking{}, err
-		}
-		result, err := getBookingTx(ctx, tx, metadata.OrganizationID, stored.BookingID)
-		if err != nil {
 			return domain.Booking{}, err
 		}
 		if err := tx.Commit(ctx); err != nil {
 			return domain.Booking{}, err
 		}
-		return result, nil
+		return stored, nil
 	}
 
 	current, err := getBookingForUpdateTx(ctx, tx, metadata.OrganizationID, bookingID)
@@ -215,6 +226,14 @@ func (r *PostgresRepository) SetBookingSubstate(
 			domain.CodeBookingVersionConflict,
 			"booking version changed",
 		)
+	}
+	if err := lockBookingStatusConfiguration(
+		ctx,
+		tx,
+		metadata.OrganizationID,
+		current.Status,
+	); err != nil {
+		return domain.Booking{}, err
 	}
 	substateCode = strings.TrimSpace(substateCode)
 	if substateCode != "" {
@@ -268,7 +287,7 @@ func (r *PostgresRepository) SetBookingSubstate(
 	); err != nil {
 		return domain.Booking{}, err
 	}
-	response, err = json.Marshal(map[string]any{"booking_id": bookingID})
+	response, err = json.Marshal(result)
 	if err != nil {
 		return domain.Booking{}, err
 	}
@@ -279,4 +298,74 @@ func (r *PostgresRepository) SetBookingSubstate(
 		return domain.Booking{}, repositoryhelpers.MapError(err)
 	}
 	return result, nil
+}
+
+func lockBookingStatusConfiguration(
+	ctx context.Context,
+	tx pgx.Tx,
+	organizationID string,
+	status domain.BookingStatus,
+) error {
+	key := organizationID + ":" + string(status)
+	if _, err := tx.Exec(
+		ctx,
+		"SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+		key,
+	); err != nil {
+		return repositoryhelpers.MapError(err)
+	}
+	return nil
+}
+
+func getBookingStatusConfigurationTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	organizationID string,
+	status domain.BookingStatus,
+) (*domain.BookingStatusConfiguration, error) {
+	configuration := domain.BookingStatusConfiguration{
+		OrganizationID: organizationID,
+		Status:         status,
+	}
+	err := tx.QueryRow(ctx, `
+		SELECT label,updated_at
+		FROM app.scheduling_booking_status_configurations
+		WHERE org_id=$1 AND status=$2`,
+		organizationID,
+		status,
+	).Scan(&configuration.Label, &configuration.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, repositoryhelpers.MapError(err)
+	}
+	rows, err := tx.Query(ctx, `
+		SELECT code,label,active,sort_order
+		FROM app.scheduling_booking_substates
+		WHERE org_id=$1 AND status=$2
+		ORDER BY sort_order,code`,
+		organizationID,
+		status,
+	)
+	if err != nil {
+		return nil, repositoryhelpers.MapError(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var substate domain.BookingSubstateDefinition
+		if err := rows.Scan(
+			&substate.Code,
+			&substate.Label,
+			&substate.Active,
+			&substate.SortOrder,
+		); err != nil {
+			return nil, repositoryhelpers.MapError(err)
+		}
+		configuration.Substates = append(configuration.Substates, substate)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, repositoryhelpers.MapError(err)
+	}
+	return &configuration, nil
 }

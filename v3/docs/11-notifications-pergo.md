@@ -25,10 +25,12 @@ No recibe teléfono, cuerpo ni variables y nunca llama directamente a PerGo.
 1. Scheduling agrega `NotificationRequested` a su outbox dentro de la
    transacción del turno.
 2. El consumidor de Notifications proyecta el snapshot recibido, resuelve la
-   ruta no secreta de la organización y persiste idempotentemente una intención
-   propia. No accede al repository de Scheduling ni crea un segundo outbox.
-   Los casos de uso que originan directamente una notificación conservan la
-   variante transaccional que persiste intención y evento juntos.
+   ruta no secreta de la organización y comprueba
+   `organization_feature_flags.whatsapp_enabled` antes de persistir
+   idempotentemente una intención propia. No accede al repository de Scheduling
+   ni crea un segundo outbox. Los casos de uso que originan directamente una
+   notificación conservan la variante transaccional que persiste intención y
+   evento juntos.
 3. El dispatcher de Notifications toma un lease exclusivamente sobre
    `NotificationRequested`. Commerce, Scheduling y Calendars tienen
    dispatchers y allowlists independientes, por lo que ningún contexto puede
@@ -97,9 +99,14 @@ La migración `016_notifications_pergo.sql` crea:
 - `notifications`;
 - `notification_webhook_inbox`.
 
-Las tres tablas tienen `org_id`, RLS habilitada y forzada. Las identidades
-durables son compuestas por tenant y la configuración `whatsapp_enabled`
-falla cerrada. El inbox no admite `UPDATE`, `DELETE` ni `TRUNCATE`.
+`organization_feature_flags`, creada por
+`018_organization_feature_flags.sql`, es la única fuente de verdad para
+habilitar WhatsApp. `notification_settings` conserva exclusivamente la ruta no
+secreta hacia PerGo (`pergo_channel` y `pergo_sender_identity`); su antiguo
+booleano ya no gobierna el rollout. Las tablas tenant tienen `org_id`, RLS
+habilitada y forzada. Las identidades durables son compuestas por tenant y
+`whatsapp_enabled` falla cerrado. El inbox no admite `UPDATE`, `DELETE` ni
+`TRUNCATE`.
 
 `017_notifications_pergo_routes.sql` agrega:
 

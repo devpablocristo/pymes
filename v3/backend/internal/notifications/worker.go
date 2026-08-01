@@ -45,10 +45,15 @@ type SchedulingProjection interface {
 	) (domain.Intent, bool, error)
 }
 
+type WorkerFeatureGate interface {
+	Enabled(context.Context, string, string) (bool, error)
+}
+
 type Worker struct {
 	Store       NotificationRelayStore
 	Provider    DeliveryProvider
 	Projection  SchedulingProjection
+	Features    WorkerFeatureGate
 	LeaseFor    time.Duration
 	MaxAttempts int
 }
@@ -57,14 +62,16 @@ func NewWorker(
 	store NotificationRelayStore,
 	provider DeliveryProvider,
 	projection SchedulingProjection,
+	features WorkerFeatureGate,
 ) Worker {
 	return Worker{
 		Store: store, Provider: provider, Projection: projection,
+		Features: features,
 	}
 }
 
 func (worker Worker) DispatchOnce(ctx context.Context) error {
-	if worker.Store == nil || worker.Provider == nil {
+	if worker.Store == nil || worker.Provider == nil || worker.Features == nil {
 		return fmt.Errorf("notification worker dependencies are not configured")
 	}
 	leaseFor := worker.LeaseFor
@@ -125,6 +132,20 @@ func (worker Worker) dispatch(
 ) error {
 	if outboxEvent.Topic != NotificationRequestedTopic {
 		return fmt.Errorf("unexpected notification topic %q", outboxEvent.Topic)
+	}
+	enabled, err := worker.Features.Enabled(
+		ctx,
+		outboxEvent.OrganizationID,
+		"whatsapp_enabled",
+	)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		// Disabling WhatsApp is an explicit business decision. A queued intent
+		// is acknowledged without delivery and must not surprise the tenant if
+		// the feature is enabled again later.
+		return nil
 	}
 	event, err := workerhelpers.DecodeRequested(outboxEvent.Payload)
 	if err != nil {

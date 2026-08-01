@@ -69,8 +69,77 @@ func enableNotifications(
 	); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = tx.Exec(ctx, `
+		INSERT INTO app.organization_feature_flags(
+		  org_id,whatsapp_enabled,updated_by
+		)
+		VALUES($1,true,'test')
+		ON CONFLICT (org_id) DO UPDATE
+		  SET whatsapp_enabled=true,updated_by='test'`,
+		organizationID,
+	); err != nil {
+		t.Fatal(err)
+	}
 	if err = tx.Commit(ctx); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestPostgresNotificationRouteIsIndependentFromFeatureFlag(t *testing.T) {
+	pool := notificationTestPool(t)
+	organizationID := "notification-org-route-" + uuid.NewString()
+	enableNotifications(t, pool, organizationID)
+	repository := NewPostgres(pool)
+
+	tx, err := pool.BeginTx(context.Background(), pgx.TxOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	if _, err = tx.Exec(
+		context.Background(),
+		"SELECT set_config('app.org_id',$1,true)",
+		organizationID,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(context.Background(), `
+		UPDATE app.notification_settings
+		SET whatsapp_enabled=false
+		WHERE org_id=$1`,
+		organizationID,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err = tx.Commit(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	route, err := repository.ResolveDeliveryRoute(
+		context.Background(),
+		organizationID,
+	)
+	if err != nil ||
+		route.Channel != "whatsapp_mock" ||
+		route.SenderIdentity != "mock:"+organizationID {
+		t.Fatalf("route=%+v err=%v", route, err)
+	}
+
+	missingOrganizationID := "notification-org-route-missing-" + uuid.NewString()
+	if _, err = pool.Exec(context.Background(), `
+		INSERT INTO app.organizations(id,name,slug,status)
+		VALUES($1,$2,$3,'ready')`,
+		missingOrganizationID,
+		missingOrganizationID,
+		missingOrganizationID,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = repository.ResolveDeliveryRoute(
+		context.Background(),
+		missingOrganizationID,
+	); !errors.Is(err, domain.ErrRouteNotConfigured) {
+		t.Fatalf("missing route error=%v", err)
 	}
 }
 

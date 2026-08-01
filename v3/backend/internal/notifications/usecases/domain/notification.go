@@ -35,7 +35,9 @@ const (
 )
 
 var (
-	ErrDisabled             = errors.New("WHATSAPP_DISABLED")
+	ErrFeatureDisabled      = errors.New("FEATURE_DISABLED")
+	ErrDisabled             = ErrFeatureDisabled
+	ErrRouteNotConfigured   = errors.New("PERGO_ROUTE_NOT_CONFIGURED")
 	ErrNotFound             = errors.New("NOTIFICATION_NOT_FOUND")
 	ErrIdempotencyKeyReused = errors.New("IDEMPOTENCY_KEY_REUSED")
 	ErrInvalidIntent        = errors.New("NOTIFICATION_INVALID")

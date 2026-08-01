@@ -26,6 +26,6 @@ func CurrentSessionFromPrincipal(value identitydomain.Principal) CurrentSession 
 			Status: value.OrganizationStatus,
 		},
 		Role:        string(value.Role),
-		Permissions: append([]string(nil), value.Permissions...),
+		Permissions: append([]string{}, value.Permissions...),
 	}
 }

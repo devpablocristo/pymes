@@ -119,6 +119,32 @@ func TestSessionFailsClosed(t *testing.T) {
 	}
 }
 
+func TestSessionEncodesMissingPermissionsAsAnEmptyArray(t *testing.T) {
+	t.Parallel()
+	handler := NewSessionHandler(sessionAuthenticatorFunc(func(*http.Request) (identitydomain.Principal, error) {
+		return identitydomain.Principal{
+			OrganizationID:     "org_local",
+			OrganizationName:   "Centro Norte",
+			OrganizationSlug:   "centro-norte",
+			OrganizationStatus: "ready",
+			ActorID:            "user_readless",
+			Role:               identitydomain.RoleMember,
+			MembershipStatus:   "active",
+		}, nil
+	}))
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(
+		response,
+		httptest.NewRequest(http.MethodGet, "/api/v1/session", nil),
+	)
+
+	if response.Code != http.StatusOK ||
+		!strings.Contains(response.Body.String(), `"permissions":[]`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func TestWebhookRejectsInvalidSignature(t *testing.T) {
 	h := NewWebhook(verifierFunc(func([]byte, http.Header) (clerk.WebhookEvent, error) {
 		return clerk.WebhookEvent{}, clerk.ErrInvalidWebhookSignature

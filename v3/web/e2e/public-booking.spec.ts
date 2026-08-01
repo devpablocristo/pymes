@@ -28,3 +28,13 @@ test("consume una acción pública opaca", async ({ page }) => {
   await page.getByRole("button", { name: "Confirmar", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Listo, guardamos el cambio" })).toBeVisible();
 });
+
+test("rechaza metadatos alterados sin ejecutar la acción", async ({ page }) => {
+  const token = "a".repeat(90);
+  await page.goto(
+    `/agenda/accion/${token}?purpose=delete_everything&version=NaN`,
+  );
+  await expect(page.getByRole("heading", { name: "Enlace inválido" })).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText(/modificado/i);
+  await expect(page.getByRole("button")).toHaveCount(0);
+});

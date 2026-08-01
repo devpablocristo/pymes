@@ -12,6 +12,15 @@ if (sourceMaps.length > 0) {
   );
 }
 
+const testChunks = files.filter((file) =>
+  /(?:fake|local-session|localsession)/i.test(file),
+);
+if (testChunks.length > 0) {
+  throw new Error(
+    `El bundle productivo contiene chunks exclusivos de test: ${testChunks.join(", ")}.`,
+  );
+}
+
 const fakeMarkers = [
   "org_e2e",
   "Reserva simultánea",

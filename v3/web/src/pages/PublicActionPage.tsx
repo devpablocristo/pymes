@@ -5,18 +5,39 @@ import { errorMessage } from "../api/errors";
 
 type Purpose = "confirm" | "cancel" | "reschedule" | "accept_waitlist";
 
+const purposes = new Set<Purpose>([
+  "confirm",
+  "cancel",
+  "reschedule",
+  "accept_waitlist",
+]);
+
+function parsePurpose(value: string | null): Purpose | null {
+  const candidate = value ?? "confirm";
+  return purposes.has(candidate as Purpose) ? (candidate as Purpose) : null;
+}
+
 export function PublicActionPage({ token, search }: { token: string; search: string }) {
   const gateway = useSchedulingGateway();
   const params = new URLSearchParams(search);
-  const purpose = (params.get("purpose") ?? "confirm") as Purpose;
+  const purpose = parsePurpose(params.get("purpose"));
   const version = Number(params.get("version") ?? "1");
+  const browserTimezone =
+    Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const [startAt, setStartAt] = useState("");
   const [reason, setReason] = useState("");
   const [state, setState] = useState<"idle" | "pending" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
+  const validMetadata =
+    purpose !== null && Number.isSafeInteger(version) && version > 0;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!purpose || !validMetadata) {
+      setMessage("El enlace de acción no contiene metadatos válidos.");
+      setState("error");
+      return;
+    }
     setState("pending");
     try {
       await gateway.consumePublicAction(token, {
@@ -26,7 +47,7 @@ export function PublicActionPage({ token, search }: { token: string; search: str
           ? {
               start_at:
                 DateTime.fromFormat(startAt, "yyyy-MM-dd'T'HH:mm", {
-                  zone: "America/Argentina/Buenos_Aires",
+                  zone: browserTimezone,
                 })
                   .toUTC()
                   .toISO() ?? startAt,
@@ -47,6 +68,22 @@ export function PublicActionPage({ token, search }: { token: string; search: str
     reschedule: { title: "Elegir un nuevo horario", action: "Reprogramar" },
     accept_waitlist: { title: "Aceptar el lugar disponible", action: "Aceptar lugar" },
   };
+
+  if (!purpose || !validMetadata) {
+    return (
+      <main className="public-action" id="main-content">
+        <div className="public-action__card">
+          <span className="public-brand-mark">P</span>
+          <p className="eyebrow">Gestión de reserva</p>
+          <h1>Enlace inválido</h1>
+          <div className="inline-alert" role="alert">
+            El enlace está incompleto o fue modificado. Solicitá uno nuevo a la
+            empresa.
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="public-action" id="main-content">
@@ -71,7 +108,7 @@ export function PublicActionPage({ token, search }: { token: string; search: str
             <form onSubmit={(event) => void submit(event)}>
               {purpose === "reschedule" ? (
                 <label className="field">
-                  <span>Nuevo horario</span>
+                  <span>Nuevo horario ({browserTimezone})</span>
                   <input
                     type="datetime-local"
                     value={startAt}

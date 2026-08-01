@@ -7,6 +7,7 @@ import type {
   Booking,
   BookingAction,
   BookingInput,
+  BookingUpdateInput,
   Branch,
   DateRange,
   PublicActionInput,
@@ -351,6 +352,52 @@ export class InMemorySchedulingGateway implements SchedulingGateway {
     if (input.notes) booking.notes = input.notes;
     this.bookings.push(booking);
     return [deepCopy(booking)];
+  }
+
+  async updateBooking(
+    identity: RequestIdentity,
+    bookingId: string,
+    input: BookingUpdateInput,
+  ): Promise<Booking> {
+    this.assertOrg(identity);
+    const booking = this.bookings.find((item) => item.id === bookingId);
+    if (!booking) {
+      throw new SchedulingApiError("NOT_FOUND", "Turno inexistente", 404);
+    }
+    if (booking.version !== input.expected_version) {
+      throw new SchedulingApiError("BOOKING_VERSION_CONFLICT", "Versión desactualizada", 409);
+    }
+    if (
+      input.customer === undefined &&
+      input.participants === undefined &&
+      input.notes === undefined &&
+      input.substate_code === undefined
+    ) {
+      throw new SchedulingApiError("VALIDATION_ERROR", "No hay campos editables", 400);
+    }
+    if (input.participants !== undefined) {
+      const service = this.services.find((item) => item.id === booking.service_id);
+      if (!service || input.participants < 1 || input.participants > service.max_participants) {
+        throw new SchedulingApiError("CAPACITY_EXCEEDED", "Capacidad no disponible", 409);
+      }
+      if (
+        input.participants !== booking.participants &&
+        !["held", "pending_confirmation", "confirmed", "checked_in"].includes(booking.status)
+      ) {
+        throw new SchedulingApiError("BOOKING_STATE_INVALID", "El turno ya no admite participantes", 409);
+      }
+      booking.participants = input.participants;
+    }
+    if (input.customer) {
+      booking.party_id = input.customer.party_id ?? `party-${crypto.randomUUID()}`;
+      booking.customer_name = input.customer.name;
+      booking.customer_email = input.customer.email;
+      booking.customer_phone = input.customer.phone;
+    }
+    if (input.notes !== undefined) booking.notes = input.notes;
+    if (input.substate_code !== undefined) booking.substate_code = input.substate_code || undefined;
+    booking.version += 1;
+    return deepCopy(booking);
   }
 
   async rescheduleBooking(

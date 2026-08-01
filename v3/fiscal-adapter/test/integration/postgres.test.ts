@@ -4,7 +4,10 @@ import { Pool } from "pg";
 import { MockFiscalAuthority } from "../../src/fiscal/mock_authority.js";
 import type { FiscalRequest } from "../../src/fiscal/usecases/domain/fiscal.js";
 import { PostgresFiscalStore } from "../../src/fiscal/repository.js";
-import { FiscalService } from "../../src/fiscal/usecases.js";
+import {
+  FiscalService,
+  type AuthorityDecision,
+} from "../../src/fiscal/usecases.js";
 import { PostgresCredentialRepository } from "../../src/credentials/repository.js";
 import type {
   SealedValue,
@@ -12,6 +15,73 @@ import type {
 } from "../../src/credentials/usecases.js";
 
 const databaseURL = process.env.FISCAL_DATABASE_TEST_URL;
+
+test("PostgreSQL claim and CAS serialize concurrent authorization dispatch", { skip: databaseURL === undefined }, async () => {
+  const pool = new Pool({ connectionString: databaseURL });
+  try {
+    await pool.query("TRUNCATE fiscal.requests, fiscal.mock_authorizations");
+    const store = new PostgresFiscalStore(pool);
+    let authorizeCalls = 0;
+    const authority = {
+      async authorize(): Promise<AuthorityDecision> {
+        authorizeCalls += 1;
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        return {
+          status: "authorized" as const,
+          cae: "12345678901234",
+          cae_expires_on: "2026-08-09",
+          result_code: "AUTHORIZED",
+        };
+      },
+      async consult(): Promise<AuthorityDecision> {
+        return { status: "not_found" };
+      },
+    };
+    const services = Array.from(
+      { length: 12 },
+      () => new FiscalService(authority, store, now),
+    );
+
+    const results = await Promise.all(
+      services.map((service) =>
+        service.authorize(structuredClone(request), contextFor(request))
+      ),
+    );
+
+    assert.equal(authorizeCalls, 1);
+    assert.ok(results.every((result) => result.cae === "12345678901234"));
+    const execution = await pool.query(
+      `SELECT execution_state,execution_attempt,lease_token,lease_expires_at,
+              dispatch_may_have_occurred
+         FROM fiscal.requests
+        WHERE organization_id=$1 AND request_id=$2`,
+      [request.organization_id, request.request_id],
+    );
+    assert.deepEqual(execution.rows[0], {
+      execution_state: "terminal",
+      execution_attempt: "1",
+      lease_token: null,
+      lease_expires_at: null,
+      dispatch_may_have_occurred: true,
+    });
+
+    const changed = structuredClone(request);
+    changed.recipient.document_number = "20999999999";
+    await assert.rejects(
+      new FiscalService(authority, store, now).authorize(
+        changed,
+        contextFor(changed),
+      ),
+      (error: unknown) =>
+        error instanceof Error &&
+        "code" in error &&
+        error.code === "IDEMPOTENCY_KEY_REUSED",
+    );
+    assert.equal(authorizeCalls, 1);
+  } finally {
+    await pool.end();
+  }
+});
 
 test("PostgreSQL preserves uncertain authorization and idempotency across reconstruction", { skip: databaseURL === undefined }, async () => {
   const firstPool = new Pool({ connectionString: databaseURL });

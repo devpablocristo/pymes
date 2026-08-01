@@ -38,7 +38,8 @@ No recibe teléfono, cuerpo ni variables y nunca llama directamente a PerGo.
 4. El adapter llama `POST /api/v1/messages` con la API key de workspace.
 5. `X-Trace-ID` contiene, codificados en base64url, organización e ID de
    notificación: `pymes.v1.<organization>.<notification>`.
-6. PerGo devuelve `202 queued` o un resultado incierto/reintentable/terminal.
+6. El ledger de ingreso de PerGo devuelve `202 queued`; la entrega al proveedor
+   ocurre después mediante su worker.
 7. PerGo publica el estado al callback global
 `POST /api/v1/webhooks/pergo`.
 8. El BFF verifica firma y timestamp antes de extraer el tenant del trace ID;
@@ -75,10 +76,19 @@ outbox y reintenta con las mismas identidades. El ledger cubre respuesta perdida
 reinicio y concurrencia en el ingreso a PerGo. Si el webhook llegó primero y
 marcó `sent`, una respuesta tardía o perdida tampoco degrada el estado.
 
-La garantía termina en la cola interna de PerGo: una caída situada exactamente
-después de que el proveedor externo aceptó el mensaje y antes de que PerGo
-persistiera el resultado todavía requiere reconciliación con ese proveedor. No
-se documenta como exactly-once de punta a punta.
+La entrega externa también conserva un claim PostgreSQL con lease, generación y
+fencing. PerGo confirma `sending` en la base antes de llamar al proveedor y no
+mantiene una transacción abierta durante esa llamada. Si se pierde una respuesta
+de transporte o vence un claim que ya había llegado a `sending`, PerGo marca el
+dispatch interno `uncertain`, lo ACKea sin fallback ni reenvío automático y
+publica el evento estable `failed` con `error=DELIVERY_UNCERTAIN`. Pymes persiste
+exclusivamente `PERGO_DELIVERY_UNCERTAIN`; cualquier texto libre del proveedor
+se reduce a `PERGO_DELIVERY_FAILED`, evitando PII o secretos.
+
+Esta política prioriza no enviar dos WhatsApp cuando el proveedor no ofrece una
+clave idempotente verificable. El resultado ambiguo requiere reconciliación u
+operación explícita; nunca se presenta como certeza de no entrega ni se
+redispara automáticamente. No se documenta como exactly-once de punta a punta.
 
 Los cambios de estado son monotónicos:
 
@@ -90,6 +100,10 @@ pending/uncertain → queued → sent → delivered → read
 Un webhook repetido conserva una sola fila por
 `(org_id, payload_hash)`. Eventos atrasados quedan auditados, pero no degradan
 un estado más avanzado.
+
+El vocabulario contractual de callbacks es exactamente
+`queued/sent/delivered/read/failed`. `sending` y `uncertain` son estados internos
+de PerGo y no atraviesan el webhook.
 
 ## Persistencia y aislamiento
 
@@ -174,6 +188,11 @@ la ruta normal proviene del snapshot tenant.
 - timeout antes de procesar;
 - webhook duplicado;
 - firma inválida.
+
+La suite del fork PerGo agrega concurrencia entre workers, fencing de claims,
+caída después de declarar `sending` y respuesta de transporte ambigua. En esos
+casos demuestra que no existe una segunda llamada al proveedor ni un fallback y
+que el único callback público es `failed/DELIVERY_UNCERTAIN`.
 
 `make db-integration` agrega aislamiento entre organizaciones, clave
 idempotente reutilizada con otro payload, concurrencia e inbox. Los tests no

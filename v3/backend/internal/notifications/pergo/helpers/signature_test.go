@@ -12,7 +12,7 @@ import (
 
 func TestVerifySignatureAuthenticatesTimestampAndPayload(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0).UTC()
-	payload := []byte(`{"event":"message.sent"}`)
+	payload := []byte(`{"event":"sent"}`)
 	secret := []byte("0123456789abcdef0123456789abcdef")
 	mac := hmac.New(sha256.New, secret)
 	_, _ = mac.Write([]byte(fmt.Sprintf("%d.", now.Unix())))

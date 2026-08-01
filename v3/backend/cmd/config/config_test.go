@@ -13,6 +13,44 @@ func TestLoadFromRequiresCompleteClerkConfiguration(t *testing.T) {
 	}
 }
 
+func TestLoadFromFailsClosedOnFiscalURLAndSchedulingActionSecret(t *testing.T) {
+	t.Parallel()
+	base := map[string]string{
+		"PYMES_DATABASE_URL":                   "postgres://db",
+		"FISCAL_ADAPTER_URL":                   "https://fiscal.internal",
+		"PYMES_CLERK_ISSUER":                   "https://issuer",
+		"PYMES_CLERK_AUTHORIZED_PARTIES":       "https://app",
+		"PYMES_CLERK_JWT_KEY":                  "pem",
+		"PYMES_CLERK_WEBHOOK_SECRET":           "whsec_test",
+		"PYMES_SCHEDULING_ACTION_TOKEN_SECRET": "01234567890123456789012345678901",
+	}
+	for _, test := range []struct {
+		name    string
+		missing string
+	}{
+		{name: "fiscal adapter URL", missing: "FISCAL_ADAPTER_URL"},
+		{
+			name:    "scheduling action token secret",
+			missing: "PYMES_SCHEDULING_ACTION_TOKEN_SECRET",
+		},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			values := make(map[string]string, len(base))
+			for key, value := range base {
+				values[key] = value
+			}
+			delete(values, test.missing)
+			if _, err := LoadFrom(func(key string) string {
+				return values[key]
+			}); err == nil {
+				t.Fatalf("expected missing %s to fail closed", test.missing)
+			}
+		})
+	}
+}
+
 func TestLoadFromRequiresSignedPerGoWebhookConfigurationWhenEnabled(t *testing.T) {
 	values := map[string]string{
 		"PYMES_DATABASE_URL":                   "postgres://db",
@@ -52,5 +90,35 @@ func TestLoadFromRejectsProductionIdentityBypass(t *testing.T) {
 	}
 	if _, err := LoadFrom(func(key string) string { return values[key] }); err == nil {
 		t.Fatal("expected production identity bypass to fail")
+	}
+}
+
+func TestLoadFromRequiresStrongProductionPreflightGate(t *testing.T) {
+	base := map[string]string{
+		"PYMES_ENVIRONMENT":                    "production",
+		"PYMES_DATABASE_URL":                   "postgres://db",
+		"FISCAL_ADAPTER_URL":                   "https://fiscal.internal",
+		"PYMES_CLERK_ISSUER":                   "https://issuer",
+		"PYMES_CLERK_AUTHORIZED_PARTIES":       "https://app",
+		"PYMES_CLERK_JWT_KEY":                  "pem",
+		"PYMES_CLERK_WEBHOOK_SECRET":           "whsec_test",
+		"PYMES_SCHEDULING_ACTION_TOKEN_SECRET": "01234567890123456789012345678901",
+		"PYMES_PREFLIGHT_TAG":                  "candidate-1111111111111111111111111111111111111111",
+		"PYMES_PREFLIGHT_TOKEN":                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+	}
+	if _, err := LoadFrom(func(key string) string { return base[key] }); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"PYMES_PREFLIGHT_TAG", "PYMES_PREFLIGHT_TOKEN"} {
+		values := make(map[string]string, len(base))
+		for name, value := range base {
+			values[name] = value
+		}
+		delete(values, key)
+		if _, err := LoadFrom(func(name string) string {
+			return values[name]
+		}); err == nil {
+			t.Fatalf("expected missing %s to fail closed", key)
+		}
 	}
 }

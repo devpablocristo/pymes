@@ -868,11 +868,11 @@ components:
         event:
           type: string
           enum:
-            - message.queued
-            - message.sent
-            - message.delivered
-            - message.read
-            - message.failed
+            - queued
+            - sent
+            - delivered
+            - read
+            - failed
         trace_id:
           type: string
           minLength: 1

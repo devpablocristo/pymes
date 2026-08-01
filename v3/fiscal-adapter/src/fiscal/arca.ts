@@ -2,6 +2,7 @@ import {
   createExplicitArcaClient,
   createWSAAAccessTicketProvider,
 } from "@devpablocristo/arca-facturacion/explicit";
+import { Arca } from "@devpablocristo/arca-facturacion";
 import type {
   ArtifactRepository,
   CredentialProbe,
@@ -27,6 +28,8 @@ import {
   artifactAAD,
   artifactReference,
 } from "./arca/helpers/artifacts.js";
+import { compatibleExplicitClient } from "./arca/helpers/client.js";
+import { providerErrorName } from "./arca/helpers/errors.js";
 
 export interface CredentialMaterialResolver {
   resolveMaterial(input: {
@@ -112,17 +115,27 @@ export class ArcaFiscalAuthority
     input: CredentialProbeInput,
   ): Promise<void> {
     try {
-      await this.client(input.material).consult({
-        pointOfSale: input.pointOfSale,
-        voucherType: 1,
-        voucherNumber: 1,
-      });
-    } catch (error) {
+      const pointsOfSale = await this.client(input.material).listPointsOfSale();
+      const configured = pointsOfSale.find(
+        (point) => point.number === input.pointOfSale,
+      );
       if (
-        typeof error === "object" &&
-        error !== null &&
-        "name" in error &&
-        (error as { name: unknown }).name === "ArcaWSFEError"
+        configured === undefined ||
+        configured.blocked ||
+        configured.deactivatedOn !== undefined
+      ) {
+        throw new CredentialError("POINT_OF_SALE_NOT_VALIDATED");
+      }
+    } catch (error) {
+      if (error instanceof CredentialError) throw error;
+      if (providerErrorName(error) === "ExplicitPointOfSaleError") {
+        throw new FiscalError(
+          "INTERNAL_ERROR",
+          "ARCA returned an invalid point-of-sale response",
+        );
+      }
+      if (
+        providerErrorName(error) === "ArcaWSFEError"
       ) {
         throw new CredentialError("POINT_OF_SALE_NOT_VALIDATED");
       }
@@ -189,7 +202,7 @@ export class ArcaFiscalAuthority
         environment: material.credential.environment,
       },
     );
-    return createExplicitArcaClient({
+    const config = {
       cuit: Number(material.credential.cuit),
       cert: material.certificatePem,
       key: material.privateKeyPem,
@@ -199,7 +212,11 @@ export class ArcaFiscalAuthority
       retries: 0,
       retryDelayMs: 1_000,
       onEvent,
-    }) as unknown as ExplicitSDKClient;
+    };
+    return compatibleExplicitClient(
+      createExplicitArcaClient(config),
+      new Arca(config),
+    );
   }
 
   private async resolveMaterial(

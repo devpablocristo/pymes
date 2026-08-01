@@ -581,6 +581,7 @@ type Event struct {
 
 const (
 	EventBookingCreated        = "BookingCreated"
+	EventBookingUpdated        = "BookingUpdated"
 	EventBookingConfirmed      = "BookingConfirmed"
 	EventBookingRescheduled    = "BookingRescheduled"
 	EventBookingCancelled      = "BookingCancelled"

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/usecases/domain"
 	"github.com/google/uuid"
@@ -35,6 +36,8 @@ type Repository interface {
 	ReserveBookings(context.Context, domain.CommandMetadata, *domain.RecurrenceSeries, []domain.Booking, []domain.ActionToken, []domain.Event) ([]domain.Booking, error)
 	GetBooking(context.Context, string, uuid.UUID) (domain.Booking, error)
 	ListBookings(context.Context, string, uuid.UUID, time.Time, time.Time) ([]domain.Booking, error)
+	ReplayBookingUpdate(context.Context, domain.CommandMetadata, uuid.UUID) (domain.Booking, bool, error)
+	UpdateBooking(context.Context, domain.CommandMetadata, uuid.UUID, int, BookingUpdate, []domain.Event) (domain.Booking, error)
 	RescheduleBooking(context.Context, domain.CommandMetadata, uuid.UUID, int, domain.Booking, []domain.Event) (domain.Booking, error)
 	TransitionBooking(context.Context, domain.CommandMetadata, uuid.UUID, int, domain.BookingStatus, string, []domain.Event) (domain.Booking, error)
 	ConfigureBookingStatus(context.Context, domain.CommandMetadata, domain.BookingStatusConfiguration) (domain.BookingStatusConfiguration, error)
@@ -58,6 +61,57 @@ type Repository interface {
 	ClaimReminders(context.Context, int, time.Time, time.Time) ([]domain.Event, error)
 	ClaimWaitlistCandidates(context.Context, int, time.Time) ([]domain.WaitlistEntry, error)
 }
+
+// PublicActionRepository owns the PostgreSQL unit of work used by public
+// action tokens. The planner is a use-case callback: the adapter locks the
+// token and aggregate first, invokes the planner with those locked snapshots,
+// then persists the mutation, events, audit, idempotency result and token
+// consumption in the same transaction.
+type PublicActionRepository interface {
+	ExecutePublicBookingAction(
+		context.Context,
+		string,
+		domain.ActionPurpose,
+		time.Time,
+		domain.CommandMetadata,
+		PublicBookingActionPlanner,
+	) (domain.Booking, error)
+	ExecutePublicWaitlistAction(
+		context.Context,
+		string,
+		time.Time,
+		domain.CommandMetadata,
+		PublicWaitlistActionPlanner,
+	) (domain.WaitlistEntry, error)
+}
+
+type PublicBookingActionPlan struct {
+	ExpectedVersion int
+	TransitionTo    domain.BookingStatus
+	Reason          string
+	Replacement     *domain.Booking
+	Events          []domain.Event
+}
+
+type PublicWaitlistActionPlan struct {
+	ExpectedVersion int
+	Booking         domain.Booking
+	ActionTokens    []domain.ActionToken
+	BookingEvents   []domain.Event
+	WaitlistEvent   domain.Event
+}
+
+type PublicBookingActionPlanner func(
+	domain.CommandMetadata,
+	domain.ActionToken,
+	domain.Booking,
+) (PublicBookingActionPlan, error)
+
+type PublicWaitlistActionPlanner func(
+	domain.CommandMetadata,
+	domain.ActionToken,
+	domain.WaitlistEntry,
+) (PublicWaitlistActionPlan, error)
 
 // SchedulingAlgorithms is implemented by platform_scheduling.go. The port uses
 // Pymes-owned types exclusively.
@@ -112,6 +166,7 @@ type CreateWaitlistInput struct {
 
 type Service struct {
 	repository    Repository
+	publicActions PublicActionRepository
 	algorithms    SchedulingAlgorithms
 	organizations OrganizationDirectory
 	parties       PartyDirectory
@@ -134,7 +189,11 @@ func WithClock(value func() time.Time) Option {
 }
 
 func NewService(repository Repository, algorithms SchedulingAlgorithms, tokens ActionTokenCodec, options ...Option) *Service {
-	service := &Service{repository: repository, algorithms: algorithms, tokens: tokens, now: time.Now}
+	publicActions, _ := repository.(PublicActionRepository)
+	service := &Service{
+		repository: repository, publicActions: publicActions,
+		algorithms: algorithms, tokens: tokens, now: time.Now,
+	}
 	for _, option := range options {
 		option(service)
 	}
@@ -709,6 +768,194 @@ type RescheduleInput struct {
 	Allocations     []domain.Allocation
 }
 
+// UpdateBookingInput deliberately contains only fields that an operator may
+// edit in place. Time, branch, service, allocations, snapshots and internal
+// status are owned by reschedule/transition flows and cannot enter this port.
+type UpdateBookingInput struct {
+	OrganizationID  string
+	BookingID       uuid.UUID
+	ExpectedVersion int
+	Customer        *PublicCustomer
+	Participants    *int
+	Notes           *string
+	SubstateCode    *string
+}
+
+// BookingUpdate is the repository-owned mutation boundary. It carries the
+// complete desired value of editable fields so the SQL adapter never accepts a
+// domain.Booking whose immutable fields could accidentally be persisted.
+type BookingUpdate struct {
+	PartyID       string
+	CustomerName  string
+	CustomerEmail string
+	CustomerPhone string
+	Participants  int
+	Notes         string
+	SubstateCode  string
+	Allocations   []domain.Allocation
+}
+
+func (s *Service) UpdateBooking(
+	ctx context.Context,
+	metadata domain.CommandMetadata,
+	input UpdateBookingInput,
+) (domain.Booking, error) {
+	if err := metadata.Validate(); err != nil {
+		return domain.Booking{}, err
+	}
+	if input.OrganizationID != metadata.OrganizationID || input.BookingID == uuid.Nil ||
+		input.ExpectedVersion <= 0 {
+		return domain.Booking{}, domain.NewError(domain.CodeValidation, "booking update identity is invalid")
+	}
+	if input.Customer == nil && input.Participants == nil && input.Notes == nil && input.SubstateCode == nil {
+		return domain.Booking{}, domain.NewError(domain.CodeValidation, "booking update has no editable fields")
+	}
+	if replayed, ok, err := s.repository.ReplayBookingUpdate(
+		ctx,
+		metadata,
+		input.BookingID,
+	); err != nil {
+		return domain.Booking{}, err
+	} else if ok {
+		return replayed, nil
+	}
+	current, err := s.repository.GetBooking(ctx, input.OrganizationID, input.BookingID)
+	if err != nil {
+		return domain.Booking{}, err
+	}
+	update := BookingUpdate{
+		PartyID:       current.PartyID,
+		CustomerName:  current.CustomerName,
+		CustomerEmail: current.CustomerEmail,
+		CustomerPhone: current.CustomerPhone,
+		Participants:  current.Participants,
+		Notes:         current.Notes,
+		SubstateCode:  current.SubstateCode,
+		Allocations:   append([]domain.Allocation(nil), current.Allocations...),
+	}
+	if input.Customer != nil {
+		if s.parties == nil {
+			return domain.Booking{}, domain.NewError(domain.CodeValidation, "party directory is not configured")
+		}
+		customer, customerErr := s.parties.EnsureCustomer(ctx, metadata, *input.Customer)
+		if customerErr != nil {
+			return domain.Booking{}, customerErr
+		}
+		update.PartyID = strings.TrimSpace(customer.PartyID)
+		update.CustomerName = strings.TrimSpace(customer.Name)
+		update.CustomerEmail = strings.TrimSpace(customer.Email)
+		update.CustomerPhone = strings.TrimSpace(customer.Phone)
+		if update.PartyID == "" || update.CustomerName == "" {
+			return domain.Booking{}, domain.NewError(domain.CodeValidation, "booking customer is invalid")
+		}
+	}
+	if input.Notes != nil {
+		update.Notes = strings.TrimSpace(*input.Notes)
+		if utf8.RuneCountInString(update.Notes) > 2000 {
+			return domain.Booking{}, domain.NewError(domain.CodeValidation, "booking notes are too long")
+		}
+	}
+	if input.SubstateCode != nil {
+		update.SubstateCode = strings.TrimSpace(*input.SubstateCode)
+		if update.SubstateCode != "" && !domain.ValidBookingSubstateCode(update.SubstateCode) {
+			return domain.Booking{}, domain.NewError(domain.CodeValidation, "booking substate is invalid")
+		}
+	}
+	if input.Participants != nil {
+		if *input.Participants <= 0 || *input.Participants > 100000 {
+			return domain.Booking{}, domain.NewError(domain.CodeValidation, "booking participants are invalid")
+		}
+		if *input.Participants != current.Participants {
+			if !current.Status.Active() {
+				return domain.Booking{}, domain.NewError(
+					domain.CodeBookingStateInvalid,
+					"participants cannot change on an inactive booking",
+				)
+			}
+			service, requirements, serviceErr := s.repository.GetService(
+				ctx,
+				input.OrganizationID,
+				current.ServiceID,
+			)
+			if serviceErr != nil {
+				return domain.Booking{}, serviceErr
+			}
+			if *input.Participants > service.MaxParticipants {
+				return domain.Booking{}, domain.NewError(
+					domain.CodeCapacityExceeded,
+					"service capacity is unavailable",
+				)
+			}
+			update.Participants = *input.Participants
+			if current.SessionID == nil {
+				update.Allocations, err = s.algorithms.NormalizeAllocations(
+					current.Allocations,
+					update.Participants,
+				)
+				if err != nil {
+					return domain.Booking{}, err
+				}
+				resources, resourcesErr := s.repository.GetResources(
+					ctx,
+					input.OrganizationID,
+					allocationIDs(update.Allocations),
+				)
+				if resourcesErr != nil {
+					return domain.Booking{}, resourcesErr
+				}
+				for _, resource := range resources {
+					if !resource.Active || resource.BranchID != current.BranchID {
+						return domain.Booking{}, domain.NewError(
+							domain.CodeResourceConflict,
+							"booking resource is unavailable",
+						)
+					}
+				}
+				if err := satisfyRequirements(requirements, update.Allocations, resources); err != nil {
+					return domain.Booking{}, err
+				}
+			}
+		}
+	}
+	projected := current
+	projected.PartyID = update.PartyID
+	projected.CustomerName = update.CustomerName
+	projected.CustomerEmail = update.CustomerEmail
+	projected.CustomerPhone = update.CustomerPhone
+	projected.Participants = update.Participants
+	projected.Notes = update.Notes
+	projected.SubstateCode = update.SubstateCode
+	projected.Allocations = append([]domain.Allocation(nil), update.Allocations...)
+	projected.Version = input.ExpectedVersion + 1
+	payload := map[string]any{
+		"booking_id":    projected.ID,
+		"party_id":      projected.PartyID,
+		"participants":  projected.Participants,
+		"substate_code": projected.SubstateCode,
+		"start_at":      projected.StartAt,
+		"end_at":        projected.EndAt,
+		"version":       projected.Version,
+	}
+	events := []domain.Event{
+		newEvent(metadata, projected.ID.String(), domain.EventBookingUpdated, payload),
+		newProjectionEvent(
+			metadata,
+			projected.ID.String(),
+			domain.EventCalendarSyncRequested,
+			domain.EventBookingUpdated,
+			payload,
+		),
+	}
+	return s.repository.UpdateBooking(
+		ctx,
+		metadata,
+		input.BookingID,
+		input.ExpectedVersion,
+		update,
+		events,
+	)
+}
+
 func (s *Service) RescheduleBooking(
 	ctx context.Context,
 	metadata domain.CommandMetadata,
@@ -721,34 +968,89 @@ func (s *Service) RescheduleBooking(
 	if err != nil {
 		return domain.Booking{}, err
 	}
+	plan, err := s.planReschedule(ctx, metadata, input, current)
+	if err != nil {
+		return domain.Booking{}, err
+	}
+	return s.repository.RescheduleBooking(
+		ctx,
+		metadata,
+		current.ID,
+		plan.ExpectedVersion,
+		*plan.Replacement,
+		plan.Events,
+	)
+}
+
+func (s *Service) planReschedule(
+	ctx context.Context,
+	metadata domain.CommandMetadata,
+	input RescheduleInput,
+	current domain.Booking,
+) (PublicBookingActionPlan, error) {
+	if input.OrganizationID != metadata.OrganizationID ||
+		current.OrganizationID != metadata.OrganizationID ||
+		current.ID != input.BookingID {
+		return PublicBookingActionPlan{}, domain.NewError(
+			domain.CodeValidation,
+			"booking tenant or identity does not match the command",
+		)
+	}
 	if !current.Status.Active() || input.ExpectedVersion <= 0 {
-		return domain.Booking{}, domain.NewError(domain.CodeBookingStateInvalid, "booking cannot be rescheduled")
+		return PublicBookingActionPlan{}, domain.NewError(
+			domain.CodeBookingStateInvalid,
+			"booking cannot be rescheduled",
+		)
+	}
+	if current.Version != input.ExpectedVersion {
+		return PublicBookingActionPlan{}, domain.NewError(
+			domain.CodeBookingVersionConflict,
+			"booking version changed",
+		)
+	}
+	if input.StartAt.IsZero() {
+		return PublicBookingActionPlan{}, domain.NewError(
+			domain.CodeValidation,
+			"reschedule time is required",
+		)
+	}
+	if current.SessionID != nil {
+		return PublicBookingActionPlan{}, domain.NewError(
+			domain.CodeBookingStateInvalid,
+			"booking cannot be rescheduled",
+		)
 	}
 	durationMinutes := input.DurationMinutes
 	if durationMinutes == 0 {
 		durationMinutes = current.DurationMinutes
 	}
 	if durationMinutes <= 0 || durationMinutes > 1440 {
-		return domain.Booking{}, domain.NewError(domain.CodeValidation, "duration must be between 1 and 1440 minutes")
+		return PublicBookingActionPlan{}, domain.NewError(
+			domain.CodeValidation,
+			"duration must be between 1 and 1440 minutes",
+		)
 	}
 	allocations := input.Allocations
 	if len(allocations) == 0 {
 		allocations = current.Allocations
 	}
-	allocations, err = s.algorithms.NormalizeAllocations(allocations, current.Participants)
+	allocations, err := s.algorithms.NormalizeAllocations(
+		allocations,
+		current.Participants,
+	)
 	if err != nil {
-		return domain.Booking{}, err
+		return PublicBookingActionPlan{}, err
 	}
 	service, requirements, err := s.repository.GetService(ctx, input.OrganizationID, current.ServiceID)
 	if err != nil {
-		return domain.Booking{}, err
+		return PublicBookingActionPlan{}, err
 	}
 	resources, err := s.repository.GetResources(ctx, input.OrganizationID, allocationIDs(allocations))
 	if err != nil {
-		return domain.Booking{}, err
+		return PublicBookingActionPlan{}, err
 	}
 	if err := satisfyRequirements(requirements, allocations, resources); err != nil {
-		return domain.Booking{}, err
+		return PublicBookingActionPlan{}, err
 	}
 	endAt := input.StartAt.Add(time.Duration(durationMinutes) * time.Minute)
 	query := domain.AvailabilityQuery{
@@ -764,7 +1066,7 @@ func (s *Service) RescheduleBooking(
 	}
 	slots, err := s.AvailableSlots(ctx, query)
 	if err != nil {
-		return domain.Booking{}, err
+		return PublicBookingActionPlan{}, err
 	}
 	var selected domain.Slot
 	found := false
@@ -775,7 +1077,10 @@ func (s *Service) RescheduleBooking(
 		}
 	}
 	if !found {
-		return domain.Booking{}, domain.NewError(domain.CodeSlotConflict, "requested slot is no longer available")
+		return PublicBookingActionPlan{}, domain.NewError(
+			domain.CodeSlotConflict,
+			"requested slot is no longer available",
+		)
 	}
 	now := s.now().UTC()
 	replacement := current
@@ -812,9 +1117,11 @@ func (s *Service) RescheduleBooking(
 			map[string]any{"supersedes_booking_id": current.ID},
 		),
 	)
-	return s.repository.RescheduleBooking(
-		ctx, metadata, current.ID, input.ExpectedVersion, replacement, events,
-	)
+	return PublicBookingActionPlan{
+		ExpectedVersion: input.ExpectedVersion,
+		Replacement:     &replacement,
+		Events:          events,
+	}, nil
 }
 
 func (s *Service) TransitionBooking(
@@ -833,15 +1140,64 @@ func (s *Service) TransitionBooking(
 	if err != nil {
 		return domain.Booking{}, err
 	}
+	plan, err := planBookingTransition(
+		metadata,
+		current,
+		expectedVersion,
+		to,
+		reason,
+	)
+	if err != nil {
+		return domain.Booking{}, err
+	}
+	return s.repository.TransitionBooking(
+		ctx,
+		metadata,
+		bookingID,
+		plan.ExpectedVersion,
+		plan.TransitionTo,
+		plan.Reason,
+		plan.Events,
+	)
+}
+
+func planBookingTransition(
+	metadata domain.CommandMetadata,
+	current domain.Booking,
+	expectedVersion int,
+	to domain.BookingStatus,
+	reason string,
+) (PublicBookingActionPlan, error) {
+	if current.OrganizationID != metadata.OrganizationID {
+		return PublicBookingActionPlan{}, domain.NewError(
+			domain.CodeValidation,
+			"booking tenant does not match the command",
+		)
+	}
+	if current.Version != expectedVersion {
+		return PublicBookingActionPlan{}, domain.NewError(
+			domain.CodeBookingVersionConflict,
+			"booking version changed",
+		)
+	}
 	if !current.Status.CanTransition(to) {
-		return domain.Booking{}, domain.NewError(domain.CodeBookingStateInvalid, "booking transition is not allowed")
+		return PublicBookingActionPlan{}, domain.NewError(
+			domain.CodeBookingStateInvalid,
+			"booking transition is not allowed",
+		)
 	}
 	reason = strings.TrimSpace(reason)
 	if to == domain.BookingCancelled && reason == "" {
-		return domain.Booking{}, domain.NewError(domain.CodeValidation, "cancellation reason is required")
+		return PublicBookingActionPlan{}, domain.NewError(
+			domain.CodeValidation,
+			"cancellation reason is required",
+		)
 	}
 	if len(reason) > 500 {
-		return domain.Booking{}, domain.NewError(domain.CodeValidation, "transition reason is too long")
+		return PublicBookingActionPlan{}, domain.NewError(
+			domain.CodeValidation,
+			"transition reason is too long",
+		)
 	}
 	eventType := map[domain.BookingStatus]string{
 		domain.BookingConfirmed: EventOrDefault(domain.EventBookingConfirmed),
@@ -853,7 +1209,7 @@ func (s *Service) TransitionBooking(
 		eventType = "BookingStateChanged"
 	}
 	payload := map[string]any{
-		"booking_id": bookingID,
+		"booking_id": current.ID,
 		"from":       current.Status,
 		"to":         to,
 		"start_at":   current.StartAt,
@@ -869,7 +1225,7 @@ func (s *Service) TransitionBooking(
 	projected.CancellationReason = reason
 	events := lifecycleAndProjectionEvents(
 		metadata,
-		bookingID.String(),
+		current.ID.String(),
 		eventType,
 		payload,
 		bookingNotificationPayload(
@@ -878,7 +1234,12 @@ func (s *Service) TransitionBooking(
 			map[string]any{"reason": reason},
 		),
 	)
-	return s.repository.TransitionBooking(ctx, metadata, bookingID, expectedVersion, to, reason, events)
+	return PublicBookingActionPlan{
+		ExpectedVersion: expectedVersion,
+		TransitionTo:    to,
+		Reason:          reason,
+		Events:          events,
+	}, nil
 }
 
 func EventOrDefault(value string) string { return value }
@@ -999,52 +1360,79 @@ func (s *Service) ConsumeBookingAction(
 	durationMinutes int,
 	reason string,
 ) (domain.Booking, error) {
+	if s.tokens == nil || s.publicActions == nil {
+		return domain.Booking{}, domain.NewError(
+			domain.CodeActionTokenInvalid,
+			"action token processing is unavailable",
+		)
+	}
 	hash, err := s.tokens.HashVerified(rawToken)
 	if err != nil {
 		return domain.Booking{}, domain.NewError(domain.CodeActionTokenInvalid, "action token is invalid")
 	}
-	token, err := s.repository.FindActionToken(ctx, hash)
-	if err != nil || token.Purpose != purpose || token.BookingID == nil {
-		return domain.Booking{}, domain.NewError(domain.CodeActionTokenInvalid, "action token is invalid")
-	}
-	if token.ConsumedAt != nil {
-		if token.ResultBookingID == nil {
-			return domain.Booking{}, domain.NewError(domain.CodeActionTokenInvalid, "action token result is unavailable")
-		}
-		return s.repository.GetBooking(ctx, token.OrganizationID, *token.ResultBookingID)
-	}
 	now := s.now().UTC()
-	if !token.ExpiresAt.After(now) {
-		return domain.Booking{}, domain.NewError(domain.CodeActionTokenExpired, "action token has expired")
-	}
-	metadata.OrganizationID = token.OrganizationID
-	var result domain.Booking
-	switch purpose {
-	case domain.ActionConfirm:
-		result, err = s.TransitionBooking(ctx, metadata, token.OrganizationID, *token.BookingID, expectedVersion, domain.BookingConfirmed, "")
-	case domain.ActionCancel:
-		result, err = s.TransitionBooking(ctx, metadata, token.OrganizationID, *token.BookingID, expectedVersion, domain.BookingCancelled, reason)
-	case domain.ActionReschedule:
-		if rescheduleAt == nil {
-			return domain.Booking{}, domain.NewError(domain.CodeValidation, "reschedule time is required")
-		}
-		result, err = s.RescheduleBooking(ctx, metadata, RescheduleInput{
-			OrganizationID:  token.OrganizationID,
-			BookingID:       *token.BookingID,
-			ExpectedVersion: expectedVersion,
-			StartAt:         *rescheduleAt,
-			DurationMinutes: durationMinutes,
-		})
-	default:
-		err = domain.NewError(domain.CodeActionTokenInvalid, "action purpose is invalid")
-	}
-	if err != nil {
-		return domain.Booking{}, err
-	}
-	if err := s.repository.ConsumeActionToken(ctx, hash, now, result.ID); err != nil {
-		return domain.Booking{}, err
-	}
-	return result, nil
+	metadata = publicActionMetadata(metadata, hash)
+	return s.publicActions.ExecutePublicBookingAction(
+		ctx,
+		hash,
+		purpose,
+		now,
+		metadata,
+		func(
+			lockedMetadata domain.CommandMetadata,
+			token domain.ActionToken,
+			current domain.Booking,
+		) (PublicBookingActionPlan, error) {
+			if token.BookingID == nil || *token.BookingID != current.ID {
+				return PublicBookingActionPlan{}, domain.NewError(
+					domain.CodeActionTokenInvalid,
+					"action token target is invalid",
+				)
+			}
+			switch purpose {
+			case domain.ActionConfirm:
+				return planBookingTransition(
+					lockedMetadata,
+					current,
+					expectedVersion,
+					domain.BookingConfirmed,
+					"",
+				)
+			case domain.ActionCancel:
+				return planBookingTransition(
+					lockedMetadata,
+					current,
+					expectedVersion,
+					domain.BookingCancelled,
+					reason,
+				)
+			case domain.ActionReschedule:
+				if rescheduleAt == nil {
+					return PublicBookingActionPlan{}, domain.NewError(
+						domain.CodeValidation,
+						"reschedule time is required",
+					)
+				}
+				return s.planReschedule(
+					ctx,
+					lockedMetadata,
+					RescheduleInput{
+						OrganizationID:  token.OrganizationID,
+						BookingID:       current.ID,
+						ExpectedVersion: expectedVersion,
+						StartAt:         rescheduleAt.UTC(),
+						DurationMinutes: durationMinutes,
+					},
+					current,
+				)
+			default:
+				return PublicBookingActionPlan{}, domain.NewError(
+					domain.CodeActionTokenInvalid,
+					"action purpose is invalid",
+				)
+			}
+		},
+	)
 }
 
 func (s *Service) ResolveActionOrganization(
@@ -1081,87 +1469,172 @@ func (s *Service) ConsumeWaitlistAction(
 	metadata domain.CommandMetadata,
 	expectedVersion int,
 ) (domain.WaitlistEntry, error) {
+	if s.tokens == nil || s.publicActions == nil {
+		return domain.WaitlistEntry{}, domain.NewError(
+			domain.CodeActionTokenInvalid,
+			"action token processing is unavailable",
+		)
+	}
 	hash, err := s.tokens.HashVerified(rawToken)
 	if err != nil {
 		return domain.WaitlistEntry{}, domain.NewError(domain.CodeActionTokenInvalid, "action token is invalid")
 	}
-	token, err := s.repository.FindActionToken(ctx, hash)
-	if err != nil || token.Purpose != domain.ActionAcceptWaitlist || token.WaitlistID == nil {
-		return domain.WaitlistEntry{}, domain.NewError(domain.CodeActionTokenInvalid, "action token is invalid")
-	}
-	if token.ConsumedAt != nil {
-		entry, getErr := s.repository.GetWaitlist(ctx, token.OrganizationID, *token.WaitlistID)
-		if getErr != nil || entry.Status != domain.WaitlistAccepted ||
-			entry.AcceptedBookingID == nil || token.ResultBookingID == nil ||
-			*entry.AcceptedBookingID != *token.ResultBookingID {
-			return domain.WaitlistEntry{}, domain.NewError(domain.CodeActionTokenInvalid, "action token result is unavailable")
-		}
-		return entry, nil
-	}
 	now := s.now().UTC()
-	if !token.ExpiresAt.After(now) {
-		return domain.WaitlistEntry{}, domain.NewError(domain.CodeActionTokenExpired, "action token has expired")
-	}
-	metadata.OrganizationID = token.OrganizationID
-	if err := metadata.Validate(); err != nil {
-		return domain.WaitlistEntry{}, err
-	}
-	current, err := s.repository.GetWaitlist(ctx, token.OrganizationID, *token.WaitlistID)
-	if err != nil {
-		return domain.WaitlistEntry{}, err
-	}
-	if current.Status != domain.WaitlistOffered || current.Version != expectedVersion ||
-		current.OfferedStartAt == nil || current.OfferedEndAt == nil ||
+	metadata = publicActionMetadata(metadata, hash)
+	return s.publicActions.ExecutePublicWaitlistAction(
+		ctx,
+		hash,
+		now,
+		metadata,
+		func(
+			lockedMetadata domain.CommandMetadata,
+			token domain.ActionToken,
+			current domain.WaitlistEntry,
+		) (PublicWaitlistActionPlan, error) {
+			return s.planWaitlistAcceptance(
+				ctx,
+				lockedMetadata,
+				token,
+				current,
+				expectedVersion,
+				now,
+			)
+		},
+	)
+}
+
+func publicActionMetadata(
+	metadata domain.CommandMetadata,
+	tokenHash string,
+) domain.CommandMetadata {
+	identity := "public-action:" + tokenHash
+	metadata.IdempotencyKey = identity
+	metadata.SourceID = identity
+	return metadata
+}
+
+func (s *Service) planWaitlistAcceptance(
+	ctx context.Context,
+	metadata domain.CommandMetadata,
+	token domain.ActionToken,
+	current domain.WaitlistEntry,
+	expectedVersion int,
+	now time.Time,
+) (PublicWaitlistActionPlan, error) {
+	if token.WaitlistID == nil || *token.WaitlistID != current.ID ||
+		current.OrganizationID != metadata.OrganizationID ||
+		current.Status != domain.WaitlistOffered ||
+		current.Version != expectedVersion ||
+		current.OfferExpiresAt == nil ||
+		!current.OfferExpiresAt.After(now) ||
+		current.OfferedStartAt == nil ||
+		current.OfferedEndAt == nil ||
 		len(current.OfferedAllocations) == 0 {
-		return domain.WaitlistEntry{}, domain.NewError(
+		return PublicWaitlistActionPlan{}, domain.NewError(
 			domain.CodeBookingVersionConflict,
 			"waitlist offer changed, expired or has no reservable slot",
 		)
 	}
-	bookingPayload, _ := json.Marshal(map[string]any{
-		"waitlist_id":  *token.WaitlistID,
-		"start_at":     current.OfferedStartAt,
-		"end_at":       current.OfferedEndAt,
-		"allocations":  current.OfferedAllocations,
-		"participants": current.Participants,
-	})
-	bookingDigest := sha256.Sum256(bookingPayload)
-	bookingMetadata := metadata
-	bookingMetadata.SourceID = "waitlist:" + token.WaitlistID.String()
-	bookingMetadata.SourceVersion = expectedVersion
-	bookingMetadata.PayloadHash = hex.EncodeToString(bookingDigest[:])
-	bookings, err := s.CreateBooking(ctx, bookingMetadata, CreateBookingInput{
-		OrganizationID: current.OrganizationID,
-		BranchID:       current.BranchID,
-		ServiceID:      current.ServiceID,
-		PartyID:        current.PartyID,
-		Customer:       PublicCustomer{PartyID: current.PartyID},
-		StartAt:        current.OfferedStartAt.UTC(),
-		Participants:   current.Participants,
-		Status:         domain.BookingConfirmed,
-		Allocations:    append([]domain.Allocation(nil), current.OfferedAllocations...),
-	})
-	if err != nil {
-		return domain.WaitlistEntry{}, err
-	}
-	if len(bookings) != 1 {
-		return domain.WaitlistEntry{}, domain.NewError(domain.CodeValidation, "waitlist booking result is invalid")
-	}
-	bookingID := bookings[0].ID
-	event := newEvent(metadata, token.WaitlistID.String(), "WaitlistAccepted", map[string]any{
-		"waitlist_id": *token.WaitlistID,
-		"booking_id":  bookingID,
-	})
-	result, err := s.repository.AcceptWaitlist(
-		ctx, token.OrganizationID, *token.WaitlistID, expectedVersion, bookingID, event,
+	branch, err := s.repository.GetBranch(
+		ctx,
+		current.OrganizationID,
+		current.BranchID,
 	)
 	if err != nil {
-		return domain.WaitlistEntry{}, err
+		return PublicWaitlistActionPlan{}, err
 	}
-	if err := s.repository.ConsumeActionToken(ctx, hash, now, bookingID); err != nil {
-		return domain.WaitlistEntry{}, err
+	service, requirements, err := s.repository.GetService(
+		ctx,
+		current.OrganizationID,
+		current.ServiceID,
+	)
+	if err != nil {
+		return PublicWaitlistActionPlan{}, err
 	}
-	return result, nil
+	if !branch.Active || !service.Active ||
+		current.Participants <= 0 ||
+		current.Participants > service.MaxParticipants {
+		return PublicWaitlistActionPlan{}, domain.NewError(
+			domain.CodeCapacityExceeded,
+			"service capacity is unavailable",
+		)
+	}
+	allocations, err := s.algorithms.NormalizeAllocations(
+		append([]domain.Allocation(nil), current.OfferedAllocations...),
+		current.Participants,
+	)
+	if err != nil {
+		return PublicWaitlistActionPlan{}, err
+	}
+	resources, err := s.repository.GetResources(
+		ctx,
+		current.OrganizationID,
+		allocationIDs(allocations),
+	)
+	if err != nil {
+		return PublicWaitlistActionPlan{}, err
+	}
+	if err := satisfyRequirements(requirements, allocations, resources); err != nil {
+		return PublicWaitlistActionPlan{}, err
+	}
+	booking, err := s.buildBooking(
+		ctx,
+		CreateBookingInput{
+			OrganizationID: current.OrganizationID,
+			BranchID:       current.BranchID,
+			ServiceID:      current.ServiceID,
+			PartyID:        current.PartyID,
+			Customer: PublicCustomer{
+				PartyID: current.PartyID,
+				Name:    current.CustomerName,
+				Email:   current.CustomerEmail,
+				Phone:   current.CustomerPhone,
+			},
+			StartAt:      current.OfferedStartAt.UTC(),
+			Participants: current.Participants,
+			Status:       domain.BookingConfirmed,
+			Allocations:  allocations,
+		},
+		metadata,
+		branch,
+		service,
+		current.PartyID,
+		allocations,
+		nil,
+		nil,
+		0,
+		current.OfferedStartAt.UTC(),
+		domain.BookingConfirmed,
+		now,
+	)
+	if err != nil {
+		return PublicWaitlistActionPlan{}, err
+	}
+	rawActions, actionTokens, err := s.bookingActionTokens(booking, now)
+	if err != nil {
+		return PublicWaitlistActionPlan{}, err
+	}
+	waitlistEvent := newEvent(
+		metadata,
+		current.ID.String(),
+		"WaitlistAccepted",
+		map[string]any{
+			"waitlist_id": current.ID,
+			"booking_id":  booking.ID,
+		},
+	)
+	return PublicWaitlistActionPlan{
+		ExpectedVersion: expectedVersion,
+		Booking:         booking,
+		ActionTokens:    actionTokens,
+		BookingEvents: bookingEvents(
+			metadata,
+			booking,
+			domain.EventBookingCreated,
+			rawActions,
+		),
+		WaitlistEvent: waitlistEvent,
+	}, nil
 }
 
 func (s *Service) CreateWaitlistEntry(

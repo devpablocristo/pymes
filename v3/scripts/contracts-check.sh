@@ -8,6 +8,10 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+python3 "$root_dir/scripts/pergo-contract-check.py" \
+  "$root_dir/api/openapi.yaml" \
+  "$root_dir/contracts/pergo.openapi.yaml"
+
 cd "$root_dir/backend"
 generator='github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0'
 public_go_operation_ids='getHealthz,getReadyz,createSale,createParty,getParty,createPurchase,getPurchase,createPayment,getPayment,createAccountingReversal,getAccountingFailure,createAccountingAdjustment,getSale,requestFiscalCredentialCSR,getFiscalCredential,uploadFiscalCertificate,configureFiscalPointOfSale,validateFiscalPointOfSale'

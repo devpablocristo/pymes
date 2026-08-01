@@ -8,7 +8,8 @@
 | pyafipws | ninguno en producción | librería como dependencia/segundo emisor | fixtures, catálogos WSAA/WSFE/padrón/FCE/WSFEX/CAEA |
 | LedgerSMB | ninguno en producción | cualquier copia, por GPLv2 | casos de diario, pagos parciales, reversas y cierre |
 
-La extracción de OA será un fork mínimo mantenido por el equipo. Si la poda no
-permite aislar en dos sprints el núcleo sin imports de módulos comerciales/UI,
-se conserva sólo el modelo y se implementa el servicio contable nuevo; no se
-arrastra OA completo por conveniencia.
+La adaptación de OA quedó concretada en el fork mantenido por el equipo. El SHA
+remoto verde `1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d` conserva el runtime
+headless aislado y sus tres targets privados; Pymes fija exactamente ese commit.
+El repositorio sigue siendo público, pero el servicio contable se despliega
+privado y no expone UI ni superficies comerciales de OA.

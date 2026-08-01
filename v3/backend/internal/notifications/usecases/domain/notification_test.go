@@ -71,14 +71,29 @@ func TestIntentDeliveryRouteIsValidatedAndFrozenIntoDigest(t *testing.T) {
 }
 
 func TestNextStatusNeverRegresses(t *testing.T) {
-	status, err := NextStatus(StatusQueued, "message.delivered")
+	status, err := NextStatus(StatusQueued, "delivered")
 	if err != nil || status != StatusDelivered {
 		t.Fatalf("delivered transition = %q, %v", status, err)
 	}
-	if _, err := NextStatus(StatusDelivered, "message.sent"); !errors.Is(err, ErrInvalidTransition) {
+	legacyStatus, legacyErr := NextStatus(StatusQueued, "message.delivered")
+	if legacyErr != nil || legacyStatus != StatusDelivered {
+		t.Fatalf("legacy delivered transition = %q, %v", legacyStatus, legacyErr)
+	}
+	if _, err := NextStatus(StatusDelivered, "sent"); !errors.Is(err, ErrInvalidTransition) {
 		t.Fatal("expected stale sent event to be rejected")
 	}
-	if _, err := NextStatus(StatusRead, "message.failed"); !errors.Is(err, ErrInvalidTransition) {
+	if _, err := NextStatus(StatusRead, "failed"); !errors.Is(err, ErrInvalidTransition) {
 		t.Fatal("expected terminal read state")
+	}
+}
+
+func TestDeliveryFailureCodePreservesOnlyStableUncertainty(t *testing.T) {
+	if code := DeliveryFailureCode("DELIVERY_UNCERTAIN"); code !=
+		FailureCodeDeliveryUncertain {
+		t.Fatalf("uncertain failure code = %q", code)
+	}
+	if code := DeliveryFailureCode("provider leaked phone +5491112345678"); code !=
+		FailureCodeDeliveryFailed {
+		t.Fatalf("untrusted provider failure code = %q", code)
 	}
 }

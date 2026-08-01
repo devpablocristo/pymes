@@ -34,6 +34,11 @@ const (
 	StatusFailed    Status = "failed"
 )
 
+const (
+	FailureCodeDeliveryFailed    = "PERGO_DELIVERY_FAILED"
+	FailureCodeDeliveryUncertain = "PERGO_DELIVERY_UNCERTAIN"
+)
+
 var (
 	ErrFeatureDisabled      = errors.New("FEATURE_DISABLED")
 	ErrDisabled             = ErrFeatureDisabled
@@ -277,6 +282,18 @@ func NextStatus(current Status, event string) (Status, error) {
 		return "", ErrInvalidTransition
 	}
 	return target, nil
+}
+
+// DeliveryFailureCode maps the provider boundary to a small stable vocabulary.
+// Arbitrary provider text must never be persisted as a Pymes failure code.
+func DeliveryFailureCode(providerCode string) string {
+	if strings.EqualFold(
+		strings.TrimSpace(providerCode),
+		"DELIVERY_UNCERTAIN",
+	) {
+		return FailureCodeDeliveryUncertain
+	}
+	return FailureCodeDeliveryFailed
 }
 
 func ValidateDeliveryEvent(event DeliveryEvent) error {

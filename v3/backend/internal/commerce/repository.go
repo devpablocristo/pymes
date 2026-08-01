@@ -15,83 +15,13 @@ import (
 	"strings"
 	"time"
 
+	repositoryhelpers "github.com/devpablocristo/pymes/v3/backend/internal/commerce/repository/helpers"
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/commerce/usecases/domain"
 	organizationdomain "github.com/devpablocristo/pymes/v3/backend/internal/organization/usecases/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-func nullableText(value string) any {
-	if strings.TrimSpace(value) == "" {
-		return nil
-	}
-	return value
-}
-
-func normalizeOrigin(
-	origin domain.OriginMetadata,
-	fallbackCorrelationID, operation, sourceID string,
-) domain.OriginMetadata {
-	origin.RequestID = strings.TrimSpace(origin.RequestID)
-	origin.CorrelationID = strings.TrimSpace(origin.CorrelationID)
-	origin.ActorRef = strings.TrimSpace(origin.ActorRef)
-	if origin.SourceVersion < 1 {
-		origin.SourceVersion = 1
-	}
-	if origin.RequestID == "" {
-		identity := fmt.Sprintf("%s\x00%s", strings.TrimSpace(operation), strings.TrimSpace(sourceID))
-		digest := sha256.Sum256([]byte(identity))
-		origin.RequestID = "internal:" + hex.EncodeToString(digest[:16])
-	}
-	if origin.CorrelationID == "" {
-		origin.CorrelationID = strings.TrimSpace(fallbackCorrelationID)
-	}
-	if origin.CorrelationID == "" {
-		origin.CorrelationID = origin.RequestID
-	}
-	if origin.ActorRef == "" {
-		origin.ActorRef = "system:internal"
-	}
-	return origin
-}
-
-func originFromIdempotencyCommand(
-	current domain.OriginMetadata,
-	command domain.IdempotencyCommand,
-) domain.OriginMetadata {
-	if strings.TrimSpace(command.RequestID) != "" {
-		current.RequestID = command.RequestID
-	}
-	if strings.TrimSpace(command.CorrelationID) != "" {
-		current.CorrelationID = command.CorrelationID
-	}
-	if strings.TrimSpace(command.ActorRef) != "" {
-		current.ActorRef = command.ActorRef
-	}
-	if command.SourceVersion > 0 {
-		current.SourceVersion = command.SourceVersion
-	}
-	return normalizeOrigin(
-		current,
-		command.CorrelationID,
-		command.Operation,
-		command.SourceID,
-	)
-}
-
-func originSourceVersion(origin domain.OriginMetadata) int {
-	if origin.SourceVersion > 0 {
-		return origin.SourceVersion
-	}
-	return 1
-}
-
-func repositoryIdempotencyKey(organizationID, operation, sourceID string, sourceVersion int) string {
-	identity := fmt.Sprintf("%s\x00%s\x00%s\x00%d", organizationID, operation, sourceID, sourceVersion)
-	digest := sha256.Sum256([]byte(identity))
-	return "pymes-v3:" + hex.EncodeToString(digest[:])
-}
 
 type Store struct {
 	Pool *pgxpool.Pool
@@ -183,7 +113,7 @@ func (s *Store) CreatePurchaseAndQueue(ctx context.Context, p domain.Purchase) e
 }
 
 func (s *Store) CreatePurchaseAndQueueIdempotent(ctx context.Context, command domain.IdempotencyCommand, purchase domain.Purchase) (domain.Purchase, error) {
-	purchase.Origin = originFromIdempotencyCommand(purchase.Origin, command)
+	purchase.Origin = repositoryhelpers.OriginFromIdempotencyCommand(purchase.Origin, command)
 	purchase.CorrelationID = purchase.Origin.CorrelationID
 	return executeIdempotent(ctx, s, command, func(tx pgx.Tx) (domain.Purchase, error) {
 		return s.createPurchaseAndQueueTx(ctx, tx, purchase)
@@ -195,7 +125,9 @@ func (s *Store) createPurchaseAndQueueTx(ctx context.Context, tx pgx.Tx, p domai
 		p.ExternalDocumentRef == "" || p.ValidateAccountingAmounts() != nil {
 		return domain.Purchase{}, fmt.Errorf("VALIDATION_ERROR")
 	}
-	p.Origin = normalizeOrigin(p.Origin, p.CorrelationID, domain.OperationCreatePurchase, p.ID)
+	p.Origin = repositoryhelpers.NormalizeOrigin(
+		p.Origin, p.CorrelationID, domain.OperationCreatePurchase, p.ID,
+	)
 	p.CorrelationID = p.Origin.CorrelationID
 	now := s.Now().UTC()
 	p.Status, p.CreatedAt = "confirmed", now
@@ -229,7 +161,7 @@ func (s *Store) createPurchaseAndQueueTx(ctx context.Context, tx pgx.Tx, p domai
 	}
 	payload, _ := json.Marshal(map[string]string{"purchase_id": p.ID})
 	digest := sha256.Sum256(payload)
-	idempotencyKey := repositoryIdempotencyKey(
+	idempotencyKey := repositoryhelpers.IdempotencyKey(
 		p.OrganizationID, "accounting.post", p.ID, p.Origin.SourceVersion,
 	)
 	if _, err := tx.Exec(ctx, `
@@ -265,7 +197,7 @@ func (s *Store) CreatePaymentAndApplications(ctx context.Context, payment domain
 }
 
 func (s *Store) CreatePaymentAndApplicationsIdempotent(ctx context.Context, command domain.IdempotencyCommand, payment domain.Payment, applications []domain.OpenItemApplication) (domain.Payment, error) {
-	payment.Origin = originFromIdempotencyCommand(payment.Origin, command)
+	payment.Origin = repositoryhelpers.OriginFromIdempotencyCommand(payment.Origin, command)
 	payment.CorrelationID = payment.Origin.CorrelationID
 	return executeIdempotent(ctx, s, command, func(tx pgx.Tx) (domain.Payment, error) {
 		return s.createPaymentAndApplicationsTx(ctx, tx, payment, applications)
@@ -278,7 +210,7 @@ func (s *Store) createPaymentAndApplicationsTx(ctx context.Context, tx pgx.Tx, p
 		!payment.Total.Valid() || payment.Total.Amount == "0" {
 		return domain.Payment{}, fmt.Errorf("VALIDATION_ERROR")
 	}
-	payment.Origin = normalizeOrigin(
+	payment.Origin = repositoryhelpers.NormalizeOrigin(
 		payment.Origin, payment.CorrelationID, domain.OperationCreatePayment, payment.ID,
 	)
 	payment.CorrelationID = payment.Origin.CorrelationID
@@ -361,7 +293,7 @@ func (s *Store) createPaymentAndApplicationsTx(ctx context.Context, tx pgx.Tx, p
 	}
 	payload, _ := json.Marshal(map[string]string{"payment_id": payment.ID})
 	digest := sha256.Sum256(payload)
-	idempotencyKey := repositoryIdempotencyKey(
+	idempotencyKey := repositoryhelpers.IdempotencyKey(
 		payment.OrganizationID, "accounting.post", payment.ID, payment.Origin.SourceVersion,
 	)
 	if _, err := tx.Exec(ctx, `
@@ -398,7 +330,7 @@ func (s *Store) CreateSaleAndQueueFiscal(ctx context.Context, sale domain.Sale, 
 }
 
 func (s *Store) CreateSaleAndQueueFiscalIdempotent(ctx context.Context, command domain.IdempotencyCommand, sale domain.Sale, credentialRef string) (domain.Sale, error) {
-	sale.Origin = originFromIdempotencyCommand(sale.Origin, command)
+	sale.Origin = repositoryhelpers.OriginFromIdempotencyCommand(sale.Origin, command)
 	sale.CorrelationID = sale.Origin.CorrelationID
 	return executeIdempotent(ctx, s, command, func(tx pgx.Tx) (domain.Sale, error) {
 		return s.createSaleAndQueueFiscalTx(ctx, tx, sale, credentialRef)
@@ -415,7 +347,9 @@ func (s *Store) createSaleAndQueueFiscalTx(ctx context.Context, tx pgx.Tx, sale 
 	if sale.FiscalEnvironment != "homologation" && sale.FiscalEnvironment != "production" {
 		return domain.Sale{}, fmt.Errorf("VALIDATION_ERROR")
 	}
-	sale.Origin = normalizeOrigin(sale.Origin, sale.CorrelationID, domain.OperationCreateSale, sale.ID)
+	sale.Origin = repositoryhelpers.NormalizeOrigin(
+		sale.Origin, sale.CorrelationID, domain.OperationCreateSale, sale.ID,
+	)
 	sale.CorrelationID = sale.Origin.CorrelationID
 	now := s.Now().UTC()
 	var status string
@@ -441,7 +375,7 @@ func (s *Store) createSaleAndQueueFiscalTx(ctx context.Context, tx pgx.Tx, sale 
 			(sourceDocumentType != "FA" && sourceDocumentType != "FB" && sourceDocumentType != "FC") {
 			return domain.Sale{}, fmt.Errorf("INVALID_SOURCE_DOCUMENT")
 		}
-		sale.FiscalSnapshot, err = attachAssociatedVoucher(
+		sale.FiscalSnapshot, err = repositoryhelpers.AttachAssociatedVoucher(
 			sale.FiscalSnapshot,
 			domain.VoucherReference{
 				PointOfSale: sourcePointOfSale, DocumentType: sourceDocumentType,
@@ -503,7 +437,8 @@ INSERT INTO app.sales (
 		sale.Voucher.DocumentType, sale.Voucher.VoucherNumber, sale.FiscalEnvironment,
 		sale.Total.Amount, sale.Total.Currency, sale.Status, sale.SnapshotDigest,
 		credentialRef, sale.FiscalSnapshot, sale.Origin.RequestID, sale.Origin.ActorRef,
-		sale.Origin.SourceVersion, sale.CorrelationID, nullableText(sale.SourceDocumentID), now,
+		sale.Origin.SourceVersion, sale.CorrelationID,
+		repositoryhelpers.NullableText(sale.SourceDocumentID), now,
 	)
 	if err != nil {
 		return domain.Sale{}, err
@@ -513,7 +448,7 @@ INSERT INTO app.sales (
 		return domain.Sale{}, err
 	}
 	digest := sha256.Sum256(payload)
-	idempotencyKey := repositoryIdempotencyKey(
+	idempotencyKey := repositoryhelpers.IdempotencyKey(
 		sale.OrganizationID, "fiscal.authorize", sale.ID, sale.Origin.SourceVersion,
 	)
 	_, err = tx.Exec(ctx, `
@@ -535,32 +470,6 @@ INSERT INTO app.outbox (
 	return sale, nil
 }
 
-func attachAssociatedVoucher(
-	noteSnapshot []byte,
-	sourceVoucher domain.VoucherReference,
-	sourceSnapshot []byte,
-) ([]byte, error) {
-	var note map[string]any
-	if len(noteSnapshot) == 0 || json.Unmarshal(noteSnapshot, &note) != nil {
-		return nil, fmt.Errorf("invalid note fiscal snapshot")
-	}
-	var source struct {
-		IssueDate string `json:"issue_date"`
-	}
-	if len(sourceSnapshot) == 0 || json.Unmarshal(sourceSnapshot, &source) != nil ||
-		source.IssueDate == "" || sourceVoucher.PointOfSale < 1 ||
-		sourceVoucher.DocumentType == "" || sourceVoucher.VoucherNumber < 1 {
-		return nil, fmt.Errorf("invalid source fiscal snapshot")
-	}
-	note["associated_voucher"] = map[string]any{
-		"point_of_sale":  sourceVoucher.PointOfSale,
-		"document_type":  sourceVoucher.DocumentType,
-		"voucher_number": sourceVoucher.VoucherNumber,
-		"issue_date":     source.IssueDate,
-	}
-	return json.Marshal(note)
-}
-
 func (s *Store) CreateAccountingReversal(ctx context.Context, value domain.AccountingReversal) (domain.AccountingReversal, error) {
 	tx, err := beginTenantTransaction(ctx, s, value.OrganizationID)
 	if err != nil {
@@ -578,7 +487,7 @@ func (s *Store) CreateAccountingReversal(ctx context.Context, value domain.Accou
 }
 
 func (s *Store) CreateAccountingReversalIdempotent(ctx context.Context, command domain.IdempotencyCommand, value domain.AccountingReversal) (domain.AccountingReversal, error) {
-	value.Origin = originFromIdempotencyCommand(value.Origin, command)
+	value.Origin = repositoryhelpers.OriginFromIdempotencyCommand(value.Origin, command)
 	value.CorrelationID = value.Origin.CorrelationID
 	return executeIdempotent(ctx, s, command, func(tx pgx.Tx) (domain.AccountingReversal, error) {
 		return s.createAccountingReversalTx(ctx, tx, value)
@@ -591,13 +500,13 @@ func (s *Store) createAccountingReversalTx(ctx context.Context, tx pgx.Tx, value
 		(value.DocumentKind != "purchase" && value.DocumentKind != "payment") {
 		return domain.AccountingReversal{}, fmt.Errorf("VALIDATION_ERROR")
 	}
-	value.Origin = normalizeOrigin(
+	value.Origin = repositoryhelpers.NormalizeOrigin(
 		value.Origin, value.CorrelationID, domain.OperationCreateAccountingReversal, value.ID,
 	)
 	value.CorrelationID = value.Origin.CorrelationID
 	value.EffectiveAt = value.EffectiveAt.UTC().Truncate(time.Microsecond)
 	if value.SnapshotDigest == "" {
-		value.SnapshotDigest = reversalSnapshotDigest(value)
+		value.SnapshotDigest = repositoryhelpers.ReversalSnapshotDigest(value)
 	}
 	var status, journalEntryID string
 	var err error
@@ -651,7 +560,7 @@ func (s *Store) createAccountingReversalTx(ctx context.Context, tx pgx.Tx, value
 	}
 	payload, _ := json.Marshal(map[string]string{"reversal_id": value.ID})
 	digest := sha256.Sum256(payload)
-	idempotencyKey := repositoryIdempotencyKey(
+	idempotencyKey := repositoryhelpers.IdempotencyKey(
 		value.OrganizationID, "accounting.reverse", value.ID, value.Origin.SourceVersion,
 	)
 	if _, err = tx.Exec(ctx, `
@@ -667,17 +576,6 @@ func (s *Store) createAccountingReversalTx(ctx context.Context, tx pgx.Tx, value
 		return domain.AccountingReversal{}, err
 	}
 	return value, nil
-}
-
-func reversalSnapshotDigest(value domain.AccountingReversal) string {
-	body, _ := json.Marshal(struct {
-		ID, DocumentKind, DocumentID, Reason string
-		EffectiveAt                          time.Time
-	}{
-		value.ID, value.DocumentKind, value.DocumentID, value.Reason, value.EffectiveAt,
-	})
-	digest := sha256.Sum256(body)
-	return hex.EncodeToString(digest[:])
 }
 
 func (s *Store) Lease(ctx context.Context, limit int, duration time.Duration) ([]domain.Event, error) {
@@ -859,7 +757,7 @@ func (s *Store) Retry(ctx context.Context, event domain.Event) error {
 	if attempt < 1 {
 		attempt = 1
 	}
-	backoff := time.Second * time.Duration(1<<min(attempt-1, 6))
+	backoff := time.Second * time.Duration(1<<repositoryhelpers.Min(attempt-1, 6))
 	if backoff > time.Minute {
 		backoff = time.Minute
 	}
@@ -881,10 +779,4 @@ func (s *Store) Retry(ctx context.Context, event domain.Event) error {
 		return domain.ErrLeaseLost
 	}
 	return tx.Commit(ctx)
-}
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

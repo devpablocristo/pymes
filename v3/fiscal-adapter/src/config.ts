@@ -52,24 +52,46 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Config
   if (!Number.isSafeInteger(requestTimeoutMs) || requestTimeoutMs < 1000 || requestTimeoutMs > 120000) {
     throw new Error("invalid FISCAL_ARCA_TIMEOUT_MS");
   }
-  const productionKMS = environment.FISCAL_KMS_KEY_NAME;
+  const cloudKMSKeyName =
+    environment.FISCAL_KMS_KEY_NAME?.trim() || undefined;
   const testKMSKey = Buffer.alloc(32, 7).toString("base64");
-  const localKMSKeyB64 =
-    environment.FISCAL_LOCAL_KMS_KEY_B64 ??
-    (runtimeEnvironment === "test" ? testKMSKey : undefined);
+  let localKMSKeyB64 =
+    environment.FISCAL_LOCAL_KMS_KEY_B64?.trim() || undefined;
+  if (
+    cloudKMSKeyName !== undefined &&
+    localKMSKeyB64 !== undefined
+  ) {
+    throw new Error(
+      "FISCAL_KMS_KEY_NAME and FISCAL_LOCAL_KMS_KEY_B64 are mutually exclusive",
+    );
+  }
   if (localKMSKeyB64 !== undefined && runtimeEnvironment !== "development" && runtimeEnvironment !== "test") {
     throw new Error("local fiscal KMS is forbidden outside development or test");
   }
+  if (
+    cloudKMSKeyName === undefined &&
+    localKMSKeyB64 === undefined &&
+    runtimeEnvironment === "test"
+  ) {
+    localKMSKeyB64 = testKMSKey;
+  }
+  if (
+    runtimeEnvironment !== "development" &&
+    runtimeEnvironment !== "test" &&
+    cloudKMSKeyName === undefined
+  ) {
+    throw new Error(
+      "FISCAL_KMS_KEY_NAME is required outside development or test",
+    );
+  }
+  if (cloudKMSKeyName === undefined && localKMSKeyB64 === undefined) {
+    throw new Error(
+      "FISCAL_KMS_KEY_NAME or FISCAL_LOCAL_KMS_KEY_B64 is required",
+    );
+  }
   const fiscalKMSKeyName =
-    mode === "arca"
-      ? productionKMS
-      : "projects/local/locations/global/keyRings/local/cryptoKeys/fiscal";
-  if (fiscalKMSKeyName === undefined || fiscalKMSKeyName.length < 1) {
-    throw new Error("FISCAL_KMS_KEY_NAME is required in arca mode");
-  }
-  if (mode === "mock" && localKMSKeyB64 === undefined) {
-    throw new Error("FISCAL_LOCAL_KMS_KEY_B64 is required in local mock mode");
-  }
+    cloudKMSKeyName ??
+    "projects/local/locations/global/keyRings/local/cryptoKeys/fiscal";
   const homologationIssuerPattern = environment.FISCAL_ARCA_HOMOLOGATION_ISSUER_PATTERN;
   const productionIssuerPattern = environment.FISCAL_ARCA_PRODUCTION_ISSUER_PATTERN;
   if (mode === "arca" && (homologationIssuerPattern === undefined || productionIssuerPattern === undefined)) {

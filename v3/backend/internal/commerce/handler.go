@@ -96,7 +96,7 @@ func (s *HTTPServer) RequestFiscalCredentialCSR(
 		return
 	}
 	var input publicapi.FiscalCredentialCSRInput
-	if decodeJSON(r, &input) != nil {
+	if handlerhelpers.DecodeJSON(r, &input) != nil {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
@@ -158,7 +158,7 @@ func (s *HTTPServer) UploadFiscalCertificate(
 		return
 	}
 	var input publicapi.FiscalCertificateUpload
-	if decodeJSON(r, &input) != nil {
+	if handlerhelpers.DecodeJSON(r, &input) != nil {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
@@ -214,7 +214,7 @@ func (s *HTTPServer) configureFiscalPointOfSale(
 		return
 	}
 	var input publicapi.FiscalPointOfSaleConfiguration
-	if decodeJSON(r, &input) != nil {
+	if handlerhelpers.DecodeJSON(r, &input) != nil {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
@@ -292,7 +292,7 @@ func (s *HTTPServer) CreateAccountingReversal(
 		return
 	}
 	var input publicapi.CreateAccountingReversalJSONRequestBody
-	if decodeJSON(r, &input) != nil || input.Id == "" || !input.DocumentKind.Valid() ||
+	if handlerhelpers.DecodeJSON(r, &input) != nil || input.Id == "" || !input.DocumentKind.Valid() ||
 		input.DocumentId == "" || input.EffectiveAt.IsZero() || strings.TrimSpace(input.Reason) == "" {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
@@ -349,7 +349,7 @@ func (s *HTTPServer) CreateAccountingAdjustment(
 		return
 	}
 	var input publicapi.CreateAccountingAdjustmentJSONRequestBody
-	if decodeJSON(r, &input) != nil ||
+	if handlerhelpers.DecodeJSON(r, &input) != nil ||
 		strings.TrimSpace(input.Id) == "" ||
 		len(input.Id) > 255 ||
 		input.EffectiveAt.IsZero() ||
@@ -400,7 +400,7 @@ func (s *HTTPServer) CreateParty(
 		return
 	}
 	var input publicapi.CreatePartyJSONRequestBody
-	if decodeJSON(r, &input) != nil || input.Id == "" || !input.Kind.Valid() || strings.TrimSpace(input.DisplayName) == "" {
+	if handlerhelpers.DecodeJSON(r, &input) != nil || input.Id == "" || !input.Kind.Valid() || strings.TrimSpace(input.DisplayName) == "" {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
@@ -444,7 +444,7 @@ func (s *HTTPServer) CreatePurchase(
 		return
 	}
 	var input publicapi.CreatePurchaseJSONRequestBody
-	if decodeJSON(r, &input) != nil {
+	if handlerhelpers.DecodeJSON(r, &input) != nil {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
@@ -506,7 +506,7 @@ func (s *HTTPServer) CreatePayment(
 		return
 	}
 	var input publicapi.CreatePaymentJSONRequestBody
-	if decodeJSON(r, &input) != nil {
+	if handlerhelpers.DecodeJSON(r, &input) != nil {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
@@ -591,7 +591,7 @@ func (s *HTTPServer) CreateSale(
 		return
 	}
 	var input publicapi.CreateSaleJSONRequestBody
-	if decodeJSON(r, &input) != nil {
+	if handlerhelpers.DecodeJSON(r, &input) != nil {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
@@ -674,10 +674,6 @@ func writeGeneratedParameterError(w http.ResponseWriter, _ *http.Request, err er
 		return
 	}
 	writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
-}
-
-func decodeJSON(r *http.Request, destination any) error {
-	return handlerhelpers.DecodeJSON(r, destination)
 }
 
 func commandIdentity(

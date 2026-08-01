@@ -259,6 +259,22 @@ type Reschedule struct {
 	Allocations     []Allocation `json:"allocations,omitempty"`
 }
 
+type UpdateBooking struct {
+	ExpectedVersion int       `json:"expected_version"`
+	Customer        *Customer `json:"customer,omitempty"`
+	Participants    *int      `json:"participants,omitempty"`
+	Notes           *string   `json:"notes,omitempty"`
+	SubstateCode    *string   `json:"substate_code,omitempty"`
+}
+
+// UpdateBookingIdempotencyScope is the canonical command payload hashed by the
+// HTTP adapter. The route resource is part of the scope so one key can never
+// replay an update completed for another booking.
+type UpdateBookingIdempotencyScope struct {
+	BookingID uuid.UUID     `json:"booking_id"`
+	Body      UpdateBooking `json:"body"`
+}
+
 type Transition struct {
 	ExpectedVersion int    `json:"expected_version"`
 	Reason          string `json:"reason,omitempty"`

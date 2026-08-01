@@ -2,6 +2,8 @@ package scheduling
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 	"time"
@@ -118,6 +120,72 @@ type partyDirectoryFake struct {
 	calls   int
 }
 
+type publicActionTokenCodecFake struct {
+	hash string
+}
+
+func (f publicActionTokenCodecFake) Issue() (string, string, error) {
+	return "issued-token", f.hash, nil
+}
+
+func (f publicActionTokenCodecFake) HashVerified(string) (string, error) {
+	return f.hash, nil
+}
+
+type publicActionRepositoryFake struct {
+	Repository
+	token            domain.ActionToken
+	booking          domain.Booking
+	metadata         domain.CommandMetadata
+	bookingPlan      PublicBookingActionPlan
+	bookingPlanCalls int
+}
+
+func (f *publicActionRepositoryFake) ExecutePublicBookingAction(
+	_ context.Context,
+	hash string,
+	purpose domain.ActionPurpose,
+	_ time.Time,
+	metadata domain.CommandMetadata,
+	planner PublicBookingActionPlanner,
+) (domain.Booking, error) {
+	metadata.OrganizationID = f.token.OrganizationID
+	f.metadata = metadata
+	plan, err := planner(metadata, f.token, f.booking)
+	if err != nil {
+		return domain.Booking{}, err
+	}
+	f.bookingPlanCalls++
+	f.bookingPlan = plan
+	result := f.booking
+	if plan.Replacement != nil {
+		result = *plan.Replacement
+	} else {
+		result.Status = plan.TransitionTo
+		result.Version++
+	}
+	if hash != f.token.TokenHash || purpose != f.token.Purpose {
+		return domain.Booking{}, domain.NewError(
+			domain.CodeActionTokenInvalid,
+			"unexpected public action",
+		)
+	}
+	return result, nil
+}
+
+func (f *publicActionRepositoryFake) ExecutePublicWaitlistAction(
+	context.Context,
+	string,
+	time.Time,
+	domain.CommandMetadata,
+	PublicWaitlistActionPlanner,
+) (domain.WaitlistEntry, error) {
+	return domain.WaitlistEntry{}, domain.NewError(
+		domain.CodeActionTokenInvalid,
+		"unexpected waitlist action",
+	)
+}
+
 func (f *partyDirectoryFake) EnsureCustomer(
 	context.Context,
 	domain.CommandMetadata,
@@ -125,6 +193,65 @@ func (f *partyDirectoryFake) EnsureCustomer(
 ) (CustomerIdentity, error) {
 	f.calls++
 	return CustomerIdentity{PartyID: f.partyID, Name: "Ada"}, nil
+}
+
+func TestConsumeBookingActionDelegatesLockedPlanningToAtomicRepository(t *testing.T) {
+	hash := hex.EncodeToString(make([]byte, sha256.Size))
+	bookingID := uuid.New()
+	repository := &publicActionRepositoryFake{
+		token: domain.ActionToken{
+			OrganizationID: "org-public-action",
+			ID:             uuid.New(),
+			BookingID:      &bookingID,
+			Purpose:        domain.ActionConfirm,
+			TokenHash:      hash,
+			ExpiresAt:      time.Now().Add(time.Hour),
+		},
+		booking: domain.Booking{
+			OrganizationID: "org-public-action",
+			ID:             bookingID,
+			Status:         domain.BookingPendingConfirmation,
+			Version:        1,
+		},
+	}
+	service := NewService(
+		repository,
+		algorithmsFake{},
+		publicActionTokenCodecFake{hash: hash},
+		WithClock(func() time.Time { return time.Now().UTC() }),
+	)
+	metadata := testMetadata("", "caller-selected-key", bookingID.String())
+	result, err := service.ConsumeBookingAction(
+		context.Background(),
+		"opaque-token",
+		domain.ActionConfirm,
+		metadata,
+		1,
+		nil,
+		0,
+		"",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != domain.BookingConfirmed ||
+		result.Version != 2 ||
+		repository.bookingPlanCalls != 1 ||
+		repository.bookingPlan.ExpectedVersion != 1 ||
+		repository.bookingPlan.TransitionTo != domain.BookingConfirmed {
+		t.Fatalf(
+			"result=%+v calls=%d plan=%+v",
+			result,
+			repository.bookingPlanCalls,
+			repository.bookingPlan,
+		)
+	}
+	stableIdentity := "public-action:" + hash
+	if repository.metadata.OrganizationID != repository.token.OrganizationID ||
+		repository.metadata.IdempotencyKey != stableIdentity ||
+		repository.metadata.SourceID != stableIdentity {
+		t.Fatalf("public action metadata was not normalized: %+v", repository.metadata)
+	}
 }
 
 func TestCreateRecurringBookingFreezesSnapshotsAndQueuesIntegrationEvents(t *testing.T) {
@@ -298,11 +425,18 @@ func TestCreateWaitlistEnsuresCustomerThroughConsumerOwnedPort(t *testing.T) {
 
 type rescheduleRepositoryFake struct {
 	Repository
-	current     domain.Booking
-	service     domain.Service
-	resource    domain.Resource
-	replacement domain.Booking
-	reason      string
+	current      domain.Booking
+	service      domain.Service
+	resource     domain.Resource
+	replacement  domain.Booking
+	reason       string
+	update       BookingUpdate
+	updateEvents []domain.Event
+	updateCalls  int
+	replay       domain.Booking
+	replayID     uuid.UUID
+	replayed     bool
+	replayErr    error
 }
 
 func (f *rescheduleRepositoryFake) GetBooking(
@@ -347,6 +481,39 @@ func (f *rescheduleRepositoryFake) LoadAvailability(
 	domain.AvailabilityQuery,
 ) (domain.AvailabilitySnapshot, error) {
 	return domain.AvailabilitySnapshot{Service: f.service}, nil
+}
+
+func (f *rescheduleRepositoryFake) ReplayBookingUpdate(
+	_ context.Context,
+	_ domain.CommandMetadata,
+	bookingID uuid.UUID,
+) (domain.Booking, bool, error) {
+	f.replayID = bookingID
+	return f.replay, f.replayed, f.replayErr
+}
+
+func (f *rescheduleRepositoryFake) UpdateBooking(
+	_ context.Context,
+	_ domain.CommandMetadata,
+	_ uuid.UUID,
+	_ int,
+	update BookingUpdate,
+	events []domain.Event,
+) (domain.Booking, error) {
+	f.updateCalls++
+	f.update = update
+	f.updateEvents = events
+	result := f.current
+	result.PartyID = update.PartyID
+	result.CustomerName = update.CustomerName
+	result.CustomerEmail = update.CustomerEmail
+	result.CustomerPhone = update.CustomerPhone
+	result.Participants = update.Participants
+	result.Notes = update.Notes
+	result.SubstateCode = update.SubstateCode
+	result.Allocations = update.Allocations
+	result.Version++
+	return result, nil
 }
 
 func (f *rescheduleRepositoryFake) RescheduleBooking(
@@ -485,6 +652,173 @@ func TestResizeRevalidatesAndFreezesDurationAndCancellationReason(t *testing.T) 
 	if err != nil || cancelled.CancellationReason != "Cliente sin disponibilidad" ||
 		repository.reason != "Cliente sin disponibilidad" {
 		t.Fatalf("cancellation reason lost: booking=%+v reason=%q err=%v", cancelled, repository.reason, err)
+	}
+}
+
+type updatePartyDirectoryFake struct {
+	input PublicCustomer
+	calls int
+}
+
+func (f *updatePartyDirectoryFake) EnsureCustomer(
+	_ context.Context,
+	_ domain.CommandMetadata,
+	input PublicCustomer,
+) (CustomerIdentity, error) {
+	f.calls++
+	f.input = input
+	return CustomerIdentity{
+		PartyID: input.PartyID,
+		Name:    "Ada Lovelace",
+		Email:   input.Email,
+		Phone:   input.Phone,
+	}, nil
+}
+
+func TestUpdateBookingEditsOnlyOperationalFieldsAndReplaysBeforePartySideEffects(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, time.August, 1, 12, 0, 0, 0, time.UTC)
+	branchID, serviceID, resourceID, bookingID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	current := domain.Booking{
+		OrganizationID:  "org-update",
+		ID:              bookingID,
+		BranchID:        branchID,
+		ServiceID:       serviceID,
+		PartyID:         "party-old",
+		Status:          domain.BookingConfirmed,
+		Participants:    1,
+		StartAt:         now.Add(time.Hour),
+		EndAt:           now.Add(2 * time.Hour),
+		OccupiesFrom:    now.Add(time.Hour),
+		OccupiesUntil:   now.Add(2 * time.Hour),
+		Version:         4,
+		ServiceName:     "Snapshot original",
+		Price:           "1250.00",
+		Currency:        "ARS",
+		DurationMinutes: 60,
+		Timezone:        "UTC",
+		CustomerName:    "Cliente anterior",
+		Allocations: []domain.Allocation{{
+			ResourceID: resourceID,
+			Mode:       domain.AllocationExclusive,
+			Units:      1,
+		}},
+	}
+	repository := &rescheduleRepositoryFake{
+		current: current,
+		service: domain.Service{
+			OrganizationID:  current.OrganizationID,
+			ID:              serviceID,
+			MaxParticipants: 4,
+		},
+		resource: domain.Resource{
+			OrganizationID: current.OrganizationID,
+			ID:             resourceID,
+			BranchID:       branchID,
+			Kind:           domain.ResourceProfessional,
+			Capacity:       1,
+			Active:         true,
+		},
+	}
+	parties := &updatePartyDirectoryFake{}
+	service := NewService(
+		repository,
+		algorithmsFake{},
+		nil,
+		WithPartyDirectory(parties),
+	)
+	participants := 2
+	notes := "  Acceso por recepción  "
+	substate := "first_visit"
+	metadata := testMetadata(current.OrganizationID, "update-booking", current.ID.String())
+	updated, err := service.UpdateBooking(context.Background(), metadata, UpdateBookingInput{
+		OrganizationID:  current.OrganizationID,
+		BookingID:       current.ID,
+		ExpectedVersion: current.Version,
+		Customer: &PublicCustomer{
+			PartyID: "party-new",
+			Name:    "No se usa como fuente",
+			Email:   "ada@example.com",
+			Phone:   "+541155555555",
+		},
+		Participants: &participants,
+		Notes:        &notes,
+		SubstateCode: &substate,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repository.updateCalls != 1 || parties.calls != 1 ||
+		repository.replayID != current.ID ||
+		updated.PartyID != "party-new" ||
+		updated.CustomerName != "Ada Lovelace" ||
+		updated.Participants != 2 ||
+		updated.Notes != "Acceso por recepción" ||
+		updated.SubstateCode != "first_visit" ||
+		updated.Version != 5 {
+		t.Fatalf(
+			"updated=%+v update=%+v repo_calls=%d party_calls=%d",
+			updated,
+			repository.update,
+			repository.updateCalls,
+			parties.calls,
+		)
+	}
+	if updated.BranchID != current.BranchID ||
+		updated.ServiceID != current.ServiceID ||
+		!updated.StartAt.Equal(current.StartAt) ||
+		updated.ServiceName != current.ServiceName ||
+		updated.Price != current.Price ||
+		updated.Currency != current.Currency ||
+		updated.DurationMinutes != current.DurationMinutes ||
+		updated.Status != current.Status {
+		t.Fatalf("immutable booking fields changed: before=%+v after=%+v", current, updated)
+	}
+	if len(repository.updateEvents) != 2 ||
+		repository.updateEvents[0].Type != domain.EventBookingUpdated ||
+		repository.updateEvents[1].Type != domain.EventCalendarSyncRequested {
+		t.Fatalf("events=%+v", repository.updateEvents)
+	}
+
+	repository.replay = updated
+	repository.replayed = true
+	repository.current.Version = updated.Version
+	replayed, err := service.UpdateBooking(context.Background(), metadata, UpdateBookingInput{
+		OrganizationID:  current.OrganizationID,
+		BookingID:       current.ID,
+		ExpectedVersion: current.Version,
+		Customer:        &PublicCustomer{PartyID: "party-new", Name: "Ada"},
+		Participants:    &participants,
+	})
+	if err != nil || replayed.Version != updated.Version ||
+		repository.updateCalls != 1 || parties.calls != 1 {
+		t.Fatalf(
+			"replay=%+v err=%v repo_calls=%d party_calls=%d",
+			replayed,
+			err,
+			repository.updateCalls,
+			parties.calls,
+		)
+	}
+
+	repository.replayed = false
+	repository.replayErr = domain.NewError(
+		domain.CodeIdempotencyKeyReused,
+		"idempotency key was reused with another payload",
+	)
+	if _, err := service.UpdateBooking(context.Background(), metadata, UpdateBookingInput{
+		OrganizationID:  current.OrganizationID,
+		BookingID:       current.ID,
+		ExpectedVersion: current.Version,
+		Notes:           &notes,
+	}); domain.ErrorCodeOf(err) != domain.CodeIdempotencyKeyReused ||
+		repository.updateCalls != 1 || parties.calls != 1 {
+		t.Fatalf(
+			"reused key err=%v repo_calls=%d party_calls=%d",
+			err,
+			repository.updateCalls,
+			parties.calls,
+		)
 	}
 }
 

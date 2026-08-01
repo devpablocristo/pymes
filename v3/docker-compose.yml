@@ -5,7 +5,7 @@ services:
       POSTGRES_USER: pymes
       POSTGRES_PASSWORD: pymes
       POSTGRES_DB: pymes_v3
-    ports: ["55434:5432"]
+    ports: ["127.0.0.1:55434:5432"]
     volumes: ["postgres-data:/var/lib/postgresql/data", "./db/migrations:/migrations:ro"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pymes -d pymes_v3"]
@@ -27,7 +27,7 @@ services:
       POSTGRES_USER: fiscal
       POSTGRES_PASSWORD: fiscal
       POSTGRES_DB: pymes_fiscal
-    ports: ["55435:5432"]
+    ports: ["127.0.0.1:55435:5432"]
     volumes: ["fiscal-postgres-data:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fiscal -d pymes_fiscal"]
@@ -103,7 +103,7 @@ services:
       PORT: "8080"
     depends_on:
       accounting-grants: { condition: service_completed_successfully }
-    ports: ["18082:8080"]
+    ports: ["127.0.0.1:18082:8080"]
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/readyz"]
       interval: 2s
@@ -153,7 +153,7 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       fiscal-fake: { condition: service_healthy }
-    ports: ["18080:8080"]
+    ports: ["127.0.0.1:18080:8080"]
     healthcheck:
       test: ["CMD", "/healthcheck", "http://127.0.0.1:8080/readyz"]
       interval: 2s
@@ -161,9 +161,14 @@ services:
       retries: 20
   web:
     build: { context: ., target: web-local }
+    environment:
+      PYMES_API_UPSTREAM: http://api:8080
+      PYMES_RELEASE_MARKER: local:compose:unpublished
+      PYMES_PREFLIGHT_TAG: local-compose-disabled
+      PYMES_PREFLIGHT_TOKEN: "0000000000000000000000000000000000000000000000000000000000000000"
     depends_on:
       api: { condition: service_healthy }
-    ports: ["18085:8080"]
+    ports: ["127.0.0.1:18085:8080"]
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/readyz"]
       interval: 2s
@@ -214,7 +219,7 @@ services:
       PORT: "8080"
     depends_on:
       fiscal-migrate: { condition: service_completed_successfully }
-    ports: ["18081:8080"]
+    ports: ["127.0.0.1:18081:8080"]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 2s
@@ -224,7 +229,7 @@ services:
     profiles: ["fakes"]
     build: { context: ., target: fake-service }
     environment: { FAKE_KIND: accounting }
-    ports: ["18083:8080"]
+    ports: ["127.0.0.1:18083:8080"]
     healthcheck:
       test: ["CMD", "/healthcheck", "http://127.0.0.1:8080/readyz"]
       interval: 2s
@@ -240,7 +245,7 @@ services:
       PERGO_FAKE_DELAY: 2s
     depends_on:
       api: { condition: service_healthy }
-    ports: ["18085:8080"]
+    ports: ["127.0.0.1:18086:8080"]
     healthcheck:
       test: ["CMD", "/healthcheck", "http://127.0.0.1:8080/readyz"]
       interval: 2s

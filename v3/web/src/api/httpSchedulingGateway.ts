@@ -141,6 +141,23 @@ export function createHttpSchedulingGateway(baseUrl: string): SchedulingGateway 
         }),
       );
     },
+    async updateBooking(identity, bookingId, input) {
+      const mutation = await authenticatedMutation(
+        identity,
+        `booking:${bookingId}:update`,
+        `v${input.expected_version}`,
+      );
+      return unwrap(
+        await client.PATCH("/api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}", {
+          params: {
+            path: { organizationId: identity.organizationId, bookingId },
+            header: mutation.params,
+          },
+          headers: mutation.headers,
+          body: input,
+        }),
+      );
+    },
     async rescheduleBooking(identity, bookingId, expectedVersion, startAt, durationMinutes, allocations) {
       const mutation = await authenticatedMutation(
         identity,

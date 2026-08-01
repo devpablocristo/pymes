@@ -46,6 +46,7 @@ type SchedulingUsecases interface {
 	CreateGroupSession(context.Context, domain.CommandMetadata, CreateGroupSessionInput) (domain.GroupSession, error)
 	GetBooking(context.Context, string, uuid.UUID) (domain.Booking, error)
 	ListBookings(context.Context, string, uuid.UUID, time.Time, time.Time) ([]domain.Booking, error)
+	UpdateBooking(context.Context, domain.CommandMetadata, UpdateBookingInput) (domain.Booking, error)
 	RescheduleBooking(context.Context, domain.CommandMetadata, RescheduleInput) (domain.Booking, error)
 	TransitionBooking(context.Context, domain.CommandMetadata, string, uuid.UUID, int, domain.BookingStatus, string) (domain.Booking, error)
 	ConfigureBookingStatus(context.Context, domain.CommandMetadata, domain.BookingStatusConfiguration) (domain.BookingStatusConfiguration, error)
@@ -96,6 +97,7 @@ func (h *HTTPHandler) Handler() http.Handler {
 		router.Post("/bookings", h.createAdminBooking)
 		router.Get("/bookings", h.listBookings)
 		router.Get("/bookings/{bookingId}", h.getBooking)
+		router.Patch("/bookings/{bookingId}", h.updateBooking)
 		router.Post("/bookings/{bookingId}/confirm", h.transition(domain.BookingConfirmed, domain.PermissionOperate))
 		router.Post("/bookings/{bookingId}/cancel", h.transition(domain.BookingCancelled, domain.PermissionOperate))
 		router.Post("/bookings/{bookingId}/check-in", h.transition(domain.BookingCheckedIn, domain.PermissionOperate))
@@ -247,7 +249,7 @@ func (h *HTTPHandler) listResources(w http.ResponseWriter, request *http.Request
 	branchID := uuid.Nil
 	if raw := strings.TrimSpace(request.URL.Query().Get("branch_id")); raw != "" {
 		var parsed bool
-		branchID, parsed = parseUUID(w, raw)
+		branchID, parsed = httphelpers.ParseUUID(w, raw)
 		if !parsed {
 			return
 		}
@@ -295,7 +297,7 @@ func (h *HTTPHandler) listAvailabilityRules(w http.ResponseWriter, request *http
 	if !ok {
 		return
 	}
-	branchID, ok := parseUUID(w, request.URL.Query().Get("branch_id"))
+	branchID, ok := httphelpers.ParseUUID(w, request.URL.Query().Get("branch_id"))
 	if !ok {
 		return
 	}
@@ -336,15 +338,15 @@ func (h *HTTPHandler) listBlocks(w http.ResponseWriter, request *http.Request) {
 	if !ok {
 		return
 	}
-	branchID, ok := parseUUID(w, request.URL.Query().Get("branch_id"))
+	branchID, ok := httphelpers.ParseUUID(w, request.URL.Query().Get("branch_id"))
 	if !ok {
 		return
 	}
-	from, ok := parseTime(w, request.URL.Query().Get("from"))
+	from, ok := httphelpers.ParseTime(w, request.URL.Query().Get("from"))
 	if !ok {
 		return
 	}
-	until, ok := parseTime(w, request.URL.Query().Get("until"))
+	until, ok := httphelpers.ParseTime(w, request.URL.Query().Get("until"))
 	if !ok {
 		return
 	}
@@ -521,7 +523,7 @@ func (h *HTTPHandler) getBooking(w http.ResponseWriter, request *http.Request) {
 	if !ok {
 		return
 	}
-	id, ok := parseUUID(w, chi.URLParam(request, "bookingId"))
+	id, ok := httphelpers.ParseUUID(w, chi.URLParam(request, "bookingId"))
 	if !ok {
 		return
 	}
@@ -538,15 +540,15 @@ func (h *HTTPHandler) listBookings(w http.ResponseWriter, request *http.Request)
 	if !ok {
 		return
 	}
-	branchID, ok := parseUUID(w, request.URL.Query().Get("branch_id"))
+	branchID, ok := httphelpers.ParseUUID(w, request.URL.Query().Get("branch_id"))
 	if !ok {
 		return
 	}
-	from, ok := parseTime(w, request.URL.Query().Get("from"))
+	from, ok := httphelpers.ParseTime(w, request.URL.Query().Get("from"))
 	if !ok {
 		return
 	}
-	until, ok := parseTime(w, request.URL.Query().Get("until"))
+	until, ok := httphelpers.ParseTime(w, request.URL.Query().Get("until"))
 	if !ok {
 		return
 	}
@@ -558,12 +560,63 @@ func (h *HTTPHandler) listBookings(w http.ResponseWriter, request *http.Request)
 	httphelpers.WriteJSON(w, http.StatusOK, dto.BookingsFromDomain(result))
 }
 
+func (h *HTTPHandler) updateBooking(w http.ResponseWriter, request *http.Request) {
+	organizationID, principal, ok := h.authorize(w, request, domain.PermissionOperate)
+	if !ok {
+		return
+	}
+	bookingID, ok := httphelpers.ParseUUID(w, chi.URLParam(request, "bookingId"))
+	if !ok {
+		return
+	}
+	var input dto.UpdateBooking
+	if !httphelpers.Decode(w, request, &input) {
+		return
+	}
+	metadata, ok := commandMetadata(
+		w,
+		request,
+		organizationID,
+		principal.ActorID,
+		dto.UpdateBookingIdempotencyScope{
+			BookingID: bookingID,
+			Body:      input,
+		},
+	)
+	if !ok {
+		return
+	}
+	var customer *PublicCustomer
+	if input.Customer != nil {
+		customer = &PublicCustomer{
+			PartyID: input.Customer.PartyID,
+			Name:    input.Customer.Name,
+			Email:   input.Customer.Email,
+			Phone:   input.Customer.Phone,
+		}
+	}
+	result, err := h.usecases.UpdateBooking(request.Context(), metadata, UpdateBookingInput{
+		OrganizationID:  organizationID,
+		BookingID:       bookingID,
+		ExpectedVersion: input.ExpectedVersion,
+		Customer:        customer,
+		Participants:    input.Participants,
+		Notes:           input.Notes,
+		SubstateCode:    input.SubstateCode,
+	})
+	if err != nil {
+		httphelpers.WriteError(w, err)
+		return
+	}
+	httphelpers.WriteJSON(w, http.StatusOK, dto.BookingFromDomain(result))
+}
+
 func (h *HTTPHandler) rescheduleBooking(w http.ResponseWriter, request *http.Request) {
 	organizationID, principal, ok := h.authorize(w, request, domain.PermissionOperate)
 	if !ok {
 		return
 	}
-	id, ok := parseUUID(w, chi.URLParam(request, "bookingId"))
+	id, ok := httphelpers.ParseUUID(w, chi.URLParam(request, "bookingId"))
 	if !ok {
 		return
 	}
@@ -596,7 +649,7 @@ func (h *HTTPHandler) transition(
 		if !ok {
 			return
 		}
-		id, ok := parseUUID(w, chi.URLParam(request, "bookingId"))
+		id, ok := httphelpers.ParseUUID(w, chi.URLParam(request, "bookingId"))
 		if !ok {
 			return
 		}
@@ -680,7 +733,7 @@ func (h *HTTPHandler) setBookingSubstate(w http.ResponseWriter, request *http.Re
 	if !ok {
 		return
 	}
-	bookingID, ok := parseUUID(w, chi.URLParam(request, "bookingId"))
+	bookingID, ok := httphelpers.ParseUUID(w, chi.URLParam(request, "bookingId"))
 	if !ok {
 		return
 	}
@@ -780,7 +833,7 @@ func (h *HTTPHandler) listWaitlist(w http.ResponseWriter, request *http.Request)
 	if !ok {
 		return
 	}
-	branchID, ok := parseUUID(w, request.URL.Query().Get("branch_id"))
+	branchID, ok := httphelpers.ParseUUID(w, request.URL.Query().Get("branch_id"))
 	if !ok {
 		return
 	}
@@ -824,7 +877,7 @@ func (h *HTTPHandler) listQueue(w http.ResponseWriter, request *http.Request) {
 	if !ok {
 		return
 	}
-	branchID, ok := parseUUID(w, request.URL.Query().Get("branch_id"))
+	branchID, ok := httphelpers.ParseUUID(w, request.URL.Query().Get("branch_id"))
 	if !ok {
 		return
 	}
@@ -841,7 +894,7 @@ func (h *HTTPHandler) advanceQueueTicket(w http.ResponseWriter, request *http.Re
 	if !ok {
 		return
 	}
-	id, ok := parseUUID(w, chi.URLParam(request, "ticketId"))
+	id, ok := httphelpers.ParseUUID(w, chi.URLParam(request, "ticketId"))
 	if !ok {
 		return
 	}
@@ -1012,22 +1065,4 @@ func commandMetadata(
 		SourceVersion: sourceVersion, PayloadHash: hex.EncodeToString(digest[:]),
 		RequestID: requestID, CorrelationID: correlationID, ActorID: actorID,
 	}, true
-}
-
-func parseUUID(w http.ResponseWriter, value string) (uuid.UUID, bool) {
-	result, err := uuid.Parse(value)
-	if err != nil {
-		httphelpers.WriteProblem(w, http.StatusBadRequest, domain.CodeValidation, "UUID is invalid")
-		return uuid.Nil, false
-	}
-	return result, true
-}
-
-func parseTime(w http.ResponseWriter, value string) (time.Time, bool) {
-	result, err := time.Parse(time.RFC3339, value)
-	if err != nil {
-		httphelpers.WriteProblem(w, http.StatusBadRequest, domain.CodeValidation, "RFC3339 time is invalid")
-		return time.Time{}, false
-	}
-	return result.UTC(), true
 }

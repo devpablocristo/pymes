@@ -48,6 +48,9 @@ type handlerUsecasesFake struct {
 	substateExpectedVersion      int
 	substateMetadata             domain.CommandMetadata
 	statusConfigurationListOrgID string
+	updateInput                  UpdateBookingInput
+	updateMetadata               domain.CommandMetadata
+	updateCalls                  int
 }
 
 func (f *handlerUsecasesFake) CreateBranch(
@@ -140,6 +143,25 @@ func (f *handlerUsecasesFake) SetBookingSubstate(
 		Status:         domain.BookingConfirmed,
 		SubstateCode:   substateCode,
 		Version:        expectedVersion + 1,
+	}, nil
+}
+
+func (f *handlerUsecasesFake) UpdateBooking(
+	_ context.Context,
+	metadata domain.CommandMetadata,
+	input UpdateBookingInput,
+) (domain.Booking, error) {
+	f.updateCalls++
+	f.updateMetadata = metadata
+	f.updateInput = input
+	return domain.Booking{
+		OrganizationID: input.OrganizationID,
+		ID:             input.BookingID,
+		PartyID:        input.Customer.PartyID,
+		Status:         domain.BookingConfirmed,
+		Participants:   *input.Participants,
+		Version:        input.ExpectedVersion + 1,
+		Notes:          *input.Notes,
 	}, nil
 }
 
@@ -269,6 +291,139 @@ func TestSchedulingHasNoPublicPhoneLookupAuthenticationRoute(t *testing.T) {
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusMethodNotAllowed && response.Code != http.StatusNotFound {
 		t.Fatalf("phone lookup unexpectedly exposed: status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestSchedulingBookingPatchAcceptsOnlyVersionedOperationalFields(t *testing.T) {
+	bookingID := uuid.New()
+	usecases := &handlerUsecasesFake{}
+	handler := NewHTTPHandler(
+		usecases,
+		authenticatorFake{principal: Principal{
+			OrganizationID:     "org_a",
+			ActorID:            "operator",
+			Role:               "member",
+			Permissions:        []string{domain.PermissionOperate},
+			OrganizationStatus: "ready",
+			MembershipStatus:   "active",
+		}},
+		schedulingFeatureGateFake{enabled: true},
+	).Handler()
+	request := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/v1/organizations/org_a/scheduling/bookings/"+bookingID.String(),
+		strings.NewReader(`{
+			"expected_version":4,
+			"customer":{"party_id":"party-a","name":"Ada","email":"ada@example.com"},
+			"participants":2,
+			"notes":"Requiere acceso",
+			"substate_code":"first_visit"
+		}`),
+	)
+	request.Header.Set("Idempotency-Key", "booking-update-4")
+	request.Header.Set("X-Source-Version", "4")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK ||
+		usecases.updateCalls != 1 ||
+		usecases.updateInput.OrganizationID != "org_a" ||
+		usecases.updateInput.BookingID != bookingID ||
+		usecases.updateInput.ExpectedVersion != 4 ||
+		usecases.updateInput.Customer == nil ||
+		usecases.updateInput.Customer.PartyID != "party-a" ||
+		usecases.updateInput.Participants == nil ||
+		*usecases.updateInput.Participants != 2 ||
+		usecases.updateInput.Notes == nil ||
+		*usecases.updateInput.Notes != "Requiere acceso" ||
+		usecases.updateInput.SubstateCode == nil ||
+		*usecases.updateInput.SubstateCode != "first_visit" ||
+		usecases.updateMetadata.IdempotencyKey != "booking-update-4" {
+		t.Fatalf(
+			"status=%d calls=%d input=%+v metadata=%+v body=%s",
+			response.Code,
+			usecases.updateCalls,
+			usecases.updateInput,
+			usecases.updateMetadata,
+			response.Body,
+		)
+	}
+
+	forbidden := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/v1/organizations/org_a/scheduling/bookings/"+bookingID.String(),
+		strings.NewReader(`{
+			"expected_version":5,
+			"start_at":"2026-08-04T10:00:00Z",
+			"status":"completed",
+			"service_name":"Alterado"
+		}`),
+	)
+	forbidden.Header.Set("Idempotency-Key", "booking-update-forbidden")
+	forbiddenResponse := httptest.NewRecorder()
+	handler.ServeHTTP(forbiddenResponse, forbidden)
+	if forbiddenResponse.Code != http.StatusBadRequest || usecases.updateCalls != 1 {
+		t.Fatalf(
+			"forbidden fields reached use case: status=%d calls=%d body=%s",
+			forbiddenResponse.Code,
+			usecases.updateCalls,
+			forbiddenResponse.Body,
+		)
+	}
+}
+
+func TestSchedulingBookingPatchIdempotencyScopeIncludesBookingID(t *testing.T) {
+	usecases := &handlerUsecasesFake{}
+	handler := NewHTTPHandler(
+		usecases,
+		authenticatorFake{principal: Principal{
+			OrganizationID:     "org_a",
+			ActorID:            "operator",
+			Role:               "member",
+			Permissions:        []string{domain.PermissionOperate},
+			OrganizationStatus: "ready",
+			MembershipStatus:   "active",
+		}},
+		schedulingFeatureGateFake{enabled: true},
+	).Handler()
+	body := `{
+		"expected_version":1,
+		"customer":{"party_id":"party-a","name":"Ada"},
+		"participants":1,
+		"notes":"Mismo payload"
+	}`
+	perform := func(bookingID uuid.UUID) domain.CommandMetadata {
+		t.Helper()
+		request := httptest.NewRequest(
+			http.MethodPatch,
+			"/api/v1/organizations/org_a/scheduling/bookings/"+bookingID.String(),
+			strings.NewReader(body),
+		)
+		request.Header.Set("Idempotency-Key", "shared-booking-update")
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf(
+				"booking=%s status=%d body=%s",
+				bookingID,
+				response.Code,
+				response.Body,
+			)
+		}
+		return usecases.updateMetadata
+	}
+
+	firstID, secondID := uuid.New(), uuid.New()
+	first := perform(firstID)
+	second := perform(secondID)
+	if first.IdempotencyKey != second.IdempotencyKey ||
+		first.PayloadHash == "" ||
+		second.PayloadHash == "" ||
+		first.PayloadHash == second.PayloadHash {
+		t.Fatalf(
+			"booking resource was not bound to payload hash: first=%+v second=%+v",
+			first,
+			second,
+		)
 	}
 }
 

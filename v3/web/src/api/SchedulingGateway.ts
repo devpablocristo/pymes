@@ -6,6 +6,7 @@ import type {
   Booking,
   BookingAction,
   BookingInput,
+  BookingUpdateInput,
   Branch,
   DateRange,
   PublicActionInput,
@@ -34,6 +35,11 @@ export interface SchedulingGateway {
   listResources(identity: RequestIdentity, branchId?: string): Promise<Resource[]>;
   listBookings(identity: RequestIdentity, branchId: string, range: DateRange): Promise<Booking[]>;
   createBooking(identity: RequestIdentity, input: BookingInput): Promise<Booking[]>;
+  updateBooking(
+    identity: RequestIdentity,
+    bookingId: string,
+    input: BookingUpdateInput,
+  ): Promise<Booking>;
   rescheduleBooking(
     identity: RequestIdentity,
     bookingId: string,

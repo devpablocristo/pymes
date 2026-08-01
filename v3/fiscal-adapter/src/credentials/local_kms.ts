@@ -8,6 +8,11 @@ import type {
   KMSClient,
 } from "./kms/models/client.js";
 import {
+  crc32c,
+  type KMSInt64Value,
+  validCRC32C,
+} from "./kms/helpers/crc32c.js";
+import {
   LOCAL_KMS_IV_BYTES,
   LOCAL_KMS_TAG_BYTES,
 } from "./local_kms/models/ciphertext.js";
@@ -32,6 +37,8 @@ export class LocalKMSClient implements KMSClient {
     name: string;
     plaintext: Uint8Array;
     additionalAuthenticatedData: Uint8Array;
+    plaintextCrc32c: KMSInt64Value;
+    additionalAuthenticatedDataCrc32c: KMSInt64Value;
   }): Promise<[KMSBytesResponse]> {
     const iv = Buffer.from(this.entropy(LOCAL_KMS_IV_BYTES));
     const cipher = createCipheriv("aes-256-gcm", this.key, iv);
@@ -40,8 +47,18 @@ export class LocalKMSClient implements KMSClient {
       cipher.update(request.plaintext),
       cipher.final(),
     ]);
+    const wrapped = Buffer.concat([iv, cipher.getAuthTag(), ciphertext]);
     return [{
-      ciphertext: Buffer.concat([iv, cipher.getAuthTag(), ciphertext]),
+      ciphertext: wrapped,
+      ciphertextCrc32c: { value: crc32c(wrapped) },
+      verifiedPlaintextCrc32c: validCRC32C(
+        request.plaintextCrc32c,
+        request.plaintext,
+      ),
+      verifiedAdditionalAuthenticatedDataCrc32c: validCRC32C(
+        request.additionalAuthenticatedDataCrc32c,
+        request.additionalAuthenticatedData,
+      ),
     }];
   }
 
@@ -49,6 +66,8 @@ export class LocalKMSClient implements KMSClient {
     name: string;
     ciphertext: Uint8Array;
     additionalAuthenticatedData: Uint8Array;
+    ciphertextCrc32c: KMSInt64Value;
+    additionalAuthenticatedDataCrc32c: KMSInt64Value;
   }): Promise<[KMSBytesResponse]> {
     const encrypted = Buffer.from(request.ciphertext);
     if (encrypted.byteLength <= LOCAL_KMS_IV_BYTES + LOCAL_KMS_TAG_BYTES) {
@@ -66,11 +85,21 @@ export class LocalKMSClient implements KMSClient {
       const decipher = createDecipheriv("aes-256-gcm", this.key, iv);
       decipher.setAAD(request.additionalAuthenticatedData);
       decipher.setAuthTag(tag);
+      const plaintext = Buffer.concat([
+        decipher.update(ciphertext),
+        decipher.final(),
+      ]);
       return [{
-        plaintext: Buffer.concat([
-          decipher.update(ciphertext),
-          decipher.final(),
-        ]),
+        plaintext,
+        plaintextCrc32c: { value: crc32c(plaintext) },
+        verifiedCiphertextCrc32c: validCRC32C(
+          request.ciphertextCrc32c,
+          request.ciphertext,
+        ),
+        verifiedAdditionalAuthenticatedDataCrc32c: validCRC32C(
+          request.additionalAuthenticatedDataCrc32c,
+          request.additionalAuthenticatedData,
+        ),
       }];
     } catch {
       throw new CredentialError("CREDENTIAL_NOT_READY", "local KMS authentication failed");

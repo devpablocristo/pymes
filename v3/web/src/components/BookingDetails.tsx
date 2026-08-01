@@ -9,6 +9,7 @@ type BookingDetailsProps = {
   pending: boolean;
   canOperate: boolean;
   onClose: () => void;
+  onEdit: (booking: Booking) => void;
   onReschedule: (booking: Booking) => void;
   onAction: (booking: Booking, action: BookingAction) => Promise<void>;
 };
@@ -39,6 +40,7 @@ export function BookingDetails({
   pending,
   canOperate,
   onClose,
+  onEdit,
   onReschedule,
   onAction,
 }: BookingDetailsProps) {
@@ -86,7 +88,19 @@ export function BookingDetails({
           <dt>Participantes</dt>
           <dd>{booking.participants}</dd>
         </div>
+        {booking.substate_code ? (
+          <div>
+            <dt>Subestado</dt>
+            <dd>{booking.substate_code}</dd>
+          </div>
+        ) : null}
       </dl>
+      {booking.notes ? (
+        <section className="drawer-section">
+          <h3>Nota interna</h3>
+          <p>{booking.notes}</p>
+        </section>
+      ) : null}
       <section className="drawer-section">
         <h3>Recursos</h3>
         {assigned.length ? (
@@ -100,6 +114,11 @@ export function BookingDetails({
         )}
       </section>
       <footer className="drawer-actions">
+        {canOperate ? (
+          <button type="button" className="button button--secondary" onClick={() => onEdit(booking)}>
+            Editar
+          </button>
+        ) : null}
         {canOperate && canReschedule ? (
           <button type="button" className="button button--secondary" onClick={() => onReschedule(booking)}>
             Reprogramar

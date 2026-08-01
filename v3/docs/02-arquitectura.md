@@ -4,13 +4,17 @@
 
 ```mermaid
 flowchart LR
-  U[Usuarios y operadores] --> B[Pymes v3 BFF / API]
+  U[Usuarios y operadores] --> WEB[Pymes Web]
+  WEB --> B[Pymes v3 BFF / API]
   B --> I[Clerk / IAM]
-  B --> P[(Pymes DB: organizaciones, documentos, fiscal, outbox)]
+  B --> P[(Pymes DB: organizaciones, comercio, agenda, integraciones, outbox)]
   B --> W[Workers v3]
-  W --> F[Servicio fiscal privado\nFiscalAuthority mock]
+  B --> F
+  W --> F[Servicio fiscal privado\nmock o ARCA por configuración]
   W --> A[Servicio contable privado\nNúcleo Open Accounting]
-  F -. fase posterior .-> R[ARCA: WSAA, WSFE, padrón, FCE, WSFEX, CAEA]
+  W --> N[PerGo]
+  W --> G[Google Calendar / Meet]
+  F --> R[ARCA: WSAA y WSFE]
   A --> C[(Accounting DB\nschema por organización)]
   W --> O[Observabilidad y auditoría]
 ```
@@ -20,44 +24,40 @@ publica mediante outbox; cada consumidor tiene inbox, clave de idempotencia y
 correlation ID. El servicio contable no conoce clientes OAuth, UI ni facturas
 completas; recibe un hecho económico balanceado y referencias opacas a la fuente.
 
-> Estado: ARCA y sus credenciales permanecen **diferidos**. El servicio fiscal
-> TypeScript ya ejecuta arquitectura hexagonal contra una autoridad mock
-> determinista, pero no se conecta a ARCA ni resuelve certificados, KMS o WSAA.
-> La implementación real deberá sustituir únicamente el companion del puerto
-> `FiscalAuthority`.
+> Estado: el mock continúa como modo determinístico de CI y despliegue inicial.
+> El servicio Fiscal también implementa onboarding por organización,
+> credenciales cifradas, WSAA, WSFE y consulta exacta mediante
+> `arca-facturacion`. Esa ruta no se considera operativa hasta completar KMS,
+> credenciales de un tenant y homologación.
 
 ## Implementación hexagonal actual
 
 ```text
 v3/backend/
-├── cmd/                         # lifecycle: api, worker, provision-org
-├── wire/                        # única composición de dependencias
+├── cmd/                         # lifecycle: api, worker, provision-org y config
+├── wire/                        # única composición concreta
 └── internal/
-    ├── commerce/
-    │   ├── domain/              # modelo y puertos comerciales
-    │   ├── handler/             # HTTP público
-    │   ├── usecases/            # comandos, relay y reconciliación
-    │   ├── repository/          # PostgreSQL / outbox
-    │   └── companion/           # clientes privados y fakes
-    ├── identity/
-    │   ├── access/              # Clerk y credencial de workload
-    │   ├── handler/             # webhook Clerk
-    │   ├── usecases/            # recepción idempotente
-    │   └── repository/          # inbox/proyección/membresías
-    └── organization/
-        ├── domain/              # directorio y estados
-        └── repository/          # directorio PostgreSQL
+    └── <contexto>/
+        ├── handler.go
+        ├── handler/{dto,helpers}/
+        ├── usecases.go
+        ├── usecases/domain/
+        ├── repository.go
+        ├── repository/{models,helpers}/
+        ├── <integracion>.go
+        ├── <integracion>/{models,helpers}/
+        ├── worker.go
+        └── worker/{models,helpers}/
 
 v3/fiscal-adapter/
 ├── src/cmd/                     # lifecycle del backend privado TypeScript
-├── src/wire.ts                  # única composición fiscal
-├── src/fiscal/domain/           # request/result/errores estables
-├── src/fiscal/ports/            # autoridad, ledger y observabilidad
-├── src/fiscal/usecases/         # autorización, idempotencia y consulta
-├── src/fiscal/handler/          # HTTP privado
-├── src/fiscal/repository/       # ledger PostgreSQL durable
-├── src/fiscal/companion/        # mock de autoridad
-└── src/identity/access/         # JWT Ed25519; bypass sólo local explícito
+├── src/wire.ts                  # composición fiscal
+├── src/fiscal/                  # dominio, casos de uso y puertos consumidores
+├── src/fiscal/handler/          # HTTP privado + models/helpers
+├── src/fiscal/repository/       # ledger PostgreSQL + models/helpers
+├── src/fiscal/authority/        # mock o ARCA + models/helpers
+├── src/credentials/             # vault, KMS y onboarding tenant
+└── src/identity/                # JWT Ed25519; bypass sólo local explícito
 
 open-accounting/internal/
 ├── pymesaccounting/             # dominio, puertos, casos de uso y HTTP privado
@@ -66,10 +66,11 @@ open-accounting/internal/
 └── pymesaccountingadminhttp/    # control plane privado, JWT + Cloud Run IAM
 ```
 
-Los handlers dependen de puertos de casos de uso, los casos de uso de puertos
-de persistencia/servicios y los repositorios o companions implementan esos
-puertos. `wire` es el único lugar que los une. No existe import desde Pymes a
-Axis: Axis fue referencia de disposición, en modo lectura.
+Los handlers dependen de puertos de casos de uso; los casos de uso declaran los
+puertos de persistencia y proveedores que consumen; cada adapter los implementa
+sin filtrar tipos externos al dominio. `wire` es el único lugar que los une.
+Axis fue referencia de disposición en modo lectura: Pymes no lo importa,
+ejecuta, llama, monta, empaqueta ni necesita en filesystem o red.
 
 ## Despliegue
 
@@ -78,14 +79,17 @@ flowchart TB
   subgraph private[Red privada]
     api[Pymes API/BFF] --> workers[Workers + outbox relay]
     api --> pgbff[(Pymes PostgreSQL)]
+    api --> kmscalendar[Cloud KMS\nCalendar tokens]
     workers --> fiscal[Servicio Fiscal]
     workers --> accounting[Servicio Accounting]
+    workers --> pergo[PerGo]
+    workers --> google[Google Calendar / Meet]
     provision[Job provision-org] --> accountingadmin[Accounting admin]
     workers --> identitykms[Cloud KMS\nfirma Ed25519 interna]
     provision --> identitykms
     accounting --> pgacc[(PostgreSQL Accounting\nschema por org)]
     accountingadmin --> pgacc
-    fiscal -. fase ARCA .-> fiscalkms[KMS / secret manager fiscal]
+    fiscal --> fiscalkms[Cloud KMS\nvault fiscal]
   end
   browser[Browser] --> api
   clerk[Clerk] --> api
@@ -97,8 +101,8 @@ Cada base se respalda, migra y restaura de forma independiente. Accounting sólo
 es alcanzable desde workers/API de la red privada; Fiscal es el único workload
 que puede resolver una `credential_ref` y conectar con ARCA.
 `internal-jwt-signing` no es un servicio ni una clave ARCA: firma identidad
-workload→workload ahora. El material fiscal futuro tendrá otro ciclo de vida y
-seguirá siendo accesible sólo por Fiscal.
+workload→workload. `calendar-tokens` y `fiscal-vault` son claves simétricas
+separadas por entorno y uso; el material fiscal sólo es accesible por Fiscal.
 
 ## Bounded contexts y fuente única de verdad
 
@@ -109,7 +113,10 @@ seguirá siendo accesible sólo por Fiscal.
 | Parties, clientes, proveedores | Pymes v3 | Pymes DB | contabilidad mediante snapshot/ref. |
 | Venta, compra, notas A/B/C, adjuntos | Pymes v3 | Pymes DB | fiscal y contabilidad |
 | Reserva de punto de venta/tipo/número; estado fiscal; CAE | Pymes v3 | Pymes DB | adaptador fiscal ejecuta, no decide |
-| Certificado y clave privada | almacén de secretos de v3 | KMS/secret manager | sólo fiscal, por `credential_ref` |
+| Certificado, clave privada y ticket WSAA | Fiscal Adapter | base Fiscal cifrada con `fiscal-vault` | sólo Fiscal, por `credential_ref` |
+| Sucursales, servicios, recursos y turnos | Pymes Scheduling | Pymes DB | Web, Notifications y Calendars mediante casos de uso/eventos |
+| Intención de notificación | Pymes Notifications | Pymes DB/outbox | PerGo entrega y devuelve estados |
+| Conexión OAuth y mapping de calendario | Pymes Calendars | Pymes DB cifrada | Google mantiene una proyección externa |
 | Cobro, pago, medio y conciliación comercial | Pymes v3 | Pymes DB | contabilidad recibe aplicación |
 | Plan, cuentas, diarios, asientos, reversas | Servicio contable | Accounting DB | Pymes consulta reportes internos |
 | Ejercicio, períodos y bloqueo contable | Servicio contable | Accounting DB | Pymes valida antes de transición |
@@ -209,10 +216,18 @@ privados la autorización sigue siendo de workload y organización.
 
 ## Eventos y errores comunes
 
-Eventos: `FiscalAuthorizationRequested`, `FiscalAuthorizationUncertain`,
-`FiscalAuthorized`, `FiscalRejected`, `AccountingPostingRequested`,
-`AccountingPosted`, `AccountingPostingRejected`, `PaymentConfirmed`,
-`OpenItemApplied`, `PeriodLocked` y `ReconciliationRequired`.
+Eventos comerciales: `FiscalAuthorizationRequested`,
+`FiscalAuthorizationUncertain`, `FiscalAuthorized`, `FiscalRejected`,
+`AccountingPostingRequested`, `AccountingPosted`,
+`AccountingPostingRejected`, `PaymentConfirmed`, `OpenItemApplied`,
+`PeriodLocked` y `ReconciliationRequired`.
+
+Agenda publica `BookingCreated`, `BookingUpdated`, `BookingConfirmed`,
+`BookingRescheduled`, `BookingCancelled`, `BookingCompleted`, `BookingNoShow`,
+`WaitlistOffered`, `ReminderDue`, `CalendarSyncRequested` y
+`NotificationRequested`. `BookingUpdated` sólo representa la edición
+optimista de datos operativos; horario, servicio, recursos y estado conservan
+sus comandos específicos.
 
 Códigos estables: `ORG_NOT_PROVISIONED`, `ORG_SUSPENDED`,
 `UNAUTHORIZED_SERVICE`, `IDEMPOTENCY_KEY_REUSED`, `UNBALANCED_POSTING`,

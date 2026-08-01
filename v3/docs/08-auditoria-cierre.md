@@ -1,37 +1,63 @@
 # Auditoría de cierre de Pymes v3
 
-Fecha: 2026-07-31.
+Fecha: 2026-08-01.
 
-Este documento evita confundir una implementación validada localmente con una
-integración o un despliegue efectivo. Un requisito sólo figura como completado
-cuando tiene evidencia ejecutable o está integrado en la rama principal.
+Un requisito sólo figura como cerrado cuando existe código integrado, un gate
+reproducible y, si es operativo, evidencia del entorno real. Esta tabla es la
+fuente autoritativa para medir el plan.
 
-## Implementación local verificada
+## Hitos de producto
 
-| Requisito | Estado | Evidencia |
+| Requisito | Estado | Evidencia / condición |
 |---|---|---|
-| Hexágono, BFF, Clerk y tenancy | Completo | Principal local proyectado, RBAC `owner/admin` para mutaciones, `member/viewer` de sólo lectura, membresía activa y organización `ready` verificadas en BFF y PostgreSQL; módulos `domain`, `usecases`, `handler`, `repository`, `access` y `wire`; RLS y pruebas PostgreSQL. |
-| Outbox, leases, idempotencia e inbox | Completo | Migraciones y pruebas de reintentos, respuesta perdida y duplicados. |
-| DLQ y recuperación operativa | Completo | DLQ durable, migración `009_dead_letter_replay_audit.sql`, replay transaccional/idempotente, auditoría RLS inmutable, `make replay-smoke` y runbook. |
-| Identidad interna | Completo en código | JWT Ed25519 de duración limitada; producción falla cerrada sin Cloud KMS o con semilla, valida CRC32C/firma pública al arrancar y genera JWKS de rotación. Falta aplicar el bootstrap por entorno. |
-| Contabilidad headless | Completo en el fork | Cuentas, períodos, posteo, reversas, partidas abiertas, aplicaciones y reportes bajo `cmd/pymes-accounting`. |
-| Fiscal mock | Completo | PostgreSQL durable, número explícito, escenarios de autorización, rechazo, timeout y respuesta incierta. No comunica con ARCA. |
-| Vertical comercial | Completo | Ventas, compras, NC/ND, cobros, pagos, aplicaciones, reversas y períodos bloqueados cubiertos por pruebas. |
-| Observabilidad | Completo en código | Health/readiness/liveness, heartbeat JSON y métricas sin PII, circuit breakers, reglas locales y aprovisionador idempotente de métricas, alertas y dashboard Cloud Monitoring. Su aplicación efectiva se verifica por entorno. |
-| Contratos y CI local | Completo | `make api-check`, `make test`, `make build`, `make db-integration`, `make backup-restore-smoke` y `make e2e`. |
-| Fundaciones cloud | Automatizadas | Secret Manager, identidades STG/PRD, Clerk PRD, Cloud SQL Client y scripts de despliegue están documentados; la clave asimétrica de identidad se prepara mediante bootstrap idempotente y requiere ejecución/verificación por entorno. |
+| H0 Baseline y Open Accounting | OA cerrado; Pymes cerrado localmente | Runtime headless fusionado; bases de sus targets privados fijadas por digest en PR #3, disparador CI en PR #4 y SHA OA remoto verde `1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d`. `make ci` de Pymes pasa localmente contra ese pin; falta integrar y validar el nuevo SHA remoto. |
+| H1 Arquitectura Go | cerrado | árbol vertical y `make architecture-check`; todos los adapters y fragmentos conservan `models`/`helpers`, la composición concreta queda en `wire` y Axis no aparece como dependencia, ruta, checkout, mount, runtime ni en `go list -deps`. |
+| H2 Platform | cerrado | paquetes Go/React 0.2 publicados y consumidos sin `replace`, `file:`, `link:` o rutas locales. |
+| H3 Agenda | cerrado en código | contrato, persistencia, invariantes y E2E determinístico; piloto pendiente en H8. |
+| H4 Web | cerrado en código | cliente generado, alta/edición/reprogramación y transiciones en UI interna, booking público y browser E2E; artefacto cloud pendiente en H8. |
+| H5 PerGo | cerrado en código | adapter/fake/webhook, ledger durable y claim/lease/fencing de entrega; el resultado incierto no se reintenta ni activa fallback. Piloto real pendiente en H8. |
+| H6 Google | cerrado en código | OAuth/cifrado/eventos/Meet/reconciliación; piloto real pendiente en H8. |
+| H7 ARCA | cerrado en código | onboarding tenant, KMS, WSAA/WSFE, autorización/consulta y contratos con fakes; fork 2.5 validado localmente pero todavía no publicado/fijado; homologación pendiente en H8. |
 
-## Dependencias externas pendientes
+## H8: puertas todavía abiertas
 
-| Requisito | Estado | Condición objetiva de cierre |
+| Puerta | Estado actual | Evidencia objetiva de cierre |
 |---|---|---|
-| Integrar Accounting | Pendiente | Fusionar la PR [open-accounting#1](https://github.com/devpablocristo/open-accounting/pull/1), actualmente abierta como *draft*, y ejecutar su CI en `main`. |
-| Publicar el hardening actual de Pymes | Pendiente | Crear una rama/PR desde los cambios locales, obtener CI remoto verde y fusionarla. |
-| ARCA real | Diferido por decisión de producto | Reanudar explícitamente esta etapa; incorporar SDK publicado, WSAA/WSFEv1, certificados y homologación. |
-| Producción/piloto | Parcial | Secret Manager, identidades y Clerk tienen evidencia previa; falta verificar/aplicar KMS asimétrico de identidad, ownership SQL, dominio/URLs autorizadas, webhook, imágenes publicadas, telemetría centralizada, backups cifrados y una organización piloto. |
+| CI local | cerrado | `make ci` verde contra OA `1af6…`, con controles H8 actuales, Docker E2E y backup/restore |
+| CI remoto/integración | pendiente | commit Pymes integrado y workflow `Pymes V3 validate` verde para ese SHA exacto |
+| Release | cerrado y validado localmente; no operado | build por digest, manifiesto de 13 entradas, candidato con tráfico cero, capability pretraffic API/Web, baseline y pin Web → API exactos, `--invoker-iam-check`, señal durable `worker_release_ready`, verificación activa dentro de la transacción, revocación de URLs taggeadas y rollback automático/manual por SHA. Bootstrap termina sin tags y Build/Deploy rechazan reruns aislados. El fault harness stateful prueba restauración exacta y fail-closed; faltan imágenes/manifiesto reales y una ejecución Cloud Run |
+| Identidad de release | cerrada en código, no aplicada | WIF separado y STG-first, condición cerrada al repo/workflow/branch/environment, seed inerte auditado sin Run Admin de proyecto, permisos finales sólo por recurso y análisis inverso fail-closed por recurso/permiso/identidad, incluso ante roles custom e impersonación |
+| Retiro WIF legado | pendiente | primer canary STG con WIF nuevo; retiro del principal Pymes, cuenta exclusiva deshabilitada, segundo canary posterior, Cloud Asset limpio y fase de cierre |
+| Controles GitHub | bloqueado por configuración | estado real: `main` exige sólo `v2-ci` con enforcement para no administradores; `stg` no tiene reglas y permite bypass admin; `prd` no existe. Deben requerirse `Pymes V3 validate`, review y environments limitados a `main`, con reviewer independiente y sin bypass en PRD |
+| KMS | provisionado, pendiente de validación runtime | STG y PRD rotan `secrets`, `calendar-tokens` y `fiscal-vault` cada 90 días; falta demostrar bindings/versiones exactos en la release real |
+| Secret Manager | parcial | `pymes-v3-{stg,prd}-scheduling-action-token-secret` existen con versión 1 e IAM mínimo; el webhook Clerk STG posee sólo un valor de bootstrap etiquetado `lifecycle=bootstrap-temporary`, por lo que aún faltan su valor real y los de PerGo/Google; siguen presentes contenedores obsoletos `fiscal-credential` e `internal-jwt-seed`, pendientes de retiro recuperable |
+| Red privada | bloqueada por aprobación de costo | subnet + Private Google Access + Public NAT válidos, o decisión operativa explícita equivalente |
+| STG | pendiente | migraciones y workloads listos, IAM mínimo, probes, digest y release marker verificados |
+| Backup/restore | pendiente en cloud | restauración de Pymes/Fiscal/Accounting a destinos aislados y reconciliación idempotente |
+| Dominio y Clerk | pendiente | URL pública real, authorized parties, callback y webhook Clerk por entorno sin placeholders |
+| Monitoring | pendiente en cloud | métricas, alertas, canal PRD y dashboard provisionados y verificados |
+| Piloto Agenda | pendiente | dos tenants y flujo real verificado |
+| Piloto PerGo | pendiente de credenciales | envío y webhook con número controlado |
+| Piloto Google/Meet | pendiente de OAuth | conexión, evento y Meet con cuenta controlada |
+| Piloto ARCA | pendiente de cliente | CSR/certificado/punto de venta del tenant y autorización/consulta en homologación |
+| PRD | pendiente | preparación posterior al cierre STG y release desde el mismo SHA/pin/materiales; la Web y metadata por entorno producen digests distintos |
+| Documentación | cerrada localmente | Drift y enlaces verdes, sin afirmaciones de despliegue o piloto no demostradas |
 
-## Regla de cierre
+## Restricciones externas
 
-No se declara el plan completo mientras quede una fila de la segunda tabla sin
-su evidencia. En particular, una prueba local no sustituye la fusión de un
-fork, la homologación ARCA ni un despliegue productivo autorizado.
+- No se carga ningún secreto, certificado, token o clave por chat ni en Git.
+- Pymes no posee certificado ARCA global; el piloto requiere una organización
+  que complete su onboarding fiscal.
+- Google requiere clientes OAuth separados y callbacks autorizados para STG y
+  PRD.
+- PerGo requiere las credenciales técnicas y el número de prueba del entorno.
+- El NAT público introduce costo recurrente; no se crea sin aprobación
+  explícita.
+- Configurar o mutar la instancia Clerk de producción requiere confirmación
+  explícita del propietario.
+
+## Regla de finalización
+
+Mientras una puerta H8 permanezca abierta, el plan no se declara al 100%. Una
+suite local demuestra comportamiento; no reemplaza IAM real, restore, callback,
+homologación o piloto.

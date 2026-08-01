@@ -4,9 +4,20 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+)
+
+const (
+	localWorkerReleaseSHA = "0000000000000000000000000000000000000000"
+	localWorkerRevision   = "local"
+)
+
+var (
+	workerReleaseSHA = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	workerRevision   = regexp.MustCompile(`^[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
 )
 
 type WorkerConfig struct {
@@ -15,6 +26,8 @@ type WorkerConfig struct {
 	FiscalURL                   string
 	AccountingURL               string
 	Environment                 string
+	ReleaseSHA                  string
+	Revision                    string
 	SchedulingActionTokenSecret string
 	AllowInsecureLocalServices  bool
 	RunOnce                     bool
@@ -70,6 +83,10 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 			"WORKLOAD_IDENTITY_INVALID",
 			"PYMES_ENVIRONMENT must be development, test, or production",
 		)
+	}
+	releaseSHA, revision, err := loadWorkerReleaseMetadata(getenv, environment)
+	if err != nil {
+		return WorkerConfig{}, err
 	}
 	allowInsecure := strings.EqualFold(
 		strings.TrimSpace(getenv("PYMES_ALLOW_INSECURE_LOCAL_SERVICES")),
@@ -195,6 +212,8 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 		FiscalURL:                   fiscalURL,
 		AccountingURL:               accountingURL,
 		Environment:                 environment,
+		ReleaseSHA:                  releaseSHA,
+		Revision:                    revision,
 		SchedulingActionTokenSecret: actionTokenSecret,
 		AllowInsecureLocalServices:  allowInsecure,
 		RunOnce:                     runOnce,
@@ -205,6 +224,35 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 		PerGo:                       pergo,
 		Calendars:                   calendars,
 	}, nil
+}
+
+func loadWorkerReleaseMetadata(
+	getenv func(string) string,
+	environment string,
+) (string, string, error) {
+	releaseSHA := strings.TrimSpace(getenv("PYMES_RELEASE_SHA"))
+	revision := strings.TrimSpace(getenv("K_REVISION"))
+	if environment != "production" {
+		if releaseSHA == "" {
+			releaseSHA = localWorkerReleaseSHA
+		}
+		if revision == "" {
+			revision = localWorkerRevision
+		}
+	}
+	if !workerReleaseSHA.MatchString(releaseSHA) {
+		return "", "", workerConfigError(
+			"WORKER_RELEASE_METADATA_INVALID",
+			"PYMES_RELEASE_SHA must contain exactly 40 lowercase hexadecimal characters",
+		)
+	}
+	if !workerRevision.MatchString(revision) {
+		return "", "", workerConfigError(
+			"WORKER_RELEASE_METADATA_INVALID",
+			"K_REVISION must contain a valid Cloud Run revision name",
+		)
+	}
+	return releaseSHA, revision, nil
 }
 
 func WorkerErrorCode(err error) string {

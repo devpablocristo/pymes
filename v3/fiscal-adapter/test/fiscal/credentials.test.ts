@@ -14,6 +14,13 @@ import {
 } from "../../src/credentials/usecases/domain/credential.js";
 import { GoogleKMSEnvelopeCipher } from "../../src/credentials/kms.js";
 import { LocalKMSClient } from "../../src/credentials/local_kms.js";
+import type {
+  KMSBytesResponse,
+  KMSClient,
+} from "../../src/credentials/kms/models/client.js";
+import {
+  crc32c,
+} from "../../src/credentials/kms/helpers/crc32c.js";
 
 const keyName =
   "projects/local/locations/global/keyRings/test/cryptoKeys/fiscal";
@@ -51,6 +58,189 @@ test("envelope encryption authenticates tenant, credential and purpose", async (
       error instanceof CredentialError &&
       error.code === "CREDENTIAL_NOT_READY",
   );
+});
+
+test("CRC32C uses the Cloud KMS Castagnoli checksum", () => {
+  assert.equal(crc32c(Buffer.from("123456789", "utf8")), 0xe3069283);
+});
+
+test("envelope encryption rejects missing, false and corrupt KMS integrity evidence", async (context) => {
+  const aad = Buffer.from("org_one\u0000fcred_integrity\u0000private-key");
+  const plaintext = Buffer.from("private material");
+  const encodedKey = Buffer.alloc(32, 29).toString("base64");
+  const encryptScenarios: Array<{
+    name: string;
+    mutate(response: KMSBytesResponse): KMSBytesResponse;
+  }> = [
+    {
+      name: "false plaintext verification",
+      mutate: (response) => ({
+        ...response,
+        verifiedPlaintextCrc32c: false,
+      }),
+    },
+    {
+      name: "missing AAD verification",
+      mutate: (response) => ({
+        ...response,
+        verifiedAdditionalAuthenticatedDataCrc32c: undefined,
+      }),
+    },
+    {
+      name: "missing ciphertext CRC",
+      mutate: (response) => ({
+        ...response,
+        ciphertextCrc32c: undefined,
+      }),
+    },
+    {
+      name: "corrupt ciphertext",
+      mutate: (response) => ({
+        ...response,
+        ciphertext: mutateBytes(response.ciphertext),
+      }),
+    },
+  ];
+  for (const scenario of encryptScenarios) {
+    await context.test(`encrypt: ${scenario.name}`, async () => {
+      const delegate = new LocalKMSClient(encodedKey);
+      const cipher = new GoogleKMSEnvelopeCipher(
+        mutateKMS(delegate, "encrypt", scenario.mutate),
+        keyName,
+      );
+      await assert.rejects(
+        cipher.seal(plaintext, aad),
+        hasCredentialMessage("fiscal KMS encrypt integrity verification failed"),
+      );
+    });
+  }
+
+  const sourceCipher = new GoogleKMSEnvelopeCipher(
+    new LocalKMSClient(encodedKey),
+    keyName,
+  );
+  const sealed = await sourceCipher.seal(plaintext, aad);
+  const decryptScenarios: Array<{
+    name: string;
+    mutate(response: KMSBytesResponse): KMSBytesResponse;
+  }> = [
+    {
+      name: "false ciphertext verification",
+      mutate: (response) => ({
+        ...response,
+        verifiedCiphertextCrc32c: false,
+      }),
+    },
+    {
+      name: "missing AAD verification",
+      mutate: (response) => ({
+        ...response,
+        verifiedAdditionalAuthenticatedDataCrc32c: undefined,
+      }),
+    },
+    {
+      name: "missing plaintext CRC",
+      mutate: (response) => ({
+        ...response,
+        plaintextCrc32c: undefined,
+      }),
+    },
+    {
+      name: "corrupt plaintext",
+      mutate: (response) => ({
+        ...response,
+        plaintext: mutateBytes(response.plaintext),
+      }),
+    },
+  ];
+  for (const scenario of decryptScenarios) {
+    await context.test(`decrypt: ${scenario.name}`, async () => {
+      const delegate = new LocalKMSClient(encodedKey);
+      const cipher = new GoogleKMSEnvelopeCipher(
+        mutateKMS(delegate, "decrypt", scenario.mutate),
+        keyName,
+      );
+      await assert.rejects(
+        cipher.open(sealed, aad),
+        hasCredentialMessage("fiscal KMS decrypt integrity verification failed"),
+      );
+    });
+  }
+});
+
+test("KMS readiness verifies encrypt and decrypt once and caches the result", async () => {
+  const delegate = new LocalKMSClient(
+    Buffer.alloc(32, 31).toString("base64"),
+  );
+  let encryptCalls = 0;
+  let decryptCalls = 0;
+  const cipher = new GoogleKMSEnvelopeCipher(
+    {
+      async encrypt(request) {
+        encryptCalls += 1;
+        return delegate.encrypt(request);
+      },
+      async decrypt(request) {
+        decryptCalls += 1;
+        return delegate.decrypt(request);
+      },
+    },
+    keyName,
+  );
+
+  await Promise.all([cipher.ready(), cipher.ready(), cipher.ready()]);
+  await cipher.ready();
+
+  assert.equal(encryptCalls, 1);
+  assert.equal(decryptCalls, 1);
+});
+
+test("KMS readiness shares an in-flight failure but permits immediate recovery", async () => {
+  const delegate = new LocalKMSClient(
+    Buffer.alloc(32, 37).toString("base64"),
+  );
+  let encryptCalls = 0;
+  let decryptCalls = 0;
+  let available = false;
+  let now = 0;
+  const cipher = new GoogleKMSEnvelopeCipher(
+    {
+      async encrypt(request) {
+        encryptCalls += 1;
+        if (!available) throw new Error("permission denied");
+        return delegate.encrypt(request);
+      },
+      async decrypt(request) {
+        decryptCalls += 1;
+        return delegate.decrypt(request);
+      },
+    },
+    keyName,
+    (size) => Buffer.alloc(size, 41),
+    () => now,
+  );
+
+  await Promise.all(
+    [cipher.ready(), cipher.ready(), cipher.ready()].map((attempt) =>
+      assert.rejects(
+        attempt,
+        hasCredentialCode("CREDENTIAL_NOT_READY"),
+      )
+    ),
+  );
+  assert.equal(encryptCalls, 1);
+  assert.equal(decryptCalls, 0);
+
+  available = true;
+  await cipher.ready();
+  await cipher.ready();
+  assert.equal(encryptCalls, 2);
+  assert.equal(decryptCalls, 1);
+
+  now = 5 * 60 * 1000;
+  await cipher.ready();
+  assert.equal(encryptCalls, 3);
+  assert.equal(decryptCalls, 2);
 });
 
 test("credential onboarding is tenant-bound, idempotent and requires homologation", async () => {
@@ -366,6 +556,47 @@ function serviceActor(organizationId: string) {
 function hasCredentialCode(code: string) {
   return (error: unknown) =>
     error instanceof CredentialError && error.code === code;
+}
+
+function hasCredentialMessage(message: string) {
+  return (error: unknown) =>
+    error instanceof CredentialError &&
+    error.code === "CREDENTIAL_NOT_READY" &&
+    error.message === message;
+}
+
+function mutateKMS(
+  delegate: KMSClient,
+  operation: "encrypt" | "decrypt",
+  mutate: (response: KMSBytesResponse) => KMSBytesResponse,
+): KMSClient {
+  return {
+    async encrypt(request) {
+      const [response] = await delegate.encrypt(request);
+      return [operation === "encrypt" ? mutate(response) : response];
+    },
+    async decrypt(request) {
+      const [response] = await delegate.decrypt(request);
+      return [operation === "decrypt" ? mutate(response) : response];
+    },
+  };
+}
+
+function mutateBytes(
+  value: Uint8Array | string | null | undefined,
+): Uint8Array {
+  if (value === null || value === undefined) {
+    throw new Error("cannot mutate an absent KMS response");
+  }
+  const bytes =
+    typeof value === "string"
+      ? Buffer.from(value, "base64")
+      : Buffer.from(value);
+  if (bytes.length === 0) {
+    throw new Error("cannot mutate an empty KMS response");
+  }
+  bytes[0] = bytes[0]! ^ 1;
+  return bytes;
 }
 
 function mutateBase64(value: string): string {

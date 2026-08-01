@@ -25,10 +25,11 @@ fi
 for environment in "${environments[@]}"; do
   keyring="pymes-v3-${environment}"
   key="internal-jwt-signing"
+  api="pymes-v3-api-${environment}@${project}.iam.gserviceaccount.com"
   worker="pymes-v3-worker-${environment}@${project}.iam.gserviceaccount.com"
   provisioner="pymes-v3-provision-${environment}@${project}.iam.gserviceaccount.com"
 
-  for principal in "$worker" "$provisioner"; do
+  for principal in "$api" "$worker" "$provisioner"; do
     account_id=${principal%%@*}
     if ! gcloud iam service-accounts describe "$principal" --project="$project" >/dev/null 2>&1; then
       gcloud iam service-accounts create "$account_id" --project="$project" \
@@ -71,13 +72,42 @@ for environment in "${environments[@]}"; do
   jq -e 'length == 1 and .[0].algorithm == "EC_SIGN_ED25519" and .[0].state == "ENABLED"' \
     <<<"$version_json" >/dev/null
 
-  for principal in "$worker" "$provisioner"; do
+  for principal in "$api" "$worker" "$provisioner"; do
     gcloud kms keys add-iam-policy-binding "$key" \
       --project="$project" --location="$region" --keyring="$keyring" \
       --member="serviceAccount:${principal}" --role=roles/cloudkms.signer --quiet >/dev/null
     gcloud kms keys add-iam-policy-binding "$key" \
       --project="$project" --location="$region" --keyring="$keyring" \
       --member="serviceAccount:${principal}" --role=roles/cloudkms.publicKeyViewer --quiet >/dev/null
+  done
+
+  expected_members=$(printf '%s\n' \
+    "serviceAccount:$api" \
+    "serviceAccount:$worker" \
+    "serviceAccount:$provisioner" | LC_ALL=C sort -u)
+  for role in roles/cloudkms.signer roles/cloudkms.publicKeyViewer; do
+    inherited_project=$(gcloud projects get-iam-policy "$project" \
+      --flatten='bindings[].members' --filter="bindings.role=$role" \
+      --format='value(bindings.members)' |
+      sed '/^[[:space:]]*$/d' | LC_ALL=C sort -u)
+    inherited_keyring=$(gcloud kms keyrings get-iam-policy "$keyring" \
+      --project="$project" --location="$region" \
+      --flatten='bindings[].members' --filter="bindings.role=$role" \
+      --format='value(bindings.members)' |
+      sed '/^[[:space:]]*$/d' | LC_ALL=C sort -u)
+    if [[ -n "$inherited_project" || -n "$inherited_keyring" ]]; then
+      echo "$role must not be inherited by $key from project or key-ring scope" >&2
+      exit 1
+    fi
+    direct_members=$(gcloud kms keys get-iam-policy "$key" \
+      --project="$project" --location="$region" --keyring="$keyring" \
+      --flatten='bindings[].members' --filter="bindings.role=$role" \
+      --format='value(bindings.members)' |
+      sed '/^[[:space:]]*$/d' | LC_ALL=C sort -u)
+    if [[ "$direct_members" != "$expected_members" ]]; then
+      echo "$key must grant $role to exactly API, worker and provisioner for $environment" >&2
+      exit 1
+    fi
   done
 
   version=$(jq -r '.[0].name' <<<"$version_json")

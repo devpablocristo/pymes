@@ -28,7 +28,7 @@ func (c HTTPFiscalClient) Authorize(
 	return c.call(
 		ctx,
 		fiscal,
-		fallback(fiscal.IdempotencyKey, fiscal.RequestID),
+		fiscalhelpers.Fallback(fiscal.IdempotencyKey, fiscal.RequestID),
 		false,
 	)
 }
@@ -40,7 +40,7 @@ func (c HTTPFiscalClient) Consult(
 	return c.call(
 		ctx,
 		fiscal,
-		fallback(fiscal.IdempotencyKey, fiscal.RequestID),
+		fiscalhelpers.Fallback(fiscal.IdempotencyKey, fiscal.RequestID),
 		true,
 	)
 }
@@ -69,7 +69,7 @@ func (c HTTPFiscalClient) RequestCredentialCSR(
 		return domain.FiscalCredentialCSRResult{}, err
 	}
 	if response.StatusCode() != http.StatusCreated || response.JSON201 == nil {
-		return domain.FiscalCredentialCSRResult{}, generatedServiceError(
+		return domain.FiscalCredentialCSRResult{}, fiscalhelpers.DecodeServiceError(
 			"fiscal credential CSR",
 			response.Status(),
 			response.Body,
@@ -102,7 +102,7 @@ func (c HTTPFiscalClient) GetCredential(
 		return domain.FiscalCredential{}, err
 	}
 	if response.StatusCode() != http.StatusOK || response.JSON200 == nil {
-		return domain.FiscalCredential{}, generatedServiceError(
+		return domain.FiscalCredential{}, fiscalhelpers.DecodeServiceError(
 			"fiscal credential",
 			response.Status(),
 			response.Body,
@@ -137,7 +137,7 @@ func (c HTTPFiscalClient) UploadCertificate(
 		return domain.FiscalCredential{}, err
 	}
 	if response.StatusCode() != http.StatusOK || response.JSON200 == nil {
-		return domain.FiscalCredential{}, generatedServiceError(
+		return domain.FiscalCredential{}, fiscalhelpers.DecodeServiceError(
 			"fiscal certificate",
 			response.Status(),
 			response.Body,
@@ -174,7 +174,7 @@ func (c HTTPFiscalClient) ConfigurePointOfSale(
 		return domain.FiscalPointOfSale{}, err
 	}
 	if response.StatusCode() != http.StatusOK || response.JSON200 == nil {
-		return domain.FiscalPointOfSale{}, generatedServiceError(
+		return domain.FiscalPointOfSale{}, fiscalhelpers.DecodeServiceError(
 			"fiscal point of sale",
 			response.Status(),
 			response.Body,
@@ -211,7 +211,7 @@ func (c HTTPFiscalClient) ValidatePointOfSale(
 		return domain.FiscalPointOfSale{}, err
 	}
 	if response.StatusCode() != http.StatusOK || response.JSON200 == nil {
-		return domain.FiscalPointOfSale{}, generatedServiceError(
+		return domain.FiscalPointOfSale{}, fiscalhelpers.DecodeServiceError(
 			"fiscal point of sale validation",
 			response.Status(),
 			response.Body,
@@ -230,19 +230,19 @@ func (c HTTPFiscalClient) call(
 	if err != nil {
 		return domain.FiscalResult{}, err
 	}
-	correlationID := fallback(fiscal.CorrelationID, key)
+	correlationID := fiscalhelpers.Fallback(fiscal.CorrelationID, key)
 	payload["request_id"] = fiscal.RequestID
 	payload["organization_id"] = fiscal.OrganizationID
 	payload["idempotency_key"] = key
 	payload["correlation_id"] = correlationID
-	payload["source_version"] = positiveVersion(fiscal.SourceVersion)
+	payload["source_version"] = fiscalhelpers.PositiveVersion(fiscal.SourceVersion)
 	payload["credential_ref"] = fiscal.CredentialRef
 	payload["point_of_sale"] = fiscal.Voucher.PointOfSale
 	payload["document_type"] = fiscal.Voucher.DocumentType
 	payload["voucher_number"] = fiscal.Voucher.VoucherNumber
 	payload["snapshot_digest"] = fiscal.SnapshotDigest
 	var body fiscalapi.FiscalRequest
-	if err := transcodeJSON(payload, &body); err != nil {
+	if err := fiscalhelpers.TranscodeJSON(payload, &body); err != nil {
 		return domain.FiscalResult{}, fmt.Errorf("encode fiscal request: %w", err)
 	}
 	client, err := c.generatedClient(
@@ -271,7 +271,7 @@ func (c HTTPFiscalClient) call(
 		if err != nil {
 			return domain.FiscalResult{}, err
 		}
-		return decodeFiscalResult(
+		return fiscalhelpers.DecodeResult(
 			"fiscal consultation",
 			response.Status(),
 			response.StatusCode(),
@@ -288,7 +288,7 @@ func (c HTTPFiscalClient) call(
 	if err != nil {
 		return domain.FiscalResult{}, err
 	}
-	return decodeFiscalResult(
+	return fiscalhelpers.DecodeResult(
 		"fiscal authorization",
 		response.Status(),
 		response.StatusCode(),
@@ -332,37 +332,4 @@ func pointOfSaleOperationKey(
 	enabled bool,
 ) string {
 	return operation + ":" + credentialID + ":" + strconv.Itoa(pointOfSale) + ":" + strconv.FormatBool(enabled)
-}
-
-func decodeFiscalResult(
-	service string,
-	status string,
-	statusCode int,
-	body []byte,
-	candidates ...*fiscalapi.FiscalResult,
-) (domain.FiscalResult, error) {
-	if statusCode != http.StatusOK &&
-		statusCode != http.StatusCreated &&
-		statusCode != http.StatusAccepted {
-		return domain.FiscalResult{}, generatedServiceError(
-			service,
-			status,
-			body,
-		)
-	}
-	for _, candidate := range candidates {
-		if candidate == nil {
-			continue
-		}
-		var result domain.FiscalResult
-		if err := transcodeJSON(candidate, &result); err != nil {
-			return domain.FiscalResult{}, fmt.Errorf(
-				"decode %s response: %w",
-				service,
-				err,
-			)
-		}
-		return result, nil
-	}
-	return domain.FiscalResult{}, generatedServiceError(service, status, body)
 }

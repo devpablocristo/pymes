@@ -169,6 +169,22 @@ paths:
         '200': { description: Turno, content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/SchedulingError' }
+    patch:
+      operationId: updateSchedulingBooking
+      description: >-
+        Edita exclusivamente datos operativos del turno. Sucursal, servicio,
+        horario, asignaciones, snapshots y estado interno requieren sus flujos
+        específicos y no son aceptados por este contrato.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/SourceVersion' }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BookingUpdateInput' } } } }
+      responses:
+        '200': { description: Turno editado, content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/SchedulingError' }
+        '409': { $ref: '#/components/responses/SchedulingError' }
   /api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}/reschedule:
     parameters:
       - { $ref: '#/components/parameters/OrganizationId' }
@@ -615,6 +631,24 @@ components:
         allocations: { type: array, items: { $ref: '#/components/schemas/Allocation' } }
         notes: { type: string }
         recurrence: { $ref: '#/components/schemas/Recurrence' }
+    BookingUpdateInput:
+      type: object
+      additionalProperties: false
+      minProperties: 2
+      required: [expected_version]
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        customer:
+          $ref: '#/components/schemas/Customer'
+          description: >-
+            Identidad y snapshot de contacto deseados. Un party_id existente
+            debe pertenecer a la organización autenticada.
+        participants: { type: integer, minimum: 1, maximum: 100000 }
+        notes: { type: string, maxLength: 2000 }
+        substate_code:
+          type: string
+          description: Código habilitado para el estado actual; vacío elimina el subestado.
+          pattern: '^$|^[a-z][a-z0-9_-]{0,39}$'
     PublicBookingInput:
       type: object
       additionalProperties: false

@@ -12,6 +12,7 @@ import {
   ArcaFiscalAuthority,
   type ArcaClientFactory,
 } from "../../src/fiscal/arca.js";
+import { compatibleExplicitClient } from "../../src/fiscal/arca/helpers/client.js";
 import { mapFiscalRequest } from "../../src/fiscal/arca/helpers/mapping.js";
 import type {
   ExplicitSDKClient,
@@ -165,24 +166,25 @@ test("consultation rejects an occupied number whose ARCA snapshot differs", asyn
   assert.equal(result.result_code, "VOUCHER_MISMATCH");
 });
 
-test("point-of-sale validation exercises WSAA/WSFE without issuing a voucher", async () => {
-  const client = new ScriptedClient([{}], []);
+test("point-of-sale validation uses FEParamGetPtosVenta without a synthetic voucher", async () => {
+  const client = new ScriptedClient([], [], [[{
+    number: 9,
+    emissionType: "CAE",
+    blocked: false,
+  }]]);
   const authority = authorityFor(client, new MemoryArtifacts());
   await authority.validatePointOfSale({
     material: credentialMaterial(),
     pointOfSale: 9,
   });
-  assert.deepEqual(client.consulted, [{
-    pointOfSale: 9,
-    voucherType: 1,
-    voucherNumber: 1,
-  }]);
+  assert.equal(client.pointsOfSaleListed, 1);
+  assert.deepEqual(client.consulted, []);
   assert.equal(client.authorized.length, 0);
 
   const providerError = new Error("invalid point of sale");
   providerError.name = "ArcaWSFEError";
   const invalid = authorityFor(
-    new ScriptedClient([providerError], []),
+    new ScriptedClient([], [], [providerError]),
     new MemoryArtifacts(),
   );
   await assert.rejects(
@@ -198,7 +200,7 @@ test("point-of-sale validation exercises WSAA/WSFE without issuing a voucher", a
   );
 
   const unavailable = authorityFor(
-    new ScriptedClient([new Error("network unavailable")], []),
+    new ScriptedClient([], [], [new Error("network unavailable")]),
     new MemoryArtifacts(),
   );
   await assert.rejects(
@@ -209,6 +211,124 @@ test("point-of-sale validation exercises WSAA/WSFE without issuing a voucher", a
     (error: unknown) =>
       error instanceof FiscalError && error.code === "AUTHORITY_TIMEOUT",
   );
+});
+
+test("point-of-sale validation rejects missing, blocked and malformed entries", async () => {
+  for (const listed of [
+    [],
+    [{
+      number: 12,
+      emissionType: "CAE",
+      blocked: true,
+    }],
+    [{
+      number: 12,
+      emissionType: "CAE",
+      blocked: false,
+      deactivatedOn: "20261231",
+    }],
+  ]) {
+    const authority = authorityFor(
+      new ScriptedClient([], [], [listed]),
+      new MemoryArtifacts(),
+    );
+    await assert.rejects(
+      authority.validatePointOfSale({
+        material: credentialMaterial(),
+        pointOfSale: 12,
+      }),
+      (error: unknown) =>
+        error instanceof Error &&
+        "code" in error &&
+        (error as { code: unknown }).code ===
+          "POINT_OF_SALE_NOT_VALIDATED",
+    );
+  }
+
+  const malformed = new Error("invalid provider payload");
+  malformed.name = "ExplicitPointOfSaleError";
+  const authority = authorityFor(
+    new ScriptedClient([], [], [malformed]),
+    new MemoryArtifacts(),
+  );
+  await assert.rejects(
+    authority.validatePointOfSale({
+      material: credentialMaterial(),
+      pointOfSale: 12,
+    }),
+    (error: unknown) =>
+      error instanceof FiscalError && error.code === "INTERNAL_ERROR",
+  );
+});
+
+test("published SDK compatibility uses FEParamGetPtosVenta until the explicit method is released", async () => {
+  let consulted = 0;
+  let legacyListed = 0;
+  const compatible = compatibleExplicitClient(
+    {
+      async authorize() {
+        return {};
+      },
+      async consult() {
+        consulted += 1;
+        return {};
+      },
+    },
+    {
+      async getPuntosVenta() {
+        legacyListed += 1;
+        return [{
+          Nro: 15,
+          EmisionTipo: "CAE",
+          Bloqueado: "N",
+          FchBaja: "NULL",
+        }];
+      },
+    },
+  );
+
+  assert.deepEqual(await compatible.listPointsOfSale(), [{
+    number: 15,
+    emissionType: "CAE",
+    blocked: false,
+  }]);
+  assert.equal(legacyListed, 1);
+  assert.equal(consulted, 0);
+});
+
+test("published SDK compatibility prefers the explicit point-of-sale API", async () => {
+  let explicitListed = 0;
+  const futureExplicitClient = {
+    async authorize() {
+      return {};
+    },
+    async consult() {
+      return {};
+    },
+    async listPointsOfSale() {
+      explicitListed += 1;
+      return [{
+        number: 16,
+        emissionType: "CAE",
+        blocked: false,
+      }];
+    },
+  };
+  const compatible = compatibleExplicitClient(
+    futureExplicitClient,
+    {
+      async getPuntosVenta() {
+        throw new Error("legacy point-of-sale API must not be called");
+      },
+    },
+  );
+
+  assert.deepEqual(await compatible.listPointsOfSale(), [{
+    number: 16,
+    emissionType: "CAE",
+    blocked: false,
+  }]);
+  assert.equal(explicitListed, 1);
 });
 
 function authorityFor(
@@ -242,11 +362,15 @@ class ScriptedClient implements ExplicitSDKClient {
     voucherNumber: number;
   }> = [];
   readonly authorized: SDKInvoiceRequest[] = [];
+  pointsOfSaleListed = 0;
   onEvent?: (event: { type: string; method?: string }) => void;
 
   constructor(
     private readonly consultResults: Array<SDKConsultResponse | Error>,
     private readonly authorizeResults: Array<SDKAuthorizationResponse | Error>,
+    private readonly pointOfSaleResults: Array<
+      Awaited<ReturnType<ExplicitSDKClient["listPointsOfSale"]>> | Error
+    > = [],
   ) {}
 
   async consult(reference: {
@@ -268,6 +392,13 @@ class ScriptedClient implements ExplicitSDKClient {
     const result = this.authorizeResults.shift();
     if (result instanceof Error) throw result;
     return result ?? {};
+  }
+
+  async listPointsOfSale() {
+    this.pointsOfSaleListed += 1;
+    const result = this.pointOfSaleResults.shift();
+    if (result instanceof Error) throw result;
+    return result ?? [];
   }
 }
 

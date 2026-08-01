@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"testing"
 
+	repositoryhelpers "github.com/devpablocristo/pymes/v3/backend/internal/commerce/repository/helpers"
 	"github.com/devpablocristo/pymes/v3/backend/internal/commerce/usecases/domain"
 )
 
 func TestAttachAssociatedVoucherDerivesImmutableSourceIdentity(t *testing.T) {
 	t.Parallel()
-	raw, err := attachAssociatedVoucher(
+	raw, err := repositoryhelpers.AttachAssociatedVoucher(
 		[]byte(`{"issue_date":"2026-07-31","currency":"ARS","totals":{"total":"12.10"}}`),
 		domain.VoucherReference{PointOfSale: 3, DocumentType: "FA", VoucherNumber: 41},
 		[]byte(`{"issue_date":"2026-07-01","currency":"ARS"}`),
@@ -38,7 +39,7 @@ func TestAttachAssociatedVoucherDerivesImmutableSourceIdentity(t *testing.T) {
 
 func TestAttachAssociatedVoucherRejectsIncompleteSource(t *testing.T) {
 	t.Parallel()
-	if _, err := attachAssociatedVoucher(
+	if _, err := repositoryhelpers.AttachAssociatedVoucher(
 		[]byte(`{"issue_date":"2026-07-31"}`),
 		domain.VoucherReference{PointOfSale: 1, DocumentType: "FA"},
 		[]byte(`{"issue_date":"2026-07-01"}`),

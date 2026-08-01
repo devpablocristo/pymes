@@ -23,6 +23,7 @@ import (
 	identitydomain "github.com/devpablocristo/pymes/v3/backend/internal/identity/usecases/domain"
 	"github.com/devpablocristo/pymes/v3/backend/internal/notifications"
 	"github.com/devpablocristo/pymes/v3/backend/internal/observability"
+	preflightmodels "github.com/devpablocristo/pymes/v3/backend/internal/observability/preflight/models"
 	"github.com/devpablocristo/pymes/v3/backend/internal/organization"
 	"github.com/devpablocristo/pymes/v3/backend/internal/postgres"
 	"github.com/devpablocristo/pymes/v3/backend/internal/scheduling"
@@ -278,6 +279,13 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 		identity.NewWebhook(webhooks, identity.ReceiveWebhook{Inbox: identities}),
 		contextRoutes...,
 	)
+	handler = observability.PreflightGate(
+		handler,
+		preflightmodels.Config{
+			Tag:   cfg.Preflight.Tag,
+			Token: cfg.Preflight.Token,
+		},
+	)
 	return &App{
 		Handler: observability.HTTP(handler, nil), database: database,
 		shutdownTracing: shutdownTracing,
@@ -443,6 +451,17 @@ func InitializeWorker(
 	if logger == nil {
 		logger = slog.Default()
 	}
+	releaseSignal, err := worker.NewReleaseSignal(
+		logger,
+		cfg.ReleaseSHA,
+		cfg.Revision,
+	)
+	if err != nil {
+		return nil, workerStartupError(
+			"WORKER_RELEASE_METADATA_INVALID",
+			err,
+		)
+	}
 	database, err := postgres.Open(
 		ctx,
 		cfg.DatabaseURL,
@@ -586,14 +605,18 @@ func InitializeWorker(
 			ReadHeaderTimeout: 2 * time.Second,
 		},
 		Runner: worker.Runner{
-			Dispatcher: dispatchers,
-			Metrics:    operations, Circuits: circuits, Logger: logger,
+			Dispatcher:     dispatchers,
+			Metrics:        operations,
+			ReleaseReady:   releaseSignal,
+			Circuits:       circuits,
+			Logger:         logger,
 			DispatchEvery:  cfg.DispatchInterval,
 			MetricsEvery:   cfg.MetricsInterval,
 			MetricsTimeout: 5 * time.Second,
 			RunOnce:        cfg.RunOnce,
 		},
-		database: database, identity: identity,
+		database:        database,
+		identity:        identity,
 		resources:       compactCloseResources(calendarResource),
 		shutdownTracing: shutdownTracing,
 		shutdownTimeout: cfg.ShutdownTimeout,

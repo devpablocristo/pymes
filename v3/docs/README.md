@@ -12,6 +12,56 @@ implementada es:
 - **Pymes v2**, **pyafipws** y **LedgerSMB** son referencias de comportamiento,
   no dependencias de ejecución ni fuentes de código copiadas.
 
+## Estado de entrega
+
+El código y los gates locales de H8 ya cubren releases inmutables por SHA y
+digest, identidades WIF separadas por ambiente, Web same-origin con marcador
+verificable, backup/restore endurecido y readiness criptográfico del vault
+Fiscal mediante Cloud KMS. La automatización también valida imágenes, labels,
+service accounts, invokers, secretos versionados, conectividad privada y jobs
+después de cada despliegue. El alta inerte queda ligada por Audit Logs a los
+FQN exactos de proyecto, región y tipo, admitiendo sólo el `actAs` inevitable
+sobre las identidades runtime allowlisted y una única mutación inicial por
+recurso. La evidencia se valida sólo después de diez minutos y dos lecturas
+estables, con un margen superior de dos minutos para timestamps de auditoría.
+Además, cada release verifica la autoridad completa y efectiva de builder y
+deployer antes de usar el builder y nuevamente antes del deploy.
+
+El bootstrap IAM sólo puede ejecutarse desde un checkout limpio cuyo HEAD y
+árbol coincidan con `main` remoto, por el operador directo revisado y sin
+impersonación de `gcloud`. Los gates fijan la cadena proyecto/folder/organización
+y los roles lectores exactos de ancestros; exigen las org policies que bloquean
+claves y adjunción cross-project; rechazan bindings directos del pool WIF;
+inventarían adjunciones de las identidades de release; y comparan la autoridad
+efectiva, incluida impersonación, de las diez identidades runtime contra
+allowlists por componente. La creación inicial de los dos custom roles de
+organización y sus bindings requiere administración humana explícita y
+`orgpolicy.googleapis.com`; esa capacidad no pertenece al workflow.
+
+Las reejecuciones de GitHub quedan prohibidas antes de autenticar al builder:
+un fallo se continúa con un nuevo dispatch. Cloud Asset y Policy Analyzer son
+eventualmente consistentes, por lo que una lectura `fullyExplored` no sustituye
+la ventana sin cambios ni la repetición estable exigidas antes de un cutover.
+
+El primer alta de STG se divide deliberadamente en dos ejecuciones. La etapa
+`bootstrap` crea candidatos privados con tráfico cero, Fiscal mock, worker
+detenido e integraciones externas deshabilitadas; esto permite conocer la URL
+estable sin exponer el producto. Después de configurar Clerk y reemplazar el
+secreto temporal del webhook, una ejecución `operational` vuelve a verificar
+todo y recién entonces promueve las revisiones. El worker permanece en
+escalado manual cero, sin health check de despliegue, hasta que su candidato
+sea el último en recibir tráfico; recién allí se activa una instancia.
+`bootstrap` no está permitido en PRD ni cuenta como canary operativo.
+
+Open Accounting está fusionado y su CI remoto es verde en
+`1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d`. `make ci` también pasa localmente
+en Pymes contra ese pin y los controles actuales. Esto describe capacidad
+implementada, no integración remota ni evidencia operativa: el cambio de Pymes
+todavía debe integrarse y obtener CI remoto verde; no se publicaron las imágenes
+de esta revisión, no se desplegó Pymes v3 en STG ni PRD y no se realizaron los
+pilotos de Agenda, PerGo, Google o ARCA. El plan sólo podrá declararse completo
+después de ejecutar y verificar esas operaciones.
+
 ## Lectura sugerida
 
 1. [Evidencia e inventario](01-evidencia.md)

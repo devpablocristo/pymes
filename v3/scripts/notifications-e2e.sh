@@ -6,7 +6,7 @@ cd "$root_dir"
 
 organization_id=${PYMES_NOTIFICATIONS_E2E_ORGANIZATION:-notifications-e2e-$$}
 api_port=${PYMES_API_PORT:-18080}
-pergo_port=${PERGO_FAKE_PORT:-18085}
+pergo_port=${PERGO_FAKE_PORT:-18086}
 database_url=${PYMES_DATABASE_URL:-}
 default_database_url='postgresql://pymes:pymes@127.0.0.1:55434/pymes_v3?sslmode=disable'
 
@@ -303,7 +303,7 @@ invalid_status=$(curl -sS -o /dev/null -w '%{http_code}' \
   -X POST \
   -H 'Content-Type: application/json' \
   -H 'X-PerGo-Signature: t=1,v1=bad' \
-  -d '{"event":"message.sent","trace_id":"pymes.v1.invalid.invalid","message_id":"invalid","channel":"whatsapp_mock","timestamp":"2026-08-01T00:00:00Z","workspace_id":"pymes-local"}' \
+  -d '{"event":"sent","trace_id":"pymes.v1.invalid.invalid","message_id":"invalid","channel":"whatsapp_mock","timestamp":"2026-08-01T00:00:00Z","workspace_id":"pymes-local"}' \
   "http://127.0.0.1:$api_port/api/v1/webhooks/pergo")
 if [ "$invalid_status" != "401" ]; then
   echo "invalid PerGo webhook status=$invalid_status, want 401" >&2

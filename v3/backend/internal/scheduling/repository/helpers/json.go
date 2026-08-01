@@ -22,3 +22,14 @@ func Decode(data []byte, value any) error {
 	}
 	return nil
 }
+
+func NullableJSON(value any) ([]byte, error) {
+	if value == nil {
+		return nil, nil
+	}
+	result, err := json.Marshal(value)
+	if err != nil {
+		return nil, fmt.Errorf("encode scheduling audit: %w", err)
+	}
+	return result, nil
+}

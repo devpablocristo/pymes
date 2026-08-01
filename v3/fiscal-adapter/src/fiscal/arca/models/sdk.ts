@@ -81,6 +81,37 @@ export interface SDKConsultResponse {
   Events?: { Evt: SDKError | SDKError[] };
 }
 
+export interface SDKPointOfSale {
+  number: number;
+  emissionType: string;
+  blocked: boolean;
+  deactivatedOn?: string;
+}
+
+export interface SDKLegacyPointOfSale {
+  Nro: number;
+  EmisionTipo: string;
+  Bloqueado: string;
+  FchBaja: string;
+}
+
+export interface ExplicitSDKBaseClient {
+  authorize(request: SDKInvoiceRequest): Promise<SDKAuthorizationResponse>;
+  consult(reference: {
+    pointOfSale: number;
+    voucherType: number;
+    voucherNumber: number;
+  }): Promise<SDKConsultResponse>;
+}
+
+export interface SDKPointOfSaleListingClient {
+  listPointsOfSale(): Promise<SDKPointOfSale[]>;
+}
+
+export interface SDKLegacyPointOfSaleClient {
+  getPuntosVenta(): Promise<SDKLegacyPointOfSale[]>;
+}
+
 export interface ExplicitSDKClient {
   authorize(request: SDKInvoiceRequest): Promise<SDKAuthorizationResponse>;
   consult(reference: {
@@ -88,4 +119,5 @@ export interface ExplicitSDKClient {
     voucherType: number;
     voucherNumber: number;
   }): Promise<SDKConsultResponse>;
+  listPointsOfSale(): Promise<SDKPointOfSale[]>;
 }

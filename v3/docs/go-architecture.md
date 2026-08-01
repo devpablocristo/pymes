@@ -153,12 +153,21 @@ make test
 `make architecture-check` usa `go/parser` y `go/ast` para verificar:
 
 - descubrimiento y forma completa de adapters;
+- aplicación de esa forma a todos los fragmentos del adapter, no sólo al
+  archivo raíz que lleva el marcador;
 - helpers con funciones reales y dto/models con tipos reales;
+- ausencia de payloads serializados, data-only structs y transformaciones en
+  los archivos raíz de adapters;
 - dominio libre de adapters;
 - interfaces fuera de repositories y packages de datos;
 - ausencia de capas históricas y `internal/contracts`;
-- composición exclusiva en wire;
+- ausencia física de directorios horizontales globales, aun cuando contengan
+  archivos no Go;
+- composición concreta entre contextos exclusivamente en `wire`;
 - ciclo de vida fuera de wire y dentro de cmd.
+- ausencia de imports, rutas, mounts, workflows o dependencias compiladas hacia
+  el proyecto usado históricamente para observar el patrón; el gate ejecuta
+  también `go list -deps -buildvcs=false`.
 
 El target forma parte de `make ci`. Toda nueva vertical o integración debe
 pasarlo antes de ejecutar los checks de integración y E2E.

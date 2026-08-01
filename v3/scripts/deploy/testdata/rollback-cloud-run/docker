@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${FAKE_RELEASE_SHA:?}"
+: "${FAKE_ACCOUNTING_SHA:?}"
+: "${FAKE_ACCOUNTING_CONTEXT:?}"
+: "${FAKE_ATTESTATIONS_VALID:=true}"
+
+[[ "${1:-} ${2:-} ${3:-}" == "buildx imagetools inspect" ]] || {
+  echo "fake docker: unsupported command" >&2
+  exit 96
+}
+image_ref=${4:-}
+[[ "${5:-}" == "--format" && -n "${6:-}" ]] || exit 97
+format=$6
+digest=${image_ref##*@}
+image_name=${image_ref%@*}
+image_name=${image_name##*/}
+
+revision=$FAKE_RELEASE_SHA
+source=https://github.com/devpablocristo/pymes
+if [[ "$image_name" == pymes-v3-accounting* ]]; then
+  revision=$FAKE_ACCOUNTING_SHA
+  source=https://github.com/devpablocristo/open-accounting
+fi
+
+base_digest() {
+  local dockerfile="$1" needle="$2"
+  sed -n \
+    "s#^FROM .*${needle}.*@\\(sha256:[0-9a-f]\\{64\\}\\).*#\\1#p" \
+    "$dockerfile" | sort -u | head -1
+}
+
+case "$format" in
+  '{{json .}}')
+    metadata_digest=$digest
+    if [[ "$FAKE_ATTESTATIONS_VALID" != "true" &&
+          "$image_name" == "pymes-v3-api" ]]; then
+      metadata_digest=sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+    fi
+    jq -n \
+      --arg digest "$metadata_digest" \
+      --arg revision "$revision" \
+      --arg source "$source" \
+      --arg pymes_sha "$FAKE_RELEASE_SHA" \
+      --arg accounting_sha "$FAKE_ACCOUNTING_SHA" '
+        {
+          manifest: {digest: $digest},
+          image: {
+            config: {
+              Labels: {
+                "org.opencontainers.image.revision": $revision,
+                "org.opencontainers.image.source": $source,
+                "org.opencontainers.image.version": $revision,
+                "io.pymes.release.environment": "stg",
+                "io.pymes.release.pymes-revision": $pymes_sha,
+                "io.pymes.release.open-accounting-revision": $accounting_sha,
+                "io.pymes.release.pymes-repository-id": "1173650578",
+                "io.pymes.release.open-accounting-repository-id": "1317775856"
+              }
+            }
+          }
+        }
+      '
+    ;;
+  '{{json .Provenance}}')
+    pymes_dockerfile="$PWD/v3/Dockerfile"
+    jq -n \
+      --arg pymes_sha "$FAKE_RELEASE_SHA" \
+      --arg accounting_sha "$FAKE_ACCOUNTING_SHA" \
+      --arg pymes_go "$(base_digest "$pymes_dockerfile" 'golang:')" \
+      --arg pymes_node "$(base_digest "$pymes_dockerfile" 'node:')" \
+      --arg pymes_distroless "$(base_digest "$pymes_dockerfile" 'distroless/static-debian12:')" \
+      --arg pymes_nginx "$(base_digest "$pymes_dockerfile" 'nginx-unprivileged:')" \
+      --arg pymes_postgres "$(base_digest "$pymes_dockerfile" 'postgres:')" \
+      --arg accounting_go "$(base_digest "$FAKE_ACCOUNTING_CONTEXT/Dockerfile" 'golang:')" \
+      --arg accounting_alpine "$(base_digest "$FAKE_ACCOUNTING_CONTEXT/Dockerfile" 'alpine:')" '
+        def material($uri; $digest): {
+          uri: ($uri + "?digest=" + $digest),
+          digest: {sha256: ($digest | sub("^sha256:"; ""))}
+        };
+        {
+          SLSA: {
+            buildType: "https://mobyproject.org/buildkit@v1",
+            pymesSha: $pymes_sha,
+            accountingSha: $accounting_sha,
+            pymesRepositoryId: "1173650578",
+            accountingRepositoryId: "1317775856",
+            materials: [
+              material("pkg:docker/golang@"; $pymes_go),
+              material("pkg:docker/node@"; $pymes_node),
+              material("distroless/static-debian12@"; $pymes_distroless),
+              material("nginxinc/nginx-unprivileged@"; $pymes_nginx),
+              material("pkg:docker/postgres@"; $pymes_postgres),
+              material("pkg:docker/golang@"; $accounting_go),
+              material("pkg:docker/alpine@"; $accounting_alpine)
+            ]
+          }
+        }
+      '
+    ;;
+  '{{json .SBOM}}')
+    jq -n '{
+      SPDX: {
+        SPDXID: "SPDXRef-DOCUMENT",
+        spdxVersion: "SPDX-2.3",
+        documentNamespace: "https://example.invalid/pymes-test-sbom",
+        packages: []
+      }
+    }'
+    ;;
+  *)
+    echo "fake docker: unsupported format" >&2
+    exit 98
+    ;;
+esac

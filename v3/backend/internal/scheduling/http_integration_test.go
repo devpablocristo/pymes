@@ -284,9 +284,155 @@ func TestSchedulingHTTPEndToEnd(t *testing.T) {
 			createdCount, conflictCount, created,
 		)
 	}
+	secondBookingBody := map[string]any{
+		"branch_id":  branchID,
+		"service_id": serviceID,
+		"customer": map[string]any{
+			"party_id": partyID,
+			"name":     "Ada HTTP",
+		},
+		"start_at":     slots[len(slots)-1].StartAt,
+		"participants": 1,
+		"allocations": []map[string]any{{
+			"resource_id": professionalID,
+			"mode":        domain.AllocationExclusive,
+			"units":       1,
+		}},
+	}
+	secondCreatedResponse := performSchedulingJSON(
+		t,
+		handler,
+		http.MethodPost,
+		fmt.Sprintf(
+			"/api/v1/organizations/%s/scheduling/bookings",
+			organizationID,
+		),
+		secondBookingBody,
+		"http-second-booking-"+suffix,
+		http.StatusCreated,
+	)
+	var secondCreated []dto.Booking
+	if err := json.Unmarshal(secondCreatedResponse.Body.Bytes(), &secondCreated); err != nil {
+		t.Fatal(err)
+	}
+	if len(secondCreated) != 1 || secondCreated[0].ID == created[0].ID {
+		t.Fatalf("second booking=%+v first=%+v", secondCreated, created)
+	}
+
+	updatePath := fmt.Sprintf(
+		"/api/v1/organizations/%s/scheduling/bookings/%s",
+		organizationID,
+		created[0].ID,
+	)
+	updateBody := map[string]any{
+		"expected_version": 1,
+		"notes":            "Acceso por recepción",
+	}
+	updateKey := "http-update-" + suffix
+	updatedResponse := performSchedulingJSON(
+		t,
+		handler,
+		http.MethodPatch,
+		updatePath,
+		updateBody,
+		updateKey,
+		http.StatusOK,
+	)
+	var updated dto.Booking
+	if err := json.Unmarshal(updatedResponse.Body.Bytes(), &updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated.Version != 2 ||
+		updated.Notes != "Acceso por recepción" ||
+		updated.BranchID != created[0].BranchID ||
+		updated.ServiceID != created[0].ServiceID ||
+		!updated.StartAt.Equal(created[0].StartAt) ||
+		updated.Status != created[0].Status ||
+		updated.ServiceName != created[0].ServiceName ||
+		updated.Price != created[0].Price {
+		t.Fatalf("booking update changed immutable fields: before=%+v after=%+v", created[0], updated)
+	}
+	replayedUpdate := performSchedulingJSON(
+		t,
+		handler,
+		http.MethodPatch,
+		updatePath,
+		updateBody,
+		updateKey,
+		http.StatusOK,
+	)
+	var replayed dto.Booking
+	if err := json.Unmarshal(replayedUpdate.Body.Bytes(), &replayed); err != nil {
+		t.Fatal(err)
+	}
+	if replayed.Version != updated.Version || replayed.Notes != updated.Notes {
+		t.Fatalf("booking update replay=%+v original=%+v", replayed, updated)
+	}
+	reusedUpdate := performSchedulingJSONNoFail(
+		handler,
+		http.MethodPatch,
+		updatePath,
+		map[string]any{"expected_version": 1, "notes": "Payload diferente"},
+		updateKey,
+	)
+	if reusedUpdate.Code != http.StatusConflict ||
+		!bytes.Contains(reusedUpdate.Body.Bytes(), []byte(domain.CodeIdempotencyKeyReused)) {
+		t.Fatalf(
+			"reused update status=%d body=%s",
+			reusedUpdate.Code,
+			reusedUpdate.Body,
+		)
+	}
+	crossBookingReplay := performSchedulingJSONNoFail(
+		handler,
+		http.MethodPatch,
+		fmt.Sprintf(
+			"/api/v1/organizations/%s/scheduling/bookings/%s",
+			organizationID,
+			secondCreated[0].ID,
+		),
+		updateBody,
+		updateKey,
+	)
+	if crossBookingReplay.Code != http.StatusConflict ||
+		!bytes.Contains(
+			crossBookingReplay.Body.Bytes(),
+			[]byte(domain.CodeIdempotencyKeyReused),
+		) {
+		t.Fatalf(
+			"cross-booking replay status=%d body=%s",
+			crossBookingReplay.Code,
+			crossBookingReplay.Body,
+		)
+	}
+	secondPersisted, err := repository.GetBooking(ctx, organizationID, secondCreated[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if secondPersisted.Version != 1 || secondPersisted.Notes != "" {
+		t.Fatalf("cross-booking replay mutated target: %+v", secondPersisted)
+	}
+	forbiddenUpdate := performSchedulingJSONNoFail(
+		handler,
+		http.MethodPatch,
+		updatePath,
+		map[string]any{
+			"expected_version": 2,
+			"start_at":         slots[2].StartAt,
+			"status":           domain.BookingCompleted,
+		},
+		"http-update-forbidden-"+suffix,
+	)
+	if forbiddenUpdate.Code != http.StatusBadRequest {
+		t.Fatalf(
+			"forbidden update status=%d body=%s",
+			forbiddenUpdate.Code,
+			forbiddenUpdate.Body,
+		)
+	}
 
 	rescheduleBody := map[string]any{
-		"expected_version": 1,
+		"expected_version": 2,
 		"start_at":         slots[3].StartAt,
 		"duration_minutes": 90,
 		"allocations": []map[string]any{{

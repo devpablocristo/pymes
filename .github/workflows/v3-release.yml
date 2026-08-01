@@ -1,0 +1,565 @@
+name: Pymes V3 Release
+run-name: Pymes V3 ${{ inputs.environment }} ${{ inputs.deploy_stage }} @ ${{ github.sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment protected by GitHub Environment rules
+        required: true
+        type: choice
+        options:
+          - stg
+          - prd
+      deploy_stage:
+        description: Bootstrap creates zero-traffic STG candidates; operational promotes after verification
+        required: true
+        default: operational
+        type: choice
+        options:
+          - operational
+          - bootstrap
+      confirm_production:
+        description: Type DEPLOY_PRD when environment is prd
+        required: false
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: pymes-v3-release-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate immutable release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: ${{ inputs.environment }}
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    outputs:
+      accounting_repository: ${{ steps.pin.outputs.repository }}
+      accounting_repository_id: ${{ steps.pin.outputs.repository_id }}
+      accounting_sha: ${{ steps.pin.outputs.revision }}
+      clerk_publishable_key: ${{ steps.release-config.outputs.clerk_publishable_key }}
+      source_sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - name: Reject unreviewed source or production intent
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_ENVIRONMENT: ${{ inputs.environment }}
+          REQUESTED_DEPLOY_STAGE: ${{ inputs.deploy_stage }}
+          PRODUCTION_CONFIRMATION: ${{ inputs.confirm_production }}
+        run: |
+          set -euo pipefail
+          [[ "${GITHUB_REPOSITORY}" == "devpablocristo/pymes" ]]
+          [[ "${GITHUB_REF}" == "refs/heads/main" ]]
+          [[ "${GITHUB_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          case "${REQUESTED_ENVIRONMENT}" in
+            stg)
+              ;;
+            prd)
+              [[ "${PRODUCTION_CONFIRMATION}" == "DEPLOY_PRD" ]]
+              ;;
+            *)
+              echo "unsupported release environment" >&2
+              exit 2
+              ;;
+          esac
+          case "${REQUESTED_DEPLOY_STAGE}" in
+            operational)
+              ;;
+            bootstrap)
+              [[ "${REQUESTED_ENVIRONMENT}" == "stg" ]]
+              ;;
+            *)
+              echo "unsupported deploy stage" >&2
+              exit 2
+              ;;
+          esac
+
+          runs="$(gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/v3-ci.yml/runs" \
+            -f head_sha="${GITHUB_SHA}" \
+            -f branch=main \
+            -f event=push \
+            -f status=success \
+            -f per_page=100)"
+          jq -e --arg sha "${GITHUB_SHA}" '
+            .workflow_runs
+            | any(
+                .head_sha == $sha and
+                .head_branch == "main" and
+                .event == "push" and
+                .status == "completed" and
+                .conclusion == "success"
+              )
+          ' <<<"${runs}" >/dev/null || {
+            echo "Pymes V3 CI has no successful push run for exact SHA ${GITHUB_SHA}" >&2
+            exit 1
+          }
+
+      - name: Checkout exact Pymes source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact Pymes source
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          [[ "${actual}" == "${GITHUB_SHA}" ]]
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+          printf 'sha=%s\n' "${actual}" >>"${GITHUB_OUTPUT}"
+
+      - name: Verify complete protected GitHub controls
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PYMES_GITHUB_RELEASE_AUDIT_TOKEN }}
+          PYMES_PRD_REVIEWER_IDS: ${{ vars.PYMES_PRD_REVIEWER_IDS }}
+        run: |
+          set -euo pipefail
+          : "${GH_TOKEN:?configure PYMES_GITHUB_RELEASE_AUDIT_TOKEN in the protected environment}"
+          ./v3/scripts/deploy/verify-github-environments.sh all all-controls
+
+      - name: Validate protected release configuration
+        id: release-config
+        shell: bash
+        env:
+          RELEASE_ENVIRONMENT: ${{ inputs.environment }}
+          CLERK_PUBLISHABLE_KEY: ${{ vars.PYMES_CLERK_PUBLISHABLE_KEY }}
+        run: |
+          set -euo pipefail
+          case "${RELEASE_ENVIRONMENT}" in
+            stg) pattern='^pk_test_[A-Za-z0-9_-]+$' ;;
+            prd) pattern='^pk_live_[A-Za-z0-9_-]+$' ;;
+            *) exit 2 ;;
+          esac
+          [[ "${CLERK_PUBLISHABLE_KEY}" =~ ${pattern} ]] || {
+            echo "protected Clerk publishable key does not match the release environment" >&2
+            exit 1
+          }
+          printf 'clerk_publishable_key=%s\n' "${CLERK_PUBLISHABLE_KEY}" >>"${GITHUB_OUTPUT}"
+
+      - name: Read immutable Open Accounting pin
+        id: pin
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pin_file=".github/dependencies/open-accounting.env"
+          repository="$(sed -n 's/^OPEN_ACCOUNTING_REPOSITORY=//p' "${pin_file}")"
+          repository_id="$(sed -n 's/^OPEN_ACCOUNTING_REPOSITORY_ID=//p' "${pin_file}")"
+          revision="$(sed -n 's/^OPEN_ACCOUNTING_REF=//p' "${pin_file}")"
+          [[ "$(grep -c '^OPEN_ACCOUNTING_REPOSITORY=' "${pin_file}")" -eq 1 ]]
+          [[ "$(grep -c '^OPEN_ACCOUNTING_REPOSITORY_ID=' "${pin_file}")" -eq 1 ]]
+          [[ "$(grep -c '^OPEN_ACCOUNTING_REF=' "${pin_file}")" -eq 1 ]]
+          [[ "${repository}" == "devpablocristo/open-accounting" ]]
+          [[ "${repository_id}" == "1317775856" ]]
+          [[ "${revision}" =~ ^[0-9a-f]{40}$ ]]
+          metadata="$(gh api --method GET "repos/${repository}")"
+          jq -e \
+            --arg repository "${repository}" \
+            --argjson repository_id "${repository_id}" \
+            '.full_name == $repository and .id == $repository_id' \
+            <<<"${metadata}" >/dev/null || {
+              echo "GitHub repository metadata does not match the immutable Open Accounting identity" >&2
+              exit 1
+            }
+          printf 'repository=%s\n' "${repository}" >>"${GITHUB_OUTPUT}"
+          printf 'repository_id=%s\n' "${repository_id}" >>"${GITHUB_OUTPUT}"
+          printf 'revision=%s\n' "${revision}" >>"${GITHUB_OUTPUT}"
+
+      - name: Set up Go for workflow policy checks
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26.5"
+          cache: false
+
+      - name: Validate release workflow policy
+        working-directory: v3
+        run: make workflow-policy-check
+
+      - name: Reverify protected GitHub controls before authority audit identity
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PYMES_GITHUB_RELEASE_AUDIT_TOKEN }}
+          PYMES_PRD_REVIEWER_IDS: ${{ vars.PYMES_PRD_REVIEWER_IDS }}
+        run: |
+          set -euo pipefail
+          : "${GH_TOKEN:?configure PYMES_GITHUB_RELEASE_AUDIT_TOKEN in the protected environment}"
+          ./v3/scripts/deploy/verify-github-environments.sh all all-controls
+
+      - name: Authenticate pre-build authority auditor
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: projects/884236221349/locations/global/workloadIdentityPools/pymes-v3-release-pool/providers/github
+          service_account: pymes-v3-gh-deploy-${{ inputs.environment }}@pymes-dev-352318.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Set up gcloud for pre-build authority audit
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+
+      - name: Verify complete release authority before builder
+        shell: bash
+        env:
+          PYMES_DEPLOY_ENV: ${{ inputs.environment }}
+          PYMES_DEPLOY_STAGE: ${{ inputs.deploy_stage }}
+          PYMES_GCP_PROJECT: pymes-dev-352318
+          PYMES_GCP_REGION: us-central1
+        run: ./v3/scripts/deploy/verify-release-authority.sh
+
+  build:
+    name: Build and attest immutable images
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Reject standalone build reruns
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${GITHUB_RUN_ATTEMPT}" == "1" ]] || {
+            echo "The image builder cannot be re-run from cached validation; dispatch a new release workflow." >&2
+            exit 1
+          }
+
+      - name: Checkout exact Pymes source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.validate.outputs.source_sha }}
+          persist-credentials: false
+
+      - name: Checkout exact Open Accounting source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ needs.validate.outputs.accounting_repository }}
+          ref: ${{ needs.validate.outputs.accounting_sha }}
+          path: .deps/open-accounting
+          persist-credentials: false
+
+      - name: Validate isolated build identity
+        shell: bash
+        env:
+          PYMES_GCP_PROJECT: pymes-dev-352318
+          PYMES_GCP_PROJECT_NUMBER: "884236221349"
+          PYMES_GCP_REGION: us-central1
+          PYMES_ARTIFACT_REPOSITORY: pymes
+          BUILD_PROVIDER: projects/884236221349/locations/global/workloadIdentityPools/pymes-v3-release-pool/providers/github
+          BUILD_SERVICE_ACCOUNT: pymes-v3-gh-build@pymes-dev-352318.iam.gserviceaccount.com
+        run: |
+          set -euo pipefail
+          [[ "${PYMES_GCP_PROJECT}" == "pymes-dev-352318" ]]
+          [[ "${PYMES_GCP_PROJECT_NUMBER}" == "884236221349" ]]
+          [[ "${PYMES_GCP_REGION}" == "us-central1" ]]
+          [[ "${PYMES_ARTIFACT_REPOSITORY}" == "pymes" ]]
+          [[ "${BUILD_PROVIDER}" == "projects/884236221349/locations/global/workloadIdentityPools/pymes-v3-release-pool/providers/github" ]]
+          [[ "${BUILD_SERVICE_ACCOUNT}" == "pymes-v3-gh-build@pymes-dev-352318.iam.gserviceaccount.com" ]]
+
+      - name: Authenticate immutable image builder
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: projects/884236221349/locations/global/workloadIdentityPools/pymes-v3-release-pool/providers/github
+          service_account: pymes-v3-gh-build@pymes-dev-352318.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+
+      - name: Configure Artifact Registry authentication
+        shell: bash
+        env:
+          PYMES_GCP_REGION: us-central1
+        run: |
+          set -euo pipefail
+          gcloud auth configure-docker \
+            "${PYMES_GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build and push release digests
+        shell: bash
+        env:
+          PYMES_RELEASE_ENV: ${{ inputs.environment }}
+          PYMES_GCP_PROJECT: pymes-dev-352318
+          PYMES_GCP_REGION: us-central1
+          PYMES_ARTIFACT_REPOSITORY: pymes
+          PYMES_SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+          OPEN_ACCOUNTING_CONTEXT: ${{ github.workspace }}/.deps/open-accounting
+          PYMES_IMAGE_MANIFEST: ${{ runner.temp }}/pymes-v3-images.env
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ needs.validate.outputs.clerk_publishable_key }}
+        run: ./v3/scripts/deploy/build-push-images.sh
+
+      - name: Record immutable digest manifest checksum
+        shell: bash
+        env:
+          MANIFEST_FILE: ${{ runner.temp }}/pymes-v3-images.env
+        run: |
+          set -euo pipefail
+          [[ -f "${MANIFEST_FILE}" && ! -L "${MANIFEST_FILE}" ]]
+          checksum="$(sha256sum -- "${MANIFEST_FILE}" | awk '{print $1}')"
+          [[ "${checksum}" =~ ^[0-9a-f]{64}$ ]]
+          {
+            printf '### Immutable Pymes v3 release manifest\n\n'
+            printf -- '- Environment: `%s`\n' '${{ inputs.environment }}'
+            printf -- '- Source SHA: `%s`\n' '${{ needs.validate.outputs.source_sha }}'
+            printf -- '- Manifest SHA-256: `%s`\n' "${checksum}"
+          } >>"${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload digest manifest
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: pymes-v3-images-${{ inputs.environment }}-${{ needs.validate.outputs.source_sha }}
+          path: ${{ runner.temp }}/pymes-v3-images.env
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
+
+  deploy:
+    name: Deploy and verify exact release
+    needs:
+      - validate
+      - build
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment:
+      name: ${{ inputs.environment }}
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - name: Reject standalone deploy reruns
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${GITHUB_RUN_ATTEMPT}" == "1" ]] || {
+            echo "The deployer cannot be re-run against cached validation or artifacts; dispatch a new release workflow." >&2
+            exit 1
+          }
+
+      - name: Checkout exact Pymes source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.validate.outputs.source_sha }}
+          persist-credentials: false
+
+      - name: Checkout exact Open Accounting source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ needs.validate.outputs.accounting_repository }}
+          ref: ${{ needs.validate.outputs.accounting_sha }}
+          path: .deps/open-accounting
+          persist-credentials: false
+
+      - name: Download immutable digest manifest
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: pymes-v3-images-${{ inputs.environment }}-${{ needs.validate.outputs.source_sha }}
+          path: ${{ runner.temp }}/release
+
+      - name: Import allowlisted release manifest
+        shell: bash
+        env:
+          EXPECTED_ENVIRONMENT: ${{ inputs.environment }}
+          EXPECTED_SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+          EXPECTED_ACCOUNTING_SHA: ${{ needs.validate.outputs.accounting_sha }}
+          PYMES_GCP_PROJECT: pymes-dev-352318
+          PYMES_GCP_REGION: us-central1
+          PYMES_ARTIFACT_REPOSITORY: pymes
+          MANIFEST_FILE: ${{ runner.temp }}/release/pymes-v3-images.env
+        run: |
+          set -euo pipefail
+          [[ -f "${MANIFEST_FILE}" ]]
+          declare -A expected=(
+            [PYMES_RELEASE_ENV]="${EXPECTED_ENVIRONMENT}"
+            [PYMES_SOURCE_SHA]="${EXPECTED_SOURCE_SHA}"
+            [PYMES_OPEN_ACCOUNTING_SOURCE_SHA]="${EXPECTED_ACCOUNTING_SHA}"
+            [PYMES_API_IMAGE]="pymes-v3-api"
+            [PYMES_WEB_IMAGE]="pymes-v3-web-${EXPECTED_ENVIRONMENT}"
+            [PYMES_WORKER_IMAGE]="pymes-v3-worker"
+            [PYMES_FISCAL_IMAGE]="pymes-v3-fiscal"
+            [PYMES_ACCOUNTING_IMAGE]="pymes-v3-accounting"
+            [PYMES_ACCOUNTING_ADMIN_IMAGE]="pymes-v3-accounting-admin"
+            [PYMES_PROVISION_IMAGE]="pymes-v3-provision"
+            [PYMES_MIGRATE_IMAGE]="pymes-v3-migrate"
+            [PYMES_FISCAL_MIGRATE_IMAGE]="pymes-v3-fiscal-migrate"
+            [PYMES_ACCOUNTING_MIGRATE_IMAGE]="pymes-v3-accounting-migrate"
+          )
+          declare -A seen=()
+          registry="${PYMES_GCP_REGION}-docker.pkg.dev/${PYMES_GCP_PROJECT}/${PYMES_ARTIFACT_REPOSITORY}"
+          while IFS='=' read -r key value; do
+            [[ -n "${key}" && -n "${value}" && -z "${seen[$key]:-}" ]]
+            [[ -n "${expected[$key]+present}" ]] || {
+              echo "release manifest contains non-allowlisted key: ${key}" >&2
+              exit 1
+            }
+            case "${key}" in
+              PYMES_RELEASE_ENV|PYMES_SOURCE_SHA|PYMES_OPEN_ACCOUNTING_SOURCE_SHA)
+                [[ "${value}" == "${expected[$key]}" ]]
+                ;;
+              *)
+                [[ "${value}" =~ ^${registry}/${expected[$key]}@sha256:[0-9a-f]{64}$ ]]
+                ;;
+            esac
+            seen["${key}"]=1
+            printf '%s=%s\n' "${key}" "${value}" >>"${GITHUB_ENV}"
+          done <"${MANIFEST_FILE}"
+          for key in "${!expected[@]}"; do
+            [[ -n "${seen[$key]:-}" ]] || {
+              echo "release manifest is missing ${key}" >&2
+              exit 1
+            }
+          done
+          [[ "${#seen[@]}" -eq "${#expected[@]}" ]]
+
+      - name: Validate isolated deploy identity
+        shell: bash
+        env:
+          RELEASE_ENVIRONMENT: ${{ inputs.environment }}
+          PYMES_GCP_PROJECT: pymes-dev-352318
+          PYMES_GCP_PROJECT_NUMBER: "884236221349"
+          PYMES_GCP_REGION: us-central1
+          PYMES_ARTIFACT_REPOSITORY: pymes
+          DEPLOY_PROVIDER: projects/884236221349/locations/global/workloadIdentityPools/pymes-v3-release-pool/providers/github
+          BUILD_SERVICE_ACCOUNT: pymes-v3-gh-build@pymes-dev-352318.iam.gserviceaccount.com
+          DEPLOY_SERVICE_ACCOUNT: pymes-v3-gh-deploy-${{ inputs.environment }}@pymes-dev-352318.iam.gserviceaccount.com
+        run: |
+          set -euo pipefail
+          [[ "${PYMES_GCP_PROJECT}" == "pymes-dev-352318" ]]
+          [[ "${PYMES_GCP_PROJECT_NUMBER}" == "884236221349" ]]
+          [[ "${PYMES_GCP_REGION}" == "us-central1" ]]
+          [[ "${PYMES_ARTIFACT_REPOSITORY}" == "pymes" ]]
+          [[ "${DEPLOY_PROVIDER}" == "projects/884236221349/locations/global/workloadIdentityPools/pymes-v3-release-pool/providers/github" ]]
+          [[ "${DEPLOY_SERVICE_ACCOUNT}" == "pymes-v3-gh-deploy-${RELEASE_ENVIRONMENT}@pymes-dev-352318.iam.gserviceaccount.com" ]]
+          [[ "${BUILD_SERVICE_ACCOUNT}" == "pymes-v3-gh-build@pymes-dev-352318.iam.gserviceaccount.com" ]]
+          [[ "${DEPLOY_SERVICE_ACCOUNT}" != "${BUILD_SERVICE_ACCOUNT}" ]]
+
+      - name: Reverify protected GitHub controls before deploy identity
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PYMES_GITHUB_RELEASE_AUDIT_TOKEN }}
+          PYMES_PRD_REVIEWER_IDS: ${{ vars.PYMES_PRD_REVIEWER_IDS }}
+        run: |
+          set -euo pipefail
+          : "${GH_TOKEN:?configure PYMES_GITHUB_RELEASE_AUDIT_TOKEN in the protected environment}"
+          ./v3/scripts/deploy/verify-github-environments.sh all all-controls
+
+      - name: Authenticate least-privilege deployer
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: projects/884236221349/locations/global/workloadIdentityPools/pymes-v3-release-pool/providers/github
+          service_account: pymes-v3-gh-deploy-${{ inputs.environment }}@pymes-dev-352318.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+
+      - name: Verify stage-scoped deployment authority
+        shell: bash
+        env:
+          PYMES_DEPLOY_ENV: ${{ inputs.environment }}
+          PYMES_DEPLOY_STAGE: ${{ inputs.deploy_stage }}
+          PYMES_GCP_PROJECT: pymes-dev-352318
+          PYMES_GCP_REGION: us-central1
+        run: ./v3/scripts/deploy/verify-release-authority.sh
+
+      - name: Set up Docker Buildx for attestation verification
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Configure Artifact Registry authentication
+        shell: bash
+        env:
+          PYMES_GCP_REGION: us-central1
+        run: |
+          set -euo pipefail
+          gcloud auth configure-docker \
+            "${PYMES_GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Verify provenance, materials, and SBOMs
+        shell: bash
+        env:
+          PYMES_RELEASE_ENV: ${{ inputs.environment }}
+          PYMES_GCP_PROJECT: pymes-dev-352318
+          PYMES_GCP_REGION: us-central1
+          PYMES_ARTIFACT_REPOSITORY: pymes
+          PYMES_SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+          OPEN_ACCOUNTING_CONTEXT: ${{ github.workspace }}/.deps/open-accounting
+        run: ./v3/scripts/deploy/build-push-images.sh verify-attestations
+
+      - name: Set up Go for KMS JWKS resolution
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26.5"
+          cache-dependency-path: v3/backend/go.sum
+
+      - name: Resolve exact internal JWKS
+        shell: bash
+        env:
+          PYMES_ENVIRONMENT: production
+          PYMES_INTERNAL_KMS_KEY_VERSION: ${{ vars.PYMES_INTERNAL_KMS_KEY_VERSION }}
+          PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS: ${{ vars.PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS }}
+        run: |
+          set -euo pipefail
+          jwks="$(cd v3/backend && go run ./cmd/internal-jwks | jq -ceS .)"
+          [[ "${jwks}" != *"|"* && "${jwks}" != *$'\n'* ]]
+          printf 'PYMES_INTERNAL_JWKS_JSON=%s\n' "${jwks}" >>"${GITHUB_ENV}"
+
+      - name: Generate masked pretraffic capability
+        shell: bash
+        run: |
+          set -euo pipefail
+          capability="$(openssl rand -hex 32)"
+          [[ "${capability}" =~ ^[0-9a-f]{64}$ ]]
+          echo "::add-mask::${capability}"
+          printf 'PYMES_PREFLIGHT_TOKEN=%s\n' "${capability}" >>"${GITHUB_ENV}"
+
+      - name: Deploy exact image digests
+        working-directory: v3
+        env:
+          PYMES_DEPLOY_ENV: ${{ inputs.environment }}
+          PYMES_DEPLOY_STAGE: ${{ inputs.deploy_stage }}
+          PYMES_RELEASE_SHA: ${{ needs.validate.outputs.source_sha }}
+          PYMES_GCP_PROJECT: pymes-dev-352318
+          PYMES_GCP_REGION: us-central1
+          PYMES_ARTIFACT_REPOSITORY: pymes
+          PYMES_CLOUDSQL_INSTANCE: ${{ vars.PYMES_CLOUDSQL_INSTANCE }}
+          PYMES_PUBLIC_BASE_URL: ${{ vars.PYMES_PUBLIC_BASE_URL }}
+          PYMES_VPC_NETWORK: ${{ vars.PYMES_VPC_NETWORK }}
+          PYMES_VPC_SUBNET: ${{ vars.PYMES_VPC_SUBNET }}
+          PYMES_CLERK_ISSUER: ${{ vars.PYMES_CLERK_ISSUER }}
+          PYMES_CLERK_AUTHORIZED_PARTIES: ${{ vars.PYMES_CLERK_AUTHORIZED_PARTIES }}
+          PYMES_INTERNAL_KMS_KEY_VERSION: ${{ vars.PYMES_INTERNAL_KMS_KEY_VERSION }}
+          PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS: ${{ vars.PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS }}
+          PYMES_FISCAL_MODE: ${{ vars.PYMES_FISCAL_MODE || 'mock' }}
+          PYMES_FISCAL_ARCA_HOMOLOGATION_ISSUER_PATTERN: ${{ vars.PYMES_FISCAL_ARCA_HOMOLOGATION_ISSUER_PATTERN }}
+          PYMES_FISCAL_ARCA_PRODUCTION_ISSUER_PATTERN: ${{ vars.PYMES_FISCAL_ARCA_PRODUCTION_ISSUER_PATTERN }}
+          PYMES_PERGO_ENABLED: ${{ vars.PYMES_PERGO_ENABLED || 'false' }}
+          PYMES_PERGO_URL: ${{ vars.PYMES_PERGO_URL }}
+          PYMES_PERGO_WORKSPACE_ID: ${{ vars.PYMES_PERGO_WORKSPACE_ID }}
+          PYMES_PERGO_CHANNEL: ${{ vars.PYMES_PERGO_CHANNEL || 'whatsapp' }}
+          PYMES_GOOGLE_CALENDAR_ENABLED: ${{ vars.PYMES_GOOGLE_CALENDAR_ENABLED || 'false' }}
+          PYMES_GOOGLE_CLIENT_ID: ${{ vars.PYMES_GOOGLE_CLIENT_ID }}
+          PYMES_GOOGLE_REDIRECT_URL: ${{ vars.PYMES_GOOGLE_REDIRECT_URL }}
+          PYMES_CALENDAR_KMS_KEY: ${{ vars.PYMES_CALENDAR_KMS_KEY }}
+          OTEL_EXPORTER_OTLP_ENDPOINT: ${{ vars.OTEL_EXPORTER_OTLP_ENDPOINT }}
+          PYMES_TRACING_EXPORTER: ${{ vars.PYMES_TRACING_EXPORTER }}
+          PYMES_TRACE_SAMPLE_RATIO: ${{ vars.PYMES_TRACE_SAMPLE_RATIO }}
+          PYMES_CLOUD_RUN_DRY_RUN: "false"
+        run: ./scripts/deploy/cloud-run.sh

@@ -153,7 +153,7 @@ func TestPerGoWebhookRejectsInvalidAndAcceptsValidSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := []byte(fmt.Sprintf(
-		`{"event":"message.sent","trace_id":%q,"message_id":"external-1","channel":"whatsapp","timestamp":"2023-11-14T22:13:20Z","workspace_id":"workspace-1"}`,
+		`{"event":"sent","trace_id":%q,"message_id":"external-1","channel":"whatsapp","timestamp":"2023-11-14T22:13:20Z","workspace_id":"workspace-1"}`,
 		traceID,
 	))
 	request := httptest.NewRequest(

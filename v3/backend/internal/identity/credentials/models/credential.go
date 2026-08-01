@@ -31,6 +31,12 @@ type CredentialRequest struct {
 	TokenID          string
 }
 
+type JWTHeader struct {
+	Algorithm string `json:"alg"`
+	Type      string `json:"typ"`
+	KeyID     string `json:"kid"`
+}
+
 type VerificationKey struct {
 	KeyID     string
 	PublicKey ed25519.PublicKey

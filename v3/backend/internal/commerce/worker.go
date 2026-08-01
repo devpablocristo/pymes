@@ -335,9 +335,13 @@ func (w DurableWorker) applyOpenItem(ctx context.Context, event domain.Event) er
 	sourceVersion := persistedSourceVersion(value.Origin)
 	snapshotDigest := value.SnapshotDigest
 	if snapshotDigest == "" {
-		snapshotDigest = commandSnapshotDigest(struct {
-			ID, DebitOpenItemID, CreditOpenItemID, Amount, Currency string
-		}{value.ID, value.DebitOpenItemID, value.CreditOpenItemID, value.Amount.Amount, value.Amount.Currency})
+		snapshotDigest = commandSnapshotDigest(workermodels.AccountingApplicationSnapshot{
+			ID:               value.ID,
+			DebitOpenItemID:  value.DebitOpenItemID,
+			CreditOpenItemID: value.CreditOpenItemID,
+			Amount:           value.Amount.Amount,
+			Currency:         value.Amount.Currency,
+		})
 	}
 	command := domain.AccountingApplicationCommand{
 		CommandID: value.ID, OrganizationID: value.OrganizationID, DebitOpenItemID: value.DebitOpenItemID,
@@ -369,9 +373,7 @@ func (w DurableWorker) applyOpenItem(ctx context.Context, event domain.Event) er
 }
 
 func (w DurableWorker) reverseAccounting(ctx context.Context, event domain.Event) error {
-	var payload struct {
-		ReversalID string `json:"reversal_id"`
-	}
+	var payload workermodels.AccountingReversalEvent
 	if err := json.Unmarshal(event.Payload, &payload); err != nil {
 		return err
 	}
@@ -400,10 +402,11 @@ func (w DurableWorker) reverseAccounting(ctx context.Context, event domain.Event
 			)
 		}
 		commandID := accountingCommandID("application-reversal", application.ID, sourceVersion)
-		snapshotDigest := commandSnapshotDigest(struct {
-			ApplicationID, Reason string
-			ReversedAt            time.Time
-		}{application.ApplicationID, value.Reason, value.EffectiveAt})
+		snapshotDigest := commandSnapshotDigest(workermodels.AccountingApplicationReversalSnapshot{
+			ApplicationID: application.ApplicationID,
+			Reason:        value.Reason,
+			ReversedAt:    value.EffectiveAt,
+		})
 		command := domain.AccountingApplicationReversalCommand{
 			CommandID: commandID, OrganizationID: value.OrganizationID,
 			IdempotencyKey: internalIdempotencyKey(value.OrganizationID, "accounting.reverse-application", application.ID, sourceVersion),
@@ -437,10 +440,12 @@ func (w DurableWorker) reverseAccounting(ctx context.Context, event domain.Event
 	}
 	snapshotDigest := value.SnapshotDigest
 	if snapshotDigest == "" {
-		snapshotDigest = commandSnapshotDigest(struct {
-			ID, JournalEntryID, Reason string
-			EffectiveAt                time.Time
-		}{value.ID, value.OriginalJournalEntryID, value.Reason, value.EffectiveAt})
+		snapshotDigest = commandSnapshotDigest(workermodels.JournalReversalSnapshot{
+			ID:             value.ID,
+			JournalEntryID: value.OriginalJournalEntryID,
+			Reason:         value.Reason,
+			EffectiveAt:    value.EffectiveAt,
+		})
 	}
 	command := domain.ReversalCommand{
 		CommandID: accountingCommandID("journal-reversal", value.ID, sourceVersion), OrganizationID: value.OrganizationID,

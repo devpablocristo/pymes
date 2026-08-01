@@ -12,8 +12,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// FakeFiscal and FakeAccounting are deterministic contract fakes for local
-// development and use-case tests; they are not production adapters.
+// FakeFiscal and FakeAccounting are deterministic contract fakes for tests;
+// they are deliberately excluded from production builds.
 type FakeFiscal struct {
 	mu               sync.Mutex
 	byVoucher        map[string]domain.FiscalResult

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	repositoryhelpers "github.com/devpablocristo/pymes/v3/backend/internal/commerce/repository/helpers"
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/commerce/usecases/domain"
 	organizationrepository "github.com/devpablocristo/pymes/v3/backend/internal/organization"
 	organizationdomain "github.com/devpablocristo/pymes/v3/backend/internal/organization/usecases/domain"
@@ -103,7 +104,7 @@ func TestOriginMetadataNormalizationAndInternalIdempotencyAreDeterministic(t *te
 		ActorRef:      " actor-7 ",
 		SourceVersion: 7,
 	}
-	normalized := normalizeOrigin(explicit, "fallback", "accounting.post", "purchase-7")
+	normalized := repositoryhelpers.NormalizeOrigin(explicit, "fallback", "accounting.post", "purchase-7")
 	if normalized.RequestID != "request-7" ||
 		normalized.CorrelationID != "correlation-7" ||
 		normalized.ActorRef != "actor-7" ||
@@ -111,8 +112,8 @@ func TestOriginMetadataNormalizationAndInternalIdempotencyAreDeterministic(t *te
 		t.Fatalf("explicit origin was not normalized exactly: %+v", normalized)
 	}
 
-	first := normalizeOrigin(domain.OriginMetadata{}, "", "accounting.post", "purchase-legacy")
-	second := normalizeOrigin(domain.OriginMetadata{}, "", "accounting.post", "purchase-legacy")
+	first := repositoryhelpers.NormalizeOrigin(domain.OriginMetadata{}, "", "accounting.post", "purchase-legacy")
+	second := repositoryhelpers.NormalizeOrigin(domain.OriginMetadata{}, "", "accounting.post", "purchase-legacy")
 	if first != second || first.RequestID == "" || first.CorrelationID == "" ||
 		first.ActorRef != "system:internal" || first.SourceVersion != 1 {
 		t.Fatalf("legacy origin is not complete and deterministic: first=%+v second=%+v", first, second)

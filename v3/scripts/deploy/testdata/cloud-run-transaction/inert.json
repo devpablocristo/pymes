@@ -1,0 +1,122 @@
+{
+  "fault": {
+    "enabled": false
+  },
+  "region": "us-central1",
+  "services": {
+    "pymes-v3-stg-accounting": {
+      "exists": true,
+      "ingress": "internal",
+      "invoker_iam_check": true,
+      "invokers": [],
+      "latest_created": "pymes-v3-stg-accounting-seed",
+      "latest_ready": "pymes-v3-stg-accounting-seed",
+      "next_revision": 1,
+      "revisions": {
+        "pymes-v3-stg-accounting-seed": {
+          "environment": {},
+          "image": "test.invalid/accounting-seed",
+          "labels": {},
+          "service_account": "pymes-v3-accounting-stg@pymes-dev-352318.iam.gserviceaccount.com"
+        }
+      },
+      "scaling": {"count": 0, "mode": "manual"},
+      "traffic": []
+    },
+    "pymes-v3-stg-accounting-admin": {
+      "exists": true,
+      "ingress": "internal",
+      "invoker_iam_check": true,
+      "invokers": [],
+      "latest_created": "pymes-v3-stg-accounting-admin-seed",
+      "latest_ready": "pymes-v3-stg-accounting-admin-seed",
+      "next_revision": 1,
+      "revisions": {
+        "pymes-v3-stg-accounting-admin-seed": {
+          "environment": {},
+          "image": "test.invalid/accounting-admin-seed",
+          "labels": {},
+          "service_account": "pymes-v3-accounting-admin-stg@pymes-dev-352318.iam.gserviceaccount.com"
+        }
+      },
+      "scaling": {"count": 0, "mode": "manual"},
+      "traffic": []
+    },
+    "pymes-v3-stg-api": {
+      "exists": true,
+      "ingress": "internal",
+      "invoker_iam_check": true,
+      "invokers": [],
+      "latest_created": "pymes-v3-stg-api-seed",
+      "latest_ready": "pymes-v3-stg-api-seed",
+      "next_revision": 1,
+      "revisions": {
+        "pymes-v3-stg-api-seed": {
+          "environment": {},
+          "image": "test.invalid/api-seed",
+          "labels": {},
+          "service_account": "pymes-v3-api-stg@pymes-dev-352318.iam.gserviceaccount.com"
+        }
+      },
+      "scaling": {"count": 0, "mode": "manual"},
+      "traffic": []
+    },
+    "pymes-v3-stg-fiscal": {
+      "exists": true,
+      "ingress": "internal",
+      "invoker_iam_check": true,
+      "invokers": [],
+      "latest_created": "pymes-v3-stg-fiscal-seed",
+      "latest_ready": "pymes-v3-stg-fiscal-seed",
+      "next_revision": 1,
+      "revisions": {
+        "pymes-v3-stg-fiscal-seed": {
+          "environment": {},
+          "image": "test.invalid/fiscal-seed",
+          "labels": {},
+          "service_account": "pymes-v3-fiscal-stg@pymes-dev-352318.iam.gserviceaccount.com"
+        }
+      },
+      "scaling": {"count": 0, "mode": "manual"},
+      "traffic": []
+    },
+    "pymes-v3-stg-web": {
+      "exists": true,
+      "ingress": "internal",
+      "invoker_iam_check": true,
+      "invokers": [],
+      "latest_created": "pymes-v3-stg-web-seed",
+      "latest_ready": "pymes-v3-stg-web-seed",
+      "next_revision": 1,
+      "revisions": {
+        "pymes-v3-stg-web-seed": {
+          "environment": {},
+          "image": "test.invalid/web-seed",
+          "labels": {},
+          "service_account": "pymes-v3-web-stg@pymes-dev-352318.iam.gserviceaccount.com"
+        }
+      },
+      "scaling": {"count": 0, "mode": "manual"},
+      "traffic": []
+    },
+    "pymes-v3-stg-worker": {
+      "exists": true,
+      "ingress": "internal",
+      "invoker_iam_check": true,
+      "invokers": [],
+      "latest_created": "pymes-v3-stg-worker-seed",
+      "latest_ready": "pymes-v3-stg-worker-seed",
+      "next_revision": 1,
+      "revisions": {
+        "pymes-v3-stg-worker-seed": {
+          "environment": {},
+          "image": "test.invalid/worker-seed",
+          "labels": {},
+          "service_account": "pymes-v3-worker-stg@pymes-dev-352318.iam.gserviceaccount.com"
+        }
+      },
+      "scaling": {"count": 0, "mode": "manual"},
+      "traffic": []
+    }
+  }
+}

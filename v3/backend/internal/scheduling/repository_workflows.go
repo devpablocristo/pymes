@@ -10,6 +10,7 @@ import (
 	"time"
 
 	repositoryhelpers "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/repository/helpers"
+	repositorymodels "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/repository/models"
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/usecases/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -128,10 +129,8 @@ func (r *PostgresRepository) CreateWaitlistEntry(
 		return domain.WaitlistEntry{}, err
 	}
 	if replayed {
-		var stored struct {
-			WaitlistID uuid.UUID `json:"waitlist_id"`
-		}
-		if err := json.Unmarshal(response, &stored); err != nil {
+		var stored repositorymodels.WaitlistIDResponse
+		if err := repositoryhelpers.Decode(response, &stored); err != nil {
 			return domain.WaitlistEntry{}, err
 		}
 		result, err := getWaitlistTx(ctx, tx, metadata.OrganizationID, stored.WaitlistID, false)
@@ -167,7 +166,10 @@ func (r *PostgresRepository) CreateWaitlistEntry(
 	if err := insertAudit(ctx, tx, metadata, "scheduling.waitlist.created", value.ID.String(), nil, value); err != nil {
 		return domain.WaitlistEntry{}, err
 	}
-	response, _ = json.Marshal(map[string]any{"waitlist_id": value.ID})
+	response, err = repositoryhelpers.Encode(repositorymodels.WaitlistIDResponse{WaitlistID: value.ID})
+	if err != nil {
+		return domain.WaitlistEntry{}, err
+	}
 	if err := completeIdempotency(ctx, tx, operationCreateWaitlist, metadata, response); err != nil {
 		return domain.WaitlistEntry{}, err
 	}
@@ -415,10 +417,8 @@ func (r *PostgresRepository) CreateQueueTicket(
 		return domain.QueueTicket{}, err
 	}
 	if replayed {
-		var stored struct {
-			TicketID uuid.UUID `json:"ticket_id"`
-		}
-		if err := json.Unmarshal(response, &stored); err != nil {
+		var stored repositorymodels.TicketIDResponse
+		if err := repositoryhelpers.Decode(response, &stored); err != nil {
 			return domain.QueueTicket{}, err
 		}
 		result, err := getQueueTicketTx(ctx, tx, metadata.OrganizationID, stored.TicketID, false)
@@ -452,7 +452,10 @@ func (r *PostgresRepository) CreateQueueTicket(
 	if err != nil {
 		return domain.QueueTicket{}, repositoryhelpers.MapError(err)
 	}
-	response, _ = json.Marshal(map[string]any{"ticket_id": value.ID})
+	response, err = repositoryhelpers.Encode(repositorymodels.TicketIDResponse{TicketID: value.ID})
+	if err != nil {
+		return domain.QueueTicket{}, err
+	}
 	if err := completeIdempotency(ctx, tx, operationCreateQueue, metadata, response); err != nil {
 		return domain.QueueTicket{}, err
 	}
@@ -479,10 +482,8 @@ func (r *PostgresRepository) AdvanceQueueTicket(
 		return domain.QueueTicket{}, err
 	}
 	if replayed {
-		var stored struct {
-			TicketID uuid.UUID `json:"ticket_id"`
-		}
-		if err := json.Unmarshal(response, &stored); err != nil {
+		var stored repositorymodels.TicketIDResponse
+		if err := repositoryhelpers.Decode(response, &stored); err != nil {
 			return domain.QueueTicket{}, err
 		}
 		result, err := getQueueTicketTx(ctx, tx, metadata.OrganizationID, stored.TicketID, false)
@@ -510,7 +511,10 @@ func (r *PostgresRepository) AdvanceQueueTicket(
 	if tag.RowsAffected() != 1 {
 		return domain.QueueTicket{}, domain.NewError(domain.CodeBookingVersionConflict, "queue ticket version changed")
 	}
-	response, _ = json.Marshal(map[string]any{"ticket_id": id})
+	response, err = repositoryhelpers.Encode(repositorymodels.TicketIDResponse{TicketID: id})
+	if err != nil {
+		return domain.QueueTicket{}, err
+	}
 	if err := completeIdempotency(ctx, tx, operationAdvanceQueue, metadata, response); err != nil {
 		return domain.QueueTicket{}, err
 	}
@@ -757,26 +761,17 @@ func (r *PostgresRepository) ClaimReminders(
 			_ = tx.Rollback(ctx)
 			return nil, repositoryhelpers.MapError(err)
 		}
-		type due struct {
-			id            uuid.UUID
-			at            time.Time
-			endsAt        time.Time
-			serviceName   string
-			timezone      string
-			customerName  string
-			customerPhone string
-		}
-		values := make([]due, 0)
+		values := make([]repositorymodels.ReminderDueRow, 0)
 		for rows.Next() {
-			var value due
+			var value repositorymodels.ReminderDueRow
 			if err := rows.Scan(
-				&value.id,
-				&value.at,
-				&value.endsAt,
-				&value.serviceName,
-				&value.timezone,
-				&value.customerName,
-				&value.customerPhone,
+				&value.ID,
+				&value.At,
+				&value.EndsAt,
+				&value.ServiceName,
+				&value.Timezone,
+				&value.CustomerName,
+				&value.CustomerPhone,
 			); err != nil {
 				rows.Close()
 				_ = tx.Rollback(ctx)
@@ -787,42 +782,42 @@ func (r *PostgresRepository) ClaimReminders(
 		rows.Close()
 		for _, value := range values {
 			payload, _ := json.Marshal(map[string]any{
-				"booking_id": value.id,
-				"start_at":   value.at,
+				"booking_id": value.ID,
+				"start_at":   value.At,
 			})
 			digest := sha256.Sum256(payload)
 			event := domain.Event{
 				ID: uuid.New(), OrganizationID: organizationID,
-				Type: domain.EventReminderDue, AggregateID: value.id.String(),
+				Type: domain.EventReminderDue, AggregateID: value.ID.String(),
 				Payload: payload, PayloadHash: hex.EncodeToString(digest[:]),
-				IdempotencyKey: fmt.Sprintf("scheduling:reminder:%s:%d", value.id, value.at.Unix()),
-				RequestID:      "worker:reminders", CorrelationID: "worker:reminders:" + value.id.String(),
+				IdempotencyKey: fmt.Sprintf("scheduling:reminder:%s:%d", value.ID, value.At.Unix()),
+				RequestID:      "worker:reminders", CorrelationID: "worker:reminders:" + value.ID.String(),
 				ActorID: "system:scheduling-worker", SourceVersion: 1, AvailableAt: from,
 			}
 			notification := newProjectionEvent(
 				domain.CommandMetadata{
 					OrganizationID: organizationID,
 					IdempotencyKey: event.IdempotencyKey,
-					SourceID:       value.id.String(),
+					SourceID:       value.ID.String(),
 					SourceVersion:  1,
 					PayloadHash:    event.PayloadHash,
 					RequestID:      event.RequestID,
 					CorrelationID:  event.CorrelationID,
 					ActorID:        event.ActorID,
 				},
-				value.id.String(),
+				value.ID.String(),
 				domain.EventNotificationRequested,
 				domain.EventReminderDue,
 				map[string]any{
 					"aggregate_type": "booking",
-					"aggregate_id":   value.id,
-					"booking_id":     value.id,
-					"recipient_e164": value.customerPhone,
-					"customer_name":  value.customerName,
-					"service_name":   value.serviceName,
-					"start_at":       value.at,
-					"end_at":         value.endsAt,
-					"timezone":       value.timezone,
+					"aggregate_id":   value.ID,
+					"booking_id":     value.ID,
+					"recipient_e164": value.CustomerPhone,
+					"customer_name":  value.CustomerName,
+					"service_name":   value.ServiceName,
+					"start_at":       value.At,
+					"end_at":         value.EndsAt,
+					"timezone":       value.Timezone,
 				},
 			)
 			notification.AvailableAt = from
@@ -834,7 +829,7 @@ func (r *PostgresRepository) ClaimReminders(
 				INSERT INTO app.scheduling_reminders (
 					org_id,booking_id,reminder_at,claimed_at,event_id
 				) VALUES ($1,$2,$3,$4,$5)`,
-				organizationID, value.id, value.at, from, event.ID,
+				organizationID, value.ID, value.At, from, event.ID,
 			)
 			if err != nil {
 				_ = tx.Rollback(ctx)

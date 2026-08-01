@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${FAKE_STATE_DIR:?}"
+: "${FAKE_API_SERVICE:?}"
+: "${FAKE_WEB_SERVICE:?}"
+
+log_file="$FAKE_STATE_DIR/commands.log"
+printf 'GCLOUD' >>"$log_file"
+printf ' %q' "$@" >>"$log_file"
+printf '\n' >>"$log_file"
+
+project=
+region=
+service=
+format=
+for argument in "$@"; do
+  case "$argument" in
+    --project=*) project=${argument#*=} ;;
+    --region=*) region=${argument#*=} ;;
+    --service=*) service=${argument#*=} ;;
+    --format=*) format=${argument#*=} ;;
+  esac
+done
+[[ -n "$project" && -n "$region" ]] || {
+  echo "fake gcloud: every command must carry project and region" >&2
+  exit 90
+}
+
+service_origin() {
+  printf 'https://%s-fakehash-uscentral1.a.run.app' "$1"
+}
+
+emit_service() {
+  local target="$1" active origin tags_json invoker_disabled ingress
+  active=$(<"$FAKE_STATE_DIR/active-$target")
+  origin=$(service_origin "$target")
+  invoker_disabled=$(<"$FAKE_STATE_DIR/invoker-disabled-$target")
+  ingress=$(<"$FAKE_STATE_DIR/ingress-$target")
+  tags_json='[]'
+  if [[ -s "$FAKE_STATE_DIR/tags-$target" ]]; then
+    tags_json=$(while IFS='=' read -r tag revision; do
+      [[ -n "$tag" && -n "$revision" ]] || continue
+      jq -cn \
+        --arg tag "$tag" \
+        --arg revision "$revision" \
+        --arg url "https://${tag}---${origin#https://}" \
+        '{tag: $tag, revisionName: $revision, url: $url}'
+    done <"$FAKE_STATE_DIR/tags-$target" | jq -s '.')
+  fi
+  jq -n \
+    --arg name "$target" \
+    --arg active "$active" \
+    --arg origin "$origin" \
+    --arg ingress "$ingress" \
+    --argjson invoker_disabled "$invoker_disabled" \
+    --argjson tags "$tags_json" '
+      {
+        metadata: {
+          name: $name,
+          annotations: {
+            "run.googleapis.com/ingress": $ingress,
+            "run.googleapis.com/invoker-iam-disabled": $invoker_disabled
+          }
+        },
+        status: {
+          url: $origin,
+          traffic: (
+            [{
+              revisionName: $active,
+              percent: 100,
+              url: $origin
+            }] + $tags
+          )
+        }
+      }
+    '
+}
+
+write_tags() {
+  local target="$1" mode="$2" mapping="$3" tag revision temporary
+  IFS='=' read -r tag revision <<<"$mapping"
+  [[ -n "$tag" && -n "$revision" ]] || exit 91
+  temporary="$FAKE_STATE_DIR/tags-$target.tmp"
+  if [[ "$mode" == "update" ]]; then
+    awk -F= -v wanted="$tag" '$1 != wanted' \
+      "$FAKE_STATE_DIR/tags-$target" >"$temporary"
+  else
+    : >"$temporary"
+  fi
+  printf '%s=%s\n' "$tag" "$revision" >>"$temporary"
+  mv "$temporary" "$FAKE_STATE_DIR/tags-$target"
+}
+
+if [[ "$#" -ge 3 && "$1 $2 $3" == "run revisions list" ]]; then
+  [[ "$format" == "json" && -n "$service" ]] || exit 92
+  cat "$FAKE_STATE_DIR/lists/$service.json"
+  exit 0
+fi
+
+if [[ "$#" -ge 4 && "$1 $2 $3" == "run revisions describe" ]]; then
+  [[ "$format" == "json" ]] || exit 93
+  cat "$FAKE_STATE_DIR/revisions/$4.json"
+  exit 0
+fi
+
+if [[ "$#" -ge 4 && "$1 $2 $3" == "run services describe" ]]; then
+  [[ "$format" == "json" ]] || exit 94
+  emit_service "$4"
+  exit 0
+fi
+
+if [[ "$#" -ge 4 && "$1 $2 $3" == "run services get-iam-policy" ]]; then
+  [[ "$format" == "json" ]] || exit 94
+  cat "$FAKE_STATE_DIR/policy-$4.json"
+  exit 0
+fi
+
+if [[ "$#" -ge 4 && "$1 $2 $3" == "run services update-traffic" ]]; then
+  target=$4
+  update_tags=
+  set_tags=
+  to_revisions=
+  clear_tags=false
+  for argument in "${@:5}"; do
+    case "$argument" in
+      --update-tags=*) update_tags=${argument#*=} ;;
+      --set-tags=*) set_tags=${argument#*=} ;;
+      --to-revisions=*) to_revisions=${argument#*=} ;;
+      --clear-tags) clear_tags=true ;;
+    esac
+  done
+
+  if [[ -n "$update_tags" && "$target" == "$FAKE_API_SERVICE" &&
+        ! -e "$FAKE_STATE_DIR/tag-timeout-consumed" &&
+        "${FAKE_TAG_TIMEOUT_MODE:-}" != "" ]]; then
+    : >"$FAKE_STATE_DIR/tag-timeout-consumed"
+    if [[ "$FAKE_TAG_TIMEOUT_MODE" == "applied" ]]; then
+      write_tags "$target" update "$update_tags"
+    fi
+    exit 1
+  fi
+
+  if [[ -n "$update_tags" ]]; then
+    write_tags "$target" update "$update_tags"
+  elif [[ -n "$set_tags" ]]; then
+    write_tags "$target" set "$set_tags"
+  elif [[ -n "$to_revisions" ]]; then
+    if [[ "$target" == "$FAKE_WEB_SERVICE" &&
+          (
+            ! -e "$FAKE_STATE_DIR/tagged-api-ready" ||
+            ! -e "$FAKE_STATE_DIR/tagged-api-auth-boundary"
+          ) ]]; then
+      echo "fake gcloud: Web traffic cannot move before tagged API probes" >&2
+      exit 98
+    fi
+    printf '%s' "${to_revisions%=100}" >"$FAKE_STATE_DIR/active-$target"
+  elif [[ "$clear_tags" == "true" ]]; then
+    : >"$FAKE_STATE_DIR/tags-$target"
+  else
+    echo "fake gcloud: unsupported update-traffic mutation" >&2
+    exit 95
+  fi
+  exit 0
+fi
+
+echo "fake gcloud: unsupported command: $*" >&2
+exit 99

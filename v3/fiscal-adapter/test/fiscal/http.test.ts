@@ -19,6 +19,7 @@ import type { InternalIdentity } from "../../src/fiscal/usecases.js";
 import { FiscalService } from "../../src/fiscal/usecases.js";
 import { InsecureLocalAuthorizer } from "../../src/identity/insecure_local.js";
 import type { CredentialApplication } from "../../src/credentials/handler.js";
+import { createFiscalRuntimeObserver } from "../../src/wire.js";
 
 const request: FiscalRequest = {
   request_id: "fiscal:sale-http:1",
@@ -95,6 +96,37 @@ test("readiness and metrics reflect the durable runtime", async () => {
     assert.equal((await fetch(`http://127.0.0.1:${port}/metrics`)).status, 503);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test("readiness fails and recovers with the fiscal KMS runtime", async () => {
+  let kmsAvailable = false;
+  const runtime = createFiscalRuntimeObserver(healthyRuntime, {
+    async ready() {
+      if (!kmsAvailable) throw new Error("KMS unavailable");
+    },
+  });
+  const server = createFiscalHTTPServer(
+    new FiscalService(
+      new MockFiscalAuthority(),
+      new InMemoryFiscalLedger(),
+    ),
+    new InsecureLocalAuthorizer(),
+    runtime,
+  );
+  await new Promise<void>((resolve) =>
+    server.listen(0, "127.0.0.1", resolve)
+  );
+  try {
+    const { port } = server.address() as AddressInfo;
+    const readiness = `http://127.0.0.1:${port}/readyz`;
+    assert.equal((await fetch(readiness)).status, 503);
+    kmsAvailable = true;
+    assert.equal((await fetch(readiness)).status, 200);
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => error ? reject(error) : resolve())
+    );
   }
 });
 

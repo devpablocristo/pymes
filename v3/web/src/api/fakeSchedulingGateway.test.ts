@@ -46,6 +46,50 @@ describe("InMemorySchedulingGateway", () => {
     expect(replacement.duration_minutes).toBe(60);
   });
 
+  it("edita sólo datos operativos y rechaza versiones obsoletas", async () => {
+    const gateway = new InMemorySchedulingGateway();
+    const current = gateway.bookings[1]!;
+    const immutable = {
+      branch_id: current.branch_id,
+      service_id: current.service_id,
+      start_at: current.start_at,
+      end_at: current.end_at,
+      status: current.status,
+      service_name: current.service_name,
+      price: current.price,
+      currency: current.currency,
+      duration_minutes: current.duration_minutes,
+      timezone: current.timezone,
+    };
+    const updated = await gateway.updateBooking(identity, current.id, {
+      expected_version: current.version,
+      customer: {
+        party_id: current.party_id,
+        name: "Ada",
+        email: "ada@example.com",
+        phone: "+541155555555",
+      },
+      participants: 2,
+      notes: "Acceso por recepción",
+      substate_code: "first_visit",
+    });
+    expect(updated).toMatchObject({
+      ...immutable,
+      participants: 2,
+      notes: "Acceso por recepción",
+      substate_code: "first_visit",
+      customer_email: "ada@example.com",
+      customer_phone: "+541155555555",
+      version: 2,
+    });
+    await expect(
+      gateway.updateBooking(identity, current.id, {
+        expected_version: 1,
+        notes: "Versión obsoleta",
+      }),
+    ).rejects.toMatchObject({ code: "BOOKING_VERSION_CONFLICT" });
+  });
+
   it("devuelve slots con una asignación elegible cuando el profesional es opcional", async () => {
     const gateway = new InMemorySchedulingGateway();
     const branch = gateway.branches[0]!;

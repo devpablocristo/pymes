@@ -10,6 +10,7 @@ import (
 	"time"
 
 	repositoryhelpers "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/repository/helpers"
+	repositorymodels "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/repository/models"
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/usecases/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -18,6 +19,7 @@ import (
 
 const (
 	operationCreateBooking  = "scheduling.booking.create"
+	operationUpdateBooking  = "scheduling.booking.update"
 	operationReschedule     = "scheduling.booking.reschedule"
 	operationTransition     = "scheduling.booking.transition"
 	operationCreateSession  = "scheduling.session.create"
@@ -55,10 +57,8 @@ func (r *PostgresRepository) ReserveBookings(
 		return nil, err
 	}
 	if replayed {
-		var stored struct {
-			BookingIDs []uuid.UUID `json:"booking_ids"`
-		}
-		if err := json.Unmarshal(response, &stored); err != nil {
+		var stored repositorymodels.BookingIDsResponse
+		if err := repositoryhelpers.Decode(response, &stored); err != nil {
 			return nil, fmt.Errorf("decode booking idempotency response: %w", err)
 		}
 		result := make([]domain.Booking, 0, len(stored.BookingIDs))
@@ -115,7 +115,10 @@ func (r *PostgresRepository) ReserveBookings(
 	for _, booking := range bookings {
 		ids = append(ids, booking.ID)
 	}
-	response, _ = json.Marshal(map[string]any{"booking_ids": ids})
+	response, err = repositoryhelpers.Encode(repositorymodels.BookingIDsResponse{BookingIDs: ids})
+	if err != nil {
+		return nil, err
+	}
 	if err := completeIdempotency(ctx, tx, operationCreateBooking, metadata, response); err != nil {
 		return nil, err
 	}
@@ -271,6 +274,294 @@ func (r *PostgresRepository) lockAndValidateCapacity(
 	return nil
 }
 
+// ReplayBookingUpdate resolves completed retries before the use case invokes
+// PartyDirectory. The transactional claim in UpdateBooking remains the
+// authority for new/concurrent commands.
+func (r *PostgresRepository) ReplayBookingUpdate(
+	ctx context.Context,
+	metadata domain.CommandMetadata,
+	bookingID uuid.UUID,
+) (domain.Booking, bool, error) {
+	tx, err := repositoryhelpers.BeginTenant(ctx, r.pool, metadata.OrganizationID)
+	if err != nil {
+		return domain.Booking{}, false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var payloadHash string
+	var response []byte
+	err = tx.QueryRow(ctx, `
+		SELECT payload_hash,response
+		FROM app.idempotency_records
+		WHERE org_id=$1 AND operation=$2 AND idempotency_key=$3`,
+		metadata.OrganizationID,
+		operationUpdateBooking,
+		metadata.IdempotencyKey,
+	).Scan(&payloadHash, &response)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Booking{}, false, nil
+	}
+	if err != nil {
+		return domain.Booking{}, false, repositoryhelpers.MapError(err)
+	}
+	if payloadHash != metadata.PayloadHash {
+		return domain.Booking{}, false, domain.NewError(
+			domain.CodeIdempotencyKeyReused,
+			"idempotency key was reused with another payload",
+		)
+	}
+	if len(response) == 0 {
+		return domain.Booking{}, false, nil
+	}
+	var stored repositorymodels.BookingResponse
+	if err := repositoryhelpers.Decode(response, &stored); err != nil {
+		return domain.Booking{}, false, err
+	}
+	if err := validateBookingUpdateReplay(metadata, bookingID, stored); err != nil {
+		return domain.Booking{}, false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Booking{}, false, repositoryhelpers.MapError(err)
+	}
+	return repositoryhelpers.BookingResponseToDomain(stored), true, nil
+}
+
+func (r *PostgresRepository) UpdateBooking(
+	ctx context.Context,
+	metadata domain.CommandMetadata,
+	bookingID uuid.UUID,
+	expectedVersion int,
+	update BookingUpdate,
+	events []domain.Event,
+) (domain.Booking, error) {
+	tx, err := repositoryhelpers.BeginTenant(ctx, r.pool, metadata.OrganizationID)
+	if err != nil {
+		return domain.Booking{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	replayed, response, err := claimIdempotency(ctx, tx, operationUpdateBooking, metadata)
+	if err != nil {
+		return domain.Booking{}, err
+	}
+	if replayed {
+		var stored repositorymodels.BookingResponse
+		if err := repositoryhelpers.Decode(response, &stored); err != nil {
+			return domain.Booking{}, err
+		}
+		if err := validateBookingUpdateReplay(metadata, bookingID, stored); err != nil {
+			return domain.Booking{}, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return domain.Booking{}, repositoryhelpers.MapError(err)
+		}
+		return repositoryhelpers.BookingResponseToDomain(stored), nil
+	}
+	current, err := getBookingForUpdateTx(ctx, tx, metadata.OrganizationID, bookingID)
+	if err != nil {
+		return domain.Booking{}, err
+	}
+	if current.Version != expectedVersion {
+		return domain.Booking{}, domain.NewError(domain.CodeBookingVersionConflict, "booking version changed")
+	}
+	if update.PartyID == "" || update.CustomerName == "" ||
+		update.Participants <= 0 || update.Participants > 100000 {
+		return domain.Booking{}, domain.NewError(domain.CodeValidation, "booking update is invalid")
+	}
+	if update.SubstateCode != current.SubstateCode {
+		if err := validateBookingSubstateTx(
+			ctx,
+			tx,
+			metadata.OrganizationID,
+			current.Status,
+			update.SubstateCode,
+		); err != nil {
+			return domain.Booking{}, err
+		}
+	}
+	participantsChanged := update.Participants != current.Participants
+	if participantsChanged && !current.Status.Active() {
+		return domain.Booking{}, domain.NewError(
+			domain.CodeBookingStateInvalid,
+			"participants cannot change on an inactive booking",
+		)
+	}
+	if current.SessionID != nil {
+		if participantsChanged {
+			var capacity, booked int
+			var status string
+			if err := tx.QueryRow(ctx, `
+				SELECT capacity,booked,status
+				FROM app.scheduling_group_sessions
+				WHERE org_id=$1 AND id=$2
+				FOR UPDATE`,
+				metadata.OrganizationID,
+				*current.SessionID,
+			).Scan(&capacity, &booked, &status); err != nil {
+				return domain.Booking{}, repositoryhelpers.MapError(err)
+			}
+			nextBooked := booked - current.Participants + update.Participants
+			if status != "open" || nextBooked < 0 || nextBooked > capacity {
+				return domain.Booking{}, domain.NewError(
+					domain.CodeCapacityExceeded,
+					"group session capacity is unavailable",
+				)
+			}
+			if _, err := tx.Exec(ctx, `
+				UPDATE app.scheduling_group_sessions
+				SET booked=$3,version=version+1,updated_at=now()
+				WHERE org_id=$1 AND id=$2`,
+				metadata.OrganizationID,
+				*current.SessionID,
+				nextBooked,
+			); err != nil {
+				return domain.Booking{}, repositoryhelpers.MapError(err)
+			}
+		}
+		if participantsChanged || update.PartyID != current.PartyID {
+			tag, err := tx.Exec(ctx, `
+				UPDATE app.scheduling_group_participants
+				SET party_id=$4,seats=$5
+				WHERE org_id=$1 AND session_id=$2 AND booking_id=$3`,
+				metadata.OrganizationID,
+				*current.SessionID,
+				bookingID,
+				update.PartyID,
+				update.Participants,
+			)
+			if err != nil {
+				return domain.Booking{}, repositoryhelpers.MapError(err)
+			}
+			if tag.RowsAffected() != 1 {
+				return domain.Booking{}, domain.NewError(
+					domain.CodeBookingStateInvalid,
+					"group participant reservation is missing",
+				)
+			}
+		}
+	} else if participantsChanged {
+		if len(update.Allocations) == 0 {
+			return domain.Booking{}, domain.NewError(domain.CodeValidation, "booking allocations are required")
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE app.scheduling_booking_resource_allocations
+			SET active=false
+			WHERE org_id=$1 AND booking_id=$2`,
+			metadata.OrganizationID,
+			bookingID,
+		); err != nil {
+			return domain.Booking{}, repositoryhelpers.MapError(err)
+		}
+		if err := r.lockAndValidateCapacity(
+			ctx,
+			tx,
+			metadata.OrganizationID,
+			update.Allocations,
+			current.OccupiesFrom,
+			current.OccupiesUntil,
+		); err != nil {
+			return domain.Booking{}, err
+		}
+		if _, err := tx.Exec(ctx, `
+			DELETE FROM app.scheduling_booking_resource_allocations
+			WHERE org_id=$1 AND booking_id=$2`,
+			metadata.OrganizationID,
+			bookingID,
+		); err != nil {
+			return domain.Booking{}, repositoryhelpers.MapError(err)
+		}
+		for _, allocation := range update.Allocations {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO app.scheduling_booking_resource_allocations (
+					org_id,booking_id,resource_id,allocation_mode,units,
+					occupies_from,occupies_until,active
+				) VALUES ($1,$2,$3,$4,$5,$6,$7,true)`,
+				metadata.OrganizationID,
+				bookingID,
+				allocation.ResourceID,
+				allocation.Mode,
+				allocation.Units,
+				current.OccupiesFrom,
+				current.OccupiesUntil,
+			); err != nil {
+				return domain.Booking{}, repositoryhelpers.MapError(err)
+			}
+		}
+	}
+	tag, err := tx.Exec(ctx, `
+		UPDATE app.scheduling_bookings
+		SET party_id=$4,
+		    customer_name_snapshot=$5,
+		    customer_email_snapshot=$6,
+		    customer_phone_snapshot=$7,
+		    participants=$8,
+		    notes=$9,
+		    substate_code=$10,
+		    version=version+1,
+		    updated_at=now()
+		WHERE org_id=$1 AND id=$2 AND version=$3`,
+		metadata.OrganizationID,
+		bookingID,
+		expectedVersion,
+		update.PartyID,
+		update.CustomerName,
+		update.CustomerEmail,
+		update.CustomerPhone,
+		update.Participants,
+		update.Notes,
+		repositoryhelpers.NullableText(update.SubstateCode),
+	)
+	if err != nil {
+		return domain.Booking{}, repositoryhelpers.MapError(err)
+	}
+	if tag.RowsAffected() != 1 {
+		return domain.Booking{}, domain.NewError(domain.CodeBookingVersionConflict, "booking version changed")
+	}
+	result, err := getBookingTx(ctx, tx, metadata.OrganizationID, bookingID)
+	if err != nil {
+		return domain.Booking{}, err
+	}
+	if err := insertEvents(ctx, tx, events); err != nil {
+		return domain.Booking{}, err
+	}
+	if err := insertAudit(
+		ctx,
+		tx,
+		metadata,
+		"scheduling.booking.updated",
+		bookingID.String(),
+		current,
+		result,
+	); err != nil {
+		return domain.Booking{}, err
+	}
+	response, err = repositoryhelpers.Encode(repositoryhelpers.BookingResponseFromDomain(result))
+	if err != nil {
+		return domain.Booking{}, err
+	}
+	if err := completeIdempotency(ctx, tx, operationUpdateBooking, metadata, response); err != nil {
+		return domain.Booking{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Booking{}, repositoryhelpers.MapError(err)
+	}
+	return result, nil
+}
+
+func validateBookingUpdateReplay(
+	metadata domain.CommandMetadata,
+	bookingID uuid.UUID,
+	stored repositorymodels.BookingResponse,
+) error {
+	if bookingID == uuid.Nil ||
+		stored.OrganizationID != metadata.OrganizationID ||
+		stored.ID != bookingID {
+		return domain.NewError(
+			domain.CodeIdempotencyKeyReused,
+			"idempotency key was reused for another booking",
+		)
+	}
+	return nil
+}
+
 func (r *PostgresRepository) RescheduleBooking(
 	ctx context.Context,
 	metadata domain.CommandMetadata,
@@ -289,10 +580,8 @@ func (r *PostgresRepository) RescheduleBooking(
 		return domain.Booking{}, err
 	}
 	if replayed {
-		var stored struct {
-			BookingID uuid.UUID `json:"booking_id"`
-		}
-		if err := json.Unmarshal(response, &stored); err != nil {
+		var stored repositorymodels.BookingIDResponse
+		if err := repositoryhelpers.Decode(response, &stored); err != nil {
 			return domain.Booking{}, err
 		}
 		result, err := getBookingTx(ctx, tx, metadata.OrganizationID, stored.BookingID)
@@ -351,7 +640,10 @@ func (r *PostgresRepository) RescheduleBooking(
 	if err := insertAudit(ctx, tx, metadata, "scheduling.booking.rescheduled", bookingID.String(), current, replacement); err != nil {
 		return domain.Booking{}, err
 	}
-	response, _ = json.Marshal(map[string]any{"booking_id": replacement.ID})
+	response, err = repositoryhelpers.Encode(repositorymodels.BookingIDResponse{BookingID: replacement.ID})
+	if err != nil {
+		return domain.Booking{}, err
+	}
 	if err := completeIdempotency(ctx, tx, operationReschedule, metadata, response); err != nil {
 		return domain.Booking{}, err
 	}
@@ -380,10 +672,8 @@ func (r *PostgresRepository) TransitionBooking(
 		return domain.Booking{}, err
 	}
 	if replayed {
-		var stored struct {
-			BookingID uuid.UUID `json:"booking_id"`
-		}
-		if err := json.Unmarshal(response, &stored); err != nil {
+		var stored repositorymodels.BookingIDResponse
+		if err := repositoryhelpers.Decode(response, &stored); err != nil {
 			return domain.Booking{}, err
 		}
 		result, err := getBookingTx(ctx, tx, metadata.OrganizationID, stored.BookingID)
@@ -465,7 +755,10 @@ func (r *PostgresRepository) TransitionBooking(
 	if err := insertAudit(ctx, tx, metadata, "scheduling.booking."+string(to), bookingID.String(), current, updated); err != nil {
 		return domain.Booking{}, err
 	}
-	response, _ = json.Marshal(map[string]any{"booking_id": bookingID})
+	response, err = repositoryhelpers.Encode(repositorymodels.BookingIDResponse{BookingID: bookingID})
+	if err != nil {
+		return domain.Booking{}, err
+	}
 	if err := completeIdempotency(ctx, tx, operationTransition, metadata, response); err != nil {
 		return domain.Booking{}, err
 	}
@@ -492,10 +785,8 @@ func (r *PostgresRepository) CreateGroupSession(
 		return domain.GroupSession{}, err
 	}
 	if replayed {
-		var stored struct {
-			SessionID uuid.UUID `json:"session_id"`
-		}
-		if err := json.Unmarshal(response, &stored); err != nil {
+		var stored repositorymodels.SessionIDResponse
+		if err := repositoryhelpers.Decode(response, &stored); err != nil {
 			return domain.GroupSession{}, err
 		}
 		result, err := getGroupSessionTx(ctx, tx, metadata.OrganizationID, stored.SessionID, false)
@@ -538,7 +829,10 @@ func (r *PostgresRepository) CreateGroupSession(
 	if err := insertAudit(ctx, tx, metadata, "scheduling.session.created", session.ID.String(), nil, session); err != nil {
 		return domain.GroupSession{}, err
 	}
-	response, _ = json.Marshal(map[string]any{"session_id": session.ID})
+	response, err = repositoryhelpers.Encode(repositorymodels.SessionIDResponse{SessionID: session.ID})
+	if err != nil {
+		return domain.GroupSession{}, err
+	}
 	if err := completeIdempotency(ctx, tx, operationCreateSession, metadata, response); err != nil {
 		return domain.GroupSession{}, err
 	}
@@ -651,11 +945,11 @@ func insertAudit(
 	action, aggregateID string,
 	before, after any,
 ) error {
-	beforeJSON, err := nullableJSON(before)
+	beforeJSON, err := repositoryhelpers.NullableJSON(before)
 	if err != nil {
 		return err
 	}
-	afterJSON, err := nullableJSON(after)
+	afterJSON, err := repositoryhelpers.NullableJSON(after)
 	if err != nil {
 		return err
 	}
@@ -668,15 +962,4 @@ func insertAudit(
 		beforeJSON, afterJSON, metadata.RequestID, metadata.CorrelationID,
 	)
 	return repositoryhelpers.MapError(err)
-}
-
-func nullableJSON(value any) ([]byte, error) {
-	if value == nil {
-		return nil, nil
-	}
-	result, err := json.Marshal(value)
-	if err != nil {
-		return nil, fmt.Errorf("encode scheduling audit: %w", err)
-	}
-	return result, nil
 }

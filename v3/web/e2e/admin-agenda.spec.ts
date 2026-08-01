@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { DateTime } from "luxon";
 
 test("opera agenda, disponibilidad y cola con fake contractual", async ({ page }) => {
   await page.goto("/app/agenda");
@@ -18,12 +19,29 @@ test("opera agenda, disponibilidad y cola con fake contractual", async ({ page }
   const dialog = page.getByRole("dialog", { name: "Nuevo turno" });
   await expect(dialog).toBeVisible();
   await dialog.getByLabel("Servicio").selectOption({ index: 1 });
+  await dialog.getByLabel("Comienza").fill(
+    DateTime.now()
+      .setZone("America/Argentina/Buenos_Aires")
+      .set({ hour: 14, minute: 0, second: 0, millisecond: 0 })
+      .toFormat("yyyy-MM-dd'T'HH:mm"),
+  );
   await dialog.getByLabel("Cliente").fill("Cliente E2E");
   await dialog.getByLabel("Email").fill("cliente@example.invalid");
   await dialog.getByLabel("WhatsApp").fill("+5491100000000");
   await dialog.getByRole("checkbox").nth(1).check();
   await dialog.getByRole("button", { name: "Crear turno" }).click();
   await expect(page.getByText("Turno creado.")).toBeVisible();
+
+  await page.locator(".booking-event").first().click();
+  const details = page.getByRole("complementary", { name: "Detalle del turno" });
+  await expect(details).toBeVisible();
+  await page.getByRole("button", { name: "Editar" }).click();
+  const editDialog = page.getByRole("dialog", { name: "Editar turno" });
+  await expect(editDialog.getByLabel(/^Cliente/)).toHaveAttribute("readonly", "");
+  await editDialog.getByLabel("Nota interna").fill("Seguimiento desde E2E");
+  await editDialog.getByRole("button", { name: "Guardar cambios" }).click();
+  await expect(page.getByText("Turno actualizado.")).toBeVisible();
+  await details.getByRole("button", { name: "Cerrar detalle" }).click();
 
   await page.getByRole("button", { name: "Día" }).click();
   await page.getByRole("button", { name: "Mes" }).click();

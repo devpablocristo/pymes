@@ -8,6 +8,7 @@ import { AvailabilityPanel } from "../components/AvailabilityPanel";
 import { BlockDialog } from "../components/BlockDialog";
 import { BookingDetails } from "../components/BookingDetails";
 import { BookingDialog, type NewBookingDraft } from "../components/BookingDialog";
+import { BookingEditDialog } from "../components/BookingEditDialog";
 import { CalendarBoard } from "../components/CalendarBoard";
 import { CancellationDialog } from "../components/CancellationDialog";
 import { DayRail } from "../components/DayRail";
@@ -20,6 +21,7 @@ import type {
   Booking,
   BookingAction,
   BookingInput,
+  BookingUpdateInput,
   DateRange,
   QueueTicket,
   WaitlistInput,
@@ -65,6 +67,7 @@ export function AdminSchedulingPage() {
   const [range, setRange] = useState<DateRange>(initialRange);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [bookingDraft, setBookingDraft] = useState<NewBookingDraft | null>(null);
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [reschedulingBooking, setReschedulingBooking] = useState<Booking | null>(null);
   const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(null);
   const [blockOpen, setBlockOpen] = useState(false);
@@ -194,6 +197,23 @@ export function AdminSchedulingPage() {
       setPending(null);
     }
     void endAt;
+  }
+
+  async function updateBooking(booking: Booking, input: BookingUpdateInput) {
+    setPending(`booking:${booking.id}`);
+    try {
+      const updated = await gateway.updateBooking(identity, booking.id, input);
+      setEditingBooking(null);
+      setSelectedBookingId(updated.id);
+      await invalidateAgenda();
+      notify("success", "Turno actualizado.");
+    } catch (error) {
+      await invalidateAgenda();
+      notify("error", errorMessage(error));
+      throw error;
+    } finally {
+      setPending(null);
+    }
   }
 
   async function calendarReschedule(booking: Booking, startAt: string, endAt: string) {
@@ -433,6 +453,7 @@ export function AdminSchedulingPage() {
               pending={pending?.startsWith("booking:") ?? false}
               canOperate={canOperate}
               onClose={() => setSelectedBookingId(null)}
+              onEdit={setEditingBooking}
               onReschedule={setReschedulingBooking}
               onAction={transitionBooking}
             />
@@ -491,6 +512,15 @@ export function AdminSchedulingPage() {
         }}
         onCreate={createBooking}
         onReschedule={rescheduleBooking}
+      />
+      <BookingEditDialog
+        booking={editingBooking}
+        maxParticipants={
+          services.find((service) => service.id === editingBooking?.service_id)?.max_participants ?? 1
+        }
+        pending={Boolean(editingBooking && pending === `booking:${editingBooking.id}`)}
+        onClose={() => setEditingBooking(null)}
+        onSave={updateBooking}
       />
       <BlockDialog
         open={blockOpen}

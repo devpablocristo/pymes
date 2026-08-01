@@ -21,6 +21,8 @@ func TestLoadWorkerFromPreservesSecureRuntimeDefaults(t *testing.T) {
 	}
 	if cfg.HTTPAddr != ":8080" ||
 		cfg.Environment != "development" ||
+		cfg.ReleaseSHA != localWorkerReleaseSHA ||
+		cfg.Revision != localWorkerRevision ||
 		cfg.AllowInsecureLocalServices ||
 		cfg.RunOnce ||
 		cfg.DispatchInterval != time.Second ||
@@ -28,6 +30,75 @@ func TestLoadWorkerFromPreservesSecureRuntimeDefaults(t *testing.T) {
 		cfg.LeaseDuration != 30*time.Second ||
 		cfg.ShutdownTimeout != 5*time.Second {
 		t.Fatalf("worker config=%+v", cfg)
+	}
+}
+
+func TestLoadWorkerFromRequiresExactReleaseMetadataInProduction(t *testing.T) {
+	t.Parallel()
+	base := map[string]string{
+		"PYMES_DATABASE_URL":                   "postgres://db",
+		"FISCAL_ADAPTER_URL":                   "https://fiscal",
+		"ACCOUNTING_URL":                       "https://accounting",
+		"PYMES_SCHEDULING_ACTION_TOKEN_SECRET": "01234567890123456789012345678901",
+		"PYMES_ENVIRONMENT":                    "production",
+		"PYMES_RELEASE_SHA":                    "0123456789abcdef0123456789abcdef01234567",
+		"K_REVISION":                           "pymes-v3-stg-worker-00042-abc",
+	}
+	cfg, err := LoadWorkerFrom(func(key string) string { return base[key] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ReleaseSHA != base["PYMES_RELEASE_SHA"] ||
+		cfg.Revision != base["K_REVISION"] {
+		t.Fatalf("release metadata = %q %q", cfg.ReleaseSHA, cfg.Revision)
+	}
+
+	tests := []struct {
+		name   string
+		change func(map[string]string)
+	}{
+		{
+			name: "missing release SHA",
+			change: func(values map[string]string) {
+				delete(values, "PYMES_RELEASE_SHA")
+			},
+		},
+		{
+			name: "uppercase release SHA",
+			change: func(values map[string]string) {
+				values["PYMES_RELEASE_SHA"] = "0123456789ABCDEF0123456789abcdef01234567"
+			},
+		},
+		{
+			name: "missing revision",
+			change: func(values map[string]string) {
+				delete(values, "K_REVISION")
+			},
+		},
+		{
+			name: "invalid revision",
+			change: func(values map[string]string) {
+				values["K_REVISION"] = "pymes/worker"
+			},
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			values := make(map[string]string, len(base))
+			for key, value := range base {
+				values[key] = value
+			}
+			test.change(values)
+			_, err := LoadWorkerFrom(func(key string) string {
+				return values[key]
+			})
+			if err == nil ||
+				WorkerErrorCode(err) != "WORKER_RELEASE_METADATA_INVALID" {
+				t.Fatalf("err=%v code=%q", err, WorkerErrorCode(err))
+			}
+		})
 	}
 }
 
@@ -52,9 +123,16 @@ func TestLoadWorkerFromValidatesIdentityDependenciesAndIntervals(t *testing.T) {
 			code: "DATABASE_URL_MISSING",
 		},
 		{
-			name: "missing dependency",
+			name: "missing accounting dependency",
 			change: func(values map[string]string) {
 				delete(values, "ACCOUNTING_URL")
+			},
+			code: "DEPENDENCY_URL_MISSING",
+		},
+		{
+			name: "missing fiscal dependency",
+			change: func(values map[string]string) {
+				delete(values, "FISCAL_ADAPTER_URL")
 			},
 			code: "DEPENDENCY_URL_MISSING",
 		},
@@ -69,6 +147,8 @@ func TestLoadWorkerFromValidatesIdentityDependenciesAndIntervals(t *testing.T) {
 			name: "production insecure bypass",
 			change: func(values map[string]string) {
 				values["PYMES_ENVIRONMENT"] = "production"
+				values["PYMES_RELEASE_SHA"] = "0123456789abcdef0123456789abcdef01234567"
+				values["K_REVISION"] = "pymes-v3-stg-worker-00042-abc"
 				values["PYMES_ALLOW_INSECURE_LOCAL_SERVICES"] = "true"
 			},
 			code: "WORKLOAD_IDENTITY_INVALID",
@@ -128,6 +208,8 @@ func TestLoadWorkerFromPreservesFastLocalLoop(t *testing.T) {
 	}
 	if !cfg.AllowInsecureLocalServices ||
 		!cfg.RunOnce ||
+		cfg.ReleaseSHA != localWorkerReleaseSHA ||
+		cfg.Revision != localWorkerRevision ||
 		cfg.DispatchInterval != 250*time.Millisecond ||
 		cfg.MetricsInterval != 15*time.Second {
 		t.Fatalf("worker config=%+v", cfg)

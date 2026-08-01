@@ -16,6 +16,10 @@ type PerGoAPI struct {
 	WorkspaceID    string
 	WebhookSecrets []string
 }
+type Preflight struct {
+	Tag   string
+	Token string
+}
 type Config struct {
 	HTTPAddr, DatabaseURL, FiscalURL, Environment string
 	AllowInsecureLocalServices                    bool
@@ -23,6 +27,7 @@ type Config struct {
 	Clerk                                         Clerk
 	PerGo                                         PerGoAPI
 	Calendars                                     Calendars
+	Preflight                                     Preflight
 }
 
 func Load() (Config, error) { return LoadFrom(os.Getenv) }
@@ -71,6 +76,10 @@ func LoadFrom(getenv func(string) string) (Config, error) {
 			WorkspaceID:    strings.TrimSpace(getenv("PERGO_WORKSPACE_ID")),
 			WebhookSecrets: csv(getenv("PERGO_WEBHOOK_SECRETS")),
 		},
+		Preflight: Preflight{
+			Tag:   strings.TrimSpace(getenv("PYMES_PREFLIGHT_TAG")),
+			Token: strings.TrimSpace(getenv("PYMES_PREFLIGHT_TOKEN")),
+		},
 		Calendars: calendars,
 	}
 	if cfg.DatabaseURL == "" {
@@ -92,6 +101,18 @@ func LoadFrom(getenv func(string) string) (Config, error) {
 			"PERGO_WORKSPACE_ID and strong PERGO_WEBHOOK_SECRETS are required when PerGo is enabled",
 		)
 	}
+	if (cfg.Preflight.Tag == "") != (cfg.Preflight.Token == "") {
+		return Config{}, fmt.Errorf(
+			"PYMES_PREFLIGHT_TAG and PYMES_PREFLIGHT_TOKEN must be configured together",
+		)
+	}
+	if cfg.Environment == "production" &&
+		(!validPreflightTag(cfg.Preflight.Tag) ||
+			!validPreflightToken(cfg.Preflight.Token)) {
+		return Config{}, fmt.Errorf(
+			"strong PYMES_PREFLIGHT_TAG and PYMES_PREFLIGHT_TOKEN are required in production",
+		)
+	}
 	return cfg, nil
 }
 
@@ -106,6 +127,34 @@ func validPerGoWebhookSecrets(secrets []string) bool {
 	}
 	return true
 }
+
+func validPreflightTag(value string) bool {
+	if len(value) != len("candidate-")+40 ||
+		!strings.HasPrefix(value, "candidate-") {
+		return false
+	}
+	for _, character := range strings.TrimPrefix(value, "candidate-") {
+		if (character < 'a' || character > 'f') &&
+			(character < '0' || character > '9') {
+			return false
+		}
+	}
+	return true
+}
+
+func validPreflightToken(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, character := range value {
+		if (character < 'a' || character > 'f') &&
+			(character < '0' || character > '9') {
+			return false
+		}
+	}
+	return true
+}
+
 func defaultValue(value, fallback string) string {
 	if trimmed := strings.TrimSpace(value); trimmed != "" {
 		return trimmed

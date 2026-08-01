@@ -14,12 +14,28 @@ import { MockFiscalAuthority } from "./fiscal/mock_authority.js";
 import {
   createFiscalHTTPServer,
   type InternalAuthorizer,
+  type FiscalRuntimeObserver,
 } from "./fiscal/handler.js";
 import { PostgresFiscalStore } from "./fiscal/repository.js";
 import { FiscalService } from "./fiscal/usecases.js";
 import { observePoolErrors } from "./fiscal/repository/helpers/pool-errors.js";
 import { Ed25519JWTAuthorizer } from "./identity/internal_jwt.js";
 import { InsecureLocalAuthorizer } from "./identity/insecure_local.js";
+
+export function createFiscalRuntimeObserver(
+  store: FiscalRuntimeObserver,
+  cipher: Pick<GoogleKMSEnvelopeCipher, "ready">,
+): FiscalRuntimeObserver {
+  return {
+    async ping(): Promise<void> {
+      await store.ping();
+      await cipher.ready();
+    },
+    metrics() {
+      return store.metrics();
+    },
+  };
+}
 
 export async function initialize(config: Config) {
   const pool = new Pool({ connectionString: config.databaseURL });
@@ -29,7 +45,9 @@ export async function initialize(config: Config) {
   const store = new PostgresFiscalStore(pool);
   const credentialRepository = new PostgresCredentialRepository(pool);
   const cloudKMS =
-    config.mode === "arca" ? new KeyManagementServiceClient() : undefined;
+    config.localKMSKeyB64 === undefined
+      ? new KeyManagementServiceClient()
+      : undefined;
   const kmsClient: KMSClient =
     cloudKMS === undefined
       ? new LocalKMSClient(config.localKMSKeyB64!)
@@ -38,6 +56,7 @@ export async function initialize(config: Config) {
     kmsClient,
     config.fiscalKMSKeyName,
   );
+  const runtime = createFiscalRuntimeObserver(store, cipher);
   let credentials: CredentialService;
   const authority =
     config.mode === "mock"
@@ -69,20 +88,25 @@ export async function initialize(config: Config) {
     authority,
   );
   try {
-    await store.ping();
+    await runtime.ping();
   } catch (error) {
     await cloudKMS?.close();
     await pool.end();
     throw error;
   }
-  const application = new FiscalService(authority, store);
+  const application = new FiscalService(authority, store, undefined, {
+    // ARCA authorize performs an exact consultation before FECAESolicitar.
+    // Keep the durable lease beyond both bounded network operations so a live
+    // owner is not mistaken for a crashed one.
+    leaseDurationMs: config.requestTimeoutMs * 3,
+  });
   const authorizer: InternalAuthorizer = config.allowInsecureLocal
     ? new InsecureLocalAuthorizer()
     : new Ed25519JWTAuthorizer(config.internalIssuer ?? "", config.internalJWKSJSON);
   const server = createFiscalHTTPServer(
     application,
     authorizer,
-    store,
+    runtime,
     credentials,
   );
   return {

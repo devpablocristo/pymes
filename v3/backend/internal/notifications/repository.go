@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	repositoryhelpers "github.com/devpablocristo/pymes/v3/backend/internal/notifications/repository/helpers"
@@ -297,7 +296,7 @@ func (repository *Postgres) MarkUncertain(
 	failureCode string,
 ) error {
 	return repository.updateDispatchState(
-		ctx, intent, domain.StatusUncertain, "", stableFailureCode(failureCode),
+		ctx, intent, domain.StatusUncertain, "", repositoryhelpers.StableFailureCode(failureCode),
 		[]domain.Status{domain.StatusPending, domain.StatusUncertain},
 	)
 }
@@ -308,7 +307,7 @@ func (repository *Postgres) MarkFailed(
 	failureCode string,
 ) error {
 	return repository.updateDispatchState(
-		ctx, intent, domain.StatusFailed, "", stableFailureCode(failureCode),
+		ctx, intent, domain.StatusFailed, "", repositoryhelpers.StableFailureCode(failureCode),
 		[]domain.Status{domain.StatusPending, domain.StatusUncertain, domain.StatusQueued},
 	)
 }
@@ -412,7 +411,7 @@ func (repository *Postgres) ApplyDeliveryEvent(
 	if transitionErr == nil {
 		failureCode := ""
 		if next == domain.StatusFailed {
-			failureCode = "PERGO_DELIVERY_FAILED"
+			failureCode = domain.DeliveryFailureCode(event.ErrorCode)
 		}
 		_, err = tx.Exec(ctx, `
 			UPDATE app.notifications
@@ -632,7 +631,7 @@ func (repository *Postgres) DeadLetterNotification(
 	event domain.OutboxEvent,
 	failureCode string,
 ) error {
-	failureCode = stableFailureCode(failureCode)
+	failureCode = repositoryhelpers.StableFailureCode(failureCode)
 	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return err
@@ -694,17 +693,4 @@ func (repository *Postgres) now() time.Time {
 		return time.Now().UTC()
 	}
 	return repository.Clock().UTC()
-}
-
-func stableFailureCode(code string) string {
-	code = strings.TrimSpace(code)
-	if code == "" || len(code) > 80 {
-		return "PERGO_DELIVERY_FAILED"
-	}
-	for _, value := range code {
-		if !(value == '_' || value >= 'A' && value <= 'Z' || value >= '0' && value <= '9') {
-			return "PERGO_DELIVERY_FAILED"
-		}
-	}
-	return code
 }

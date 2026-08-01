@@ -572,7 +572,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** @description Edita exclusivamente datos operativos del turno. Sucursal, servicio, horario, asignaciones, snapshots y estado interno requieren sus flujos específicos y no son aceptados por este contrato. */
+        patch: operations["updateSchedulingBooking"];
         trace?: never;
     };
     "/api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}/reschedule": {
@@ -948,7 +949,7 @@ export interface components {
         };
         PerGoDeliveryEvent: {
             /** @enum {string} */
-            event: "message.queued" | "message.sent" | "message.delivered" | "message.read" | "message.failed";
+            event: "queued" | "sent" | "delivered" | "read" | "failed";
             trace_id: string;
             message_id: string;
             /** @enum {string} */
@@ -1534,6 +1535,15 @@ export interface components {
             allocations?: components["schemas"]["Allocation"][];
             notes?: string;
             recurrence?: components["schemas"]["Recurrence"];
+        };
+        BookingUpdateInput: {
+            expected_version: number;
+            /** @description Identidad y snapshot de contacto deseados. Un party_id existente debe pertenecer a la organización autenticada. */
+            customer?: components["schemas"]["Customer"];
+            participants?: number;
+            notes?: string;
+            /** @description Código habilitado para el estado actual; vacío elimina el subestado. */
+            substate_code?: string;
         };
         RescheduleInput: {
             expected_version: number;
@@ -3014,6 +3024,40 @@ export interface operations {
             };
             403: components["responses"]["responses-Forbidden"];
             404: components["responses"]["SchedulingError"];
+        };
+    };
+    updateSchedulingBooking: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
+            };
+            path: {
+                organizationId: components["parameters"]["parameters-OrganizationId"];
+                bookingId: components["parameters"]["BookingId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingUpdateInput"];
+            };
+        };
+        responses: {
+            /** @description Turno editado */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Booking"];
+                };
+            };
+            400: components["responses"]["SchedulingError"];
+            403: components["responses"]["responses-Forbidden"];
+            404: components["responses"]["SchedulingError"];
+            409: components["responses"]["SchedulingError"];
         };
     };
     rescheduleSchedulingBooking: {

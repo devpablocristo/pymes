@@ -227,32 +227,15 @@ func (r *PostgresRepository) SetBookingSubstate(
 			"booking version changed",
 		)
 	}
-	if err := lockBookingStatusConfiguration(
+	substateCode = strings.TrimSpace(substateCode)
+	if err := validateBookingSubstateTx(
 		ctx,
 		tx,
 		metadata.OrganizationID,
 		current.Status,
+		substateCode,
 	); err != nil {
 		return domain.Booking{}, err
-	}
-	substateCode = strings.TrimSpace(substateCode)
-	if substateCode != "" {
-		var active bool
-		err := tx.QueryRow(ctx, `
-			SELECT active
-			FROM app.scheduling_booking_substates
-			WHERE org_id=$1 AND status=$2 AND code=$3`,
-			metadata.OrganizationID, current.Status, substateCode,
-		).Scan(&active)
-		if errors.Is(err, pgx.ErrNoRows) || (err == nil && !active) {
-			return domain.Booking{}, domain.NewError(
-				domain.CodeBookingStateInvalid,
-				"booking substate is not enabled for the current internal status",
-			)
-		}
-		if err != nil {
-			return domain.Booking{}, repositoryhelpers.MapError(err)
-		}
 	}
 	tag, err := tx.Exec(ctx, `
 		UPDATE app.scheduling_bookings
@@ -298,6 +281,41 @@ func (r *PostgresRepository) SetBookingSubstate(
 		return domain.Booking{}, repositoryhelpers.MapError(err)
 	}
 	return result, nil
+}
+
+func validateBookingSubstateTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	organizationID string,
+	status domain.BookingStatus,
+	substateCode string,
+) error {
+	if err := lockBookingStatusConfiguration(ctx, tx, organizationID, status); err != nil {
+		return err
+	}
+	substateCode = strings.TrimSpace(substateCode)
+	if substateCode == "" {
+		return nil
+	}
+	var active bool
+	err := tx.QueryRow(ctx, `
+		SELECT active
+		FROM app.scheduling_booking_substates
+		WHERE org_id=$1 AND status=$2 AND code=$3`,
+		organizationID,
+		status,
+		substateCode,
+	).Scan(&active)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && !active) {
+		return domain.NewError(
+			domain.CodeBookingStateInvalid,
+			"booking substate is not enabled for the current internal status",
+		)
+	}
+	if err != nil {
+		return repositoryhelpers.MapError(err)
+	}
+	return nil
 }
 
 func lockBookingStatusConfiguration(

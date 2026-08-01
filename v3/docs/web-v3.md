@@ -1,9 +1,10 @@
 # Web de Pymes v3
 
-La Web es un artefacto React 19 + TypeScript + Vite desplegado como servicio
-estático. Sólo habla con el BFF público de Pymes; nunca recibe credenciales de
-base de datos, URLs privadas, secretos de Clerk, PerGo, Google, Fiscal ni
-Accounting.
+La Web es un artefacto React 19 + TypeScript + Vite preparado para desplegarse
+como servicio estático. Cuando se despliegue sólo hablará con el BFF público de
+Pymes; nunca recibirá credenciales de base de datos, URLs privadas, secretos de
+Clerk, PerGo, Google, Fiscal ni Accounting. Todavía no existe una revisión Web
+v3 desplegada en STG o PRD.
 
 ## Rutas
 
@@ -46,7 +47,10 @@ build de producción.
 
 - día, semana, mes y lista mediante el Calendar Board 0.2 publicado;
 - filtro por sucursal, servicio, profesional o recurso;
-- alta, selección, reprogramación, drag-and-drop y resize;
+- alta, selección y edición optimista de contacto, participantes, nota y
+  subestado;
+- reprogramación, drag-and-drop y resize por un flujo separado que revalida
+  horario y recursos;
 - rollback visual ante conflicto de versión, slot, recurso o capacidad;
 - confirmación, cancelación con motivo, check-in, completar y no-show;
 - disponibilidad habitual, bloqueos, waitlist y cola;
@@ -55,21 +59,23 @@ build de producción.
 
 Los formularios de creación conservan un command ID mientras su snapshot no
 cambie. Un reenvío idéntico después de perder la respuesta reutiliza la misma
-`Idempotency-Key`; editar el formulario genera otro command ID. Las
-reprogramaciones, transiciones y avances de cola ligan la clave a la versión
-optimista que intentan modificar.
+`Idempotency-Key`; editar el formulario genera otro command ID. La edición de
+un turno liga payload, idempotencia y `expected_version`: un replay exacto
+devuelve la respuesta persistida, una reutilización con otro payload falla y
+dos ediciones concurrentes no pueden ganar. Reprogramaciones, transiciones y
+avances de cola aplican el mismo límite optimista.
 
 FullCalendar permanece en Standard `6.1.21`, con Luxon 3 y `luxon3`. No se
 incluyen Premium, RRule ni FullCalendar 7.
 
 ## Build y despliegue
 
-La imagen productiva se construye por entorno:
+La imagen productiva no incorpora el origen de API. Se construye de forma
+reproducible con la publishable key de Clerk:
 
 ```bash
 docker build \
   --target web \
-  --build-arg VITE_API_BASE_URL=https://api.example.com \
   --build-arg VITE_CLERK_PUBLISHABLE_KEY=pk_example \
   --build-arg VITE_PYMES_ORGANIZATION_SLUG=demo \
   -t IMAGE .
@@ -77,9 +83,12 @@ docker build \
 
 La publishable key no es un secreto; la secret key de Clerk nunca entra al
 bundle. `cloud-run.sh` despliega Web con `min=0`, CPU throttling, acceso público,
-sin Cloud SQL y sin secretos. Nginx sirve assets versionados como inmutables,
-`index.html` sin caché, fallback SPA y headers CSP, anti-framing y
-`nosniff`.
+sin Cloud SQL y sin secretos. En runtime configura
+`PYMES_API_UPSTREAM` para que Nginx proxyee `/api/` al BFF: el navegador siempre
+usa el mismo origen y no conoce la URL privada del servicio. Nginx sirve assets
+versionados como inmutables, `index.html` sin caché, fallback SPA y headers CSP,
+anti-framing y `nosniff`. `X-Pymes-Release` expone un marcador no secreto que el
+verificador compara con entorno, SHA y digest.
 
 Google OAuth tampoco termina en Web. Existe un único callback global del BFF:
 
@@ -102,11 +111,12 @@ Web.
 3. typecheck;
 4. unitarias;
 5. build productivo;
-6. ausencia de fakes y source maps públicos en el artefacto;
+6. ausencia de fakes, origen API embebido y source maps públicos en el artefacto;
 7. auditoría de dependencias;
 8. Playwright en Chromium desktop y mobile.
 
-Los E2E cubren operación de Agenda, filtros accesibles, disponibilidad,
-bloqueos, cola, reserva pública y acción opaca. `cloud-run-security-check.sh`
-prueba en seco STG/PRD, escala a cero, ausencia de secretos/SQL en Web y el
-callback Google global.
+Los E2E cubren operación de Agenda, edición separada de reprogramación,
+rollback ante conflicto, filtros accesibles, disponibilidad, bloqueos, cola,
+reserva pública y acción opaca. `cloud-run-security-check.sh` prueba en seco
+STG/PRD, escala a cero, ausencia de secretos/SQL en Web y el callback Google
+global.

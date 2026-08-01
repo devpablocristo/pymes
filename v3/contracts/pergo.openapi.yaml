@@ -124,10 +124,11 @@ components:
         event:
           type: string
           enum:
-            - message.sent
-            - message.delivered
-            - message.read
-            - message.failed
+            - queued
+            - sent
+            - delivered
+            - read
+            - failed
         trace_id:
           type: string
           pattern: '^pymes\.v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'

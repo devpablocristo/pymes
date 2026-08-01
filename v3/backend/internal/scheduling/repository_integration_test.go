@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	repositoryhelpers "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/repository/helpers"
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/usecases/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -394,6 +395,869 @@ func TestPostgresSchedulingTenantIsolationConcurrencyAndRecovery(t *testing.T) {
 		ctx, organizationID, *accepted.AcceptedBookingID,
 	); err != nil {
 		t.Fatalf("accepted waitlist booking is missing: %v", err)
+	}
+}
+
+func TestPostgresBookingUpdateIsVersionedIdempotentAndPreservesImmutableFields(t *testing.T) {
+	databaseURL := os.Getenv("PYMES_DATABASE_TEST_URL")
+	if databaseURL == "" {
+		t.Skip("PYMES_DATABASE_TEST_URL is required")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	suffix := uuid.NewString()
+	organizationID := "org_sched_update_" + suffix
+	partyID := "party_sched_update_" + suffix
+	branchID, serviceID, resourceID, roomID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	seedSchedulingTenant(
+		t,
+		pool,
+		organizationID,
+		partyID,
+		branchID,
+		serviceID,
+		resourceID,
+		roomID,
+	)
+	repository := NewPostgresRepository(pool)
+	startAt := time.Date(2026, time.August, 12, 14, 0, 0, 0, time.UTC)
+	original := testBooking(
+		organizationID,
+		uuid.New(),
+		branchID,
+		serviceID,
+		partyID,
+		resourceID,
+		startAt,
+		domain.BookingConfirmed,
+	)
+	original.CustomerName = "Cliente original"
+	original.CustomerEmail = "original@example.com"
+	createMetadata := testMetadata(
+		organizationID,
+		"create-update-"+suffix,
+		original.ID.String(),
+	)
+	if _, err := repository.ReserveBookings(
+		ctx,
+		createMetadata,
+		nil,
+		[]domain.Booking{original},
+		nil,
+		nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+	persistedOriginal, err := repository.GetBooking(ctx, organizationID, original.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	update := BookingUpdate{
+		PartyID:       partyID,
+		CustomerName:  "Cliente actualizado",
+		CustomerEmail: "actualizado@example.com",
+		CustomerPhone: "+541155555555",
+		Participants:  2,
+		Notes:         "Acceso por recepción",
+		Allocations:   append([]domain.Allocation(nil), original.Allocations...),
+	}
+	updateMetadata := testMetadata(
+		organizationID,
+		"update-booking-"+suffix,
+		original.ID.String(),
+	)
+	event := newEvent(
+		updateMetadata,
+		original.ID.String(),
+		domain.EventBookingUpdated,
+		map[string]any{"booking_id": original.ID, "version": 2},
+	)
+	updated, err := repository.UpdateBooking(
+		ctx,
+		updateMetadata,
+		original.ID,
+		1,
+		update,
+		[]domain.Event{event},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Version != 2 ||
+		updated.Participants != 2 ||
+		updated.CustomerName != update.CustomerName ||
+		updated.CustomerEmail != update.CustomerEmail ||
+		updated.CustomerPhone != update.CustomerPhone ||
+		updated.Notes != update.Notes {
+		t.Fatalf("editable fields not persisted: %+v", updated)
+	}
+	if updated.BranchID != persistedOriginal.BranchID ||
+		updated.ServiceID != persistedOriginal.ServiceID ||
+		!updated.StartAt.Equal(persistedOriginal.StartAt) ||
+		!updated.EndAt.Equal(persistedOriginal.EndAt) ||
+		updated.Status != persistedOriginal.Status ||
+		updated.ServiceName != persistedOriginal.ServiceName ||
+		updated.Price != persistedOriginal.Price ||
+		updated.Currency != persistedOriginal.Currency ||
+		updated.DurationMinutes != persistedOriginal.DurationMinutes ||
+		updated.Timezone != persistedOriginal.Timezone {
+		t.Fatalf("immutable fields changed: before=%+v after=%+v", persistedOriginal, updated)
+	}
+	preflight, replayed, err := repository.ReplayBookingUpdate(
+		ctx,
+		updateMetadata,
+		original.ID,
+	)
+	if err != nil || !replayed || preflight.Version != updated.Version ||
+		preflight.Notes != updated.Notes {
+		t.Fatalf("preflight=%+v replayed=%v err=%v", preflight, replayed, err)
+	}
+	if _, _, err := repository.ReplayBookingUpdate(
+		ctx,
+		updateMetadata,
+		uuid.New(),
+	); domain.ErrorCodeOf(err) != domain.CodeIdempotencyKeyReused {
+		t.Fatalf("cross-booking replay error=%v", err)
+	}
+	exactReplay, err := repository.UpdateBooking(
+		ctx,
+		updateMetadata,
+		original.ID,
+		1,
+		update,
+		[]domain.Event{event},
+	)
+	if err != nil || exactReplay.Version != updated.Version ||
+		exactReplay.Notes != updated.Notes {
+		t.Fatalf("exact replay=%+v err=%v", exactReplay, err)
+	}
+	reusedMetadata := updateMetadata
+	reusedDigest := sha256.Sum256([]byte("different-payload"))
+	reusedMetadata.PayloadHash = hex.EncodeToString(reusedDigest[:])
+	if _, _, err := repository.ReplayBookingUpdate(
+		ctx,
+		reusedMetadata,
+		original.ID,
+	); domain.ErrorCodeOf(err) != domain.CodeIdempotencyKeyReused {
+		t.Fatalf("preflight reused key error=%v", err)
+	}
+	if _, err := repository.UpdateBooking(
+		ctx,
+		reusedMetadata,
+		original.ID,
+		2,
+		update,
+		nil,
+	); domain.ErrorCodeOf(err) != domain.CodeIdempotencyKeyReused {
+		t.Fatalf("transactional reused key error=%v", err)
+	}
+	staleMetadata := testMetadata(
+		organizationID,
+		"stale-update-"+suffix,
+		original.ID.String()+":stale",
+	)
+	if _, err := repository.UpdateBooking(
+		ctx,
+		staleMetadata,
+		original.ID,
+		1,
+		update,
+		nil,
+	); domain.ErrorCodeOf(err) != domain.CodeBookingVersionConflict {
+		t.Fatalf("stale update error=%v", err)
+	}
+	var auditCount int
+	if err := pool.QueryRow(ctx, `
+		SELECT count(*)
+		FROM app.scheduling_audit
+		WHERE org_id=$1 AND aggregate_id=$2
+		  AND action='scheduling.booking.updated'`,
+		organizationID,
+		original.ID.String(),
+	).Scan(&auditCount); err != nil {
+		t.Fatal(err)
+	}
+	if auditCount != 1 {
+		t.Fatalf("update audit count=%d", auditCount)
+	}
+}
+
+func TestPostgresPublicBookingActionIsConcurrentAndExactlyOnce(t *testing.T) {
+	databaseURL := os.Getenv("PYMES_DATABASE_TEST_URL")
+	if databaseURL == "" {
+		t.Skip("PYMES_DATABASE_TEST_URL is required")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+
+	suffix := uuid.NewString()
+	organizationID := "org_public_action_" + suffix
+	partyID := "party_public_action_" + suffix
+	branchID, serviceID := uuid.New(), uuid.New()
+	resourceID, roomID := uuid.New(), uuid.New()
+	seedSchedulingTenant(
+		t,
+		pool,
+		organizationID,
+		partyID,
+		branchID,
+		serviceID,
+		resourceID,
+		roomID,
+	)
+	now := time.Date(2026, time.August, 20, 12, 0, 0, 0, time.UTC)
+	repository := NewPostgresRepository(pool)
+	codec, err := NewHMACActionTokenCodec(
+		[]byte("01234567890123456789012345678901"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawToken, tokenHash, err := codec.Issue()
+	if err != nil {
+		t.Fatal(err)
+	}
+	booking := testBooking(
+		organizationID,
+		uuid.New(),
+		branchID,
+		serviceID,
+		partyID,
+		resourceID,
+		now.Add(24*time.Hour),
+		domain.BookingPendingConfirmation,
+	)
+	bookingID := booking.ID
+	token := domain.ActionToken{
+		OrganizationID: organizationID,
+		ID:             uuid.New(),
+		BookingID:      &bookingID,
+		Purpose:        domain.ActionConfirm,
+		TokenHash:      tokenHash,
+		ExpiresAt:      now.Add(time.Hour),
+		CreatedAt:      now,
+	}
+	createMetadata := testMetadata(
+		organizationID,
+		"create-public-action-"+suffix,
+		booking.ID.String(),
+	)
+	if _, err := repository.ReserveBookings(
+		ctx,
+		createMetadata,
+		nil,
+		[]domain.Booking{booking},
+		[]domain.ActionToken{token},
+		bookingEvents(
+			createMetadata,
+			booking,
+			domain.EventBookingCreated,
+		),
+	); err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(
+		repository,
+		algorithmsFake{},
+		codec,
+		WithClock(func() time.Time { return now }),
+	)
+	actionMetadata := testMetadata(
+		"",
+		"confirm-public-action-"+suffix,
+		booking.ID.String(),
+	)
+	results := make(chan domain.Booking, 2)
+	errs := make(chan error, 2)
+	var wait sync.WaitGroup
+	for range 2 {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			result, actionErr := service.ConsumeBookingAction(
+				ctx,
+				rawToken,
+				domain.ActionConfirm,
+				actionMetadata,
+				1,
+				nil,
+				0,
+				"",
+			)
+			results <- result
+			errs <- actionErr
+		}()
+	}
+	wait.Wait()
+	close(results)
+	close(errs)
+	for actionErr := range errs {
+		if actionErr != nil {
+			t.Fatalf("concurrent action failed: %v", actionErr)
+		}
+	}
+	for result := range results {
+		if result.ID != booking.ID ||
+			result.Status != domain.BookingConfirmed ||
+			result.Version != 2 {
+			t.Fatalf("unexpected concurrent action result: %+v", result)
+		}
+	}
+	stored, err := repository.GetBooking(ctx, organizationID, booking.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Status != domain.BookingConfirmed || stored.Version != 2 {
+		t.Fatalf("booking was mutated more than once: %+v", stored)
+	}
+	storedToken, err := repository.FindActionToken(ctx, tokenHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if storedToken.ConsumedAt == nil ||
+		storedToken.ResultBookingID == nil ||
+		*storedToken.ResultBookingID != booking.ID {
+		t.Fatalf("token was not committed with result: %+v", storedToken)
+	}
+	assertPublicActionEffects(
+		t,
+		pool,
+		organizationID,
+		booking.ID,
+		domain.EventBookingConfirmed,
+		actionMetadata.CorrelationID,
+		1,
+	)
+}
+
+func TestPostgresPublicBookingActionRollsBackBeforeTokenConsumption(t *testing.T) {
+	databaseURL := os.Getenv("PYMES_DATABASE_TEST_URL")
+	if databaseURL == "" {
+		t.Skip("PYMES_DATABASE_TEST_URL is required")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+
+	suffix := uuid.NewString()
+	organizationID := "org_public_rollback_" + suffix
+	partyID := "party_public_rollback_" + suffix
+	branchID, serviceID := uuid.New(), uuid.New()
+	resourceID, roomID := uuid.New(), uuid.New()
+	seedSchedulingTenant(
+		t,
+		pool,
+		organizationID,
+		partyID,
+		branchID,
+		serviceID,
+		resourceID,
+		roomID,
+	)
+	now := time.Date(2026, time.August, 21, 12, 0, 0, 0, time.UTC)
+	repository := NewPostgresRepository(pool)
+	codec, err := NewHMACActionTokenCodec(
+		[]byte("01234567890123456789012345678901"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawToken, tokenHash, err := codec.Issue()
+	if err != nil {
+		t.Fatal(err)
+	}
+	booking := testBooking(
+		organizationID,
+		uuid.New(),
+		branchID,
+		serviceID,
+		partyID,
+		resourceID,
+		now.Add(24*time.Hour),
+		domain.BookingPendingConfirmation,
+	)
+	bookingID := booking.ID
+	token := domain.ActionToken{
+		OrganizationID: organizationID,
+		ID:             uuid.New(),
+		BookingID:      &bookingID,
+		Purpose:        domain.ActionConfirm,
+		TokenHash:      tokenHash,
+		ExpiresAt:      now.Add(time.Hour),
+		CreatedAt:      now,
+	}
+	createMetadata := testMetadata(
+		organizationID,
+		"create-public-rollback-"+suffix,
+		booking.ID.String(),
+	)
+	if _, err := repository.ReserveBookings(
+		ctx,
+		createMetadata,
+		nil,
+		[]domain.Booking{booking},
+		[]domain.ActionToken{token},
+		bookingEvents(
+			createMetadata,
+			booking,
+			domain.EventBookingCreated,
+		),
+	); err != nil {
+		t.Fatal(err)
+	}
+	dropFailure := installPublicActionTokenFailure(
+		t,
+		pool,
+		organizationID,
+		tokenHash,
+	)
+	defer dropFailure()
+	service := NewService(
+		repository,
+		algorithmsFake{},
+		codec,
+		WithClock(func() time.Time { return now }),
+	)
+	actionMetadata := testMetadata(
+		"",
+		"confirm-public-rollback-"+suffix,
+		booking.ID.String(),
+	)
+	if _, err := service.ConsumeBookingAction(
+		ctx,
+		rawToken,
+		domain.ActionConfirm,
+		actionMetadata,
+		1,
+		nil,
+		0,
+		"",
+	); err == nil {
+		t.Fatal("fault injection unexpectedly committed the public action")
+	}
+	stored, err := repository.GetBooking(ctx, organizationID, booking.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Status != domain.BookingPendingConfirmation || stored.Version != 1 {
+		t.Fatalf("booking escaped the failed transaction: %+v", stored)
+	}
+	storedToken, err := repository.FindActionToken(ctx, tokenHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if storedToken.ConsumedAt != nil || storedToken.ResultBookingID != nil {
+		t.Fatalf("failed action consumed its token: %+v", storedToken)
+	}
+	assertPublicActionEffects(
+		t,
+		pool,
+		organizationID,
+		booking.ID,
+		domain.EventBookingConfirmed,
+		actionMetadata.CorrelationID,
+		0,
+	)
+	var idempotencyRecords int
+	idempotencyTx, err := repositoryhelpers.BeginTenant(ctx, pool, organizationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := idempotencyTx.QueryRow(ctx, `
+		SELECT count(*)
+		FROM app.idempotency_records
+		WHERE org_id=$1
+		  AND operation=$2
+		  AND idempotency_key=$3`,
+		organizationID,
+		operationPublicBookingAction,
+		"public-action:"+tokenHash,
+	).Scan(&idempotencyRecords); err != nil {
+		_ = idempotencyTx.Rollback(ctx)
+		t.Fatal(err)
+	}
+	if err := idempotencyTx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if idempotencyRecords != 0 {
+		t.Fatalf("failed action left %d idempotency rows", idempotencyRecords)
+	}
+
+	dropFailure()
+	result, err := service.ConsumeBookingAction(
+		ctx,
+		rawToken,
+		domain.ActionConfirm,
+		actionMetadata,
+		1,
+		nil,
+		0,
+		"",
+	)
+	if err != nil {
+		t.Fatalf("retry after rollback failed: %v", err)
+	}
+	if result.Status != domain.BookingConfirmed || result.Version != 2 {
+		t.Fatalf("retry returned unexpected booking: %+v", result)
+	}
+}
+
+func TestPostgresPublicWaitlistAcceptanceIsConcurrentAndExactlyOnce(t *testing.T) {
+	databaseURL := os.Getenv("PYMES_DATABASE_TEST_URL")
+	if databaseURL == "" {
+		t.Skip("PYMES_DATABASE_TEST_URL is required")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+
+	suffix := uuid.NewString()
+	organizationID := "org_waitlist_action_" + suffix
+	partyID := "party_waitlist_action_" + suffix
+	branchID, serviceID := uuid.New(), uuid.New()
+	resourceID, roomID := uuid.New(), uuid.New()
+	seedSchedulingTenant(
+		t,
+		pool,
+		organizationID,
+		partyID,
+		branchID,
+		serviceID,
+		resourceID,
+		roomID,
+	)
+	now := time.Date(2026, time.August, 22, 12, 0, 0, 0, time.UTC)
+	repository := NewPostgresRepository(pool)
+	codec, err := NewHMACActionTokenCodec(
+		[]byte("01234567890123456789012345678901"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitlistAt := now.Add(24 * time.Hour)
+	waitlist := domain.WaitlistEntry{
+		OrganizationID: organizationID,
+		ID:             uuid.New(),
+		BranchID:       branchID,
+		ServiceID:      serviceID,
+		PartyID:        partyID,
+		CustomerName:   "Waitlist Customer",
+		PreferredFrom:  waitlistAt,
+		PreferredUntil: waitlistAt.Add(2 * time.Hour),
+		Participants:   1,
+		Status:         domain.WaitlistPending,
+		Version:        1,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	waitlistMetadata := testMetadata(
+		organizationID,
+		"create-waitlist-action-"+suffix,
+		waitlist.ID.String(),
+	)
+	if _, err := repository.CreateWaitlistEntry(
+		ctx,
+		waitlistMetadata,
+		waitlist,
+		newEvent(
+			waitlistMetadata,
+			waitlist.ID.String(),
+			"WaitlistCreated",
+			map[string]any{"waitlist_id": waitlist.ID},
+		),
+	); err != nil {
+		t.Fatal(err)
+	}
+	rawToken, tokenHash, err := codec.Issue()
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitlistID := waitlist.ID
+	token := domain.ActionToken{
+		OrganizationID: organizationID,
+		ID:             uuid.New(),
+		WaitlistID:     &waitlistID,
+		Purpose:        domain.ActionAcceptWaitlist,
+		TokenHash:      tokenHash,
+		ExpiresAt:      now.Add(time.Hour),
+		CreatedAt:      now,
+	}
+	slot := domain.Slot{
+		StartAt:       waitlistAt,
+		EndAt:         waitlistAt.Add(time.Hour),
+		OccupiesFrom:  waitlistAt,
+		OccupiesUntil: waitlistAt.Add(time.Hour),
+		Timezone:      "UTC",
+		Allocations: []domain.Allocation{{
+			ResourceID: resourceID,
+			Mode:       domain.AllocationExclusive,
+			Units:      1,
+		}},
+		Remaining: 1,
+	}
+	offered, err := repository.OfferWaitlist(
+		ctx,
+		organizationID,
+		waitlist.ID,
+		slot,
+		now.Add(30*time.Minute),
+		token,
+		[]domain.Event{newEvent(
+			waitlistMetadata,
+			waitlist.ID.String(),
+			domain.EventWaitlistOffered,
+			map[string]any{"waitlist_id": waitlist.ID},
+		)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(
+		repository,
+		algorithmsFake{slots: []domain.Slot{slot}},
+		codec,
+		WithClock(func() time.Time { return now }),
+	)
+	actionMetadata := testMetadata(
+		"",
+		"accept-waitlist-action-"+suffix,
+		waitlist.ID.String(),
+	)
+	results := make(chan domain.WaitlistEntry, 2)
+	errs := make(chan error, 2)
+	var wait sync.WaitGroup
+	for range 2 {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			result, actionErr := service.ConsumeWaitlistAction(
+				ctx,
+				rawToken,
+				actionMetadata,
+				offered.Version,
+			)
+			results <- result
+			errs <- actionErr
+		}()
+	}
+	wait.Wait()
+	close(results)
+	close(errs)
+	for actionErr := range errs {
+		if actionErr != nil {
+			t.Fatalf("concurrent waitlist action failed: %v", actionErr)
+		}
+	}
+	var acceptedBookingID uuid.UUID
+	for result := range results {
+		if result.Status != domain.WaitlistAccepted ||
+			result.Version != 3 ||
+			result.AcceptedBookingID == nil {
+			t.Fatalf("unexpected waitlist action result: %+v", result)
+		}
+		if acceptedBookingID == uuid.Nil {
+			acceptedBookingID = *result.AcceptedBookingID
+		} else if acceptedBookingID != *result.AcceptedBookingID {
+			t.Fatalf(
+				"concurrent waitlist actions created distinct bookings: %s and %s",
+				acceptedBookingID,
+				*result.AcceptedBookingID,
+			)
+		}
+	}
+	var bookingCount, acceptedEventCount, acceptedAuditCount int
+	tx, err := repositoryhelpers.BeginTenant(ctx, pool, organizationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*)
+		FROM app.scheduling_bookings
+		WHERE org_id=$1 AND starts_at=$2`,
+		organizationID,
+		waitlistAt,
+	).Scan(&bookingCount); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*)
+		FROM app.scheduling_events
+		WHERE org_id=$1 AND aggregate_id=$2 AND event_type='WaitlistAccepted'`,
+		organizationID,
+		waitlist.ID.String(),
+	).Scan(&acceptedEventCount); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*)
+		FROM app.scheduling_audit
+		WHERE org_id=$1 AND aggregate_id=$2
+		  AND action='scheduling.waitlist.accepted'`,
+		organizationID,
+		waitlist.ID.String(),
+	).Scan(&acceptedAuditCount); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if bookingCount != 1 ||
+		acceptedEventCount != 1 ||
+		acceptedAuditCount != 1 {
+		t.Fatalf(
+			"booking=%d event=%d audit=%d",
+			bookingCount,
+			acceptedEventCount,
+			acceptedAuditCount,
+		)
+	}
+}
+
+func assertPublicActionEffects(
+	t *testing.T,
+	pool *pgxpool.Pool,
+	organizationID string,
+	bookingID uuid.UUID,
+	eventType string,
+	correlationID string,
+	want int,
+) {
+	t.Helper()
+	ctx := context.Background()
+	tx, err := repositoryhelpers.BeginTenant(ctx, pool, organizationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var events, audits, outbox int
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*)
+		FROM app.scheduling_events
+		WHERE org_id=$1 AND aggregate_id=$2
+		  AND event_type=$3 AND correlation_id=$4`,
+		organizationID,
+		bookingID.String(),
+		eventType,
+		correlationID,
+	).Scan(&events); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*)
+		FROM app.scheduling_audit
+		WHERE org_id=$1 AND aggregate_id=$2
+		  AND action=$3 AND correlation_id=$4`,
+		organizationID,
+		bookingID.String(),
+		"scheduling.booking."+string(domain.BookingConfirmed),
+		correlationID,
+	).Scan(&audits); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*)
+		FROM app.outbox
+		WHERE org_id=$1 AND correlation_id=$2`,
+		organizationID,
+		correlationID,
+	).Scan(&outbox); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if events != want || audits != want || outbox != 2*want {
+		t.Fatalf(
+			"public action effects events=%d audits=%d outbox=%d want=%d/%d/%d",
+			events,
+			audits,
+			outbox,
+			want,
+			want,
+			2*want,
+		)
+	}
+}
+
+func installPublicActionTokenFailure(
+	t *testing.T,
+	pool *pgxpool.Pool,
+	organizationID string,
+	tokenHash string,
+) func() {
+	t.Helper()
+	ctx := context.Background()
+	identifier := uuid.New()
+	suffix := hex.EncodeToString(identifier[:])
+	functionName := "test_fail_public_token_" + suffix
+	triggerName := "test_fail_public_token_" + suffix
+	if _, err := pool.Exec(ctx, fmt.Sprintf(`
+		CREATE FUNCTION app.%s() RETURNS trigger
+		LANGUAGE plpgsql
+		AS $$
+		BEGIN
+		  IF NEW.org_id = '%s'
+		     AND NEW.token_hash = '%s'
+		     AND OLD.consumed_at IS NULL
+		     AND NEW.consumed_at IS NOT NULL THEN
+		    RAISE EXCEPTION 'injected public action token failure';
+		  END IF;
+		  RETURN NEW;
+		END
+		$$`,
+		functionName,
+		organizationID,
+		tokenHash,
+	)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, fmt.Sprintf(`
+		CREATE TRIGGER %s
+		BEFORE UPDATE ON app.scheduling_action_tokens
+		FOR EACH ROW EXECUTE FUNCTION app.%s()`,
+		triggerName,
+		functionName,
+	)); err != nil {
+		_, _ = pool.Exec(
+			ctx,
+			fmt.Sprintf("DROP FUNCTION IF EXISTS app.%s()", functionName),
+		)
+		t.Fatal(err)
+	}
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			if _, err := pool.Exec(
+				ctx,
+				fmt.Sprintf(
+					"DROP TRIGGER IF EXISTS %s ON app.scheduling_action_tokens",
+					triggerName,
+				),
+			); err != nil {
+				t.Errorf("drop fault trigger: %v", err)
+			}
+			if _, err := pool.Exec(
+				ctx,
+				fmt.Sprintf("DROP FUNCTION IF EXISTS app.%s()", functionName),
+			); err != nil {
+				t.Errorf("drop fault function: %v", err)
+			}
+		})
 	}
 }
 

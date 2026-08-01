@@ -44,14 +44,248 @@ PRD sin llamar a GCP; `make replay-smoke` aplica todas las migraciones en una
 base descartable, mueve una DLQ, repite el comando como no-op y demuestra que
 su auditoría no admite mutación.
 
+`make scheduling-e2e` cubre también la edición operativa de un turno:
+`expected_version`, RLS y locks se resuelven dentro de PostgreSQL; un replay
+exacto conserva el snapshot de respuesta del adapter, la misma clave con otro
+hash devuelve `IDEMPOTENCY_KEY_REUSED`, una versión obsoleta no muta y los
+cambios de participantes vuelven a validar recursos o cupo grupal. Servicio,
+horario, snapshots comerciales, asignaciones y estado no son campos aceptados
+por el `PATCH`; conservan sus comandos específicos. `make web-ci` prueba el
+formulario separado, el cliente generado y que un rechazo mantiene la edición
+abierta sin dejar una promesa no manejada.
+
 `make security` ejecuta `govulncheck` sobre Pymes y el runtime headless
 contable, además de `npm audit` sobre Fiscal. El gate quedó en cero
 vulnerabilidades alcanzables después de actualizar Go 1.26.5, `pgx`, `x/text`
 y `go-jose`; la incorporación del cliente KMS actualizó además `grpc` a una
 versión sin la vulnerabilidad alcanzable detectada por `govulncheck`.
 
-La suite completa histórica de Open Accounting conserva fallos ajenos al
-runtime headless en SmartAccounts/cutover y en un enlace documental a
-`.mailmap`. Las suites relevantes del binario headless, accounting, tenant,
-boundary arquitectónico y la integración PostgreSQL pasan; esos fallos
-heredados no se incorporan al gate de Pymes.
+## Evidencia H8 disponible
+
+La política de release ya es verificable sin desplegar. `make
+workflow-policy-check` comprueba que el workflow sea manual, parta de `main`,
+exija un CI verde para el SHA exacto y una confirmación escrita para PRD. Build
+y deploy usan identidades WIF separadas por entorno. El primer paso de ambos
+jobs rechaza cualquier `GITHUB_RUN_ATTEMPT` distinto de `1`: Build lo hace
+antes de solicitar la identidad del builder y Deploy antes de checkout,
+descargar artefactos o autenticar. Un job o workflow reejecutado no puede
+reutilizar una validación ni un manifiesto anterior y debe reemplazarse por un
+nuevo `workflow_dispatch`. El builder rechaza
+worktrees sucios, fija tanto Pymes como Open Accounting a commits completos,
+publica SBOM y provenance y entrega únicamente referencias
+`@sha256:<digest>` mediante un manifiesto con claves permitidas.
+El mismo gate ejecuta los tests del seed inicial: rechaza otro head de GitHub,
+CI fallido, imagen o service account distinta, escalado no nulo, tráfico, IAM,
+variables, volúmenes, Cloud SQL, Direct VPC, Serverless VPC Connector y jobs con
+ejecuciones. La auditoría admite únicamente las mutaciones Cloud Run sobre los
+FQN exactos del proyecto, región y tipo esperados y los eventos
+`iam.serviceAccounts.actAs` exitosos sobre las diez identidades runtime
+allowlisted. Exige exactamente una mutación de creación por cada uno de los once
+FQN y rechaza actualizaciones posteriores o `SetIamPolicy`. El seed no pasa
+ninguna variante `--allow-unauthenticated`, porque ambas fuerzan una operación
+IAM al reintentar; la política vacía se comprueba antes y después. Los fixtures
+rechazan además otra región, tipo, cuenta, permiso o recurso de autorización.
+La finalización acota inicio y fin con dos minutos de margen superior para
+timestamps fraccionarios y reloj, espera al menos diez minutos de asentamiento
+y exige dos lecturas idénticas de Admin Activity separadas por veinte segundos.
+También prueba que la autoridad recurrente acepte la transición
+seed → bootstrap → operational, pero rechace roles custom ampliados, Run Admin
+de proyecto, condiciones IAM y cualquier administrador o invoker fuera de la
+allowlist.
+
+La autoridad no se confía sólo al bootstrap. Antes de autenticar al builder, el
+job protegido autentica al deployer exacto del environment y vuelve a comprobar
+pool/provider WIF, cuentas builder/deployer activas y sin claves, trust completo,
+Artifact Registry, los catorce Secrets, diez identidades runtime keyless, KMS y
+los once recursos Run. También exige que las políticas efectivas
+`iam.disableCrossProjectServiceAccountUsage` e
+`iam.disableServiceAccountKeyCreation` estén aplicadas y que
+`orgpolicy.googleapis.com` esté disponible. Policy Analyzer debe estar
+completamente explorado, sin grupos, caminos de impersonación ni pares efectivos
+fuera de la allowlist de builder, deployer y cada identidad runtime. Una
+consulta inversa adicional parte de los permisos sensibles —no del nombre del
+rol— y compara cada triple recurso/permiso/identidad sobre proyecto, release y
+runtime service accounts, Run, Secrets, Artifact Registry y KMS. Por eso un rol
+custom o alternativo con el mismo poder, un grant heredado, una identidad
+cross-environment o una cadena de impersonación también bloquean. El deploy
+repite el límite KMS inmediatamente antes de usar las claves; cualquier lectura
+incompleta, cuota agotada después del retry acotado o drift falla cerrado.
+
+El bootstrap IAM incorpora un guarda de fuente y operador antes de cualquier
+mutación: checkout limpio de `main`, HEAD y árbol idénticos al repositorio
+GitHub esperado, cuenta activa directa `softponti@gmail.com` y ausencia de
+impersonación, credential override, access-token file o login config en
+`gcloud`. La cadena de ancestros debe ser exactamente proyecto
+`pymes-dev-352318` → folder `673291958610` → organización `663017421195`.
+Builder no recibe ningún rol de ancestro; el deployer recibe únicamente los
+roles custom de lectura de IAM de organización y folder, sin condiciones. La
+creación o actualización inicial de esos dos roles de organización y sus
+bindings requiere un operador humano con administración de custom roles y
+políticas IAM en esos scopes; el workflow no puede otorgarse esa facultad.
+
+El gate busca cualquier `principal://` o `principalSet://` que mencione el pool
+de release y exige el conjunto exacto correspondiente a la fase. Durante STG
+sólo pueden existir Build y deployer STG, y la presencia prematura del subject
+PRD falla; después del cierre STG, la preparación PRD exige exactamente esos
+dos más el deployer PRD. Todos son bindings
+`roles/iam.workloadIdentityUser` sobre su service account destino. Además relee
+las políticas conocidas de proyecto, Artifact Registry, Secrets, KMS, runtime
+y Cloud Run.
+Builder y deployers deben aparecer sin claves y sin adjunción a workloads: se
+combina Cloud Asset con lecturas directas de servicios, jobs y revisiones Cloud
+Run, mientras la org policy prohíbe adjuntarlos desde otro proyecto. Las
+políticas de cada runtime SA contienen sólo el `actAs` del deployer de su
+entorno y su autoridad efectiva debe coincidir con la allowlist propia del
+componente.
+
+Cloud Asset Search y Policy Analyzer son fuentes de consistencia eventual:
+`fullyExplored` prueba completitud del snapshot analizado, no frescura de un
+cambio recién aplicado. Las lecturas directas son autoritativas para los
+recursos enumerados; los barridos globales WIF/workload requieren una ventana
+sin mutaciones, repetición y conservación de la evidencia antes de un cutover.
+La espera automática de diez minutos y las dos lecturas separadas por veinte
+segundos corresponden específicamente a Admin Activity del seed inicial; no
+deben presentarse como garantía universal de frescura de Cloud Asset.
+
+`make legacy-wif-test` prueba el corte sin tocar GCP: acepta sólo canaries
+`stg operational` del SHA, árbol y workflow exactos; rechaza `bootstrap`, un
+SHA ancestro, un árbol distinto, análisis IAM incompleto o con autoridad
+residual, un deployer PRD provisionado prematuramente, grupos de ancestros cuya
+membresía no pueda comprobarse, referencias Cloud Asset en otra región, errores
+de Service Usage y marcadores cuyos eventos estén incompletos, desordenados o
+pertenezcan a actores diferentes. También demuestra que el modo interno de test
+no puede usarse al ejecutar directamente el script de retiro.
+
+La release consulta GitHub antes de solicitar una credencial WIF. En cada
+ejecución comprueba mediante la vista pública de la rama que `main` esté
+protegida para todos y exija únicamente `Pymes V3 validate`; también relee las
+reglas del environment seleccionado. La auditoría operativa, obligatoria antes
+de crear WIF, comprueba además una aprobación, revisión del último push,
+resolución de conversaciones, ausencia de bypass y aplicación a
+administradores. Los environments `stg` y `prd` sólo admiten `main`; PRD exige
+el conjunto exacto de reviewers aprobado, impide autoaprobación y no permite
+bypass administrativo. El bootstrap es plan-only por defecto y falla cerrado
+si falta cualquiera de esas reglas.
+
+`scripts/deploy/cloud-run-security-check.sh` ejecuta `cloud-run.sh` en dry-run
+para STG y PRD sin permitir que se invoque `gcloud`. El gate positivo cubre:
+
+- label `pymes-v3-release` igual al SHA fuente en los seis servicios y cinco
+  jobs;
+- marcador Web exacto
+  `entorno:sha-fuente:sha256:digest-web`, proxy `/api/` al BFF y callbacks
+  Clerk, PerGo y Google en el mismo origen público;
+- imágenes exclusivamente por digest, secretos por versión numérica,
+  invokers exactos y ausencia de `roles/run.invoker` a nivel proyecto;
+- API, worker, Fiscal y provisioner con Direct VPC según su necesidad, además
+  de Private Google Access y Public NAT comprobables;
+- Fiscal `mock` y `arca` usando siempre `fiscal-vault` en producción, con
+  primary habilitada, rotación de 90 días e IAM directo; PerGo y Google sólo
+  reciben configuración cuando su flag está habilitado.
+
+Los casos negativos rechazan tags mutables, SHA inválido, origen público fuera
+de Clerk, callback Google distinto, CIDR fuera de `/20`–`/26`, modo Fiscal
+inválido, ARCA sin políticas de issuer y creación de Cloud NAT sin aceptación
+explícita del costo. También prueban que bootstrap no admite PRD, ARCA, PerGo,
+Google, origen real ni un secreto Clerk sin
+`lifecycle=bootstrap-temporary`; operational rechaza ese label y la simulación
+de metadata se acepta únicamente en dry-run. Un negativo adicional simula un
+servicio STG activo y demuestra que bootstrap aborta antes de ejecutar
+migraciones o cambiar ingress/IAM.
+
+Cada servicio se crea primero como candidato con tráfico cero. En bootstrap,
+API y Web además usan ingress interno y carecen de `allUsers`; el worker
+conserva escalado manual `0`, mínimo de revisión `0` y no ejecuta deployment
+health check. El script no promueve ni sondea esas URLs y, después de verificar
+la configuración, elimina todos los tags de los seis servicios. El bootstrap
+termina así con revisiones inertes, sin tráfico y sin una URL taggeada que
+pueda confundirse con un release operacional.
+
+En `operational`, las URLs taggeadas de API y Web quedan protegidas durante
+pretraffic por una capability efímera de 32 bytes codificada como 64
+hexadecimales. El workflow la genera por ejecución, la enmascara y la inyecta
+directamente en ambas revisiones. Una petición al host candidato sin el header
+exacto responde `404`; Web agrega la capability sólo al proxy interno hacia la
+API candidata. El host estable de API no requiere ese header. El
+verificador demuestra los rechazos sin capability y ejecuta los probes con la
+capability correcta sin imprimirla.
+El deploy y el verificador transportan ese valor mediante archivos efímeros con
+permisos `0600`; la matriz stateful rechaza que aparezca en `argv` de `gcloud` o
+`curl` y comprueba que los archivos se eliminen.
+
+Antes de mutar tráfico, el release identifica un único baseline activo por
+servicio y valida que el Web anterior apunte exactamente a la URL taggeada de
+la revisión API anterior, con tag y capability coincidentes. No acepta
+descripciones ambiguas, errores de lectura como si fueran ausencia ni reutiliza
+el mismo SHA/tag ya activo. Todos los deploys de servicios fuerzan el chequeo
+IAM de invocación y el readback verifica ingress, la ausencia o presencia
+esperada de `allUsers` y los invokers exactos.
+
+El worker permanece en escalado `0` durante pretraffic, se enruta último y sólo
+entonces pasa a `1`. La promoción no se considera sana por el mero arranque del
+contenedor: espera en Cloud Logging un evento
+`worker_release_ready` de la revisión y SHA exactos, emitido únicamente después
+de que el worker logró su primera lectura durable de métricas desde PostgreSQL.
+Un fallo o cancelación antes de esa lectura no emite la señal ni inicia el
+dispatch.
+
+El verificador compara digests, SHA, forma del contenedor, identidades, ingress,
+invokers, SQL, VPC, KMS/JWKS y configuración runtime antes de promover.
+Después de mover exactamente el 100 % del tráfico, verifica el estado activo
+dentro de la misma transacción de release, antes de desarmar el rollback. No
+existe un segundo paso de verificación post-release capaz de fallar cuando ya
+no puede revertir.
+
+El asentamiento conserva exactamente un tag en API —el tag del release activo
+que usa Web— y cero tags en Fiscal, Accounting, Accounting Admin, Worker y Web.
+Cada retiro de tag se prueba tanto en control plane como contra su URL pública,
+que debe responder `404`; luego se elimina la revisión candidata que ya no se
+usa. También se comprueba que la URL del API anterior y la URL Web candidata
+queden revocadas. Ante un fallo se restaura primero el tag API exacto del
+baseline, se prueba su `/readyz` con su capability histórica y recién entonces
+se devuelve Web. Para worker se baja primero a `0`; un primer despliegue fallido
+se vuelve inerte, se elimina y se comprueba su ausencia.
+
+Además de ese rollback automático, `rollback-cloud-run.sh` implementa la
+recuperación durable por SHA de release: resuelve una única revisión API y Web
+por label inmutable, pero el label no alcanza para autorizarla. Antes de leer o
+mutar Cloud Run exige el manifiesto completo descargado de la release y el
+SHA-256 que el job de build registró separadamente en su summary, valida su
+allowlist y los repositorios canónicos, comprueba el pin de Open Accounting y
+repite el mismo gate de provenance, materiales y SBOM de la release. Luego
+exige que los digests API/Web de las revisiones coincidan exactamente con ese
+manifiesto y valida readiness, identidad, ingress/IAM, tag, capability y pin
+Web → API. Restaura primero y prueba el tag API, mueve Web antes que API y deja
+otra vez la política exacta de tags. La capability se usa mediante un archivo
+temporal modo `0600`, no aparece en argumentos ni logs. Sus tests locales
+cubren éxito, orden, checksum o repositorio inválido, attestation rechazada,
+digest de revisión ajeno al manifiesto, revisiones duplicadas o incompatibles,
+timeout antes/después de aplicar tráfico y timeout de probe.
+`cloud-run-transaction-test.sh`, ejecutado por `make quality`, reutiliza las
+funciones reales del deploy contra un control/data plane stateful y agrega
+fallos inyectados de `list`, `describe`, deploy con respuesta perdida, IAM,
+promoción, asentamiento y ausencia de señal del worker. Cada escenario exige
+baseline exacto o estado inerte fail-closed y prohíbe afirmar
+`ROLLBACK COMPLETE` sin convergencia.
+
+El smoke de backup/restore también prueba ahora los guardas destructivos:
+permisos `0600`, manifiesto SHA-256 ligado a servicio/base/archivo, rechazo de
+archivo alterado o de otro servicio, destino nuevo y vacío, confirmación exacta
+obligatoria y restore en una única transacción. Los wrappers de libpq no
+incluyen la URI ni su password en el vector de argumentos y Compose publica
+todos sus puertos exclusivamente en `127.0.0.1`.
+
+Esta evidencia demuestra implementación y gates locales, incluido el rollback
+durable, no operación real.
+Todavía no hay evidencia en el repositorio de imágenes v3 publicadas, recursos
+WIF/red aplicados, controles GitHub reconciliados, servicios STG/PRD
+desplegados, restores administrados ni pilotos de Agenda, PerGo, Google o
+ARCA. `verify-cloud-run.sh` sólo constituirá evidencia de runtime después de
+una release real exitosa.
+
+El SHA fijado de Open Accounting
+`1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d` tiene CI remoto verde en el run
+`30704446792`: pasaron backend, lint, integración PostgreSQL, E2E, frontend y el
+runtime Pymes headless. `make ci` de Pymes también pasa localmente contra ese
+checkout exacto y los controles H8 actuales. Todavía falta integrar el cambio
+de Pymes y obtener el workflow remoto verde para su nuevo SHA.

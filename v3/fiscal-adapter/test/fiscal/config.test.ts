@@ -99,3 +99,51 @@ test("ARCA mode requires a production KMS key and environment-specific issuers",
   assert.equal(config.localKMSKeyB64, undefined);
   assert.equal(config.requestTimeoutMs, 30_000);
 });
+
+test("production mock mode uses Cloud KMS and never requires a local key", () => {
+  const kmsKey =
+    "projects/pymes/locations/us-central1/keyRings/fiscal/cryptoKeys/stg";
+  const config = loadConfig({
+    FISCAL_ADAPTER_MODE: "mock",
+    FISCAL_DATABASE_URL: "postgres://fiscal",
+    PYMES_ENVIRONMENT: "production",
+    PYMES_INTERNAL_ISSUER: "pymes-v3",
+    PYMES_INTERNAL_JWKS_JSON: JSON.stringify({
+      keys: [{
+        kty: "OKP",
+        crv: "Ed25519",
+        alg: "EdDSA",
+        kid: "workload-1",
+        x: "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ",
+      }],
+    }),
+    FISCAL_KMS_KEY_NAME: kmsKey,
+  });
+
+  assert.equal(config.mode, "mock");
+  assert.equal(config.fiscalKMSKeyName, kmsKey);
+  assert.equal(config.localKMSKeyB64, undefined);
+});
+
+test("fiscal KMS configuration is explicit and mutually exclusive", () => {
+  const base = {
+    FISCAL_ADAPTER_MODE: "mock",
+    FISCAL_DATABASE_URL: "postgres://fiscal",
+    PYMES_ENVIRONMENT: "development",
+    FISCAL_ALLOW_INSECURE_LOCAL: "true",
+  };
+  assert.throws(
+    () => loadConfig(base),
+    /FISCAL_KMS_KEY_NAME or FISCAL_LOCAL_KMS_KEY_B64/,
+  );
+  assert.throws(
+    () =>
+      loadConfig({
+        ...base,
+        FISCAL_KMS_KEY_NAME:
+          "projects/pymes/locations/us-central1/keyRings/fiscal/cryptoKeys/stg",
+        FISCAL_LOCAL_KMS_KEY_B64: Buffer.alloc(32, 9).toString("base64"),
+      }),
+    /mutually exclusive/,
+  );
+});

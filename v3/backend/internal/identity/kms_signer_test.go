@@ -11,6 +11,7 @@ import (
 	"time"
 
 	kmspb "cloud.google.com/go/kms/apiv1/kmspb"
+	credentialhelpers "github.com/devpablocristo/pymes/v3/backend/internal/identity/credentials/helpers"
 	"github.com/googleapis/gax-go/v2"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
@@ -81,7 +82,7 @@ func TestKMSServiceIssuerVerifiesIntegrityAndPublishesRotationOverlap(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if issuer.KeyID() != stableKMSKeyID(client.materials[testKMSVersion1].public) {
+	if issuer.KeyID() != credentialhelpers.StableKeyID(client.materials[testKMSVersion1].public) {
 		t.Fatalf("kid = %q", issuer.KeyID())
 	}
 	token, err := issuer.MintCredential(context.Background(), CredentialRequest{
@@ -116,8 +117,9 @@ func TestKMSServiceIssuerVerifiesIntegrityAndPublishesRotationOverlap(t *testing
 	if err := json.Unmarshal([]byte(encoded), &jwks); err != nil {
 		t.Fatal(err)
 	}
-	if len(jwks.Keys) != 2 || jwks.Keys[0].KeyID != stableKMSKeyID(client.materials[testKMSVersion1].public) ||
-		jwks.Keys[1].KeyID != stableKMSKeyID(client.materials[testKMSVersion2].public) {
+	if len(jwks.Keys) != 2 ||
+		jwks.Keys[0].KeyID != credentialhelpers.StableKeyID(client.materials[testKMSVersion1].public) ||
+		jwks.Keys[1].KeyID != credentialhelpers.StableKeyID(client.materials[testKMSVersion2].public) {
 		t.Fatalf("rotation JWKS = %s", encoded)
 	}
 }

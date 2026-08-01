@@ -27,3 +27,32 @@
 - Los comandos sensibles deben ser transaccionales e idempotentes.
 - Backend, adaptador fiscal mock, contratos y migraciones tienen dependencias
   y checks propios dentro de `v3/`. No existe runtime activo fuera de `v3/`.
+
+## Arquitectura Go
+
+- Axis fue únicamente una referencia de lectura para documentar el estándar.
+  Pymes no puede importarlo, copiarlo, llamarlo, montarlo, incluirlo en CI,
+  Docker o despliegues, ni requerir que exista en el filesystem o la red.
+- Cada bounded context vive en `v3/backend/internal/<contexto>` y expone sus
+  casos de uso y puertos desde `usecases.go`; las interfaces pertenecen siempre
+  al consumidor.
+- `handler`, `repository`, `worker` y cada integración externa son adapters.
+  Cada adapter conserva un archivo raíz y subdirectorios `models/` y
+  `helpers/`; los tipos del proveedor nunca entran al dominio.
+- Las entidades e invariantes viven en `usecases/domain`; ese paquete no
+  importa HTTP, SQL, pgx, Clerk, Platform, Google, PerGo, Accounting ni Fiscal.
+- Toda construcción concreta ocurre en `v3/backend/wire`. `cmd` sólo carga
+  configuración, invoca `wire` y controla el ciclo de vida.
+- No crear capas horizontales globales `ports`, `access`, `companion`,
+  `domain`, `handler` o `repository`, ni acceder al repository o handler de
+  otro contexto.
+- Ejecutar `make architecture-check` después de cualquier cambio Go.
+
+## Release y operación
+
+- Las imágenes desplegables se publican por digest y se vinculan al SHA exacto
+  de Pymes y al SHA fijado de Open Accounting.
+- STG y PRD comparten el proyecto para reducir costos, pero usan service
+  accounts, secretos, claves KMS, bases lógicas y servicios separados.
+- No afirmar que un entorno o piloto está completo sin evidencia automática de
+  revisión, IAM, migraciones, readiness, digest y recuperación.

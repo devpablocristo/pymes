@@ -207,7 +207,7 @@ func TestPostgresNotificationIdempotencyRLSAndWebhookInbox(
 	}
 
 	event := domain.DeliveryEvent{
-		Event: "message.sent", TraceID: "pymes.v1.trace",
+		Event: "sent", TraceID: "pymes.v1.trace",
 		NotificationID: first.ID,
 		MessageID:      "pergo-message-1", Channel: "whatsapp",
 		Timestamp: time.Now().UTC(), WorkspaceID: "workspace-1",
@@ -230,6 +230,22 @@ func TestPostgresNotificationIdempotencyRLSAndWebhookInbox(
 	if err != nil || stored.Status != domain.StatusSent ||
 		stored.ExternalMessageID != event.MessageID {
 		t.Fatalf("stored notification=%+v err=%v", stored, err)
+	}
+	uncertain := event
+	uncertain.Event = "failed"
+	uncertain.ErrorCode = "DELIVERY_UNCERTAIN"
+	uncertain.Timestamp = event.Timestamp.Add(time.Second)
+	duplicate, err = repository.ApplyDeliveryEvent(
+		ctx, intentA.OrganizationID, uncertain,
+		"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+	)
+	if err != nil || duplicate {
+		t.Fatalf("uncertain webhook duplicate=%v err=%v", duplicate, err)
+	}
+	stored, err = repository.Get(ctx, intentA.OrganizationID, first.ID)
+	if err != nil || stored.Status != domain.StatusFailed ||
+		stored.FailureCode != domain.FailureCodeDeliveryUncertain {
+		t.Fatalf("uncertain notification=%+v err=%v", stored, err)
 	}
 	if _, err = repository.Get(
 		ctx, organizationB, "only-org-a",

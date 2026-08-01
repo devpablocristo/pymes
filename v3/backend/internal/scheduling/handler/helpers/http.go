@@ -5,8 +5,10 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"time"
 
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/usecases/domain"
+	"github.com/google/uuid"
 )
 
 type Problem struct {
@@ -62,4 +64,22 @@ func WriteError(w http.ResponseWriter, err error) {
 		status = http.StatusGone
 	}
 	WriteProblem(w, status, schedulingError.Code, schedulingError.Message)
+}
+
+func ParseUUID(w http.ResponseWriter, value string) (uuid.UUID, bool) {
+	result, err := uuid.Parse(value)
+	if err != nil {
+		WriteProblem(w, http.StatusBadRequest, domain.CodeValidation, "UUID is invalid")
+		return uuid.Nil, false
+	}
+	return result, true
+}
+
+func ParseTime(w http.ResponseWriter, value string) (time.Time, bool) {
+	result, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		WriteProblem(w, http.StatusBadRequest, domain.CodeValidation, "RFC3339 time is invalid")
+		return time.Time{}, false
+	}
+	return result.UTC(), true
 }

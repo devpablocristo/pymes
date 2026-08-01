@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -44,16 +45,32 @@ func TestDispatchersRunEveryContextEvenWhenOneFails(t *testing.T) {
 }
 
 type countingMetrics struct {
-	calls atomic.Int64
-	value workerdomain.Metrics
-	err   error
+	calls     atomic.Int64
+	value     workerdomain.Metrics
+	err       error
+	onCollect func()
 }
 
 func (m *countingMetrics) Collect(
 	context.Context,
 ) (workerdomain.Metrics, error) {
 	m.calls.Add(1)
+	if m.onCollect != nil {
+		m.onCollect()
+	}
 	return m.value, m.err
+}
+
+type countingReleaseReady struct {
+	calls    atomic.Int64
+	onSignal func()
+}
+
+func (signal *countingReleaseReady) SignalReady(context.Context) {
+	signal.calls.Add(1)
+	if signal.onSignal != nil {
+		signal.onSignal()
+	}
 }
 
 type runnerFixedCircuit bool
@@ -68,23 +85,28 @@ func TestRunnerOwnsDispatchAndMetricsLoop(t *testing.T) {
 	defer cancel()
 	var dispatches atomic.Int64
 	metrics := &countingMetrics{}
+	releaseReady := &countingReleaseReady{}
 	runner := Runner{
 		Dispatcher: dispatcherFunc(func(context.Context) error {
 			dispatches.Add(1)
 			cancel()
 			return nil
 		}),
-		Metrics: metrics, Logger: slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		Metrics: metrics, ReleaseReady: releaseReady,
+		Logger:        slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
 		DispatchEvery: time.Millisecond, MetricsEvery: time.Hour,
 	}
 	if err := runner.Run(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if dispatches.Load() != 1 || metrics.calls.Load() != 1 {
+	if dispatches.Load() != 1 ||
+		metrics.calls.Load() != 1 ||
+		releaseReady.calls.Load() != 1 {
 		t.Fatalf(
-			"dispatches=%d metrics=%d",
+			"dispatches=%d metrics=%d release_ready=%d",
 			dispatches.Load(),
 			metrics.calls.Load(),
+			releaseReady.calls.Load(),
 		)
 	}
 }
@@ -98,14 +120,22 @@ func TestRunnerRejectsMissingPorts(t *testing.T) {
 
 func TestRunnerRunOnceDispatchesImmediatelyAndTerminates(t *testing.T) {
 	t.Parallel()
-	metrics := &countingMetrics{}
+	var order []string
+	metrics := &countingMetrics{
+		onCollect: func() { order = append(order, "metrics") },
+	}
+	releaseReady := &countingReleaseReady{
+		onSignal: func() { order = append(order, "release-ready") },
+	}
 	var dispatches atomic.Int64
 	runner := Runner{
 		Dispatcher: dispatcherFunc(func(context.Context) error {
+			order = append(order, "dispatch")
 			dispatches.Add(1)
 			return nil
 		}),
-		Metrics: metrics,
+		Metrics:      metrics,
+		ReleaseReady: releaseReady,
 		Logger: slog.New(
 			slog.NewTextHandler(&bytes.Buffer{}, nil),
 		),
@@ -116,12 +146,18 @@ func TestRunnerRunOnceDispatchesImmediatelyAndTerminates(t *testing.T) {
 	if err := runner.Run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if dispatches.Load() != 1 || metrics.calls.Load() != 1 {
+	if dispatches.Load() != 1 ||
+		metrics.calls.Load() != 1 ||
+		releaseReady.calls.Load() != 1 {
 		t.Fatalf(
-			"dispatches=%d metrics=%d",
+			"dispatches=%d metrics=%d release_ready=%d",
 			dispatches.Load(),
 			metrics.calls.Load(),
+			releaseReady.calls.Load(),
 		)
+	}
+	if got := strings.Join(order, ","); got != "metrics,release-ready,dispatch" {
+		t.Fatalf("startup order = %q", got)
 	}
 }
 
@@ -133,12 +169,72 @@ func TestRunnerRunOnceReturnsDispatchFailure(t *testing.T) {
 			return sentinel
 		}),
 		Metrics:       &countingMetrics{},
+		ReleaseReady:  &countingReleaseReady{},
 		DispatchEvery: time.Hour,
 		MetricsEvery:  time.Hour,
 		RunOnce:       true,
 	}
 	if err := runner.Run(context.Background()); !errors.Is(err, sentinel) {
 		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestRunnerDoesNotSignalReleaseReadyWhenInitialMetricsFail(t *testing.T) {
+	t.Parallel()
+	var dispatches atomic.Int64
+	metrics := &countingMetrics{err: errors.New("database unavailable")}
+	releaseReady := &countingReleaseReady{}
+	runner := Runner{
+		Dispatcher: dispatcherFunc(func(context.Context) error {
+			dispatches.Add(1)
+			return nil
+		}),
+		Metrics:       metrics,
+		ReleaseReady:  releaseReady,
+		Logger:        slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		DispatchEvery: time.Hour,
+		MetricsEvery:  time.Hour,
+		RunOnce:       true,
+	}
+	err := runner.Run(context.Background())
+	if err == nil {
+		t.Fatal("initial metrics failure was accepted")
+	}
+	if metrics.calls.Load() != 1 ||
+		releaseReady.calls.Load() != 0 ||
+		dispatches.Load() != 0 {
+		t.Fatalf(
+			"metrics=%d release_ready=%d dispatches=%d",
+			metrics.calls.Load(),
+			releaseReady.calls.Load(),
+			dispatches.Load(),
+		)
+	}
+}
+
+func TestRunnerDoesNotSignalReleaseReadyWhileStopping(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	metrics := &countingMetrics{onCollect: cancel}
+	releaseReady := &countingReleaseReady{}
+	runner := Runner{
+		Dispatcher:    dispatcherFunc(func(context.Context) error { return nil }),
+		Metrics:       metrics,
+		ReleaseReady:  releaseReady,
+		Logger:        slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		DispatchEvery: time.Hour,
+		MetricsEvery:  time.Hour,
+		RunOnce:       true,
+	}
+	if err := runner.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if metrics.calls.Load() != 1 || releaseReady.calls.Load() != 0 {
+		t.Fatalf(
+			"metrics=%d release_ready=%d",
+			metrics.calls.Load(),
+			releaseReady.calls.Load(),
+		)
 	}
 }
 

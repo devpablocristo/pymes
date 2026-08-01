@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${FAKE_STATE_DIR:?}"
+: "${FAKE_API_SERVICE:?}"
+: "${FAKE_WEB_SERVICE:?}"
+: "${FAKE_TOKEN:?}"
+
+[[ "${1:-}" == "--disable" ]] || {
+  echo "fake curl: --disable must be the first argument" >&2
+  exit 95
+}
+shift
+
+header_file=
+body_file=
+config_file=
+url=
+while (($# > 0)); do
+  case "$1" in
+    --proto|--max-redirs|--connect-timeout|--max-time|--header|--write-out)
+      shift 2
+      ;;
+    --dump-header)
+      header_file=$2
+      shift 2
+      ;;
+    --output)
+      body_file=$2
+      shift 2
+      ;;
+    --config)
+      config_file=$2
+      shift 2
+      ;;
+    --tlsv1.2|--silent|--show-error)
+      shift
+      ;;
+    https://*)
+      url=$1
+      shift
+      ;;
+    *)
+      echo "fake curl: unsupported argument" >&2
+      exit 96
+      ;;
+  esac
+done
+
+[[ -n "$header_file" && -n "$body_file" && -n "$url" ]] || exit 97
+printf 'CURL %s\n' "$url" >>"$FAKE_STATE_DIR/commands.log"
+
+if [[ "${FAKE_CURL_TIMEOUT:-}" == "tagged" &&
+      "$url" == https://c-* ]]; then
+  exit 28
+fi
+
+host_and_path=${url#https://}
+host=${host_and_path%%/*}
+path=/${host_and_path#*/}
+if [[ "$host_and_path" == "$host" ]]; then
+  path=/
+fi
+
+api_host="${FAKE_API_SERVICE}-fakehash-uscentral1.a.run.app"
+web_host="${FAKE_WEB_SERVICE}-fakehash-uscentral1.a.run.app"
+status=503
+body='{"code":"UNAVAILABLE","message":"fake unavailable"}'
+release_marker=
+
+provided_token=
+if [[ -n "$config_file" ]]; then
+  provided_token=$(sed -n \
+    's/^header = "X-Pymes-Preflight-Token: \([0-9a-f]*\)"$/\1/p' \
+    "$config_file")
+fi
+
+if [[ "$host" == c-*---"$api_host" ]]; then
+  tag=${host%%---*}
+  mapped_revision=$(awk -F= -v wanted="$tag" \
+    '$1 == wanted { print $2 }' \
+    "$FAKE_STATE_DIR/tags-$FAKE_API_SERVICE")
+  if [[ -n "$mapped_revision" && "$provided_token" == "$FAKE_TOKEN" ]]; then
+    case "$path" in
+      /readyz)
+        status=200
+        body='ready'
+        : >"$FAKE_STATE_DIR/tagged-api-ready"
+        ;;
+      /api/v1/session)
+        status=403
+        body='{"code":"FORBIDDEN","message":"authentication required"}'
+        : >"$FAKE_STATE_DIR/tagged-api-auth-boundary"
+        ;;
+    esac
+  fi
+elif [[ "$host" == "$api_host" ]]; then
+  if [[ -s "$FAKE_STATE_DIR/active-$FAKE_API_SERVICE" &&
+        "$provided_token" == "$FAKE_TOKEN" &&
+        "$path" == "/readyz" ]]; then
+    status=200
+    body='ready'
+  fi
+elif [[ "$host" == "$web_host" ]]; then
+  active_web=$(<"$FAKE_STATE_DIR/active-$FAKE_WEB_SERVICE")
+  release_marker=$(jq -r '
+    [
+      (.spec.containers[0].env // [])[]
+      | select(.name == "PYMES_RELEASE_MARKER")
+      | .value
+    ] | select(length == 1) | .[0]
+  ' "$FAKE_STATE_DIR/revisions/$active_web.json")
+  if [[ "$path" == "/readyz" ]]; then
+    status=200
+    body='ready'
+  elif [[ "$path" == "/api/v1/session" ]]; then
+    upstream=$(jq -r '
+      [
+        (.spec.containers[0].env // [])[]
+        | select(.name == "PYMES_API_UPSTREAM")
+        | .value
+      ] | select(length == 1) | .[0]
+    ' "$FAKE_STATE_DIR/revisions/$active_web.json")
+    upstream_host=${upstream#https://}
+    upstream_tag=${upstream_host%%---*}
+    mapped_revision=$(awk -F= -v wanted="$upstream_tag" \
+      '$1 == wanted { print $2 }' \
+      "$FAKE_STATE_DIR/tags-$FAKE_API_SERVICE")
+    if [[ -n "$mapped_revision" ]]; then
+      status=403
+      body='{"code":"FORBIDDEN","message":"authentication required"}'
+    fi
+  fi
+fi
+
+{
+  printf 'HTTP/2 %s\r\n' "$status"
+  printf 'content-type: application/json\r\n'
+  if [[ -n "$release_marker" ]]; then
+    printf 'x-pymes-release: %s\r\n' "$release_marker"
+  fi
+  printf '\r\n'
+} >"$header_file"
+printf '%s' "$body" >"$body_file"
+printf '%s\n%s\n\n' "$status" "$url"

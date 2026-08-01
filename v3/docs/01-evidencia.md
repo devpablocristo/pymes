@@ -90,4 +90,5 @@ una afirmación de calidad general.
 | Pymes v2 como runtime | 4 | 4 | 4 | 3 | 3 | 4 | 4 | 3,80 | Referencia selectiva, no base de v3 |
 
 La evaluación no deja una decisión pendiente: se extrae/adapta el núcleo de OA
-en un fork privado mantenido por el equipo; no se despliega OA completo.
+en el fork público mantenido por el equipo y se despliega únicamente su runtime
+headless como servicio privado; no se expone ni se despliega OA completo.

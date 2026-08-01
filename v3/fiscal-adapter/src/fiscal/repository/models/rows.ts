@@ -4,6 +4,8 @@ import type {
 } from "../../usecases/domain/fiscal.js";
 
 export interface FiscalRecordRow {
+  organization_id?: string;
+  request_id?: string;
   idempotency_key: string;
   payload_hash: string;
   correlation_id: string;
@@ -15,6 +17,17 @@ export interface FiscalRecordRow {
   workload_token_id: string;
   request: FiscalRequest;
   result: FiscalResult;
+}
+
+export interface FiscalExecutionRow extends FiscalRecordRow {
+  organization_id: string;
+  request_id: string;
+  execution_state: "claimed" | "in_progress" | "uncertain" | "terminal";
+  execution_attempt: string | number;
+  lease_token: string | null;
+  lease_expires_at: Date | string | null;
+  lease_active?: boolean;
+  dispatch_may_have_occurred: boolean;
 }
 
 export interface FiscalMetricsRow {

@@ -166,7 +166,7 @@ func occupancy(
 	startAt, endAt time.Time,
 ) (int, int) {
 	allocated := 0
-	bookings := make(map[uuid.UUID]struct{})
+	bookings := make(map[uuid.UUID]bool)
 	for _, value := range values {
 		if !value.BookingOpen || value.ResourceID != resourceID ||
 			(query.ExcludeBookingID != nil && value.BookingID == *query.ExcludeBookingID) ||
@@ -175,7 +175,7 @@ func occupancy(
 		}
 		allocated += value.Units
 		if value.ServiceID == query.ServiceID {
-			bookings[value.BookingID] = struct{}{}
+			bookings[value.BookingID] = true
 		}
 	}
 	return allocated, len(bookings)
@@ -183,13 +183,13 @@ func occupancy(
 
 func deduplicateSlots(values []domain.Slot) []domain.Slot {
 	result := make([]domain.Slot, 0, len(values))
-	seen := make(map[string]struct{}, len(values))
+	seen := make(map[string]bool, len(values))
 	for _, value := range values {
 		key := fmt.Sprintf("%d:%d", value.StartAt.UnixNano(), value.EndAt.UnixNano())
-		if _, ok := seen[key]; ok {
+		if seen[key] {
 			continue
 		}
-		seen[key] = struct{}{}
+		seen[key] = true
 		result = append(result, value)
 	}
 	return result

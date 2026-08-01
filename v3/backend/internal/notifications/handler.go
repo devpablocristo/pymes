@@ -211,7 +211,8 @@ func (handler Handler) PerGoWebhook(
 		)
 		return
 	}
-	if decoder.Decode(&struct{}{}) == nil {
+	var trailing any
+	if decoder.Decode(&trailing) == nil {
 		handlerhelpers.WriteJSON(
 			writer, http.StatusBadRequest,
 			handlerdto.Error{Code: "PERGO_WEBHOOK_INVALID"},

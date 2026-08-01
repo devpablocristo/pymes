@@ -4,11 +4,25 @@ package helpers
 import (
 	"context"
 	"errors"
+	"strings"
 
 	repositorymodels "github.com/devpablocristo/pymes/v3/backend/internal/notifications/repository/models"
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/notifications/usecases/domain"
 	"github.com/jackc/pgx/v5"
 )
+
+func StableFailureCode(code string) string {
+	code = strings.TrimSpace(code)
+	if code == "" || len(code) > 80 {
+		return "PERGO_DELIVERY_FAILED"
+	}
+	for _, value := range code {
+		if !(value == '_' || value >= 'A' && value <= 'Z' || value >= '0' && value <= '9') {
+			return "PERGO_DELIVERY_FAILED"
+		}
+	}
+	return code
+}
 
 func SetOrganization(ctx context.Context, tx pgx.Tx, organizationID string) error {
 	if tx == nil || organizationID == "" {

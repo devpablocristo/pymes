@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   documentTypes,
   FiscalError,
@@ -47,10 +47,41 @@ export interface FiscalRecord {
   result: FiscalResult;
 }
 
+export interface FiscalLease {
+  token: string;
+  durationMs: number;
+}
+
+export type FiscalClaim =
+  | {
+      kind: "acquired";
+      recovery: "authorize" | "consult_exact";
+      attempt: number;
+    }
+  | { kind: "busy" }
+  | { kind: "stable"; record: FiscalRecord };
+
+export interface FiscalCompletion {
+  stored: boolean;
+  record: FiscalRecord;
+}
+
 export interface FiscalLedger {
   findByIdempotency(organizationId: string, idempotencyKey: string): Promise<FiscalRecord | undefined>;
   findByRequest(organizationId: string, requestId: string): Promise<FiscalRecord | undefined>;
-  save(record: FiscalRecord): Promise<void>;
+  claimAuthorization(record: FiscalRecord, lease: FiscalLease): Promise<FiscalClaim>;
+  markDispatched(
+    organizationId: string,
+    requestId: string,
+    payloadHash: string,
+    lease: FiscalLease,
+    attempt: number,
+  ): Promise<boolean>;
+  completeAuthorization(
+    record: FiscalRecord,
+    leaseToken: string,
+    attempt: number,
+  ): Promise<FiscalCompletion>;
 }
 
 export interface RequestContext {
@@ -59,31 +90,60 @@ export interface RequestContext {
   identity: InternalIdentity;
 }
 
+export interface FiscalServiceOptions {
+  leaseDurationMs?: number;
+  contentionTimeoutMs?: number;
+  contentionPollMs?: number;
+  leaseToken?: () => string;
+  sleep?: (durationMs: number) => Promise<void>;
+}
+
+const DEFAULT_LEASE_DURATION_MS = 30_000;
+const DEFAULT_CONTENTION_TIMEOUT_MS = 5_000;
+const DEFAULT_CONTENTION_POLL_MS = 10;
+
 export class FiscalService {
+  private readonly leaseDurationMs: number;
+  private readonly contentionTimeoutMs: number;
+  private readonly contentionPollMs: number;
+  private readonly leaseToken: () => string;
+  private readonly sleep: (durationMs: number) => Promise<void>;
+
   constructor(
     private readonly authority: FiscalAuthority,
     private readonly ledger: FiscalLedger,
     private readonly now: () => Date = () => new Date(),
-  ) {}
+    options: FiscalServiceOptions = {},
+  ) {
+    this.leaseDurationMs = positiveInteger(
+      options.leaseDurationMs,
+      DEFAULT_LEASE_DURATION_MS,
+    );
+    this.contentionTimeoutMs = positiveInteger(
+      options.contentionTimeoutMs,
+      DEFAULT_CONTENTION_TIMEOUT_MS,
+    );
+    this.contentionPollMs = positiveInteger(
+      options.contentionPollMs,
+      DEFAULT_CONTENTION_POLL_MS,
+    );
+    this.leaseToken = options.leaseToken ?? randomUUID;
+    this.sleep = options.sleep ?? delay;
+  }
 
   async authorize(request: FiscalRequest, context: RequestContext): Promise<FiscalResult> {
     validateRequest(request);
     validateContext(context, request.organization_id);
     validateMetadata(request, context);
     const payloadHash = hashPayload(request);
-    const existing = await this.findExisting(request, context.idempotencyKey, payloadHash);
-    if (existing !== undefined) return structuredClone(existing.result);
-
-    const decision = await this.authority.authorize(structuredClone(request));
-    const result = this.toResult(request, decision, context);
-    await this.ledger.save({
-      idempotencyKey: context.idempotencyKey,
+    const record = this.pendingRecord(
+      request,
+      context.idempotencyKey,
       payloadHash,
-      audit: auditMetadata(context.identity),
-      request: structuredClone(request),
-      result,
-    });
-    return structuredClone(result);
+      auditMetadata(context.identity),
+      context,
+    );
+    return this.executeClaimed(record, "authorize", context);
   }
 
   async consult(
@@ -104,28 +164,144 @@ export class FiscalService {
     if (recorded !== undefined && recorded.payloadHash !== payloadHash) {
       throw new FiscalError("IDEMPOTENCY_KEY_REUSED");
     }
-
-    const decision = await this.authority.consult(structuredClone(request));
-    const result = this.toResult(request, decision, context);
-    await this.ledger.save({
-      idempotencyKey: recorded?.idempotencyKey ?? context.idempotencyKey,
+    const record = this.pendingRecord(
+      request,
+      recorded?.idempotencyKey ?? context.idempotencyKey,
       payloadHash,
-      audit: recorded?.audit ?? auditMetadata(context.identity),
-      request: structuredClone(request),
-      result,
-    });
-    return structuredClone(result);
+      recorded?.audit ?? auditMetadata(context.identity),
+      context,
+    );
+    return this.executeClaimed(record, "consult", context);
   }
 
-  private async findExisting(request: FiscalRequest, idempotencyKey: string, payloadHash: string): Promise<FiscalRecord | undefined> {
-    const byKey = await this.ledger.findByIdempotency(request.organization_id, idempotencyKey);
-    const byRequest = await this.ledger.findByRequest(request.organization_id, request.request_id);
-    for (const record of [byKey, byRequest]) {
-      if (record !== undefined && record.payloadHash !== payloadHash) {
-        throw new FiscalError("IDEMPOTENCY_KEY_REUSED");
+  private async executeClaimed(
+    record: FiscalRecord,
+    operation: "authorize" | "consult",
+    context: RequestContext,
+  ): Promise<FiscalResult> {
+    const startedAt = Date.now();
+    while (true) {
+      const lease: FiscalLease = {
+        token: this.leaseToken(),
+        durationMs: this.leaseDurationMs,
+      };
+      const claim = await this.ledger.claimAuthorization(record, lease);
+      if (claim.kind === "stable") {
+        return structuredClone(claim.record.result);
       }
+      if (claim.kind === "busy") {
+        if (Date.now() - startedAt >= this.contentionTimeoutMs) {
+          throw new FiscalError(
+            "AUTHORITY_TIMEOUT",
+            "fiscal authorization is already in progress",
+          );
+        }
+        await this.sleep(this.contentionPollMs);
+        continue;
+      }
+
+      const marked = await this.ledger.markDispatched(
+        record.request.organization_id,
+        record.request.request_id,
+        record.payloadHash,
+        lease,
+        claim.attempt,
+      );
+      if (!marked) {
+        await this.sleep(this.contentionPollMs);
+        continue;
+      }
+
+      try {
+        let decision: AuthorityDecision;
+        if (operation === "consult" || claim.recovery === "consult_exact") {
+          decision = await this.authority.consult(
+            structuredClone(record.request),
+          );
+          if (
+            operation === "authorize" &&
+            claim.recovery === "consult_exact" &&
+            decision.status === "not_found"
+          ) {
+            decision = await this.authority.authorize(
+              structuredClone(record.request),
+            );
+          }
+        } else {
+          decision = await this.authority.authorize(
+            structuredClone(record.request),
+          );
+        }
+        const completed = await this.ledger.completeAuthorization(
+          {
+            ...record,
+            result: this.toResult(record.request, decision, context),
+          },
+          lease.token,
+          claim.attempt,
+        );
+        if (completed.stored || isStable(completed.record.result)) {
+          return structuredClone(completed.record.result);
+        }
+      } catch (error) {
+        const uncertain = {
+          ...record,
+          result: this.toResult(
+            record.request,
+            {
+              status: "uncertain",
+              result_code: "DISPATCH_OUTCOME_UNKNOWN",
+              messages: ["La ejecución fiscal debe reconciliarse por consulta exacta"],
+            },
+            context,
+          ),
+        };
+        const completion = await this.ledger.completeAuthorization(
+          uncertain,
+          lease.token,
+          claim.attempt,
+        ).catch(() => undefined);
+        if (
+          completion !== undefined &&
+          isStable(completion.record.result)
+        ) {
+          return structuredClone(completion.record.result);
+        }
+        throw error;
+      }
+
+      if (Date.now() - startedAt >= this.contentionTimeoutMs) {
+        throw new FiscalError(
+          "AUTHORITY_TIMEOUT",
+          "fiscal authorization convergence timed out",
+        );
+      }
+      await this.sleep(this.contentionPollMs);
     }
-    return byKey ?? byRequest;
+  }
+
+  private pendingRecord(
+    request: FiscalRequest,
+    idempotencyKey: string,
+    payloadHash: string,
+    audit: FiscalAuditMetadata,
+    context: RequestContext,
+  ): FiscalRecord {
+    return {
+      idempotencyKey,
+      payloadHash,
+      audit,
+      request: structuredClone(request),
+      result: this.toResult(
+        request,
+        {
+          status: "uncertain",
+          result_code: "CLAIMED",
+          messages: ["La ejecución fiscal todavía no tiene un resultado estable"],
+        },
+        context,
+      ),
+    };
   }
 
   private toResult(request: FiscalRequest, decision: AuthorityDecision, context: RequestContext): FiscalResult {
@@ -322,4 +498,23 @@ function canonical(value: unknown): unknown {
     return Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, child]) => [key, canonical(child)]));
   }
   return value;
+}
+
+function isStable(result: FiscalResult): boolean {
+  return result.status === "authorized" || result.status === "rejected";
+}
+
+function positiveInteger(
+  value: number | undefined,
+  fallback: number,
+): number {
+  if (value === undefined) return fallback;
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new FiscalError("VALIDATION_ERROR");
+  }
+  return value;
+}
+
+function delay(durationMs: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, durationMs));
 }

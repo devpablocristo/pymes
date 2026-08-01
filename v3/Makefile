@@ -98,7 +98,9 @@ e2e:
 	$(MAKE) observability-e2e
 	$(MAKE) recovery-e2e
 	$(MAKE) replay-smoke
+	docker compose stop worker
 	cd backend && PYMES_DATABASE_TEST_URL='postgres://pymes:pymes@127.0.0.1:55434/pymes_v3?sslmode=disable' go test ./internal/commerce -run 'TestDurableWorkerRecoversLostFiscalAndAccountingResponses' -count=1
+	docker compose up -d --wait worker
 	$(MAKE) fiscal-e2e
 	$(MAKE) accounting-e2e
 

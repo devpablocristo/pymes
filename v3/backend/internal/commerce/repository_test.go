@@ -10,6 +10,7 @@ import (
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/commerce/usecases/domain"
 	organizationrepository "github.com/devpablocristo/pymes/v3/backend/internal/organization"
 	organizationdomain "github.com/devpablocristo/pymes/v3/backend/internal/organization/usecases/domain"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"os"
 	"strings"
@@ -514,11 +515,18 @@ func TestDurableWorkerRecoversLostFiscalAndAccountingResponses(t *testing.T) {
 	if _, err := pool.Exec(context.Background(), "TRUNCATE app.outbox, app.sales, app.organizations CASCADE"); err != nil {
 		t.Fatal(err)
 	}
-	organization, err := createReadyOrganization(t, pool, "org_worker", "Worker", "worker")
+	runID := uuid.NewString()
+	organization, err := createReadyOrganization(
+		t,
+		pool,
+		"org_worker_"+runID,
+		"Worker",
+		"worker-"+runID,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	sale := domain.Sale{ID: "sale_worker", OrganizationID: organization.ID, RecipientRef: "party", Voucher: domain.VoucherReference{PointOfSale: 1, DocumentType: "FA", VoucherNumber: 2}, Total: domain.Money{Amount: "121.00", Currency: "ARS"}, Status: domain.SaleFiscalPending, SnapshotDigest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", CorrelationID: "worker-test", FiscalSnapshot: []byte(`{"issue_date":"2026-07-31","currency":"ARS","totals":{"net":"100","vat":"21","exempt":"0","total":"121"}}`)}
+	sale := domain.Sale{ID: "sale_worker_" + runID, OrganizationID: organization.ID, RecipientRef: "party", Voucher: domain.VoucherReference{PointOfSale: 1, DocumentType: "FA", VoucherNumber: 2}, Total: domain.Money{Amount: "121.00", Currency: "ARS"}, Status: domain.SaleFiscalPending, SnapshotDigest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", CorrelationID: "worker-test-" + runID, FiscalSnapshot: []byte(`{"issue_date":"2026-07-31","currency":"ARS","totals":{"net":"100","vat":"21","exempt":"0","total":"121"}}`)}
 	if _, err := store.CreateSaleAndQueueFiscal(context.Background(), sale, "kms://credential/worker"); err != nil {
 		t.Fatal(err)
 	}

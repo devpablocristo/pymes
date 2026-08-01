@@ -26,12 +26,13 @@ type WorkerConfig struct {
 }
 
 type PerGoWorker struct {
-	Enabled     bool
-	BaseURL     string
-	APIKey      string
-	WorkspaceID string
-	Channel     string
-	Timeout     time.Duration
+	Enabled                  bool
+	BaseURL                  string
+	APIKey                   string
+	WorkspaceID              string
+	Channel                  string
+	AllowGlobalRouteFallback bool
+	Timeout                  time.Duration
 }
 
 type WorkerConfigError struct {
@@ -132,6 +133,16 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 			Err:  err,
 		}
 	}
+	allowGlobalRouteFallback, err := parseWorkerBoolean(
+		"PERGO_ALLOW_GLOBAL_ROUTE_FALLBACK",
+		strings.TrimSpace(getenv("PERGO_ALLOW_GLOBAL_ROUTE_FALLBACK")),
+	)
+	if err != nil {
+		return WorkerConfig{}, &WorkerConfigError{
+			Code: "PERGO_CONFIG_INVALID",
+			Err:  err,
+		}
+	}
 	pergoTimeout := 5 * time.Second
 	if value := strings.TrimSpace(getenv("PERGO_TIMEOUT")); value != "" {
 		pergoTimeout, err = time.ParseDuration(value)
@@ -144,12 +155,13 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 		}
 	}
 	pergo := PerGoWorker{
-		Enabled:     pergoEnabled,
-		BaseURL:     strings.TrimRight(strings.TrimSpace(getenv("PERGO_URL")), "/"),
-		APIKey:      strings.TrimSpace(getenv("PERGO_API_KEY")),
-		WorkspaceID: strings.TrimSpace(getenv("PERGO_WORKSPACE_ID")),
-		Channel:     defaultValue(getenv("PERGO_CHANNEL"), "whatsapp"),
-		Timeout:     pergoTimeout,
+		Enabled:                  pergoEnabled,
+		BaseURL:                  strings.TrimRight(strings.TrimSpace(getenv("PERGO_URL")), "/"),
+		APIKey:                   strings.TrimSpace(getenv("PERGO_API_KEY")),
+		WorkspaceID:              strings.TrimSpace(getenv("PERGO_WORKSPACE_ID")),
+		Channel:                  defaultValue(getenv("PERGO_CHANNEL"), "whatsapp"),
+		AllowGlobalRouteFallback: allowGlobalRouteFallback,
+		Timeout:                  pergoTimeout,
 	}
 	if pergo.Enabled &&
 		(pergo.BaseURL == "" || pergo.APIKey == "" ||

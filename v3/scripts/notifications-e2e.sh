@@ -36,19 +36,28 @@ ON CONFLICT (id) DO UPDATE SET status='ready';
 
 BEGIN;
 SELECT set_config('app.org_id', :'organization_id', true);
-INSERT INTO app.notification_settings(org_id,whatsapp_enabled)
-VALUES(:'organization_id',true)
+INSERT INTO app.notification_settings(
+  org_id,whatsapp_enabled,pergo_channel,pergo_sender_identity
+)
+VALUES(
+  :'organization_id',true,'whatsapp_mock','mock:' || :'organization_id'
+)
 ON CONFLICT (org_id) DO UPDATE
-SET whatsapp_enabled=true,updated_at=now();
+SET whatsapp_enabled=true,
+    pergo_channel=EXCLUDED.pergo_channel,
+    pergo_sender_identity=EXCLUDED.pergo_sender_identity,
+    updated_at=now();
 INSERT INTO app.notifications(
   org_id,id,kind,aggregate_type,aggregate_id,recipient_e164,template_name,
-  template_version,locale,variables,body,send_at,status,idempotency_key,
-  correlation_id,request_id,actor_ref,source_version,snapshot_digest
+  template_version,locale,variables,body,delivery_channel,sender_identity,
+  send_at,status,idempotency_key,correlation_id,request_id,actor_ref,
+  source_version,snapshot_digest
 )
 VALUES(
   :'organization_id',:'notification_id','reminder','booking',
   'booking-e2e','+5491112345678','booking.reminder',1,'es_AR',
-  '{"customer":"E2E"}'::jsonb,'Recordatorio de turno',now(),'pending',
+  '{"customer":"E2E"}'::jsonb,'Recordatorio de turno',
+  'whatsapp_mock','mock:' || :'organization_id',now(),'pending',
   'notification:' || :'notification_id',
   'correlation:' || :'notification_id',
   'request:' || :'notification_id','system:scheduling',1,repeat('b',64)
@@ -91,10 +100,17 @@ ON CONFLICT (id) DO UPDATE SET status='ready';
 
 BEGIN;
 SELECT set_config('app.org_id', :'organization_id', true);
-INSERT INTO app.notification_settings(org_id,whatsapp_enabled)
-VALUES(:'organization_id',true)
+INSERT INTO app.notification_settings(
+  org_id,whatsapp_enabled,pergo_channel,pergo_sender_identity
+)
+VALUES(
+  :'organization_id',true,'whatsapp_mock','mock:' || :'organization_id'
+)
 ON CONFLICT (org_id) DO UPDATE
-SET whatsapp_enabled=true,updated_at=now();
+SET whatsapp_enabled=true,
+    pergo_channel=EXCLUDED.pergo_channel,
+    pergo_sender_identity=EXCLUDED.pergo_sender_identity,
+    updated_at=now();
 INSERT INTO app.outbox(
   id,org_id,topic,payload,payload_hash,idempotency_key,request_id,actor_ref,
   source_version,snapshot_digest,correlation_id,available_at
@@ -202,11 +218,27 @@ projection_count=$(
     -c "SELECT set_config('app.org_id', '$organization_id', false); SELECT count(*) FROM app.notifications WHERE org_id='$organization_id' AND idempotency_key='scheduling:NotificationRequested:booking-projection-e2e:source:1';" |
     tail -n 1
 )
+projection_route=$(
+  psql_app \
+    -qAt -v ON_ERROR_STOP=1 \
+    -c "SELECT set_config('app.org_id', '$organization_id', false); SELECT delivery_channel || ':' || sender_identity FROM app.notifications WHERE org_id='$organization_id' AND idempotency_key='scheduling:NotificationRequested:booking-projection-e2e:source:1';" |
+    tail -n 1
+)
 if [ "$wait_published_idempotency" != "1:1" ] ||
-  [ "$projection_count" != "1" ]; then
-  echo "scheduling projection did not converge: outbox=$wait_published_idempotency notifications=$projection_count" >&2
+  [ "$projection_count" != "1" ] ||
+  [ "$projection_route" != "whatsapp_mock:mock:$organization_id" ]; then
+  echo "scheduling projection did not converge: outbox=$wait_published_idempotency notifications=$projection_count route=$projection_route" >&2
   exit 1
 fi
+projection_stats=$(curl -fsS \
+  "http://127.0.0.1:$pergo_port/__test/messages/$organization_id/$projection_notification_id")
+case "$projection_stats" in
+  *"\"channel\":\"whatsapp_mock\""*"\"sender_identity\":\"mock:$organization_id\""*) ;;
+  *)
+    echo "PerGo did not receive the tenant route: $projection_stats" >&2
+    exit 1
+    ;;
+esac
 
 set_scenario timeout_after
 queue_notification notification-timeout-after

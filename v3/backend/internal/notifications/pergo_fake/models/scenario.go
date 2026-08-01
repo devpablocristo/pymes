@@ -10,6 +10,8 @@ type ScenarioResponse struct {
 }
 
 type MessageStats struct {
-	Requests          int `json:"requests"`
-	WebhookDeliveries int `json:"webhook_deliveries"`
+	Requests          int    `json:"requests"`
+	WebhookDeliveries int    `json:"webhook_deliveries"`
+	Channel           string `json:"channel"`
+	SenderIdentity    string `json:"sender_identity"`
 }

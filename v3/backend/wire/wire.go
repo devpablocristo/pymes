@@ -344,11 +344,13 @@ func InitializeWorker(
 				cfg.PerGo.BaseURL,
 				cfg.PerGo.APIKey,
 				cfg.PerGo.Channel,
+				cfg.PerGo.AllowGlobalRouteFallback,
 				nil,
 				cfg.PerGo.Timeout,
 			),
 			notifications.ProjectSchedulingNotification{
 				Repository: notificationStore,
+				Routes:     notificationStore,
 			},
 		)
 		notificationDispatcher.LeaseFor = cfg.LeaseDuration

@@ -31,7 +31,13 @@ type PerGoFakeConfig struct {
 }
 
 type fakeDelivery struct {
+	idempotencyKey    string
+	traceID           string
 	digest            string
+	messageID         string
+	queuedAt          time.Time
+	channel           string
+	senderIdentity    string
 	event             []byte
 	requests          int
 	webhookDeliveries int
@@ -42,6 +48,7 @@ type PerGoFake struct {
 	mu       sync.RWMutex
 	scenario string
 	messages map[string]fakeDelivery
+	traceIDs map[string]string
 }
 
 func NewPerGoFake(config PerGoFakeConfig) *PerGoFake {
@@ -51,6 +58,7 @@ func NewPerGoFake(config PerGoFakeConfig) *PerGoFake {
 	return &PerGoFake{
 		config: config, scenario: "success",
 		messages: make(map[string]fakeDelivery),
+		traceIDs: make(map[string]string),
 	}
 }
 
@@ -86,7 +94,8 @@ func (fake *PerGoFake) enqueue(
 		return
 	}
 	traceID := strings.TrimSpace(request.Header.Get("X-Trace-ID"))
-	if traceID == "" || strings.TrimSpace(request.Header.Get("Idempotency-Key")) == "" {
+	idempotencyKey := strings.TrimSpace(request.Header.Get("Idempotency-Key"))
+	if traceID == "" || idempotencyKey == "" {
 		http.Error(writer, "invalid identity", http.StatusBadRequest)
 		return
 	}
@@ -120,34 +129,48 @@ func (fake *PerGoFake) enqueue(
 	digest := sha256.Sum256(body)
 	digestValue := hex.EncodeToString(digest[:])
 	fake.mu.Lock()
-	existing, exists := fake.messages[traceID]
+	existing, exists := fake.messages[idempotencyKey]
 	if exists && existing.digest != digestValue {
 		fake.mu.Unlock()
-		http.Error(writer, "idempotency conflict", http.StatusConflict)
+		http.Error(writer, "idempotency_key_reused", http.StatusConflict)
 		return
 	}
-	if !exists {
-		existing = fakeDelivery{digest: digestValue}
+	if exists {
+		existing.requests++
+		fake.messages[idempotencyKey] = existing
+		fake.mu.Unlock()
+		fake.accept(writer, existing, true)
+		return
 	}
-	existing.requests++
-	fake.messages[traceID] = existing
+	existing = fakeDelivery{
+		idempotencyKey: idempotencyKey,
+		traceID:        traceID,
+		digest:         digestValue,
+		messageID:      pergofakehelpers.ExternalMessageID(traceID),
+		queuedAt:       time.Now().UTC(),
+		channel:        message.Channel,
+		senderIdentity: message.From,
+		requests:       1,
+	}
+	fake.messages[idempotencyKey] = existing
+	fake.traceIDs[traceID] = idempotencyKey
 	fake.mu.Unlock()
 	event, eventErr := fake.deliveryEvent(traceID, message)
 	if eventErr == nil {
 		fake.mu.Lock()
-		value := fake.messages[traceID]
+		value := fake.messages[idempotencyKey]
 		value.event = event
-		fake.messages[traceID] = value
+		fake.messages[idempotencyKey] = value
 		fake.mu.Unlock()
 		if fake.sendWebhook(request.Context(), event) == nil {
-			fake.recordWebhookDelivery(traceID)
+			fake.recordWebhookDelivery(idempotencyKey)
 		}
 	}
 	if scenario == "timeout_after" {
 		fake.wait(request.Context())
 		return
 	}
-	fake.accept(writer, traceID)
+	fake.accept(writer, existing, false)
 }
 
 func (fake *PerGoFake) setScenario(
@@ -189,9 +212,10 @@ func (fake *PerGoFake) replay(
 		return
 	}
 	fake.mu.RLock()
-	delivery, exists := fake.messages[traceID]
+	idempotencyKey, indexed := fake.traceIDs[traceID]
+	delivery, exists := fake.messages[idempotencyKey]
 	fake.mu.RUnlock()
-	if !exists || len(delivery.event) == 0 {
+	if !indexed || !exists || len(delivery.event) == 0 {
 		http.Error(writer, "not found", http.StatusNotFound)
 		return
 	}
@@ -199,7 +223,7 @@ func (fake *PerGoFake) replay(
 		http.Error(writer, "delivery failed", http.StatusBadGateway)
 		return
 	}
-	fake.recordWebhookDelivery(traceID)
+	fake.recordWebhookDelivery(idempotencyKey)
 	writer.WriteHeader(http.StatusNoContent)
 }
 
@@ -216,9 +240,10 @@ func (fake *PerGoFake) stats(
 		return
 	}
 	fake.mu.RLock()
-	delivery, exists := fake.messages[traceID]
+	idempotencyKey, indexed := fake.traceIDs[traceID]
+	delivery, exists := fake.messages[idempotencyKey]
 	fake.mu.RUnlock()
-	if !exists {
+	if !indexed || !exists {
 		http.Error(writer, "not found", http.StatusNotFound)
 		return
 	}
@@ -226,6 +251,8 @@ func (fake *PerGoFake) stats(
 	_ = json.NewEncoder(writer).Encode(pergofakemodels.MessageStats{
 		Requests:          delivery.requests,
 		WebhookDeliveries: delivery.webhookDeliveries,
+		Channel:           delivery.channel,
+		SenderIdentity:    delivery.senderIdentity,
 	})
 }
 
@@ -283,11 +310,11 @@ func (fake *PerGoFake) currentScenario() string {
 	return fake.scenario
 }
 
-func (fake *PerGoFake) recordWebhookDelivery(traceID string) {
+func (fake *PerGoFake) recordWebhookDelivery(idempotencyKey string) {
 	fake.mu.Lock()
-	value := fake.messages[traceID]
+	value := fake.messages[idempotencyKey]
 	value.webhookDeliveries++
-	fake.messages[traceID] = value
+	fake.messages[idempotencyKey] = value
 	fake.mu.Unlock()
 }
 
@@ -300,12 +327,19 @@ func (fake *PerGoFake) wait(ctx context.Context) {
 	}
 }
 
-func (fake *PerGoFake) accept(writer http.ResponseWriter, traceID string) {
+func (fake *PerGoFake) accept(
+	writer http.ResponseWriter,
+	delivery fakeDelivery,
+	replayed bool,
+) {
 	writer.Header().Set("Content-Type", "application/json")
-	writer.Header().Set("X-Trace-ID", traceID)
+	writer.Header().Set("X-Trace-ID", delivery.traceID)
+	if replayed {
+		writer.Header().Set("Idempotency-Replayed", "true")
+	}
 	writer.WriteHeader(http.StatusAccepted)
 	_ = json.NewEncoder(writer).Encode(pergomodels.MessageResponse{
-		MessageID: pergofakehelpers.ExternalMessageID(traceID),
-		Status:    "queued", QueuedAt: time.Now().UTC(),
+		MessageID: delivery.messageID,
+		Status:    "queued", QueuedAt: delivery.queuedAt,
 	})
 }

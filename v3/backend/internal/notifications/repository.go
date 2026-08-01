@@ -21,7 +21,8 @@ import (
 
 const intentColumns = `
 id,org_id,kind,aggregate_type,aggregate_id,recipient_e164,template_name,
-template_version,locale,variables,body,send_at,status,
+template_version,locale,variables,body,
+COALESCE(delivery_channel,''),COALESCE(sender_identity,''),send_at,status,
 COALESCE(external_message_id,''),idempotency_key,correlation_id,request_id,
 actor_ref,source_version,snapshot_digest,COALESCE(failure_code,''),
 created_at,updated_at`
@@ -29,6 +30,50 @@ created_at,updated_at`
 type Postgres struct {
 	pool  *pgxpool.Pool
 	Clock func() time.Time
+}
+
+func (repository *Postgres) ResolveDeliveryRoute(
+	ctx context.Context,
+	organizationID string,
+) (domain.DeliveryRoute, error) {
+	if repository == nil || repository.pool == nil {
+		return domain.DeliveryRoute{}, errors.New(
+			"notification database is required",
+		)
+	}
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return domain.DeliveryRoute{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err = repositoryhelpers.SetOrganization(
+		ctx, tx, organizationID,
+	); err != nil {
+		return domain.DeliveryRoute{}, err
+	}
+	var enabled bool
+	var route domain.DeliveryRoute
+	err = tx.QueryRow(ctx, `
+		SELECT whatsapp_enabled,
+		       COALESCE(pergo_channel,''),
+		       COALESCE(pergo_sender_identity,'')
+		FROM app.notification_settings
+		WHERE org_id=$1`,
+		organizationID,
+	).Scan(&enabled, &route.Channel, &route.SenderIdentity)
+	if errors.Is(err, pgx.ErrNoRows) || !enabled {
+		return domain.DeliveryRoute{}, domain.ErrDisabled
+	}
+	if err != nil {
+		return domain.DeliveryRoute{}, err
+	}
+	if err = route.Validate(); err != nil {
+		return domain.DeliveryRoute{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return domain.DeliveryRoute{}, err
+	}
+	return route, nil
 }
 
 func NewPostgres(pool *pgxpool.Pool) *Postgres {
@@ -47,6 +92,43 @@ func (repository *Postgres) Project(
 	intent domain.Intent,
 ) (domain.Intent, error) {
 	return repository.create(ctx, intent, false)
+}
+
+func (repository *Postgres) FindProjected(
+	ctx context.Context,
+	organizationID string,
+	idempotencyKey string,
+) (domain.Intent, error) {
+	if repository == nil || repository.pool == nil {
+		return domain.Intent{}, errors.New("notification database is required")
+	}
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return domain.Intent{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err = repositoryhelpers.SetOrganization(
+		ctx, tx, organizationID,
+	); err != nil {
+		return domain.Intent{}, err
+	}
+	intent, err := repositoryhelpers.ScanIntent(tx.QueryRow(ctx, `
+		SELECT `+intentColumns+`
+		FROM app.notifications
+		WHERE org_id=$1 AND idempotency_key=$2`,
+		organizationID,
+		idempotencyKey,
+	))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Intent{}, domain.ErrNotFound
+	}
+	if err != nil {
+		return domain.Intent{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return domain.Intent{}, err
+	}
+	return intent, nil
 }
 
 func (repository *Postgres) create(
@@ -88,18 +170,21 @@ func (repository *Postgres) create(
 	row := tx.QueryRow(ctx, `
 		INSERT INTO app.notifications(
 			id,org_id,kind,aggregate_type,aggregate_id,recipient_e164,
-			template_name,template_version,locale,variables,body,send_at,status,
+			template_name,template_version,locale,variables,body,
+			delivery_channel,sender_identity,send_at,status,
 			idempotency_key,correlation_id,request_id,actor_ref,source_version,
 			snapshot_digest,created_at,updated_at
 		)
 		VALUES(
-			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$20
+			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
+			$19,$20,$21,$22,$22
 		)
 		ON CONFLICT (org_id,idempotency_key) DO NOTHING
 		RETURNING `+intentColumns,
 		intent.ID, intent.OrganizationID, intent.Kind, intent.AggregateType,
 		intent.AggregateID, intent.RecipientE164, intent.TemplateName,
 		intent.TemplateVersion, intent.Locale, variables, intent.Body,
+		nullIfEmpty(intent.DeliveryChannel), nullIfEmpty(intent.SenderIdentity),
 		intent.SendAt.UTC(), intent.Status, intent.IdempotencyKey,
 		intent.CorrelationID, intent.RequestID, intent.ActorRef,
 		intent.SourceVersion, intent.SnapshotDigest, now,
@@ -150,6 +235,13 @@ func (repository *Postgres) create(
 		return domain.Intent{}, err
 	}
 	return stored, nil
+}
+
+func nullIfEmpty(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
 }
 
 func (repository *Postgres) Get(
@@ -421,7 +513,7 @@ func (repository *Postgres) LeaseNotifications(
 					  value.payload_hash,value.idempotency_key,
 					  value.request_id,value.actor_ref,value.source_version,
 					  value.snapshot_digest,value.correlation_id,
-					  value.available_at,value.attempts,value.lease_token,
+					  value.available_at,value.created_at,value.attempts,value.lease_token,
 					  value.lease_expires_at`,
 					organizationID,
 					now,

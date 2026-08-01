@@ -25,7 +25,9 @@ func TestPerGoSendsStableIdentityWithoutLoggingOrLeakingProviderTypes(t *testing
 		Kind: domain.KindConfirmation, RecipientE164: "+5491112345678",
 		TemplateName: "booking.confirmation", TemplateVersion: 3,
 		Locale: "es_AR", Body: "Confirmado", IdempotencyKey: "booking-1:v3",
-		CorrelationID: "correlation-1",
+		CorrelationID:   "correlation-1",
+		DeliveryChannel: "whatsapp_cloud",
+		SenderIdentity:  "5491100000000",
 	}
 	expectedTraceID, err := pergohelpers.TraceID(
 		intent.OrganizationID,
@@ -34,17 +36,27 @@ func TestPerGoSendsStableIdentityWithoutLoggingOrLeakingProviderTypes(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
+	expectedIdempotencyKey, err := pergohelpers.IngressIdempotencyKey(
+		intent.OrganizationID,
+		intent.IdempotencyKey,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	client := roundTripFunc(func(request *http.Request) (*http.Response, error) {
 		if request.Header.Get("Authorization") != "Bearer secret" ||
 			request.Header.Get("X-Trace-ID") != expectedTraceID ||
-			request.Header.Get("Idempotency-Key") != intent.IdempotencyKey {
+			request.Header.Get("Idempotency-Key") != expectedIdempotencyKey {
 			t.Fatalf("unexpected headers: %#v", request.Header)
 		}
 		var payload map[string]any
 		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
 			t.Fatal(err)
 		}
-		if payload["to"] != "5491112345678" || payload["body"] != "Confirmado" {
+		if payload["to"] != "5491112345678" ||
+			payload["from"] != "5491100000000" ||
+			payload["channel"] != "whatsapp_cloud" ||
+			payload["body"] != "Confirmado" {
 			t.Fatalf("unexpected PerGo payload: %#v", payload)
 		}
 		metadata := payload["metadata"].(map[string]any)
@@ -77,7 +89,9 @@ func TestPerGoClassifiesLostResponseAsUncertainAndFourHundredAsTerminal(t *testi
 		Kind: domain.KindReminder, RecipientE164: "+5491112345678",
 		TemplateName: "booking.reminder", TemplateVersion: 1,
 		Locale: "es_AR", Body: "Recordatorio", IdempotencyKey: "reminder-1",
-		CorrelationID: "correlation-1",
+		CorrelationID:   "correlation-1",
+		DeliveryChannel: "whatsapp",
+		SenderIdentity:  "5491100000000",
 	}
 	_, err := (PerGo{
 		BaseURL: "http://pergo", APIKey: "secret",

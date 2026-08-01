@@ -24,23 +24,26 @@ type HTTPDoer interface {
 }
 
 type PerGo struct {
-	BaseURL string
-	APIKey  string
-	Channel string
-	Client  HTTPDoer
-	Timeout time.Duration
+	BaseURL                  string
+	APIKey                   string
+	Channel                  string
+	AllowGlobalRouteFallback bool
+	Client                   HTTPDoer
+	Timeout                  time.Duration
 }
 
 func NewPerGo(
 	baseURL string,
 	apiKey string,
 	channel string,
+	allowGlobalRouteFallback bool,
 	client HTTPDoer,
 	timeout time.Duration,
 ) *PerGo {
 	return &PerGo{
 		BaseURL: baseURL, APIKey: apiKey, Channel: channel,
-		Client: client, Timeout: timeout,
+		AllowGlobalRouteFallback: allowGlobalRouteFallback,
+		Client:                   client, Timeout: timeout,
 	}
 }
 
@@ -55,18 +58,28 @@ func (adapter PerGo) Send(
 			Cause:      errors.New("PerGo URL and API key are required"),
 		}
 	}
-	channel := strings.TrimSpace(adapter.Channel)
-	if channel == "" {
-		channel = "whatsapp"
-	}
-	if channel != "whatsapp" && channel != "whatsapp_cloud" && channel != "whatsapp_mock" {
+	channel, senderIdentity, routeErr := pergohelpers.DeliveryRoute(
+		intent,
+		adapter.Channel,
+		adapter.AllowGlobalRouteFallback,
+	)
+	if routeErr != nil {
 		return DeliveryReceipt{}, &ProviderError{
-			StableCode: "PERGO_CHANNEL_INVALID",
-			Cause:      errors.New("unsupported PerGo channel"),
+			StableCode: "PERGO_ROUTE_NOT_CONFIGURED",
+			Cause:      routeErr,
 		}
 	}
-	payload := pergohelpers.MessageRequest(intent, channel)
+	payload := pergohelpers.MessageRequest(intent, channel, senderIdentity)
 	traceID, err := pergohelpers.TraceID(intent.OrganizationID, intent.ID)
+	if err != nil {
+		return DeliveryReceipt{}, &ProviderError{
+			StableCode: "PERGO_IDENTITY_INVALID", Cause: err,
+		}
+	}
+	ingressIdempotencyKey, err := pergohelpers.IngressIdempotencyKey(
+		intent.OrganizationID,
+		intent.IdempotencyKey,
+	)
 	if err != nil {
 		return DeliveryReceipt{}, &ProviderError{
 			StableCode: "PERGO_IDENTITY_INVALID", Cause: err,
@@ -92,7 +105,7 @@ func (adapter PerGo) Send(
 	request.Header.Set("Authorization", "Bearer "+adapter.APIKey)
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-Trace-ID", traceID)
-	request.Header.Set("Idempotency-Key", intent.IdempotencyKey)
+	request.Header.Set("Idempotency-Key", ingressIdempotencyKey)
 	client := adapter.Client
 	if client == nil {
 		timeout := adapter.Timeout

@@ -1,12 +1,33 @@
 package helpers
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"strings"
 )
 
 const tracePrefix = "pymes.v1."
+const idempotencyPrefix = "pymes.v1."
+
+// IngressIdempotencyKey namespaces Pymes' tenant-local key before sending it
+// into a shared PerGo workspace. The digest keeps the provider header bounded
+// even when both source components use their maximum domain length.
+func IngressIdempotencyKey(
+	organizationID string,
+	idempotencyKey string,
+) (string, error) {
+	organizationID = strings.TrimSpace(organizationID)
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	if organizationID == "" || idempotencyKey == "" {
+		return "", errors.New("organization and idempotency key are required")
+	}
+	digest := sha256.Sum256(
+		[]byte(organizationID + "\x00" + idempotencyKey),
+	)
+	return idempotencyPrefix + hex.EncodeToString(digest[:]), nil
+}
 
 // TraceID produces the tenant-aware identity returned unchanged by PerGo in
 // delivery webhooks. Both components are base64url encoded so neither tenant

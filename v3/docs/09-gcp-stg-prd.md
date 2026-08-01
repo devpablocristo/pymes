@@ -90,8 +90,10 @@ Faltan antes de desplegar:
   sigue siendo un placeholder y no se inventa uno;
 - endpoint público para cada webhook y su secreto de firma, que sólo pueden
   cerrarse después de desplegar el BFF;
-- URL HTTPS, workspace y canal PerGo por entorno; API y worker reciben secretos
-  distintos y el callback único es `/api/v1/webhooks/pergo`;
+- URL HTTPS y workspace PerGo por entorno; cada organización configura sólo
+  canal e identidad no secreta del remitente, mientras API y worker reciben
+  secretos técnicos distintos y el callback único es
+  `/api/v1/webhooks/pergo`;
 - imágenes publicadas y servicios Cloud Run que usen las identidades indicadas;
 - jobs Cloud Run de migración/provisionamiento y Monitoring;
 - certificado fiscal sólo al reanudar la etapa ARCA.

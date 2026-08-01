@@ -171,6 +171,7 @@ services:
       PERGO_API_KEY: local-pergo-api-key
       PERGO_WORKSPACE_ID: pymes-local
       PERGO_CHANNEL: whatsapp_mock
+      PERGO_ALLOW_GLOBAL_ROUTE_FALLBACK: "true"
       PERGO_TIMEOUT: 750ms
     depends_on:
       migrate: { condition: service_completed_successfully }

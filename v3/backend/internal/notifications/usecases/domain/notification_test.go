@@ -43,6 +43,33 @@ func TestIntentValidationAndDigestAreDeterministic(t *testing.T) {
 	}
 }
 
+func TestIntentDeliveryRouteIsValidatedAndFrozenIntoDigest(t *testing.T) {
+	intent := validIntent()
+	intent.DeliveryChannel = "whatsapp_cloud"
+	intent.SenderIdentity = "5491100000000"
+	first, err := intent.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	intent.SenderIdentity = "5491199999999"
+	second, err := intent.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == second {
+		t.Fatal("delivery route was not frozen into the intent digest")
+	}
+	intent.SenderIdentity = ""
+	if !errors.Is(intent.Validate(), ErrInvalidIntent) {
+		t.Fatal("partial delivery route was accepted")
+	}
+	intent.DeliveryChannel = "email"
+	intent.SenderIdentity = "sender"
+	if !errors.Is(intent.Validate(), ErrInvalidIntent) {
+		t.Fatal("unsupported delivery channel was accepted")
+	}
+}
+
 func TestNextStatusNeverRegresses(t *testing.T) {
 	status, err := NextStatus(StatusQueued, "message.delivered")
 	if err != nil || status != StatusDelivered {

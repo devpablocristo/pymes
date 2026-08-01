@@ -42,6 +42,30 @@ func TestBookingTransitionsPreserveInternalInvariants(t *testing.T) {
 	}
 }
 
+func TestBookingStatusConfigurationCannotRedefineInternalStates(t *testing.T) {
+	configuration := BookingStatusConfiguration{
+		OrganizationID: "org-a",
+		Status:         BookingConfirmed,
+		Label:          "Agendado",
+		Substates: []BookingSubstateDefinition{
+			{Code: "first_visit", Label: "Primera visita", Active: true, SortOrder: 10},
+			{Code: "vip", Label: "Prioridad", Active: true, SortOrder: 20},
+		},
+	}
+	if err := configuration.Validate(); err != nil {
+		t.Fatalf("valid customization rejected: %v", err)
+	}
+	configuration.Status = BookingStatus("custom_confirmed")
+	if err := configuration.Validate(); ErrorCodeOf(err) != CodeValidation {
+		t.Fatalf("custom internal state was accepted: %v", err)
+	}
+	configuration.Status = BookingConfirmed
+	configuration.Substates[1].Code = configuration.Substates[0].Code
+	if err := configuration.Validate(); ErrorCodeOf(err) != CodeValidation {
+		t.Fatalf("duplicate substate code was accepted: %v", err)
+	}
+}
+
 func TestExpandRecurrenceKeepsWallClockAcrossDST(t *testing.T) {
 	location, err := time.LoadLocation("America/New_York")
 	if err != nil {

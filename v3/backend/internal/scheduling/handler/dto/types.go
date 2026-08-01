@@ -264,6 +264,57 @@ type Transition struct {
 	Reason          string `json:"reason,omitempty"`
 }
 
+type BookingSubstateDefinition struct {
+	Code      string `json:"code"`
+	Label     string `json:"label"`
+	Active    bool   `json:"active"`
+	SortOrder int    `json:"sort_order"`
+}
+
+type ConfigureBookingStatus struct {
+	Label     string                      `json:"label"`
+	Substates []BookingSubstateDefinition `json:"substates"`
+}
+
+type BookingStatusConfiguration struct {
+	Status    domain.BookingStatus        `json:"status"`
+	Label     string                      `json:"label"`
+	Substates []BookingSubstateDefinition `json:"substates"`
+	UpdatedAt time.Time                   `json:"updated_at"`
+}
+
+func BookingStatusConfigurationFromDomain(
+	value domain.BookingStatusConfiguration,
+) BookingStatusConfiguration {
+	substates := make([]BookingSubstateDefinition, 0, len(value.Substates))
+	for _, substate := range value.Substates {
+		substates = append(substates, BookingSubstateDefinition{
+			Code:      substate.Code,
+			Label:     substate.Label,
+			Active:    substate.Active,
+			SortOrder: substate.SortOrder,
+		})
+	}
+	return BookingStatusConfiguration{
+		Status: value.Status, Label: value.Label, Substates: substates, UpdatedAt: value.UpdatedAt,
+	}
+}
+
+func BookingStatusConfigurationsFromDomain(
+	values []domain.BookingStatusConfiguration,
+) []BookingStatusConfiguration {
+	result := make([]BookingStatusConfiguration, 0, len(values))
+	for _, value := range values {
+		result = append(result, BookingStatusConfigurationFromDomain(value))
+	}
+	return result
+}
+
+type SetBookingSubstate struct {
+	ExpectedVersion int    `json:"expected_version"`
+	SubstateCode    string `json:"substate_code"`
+}
+
 type Action struct {
 	Purpose         domain.ActionPurpose `json:"purpose"`
 	ExpectedVersion int                  `json:"expected_version"`
@@ -304,6 +355,7 @@ type Booking struct {
 	ServiceID          uuid.UUID            `json:"service_id"`
 	PartyID            string               `json:"party_id"`
 	Status             domain.BookingStatus `json:"status"`
+	SubstateCode       string               `json:"substate_code,omitempty"`
 	Participants       int                  `json:"participants"`
 	StartAt            time.Time            `json:"start_at"`
 	EndAt              time.Time            `json:"end_at"`
@@ -326,6 +378,7 @@ func BookingFromDomain(value domain.Booking) Booking {
 		ID: value.ID, SeriesID: value.SeriesID, SessionID: value.SessionID,
 		SupersedesID: value.SupersedesID, BranchID: value.BranchID,
 		ServiceID: value.ServiceID, PartyID: value.PartyID, Status: value.Status,
+		SubstateCode: value.SubstateCode,
 		Participants: value.Participants, StartAt: value.StartAt, EndAt: value.EndAt,
 		Version: value.Version, ServiceName: value.ServiceName, Price: value.Price,
 		Currency: value.Currency, DurationMinutes: value.DurationMinutes,

@@ -37,6 +37,9 @@ type Repository interface {
 	ListBookings(context.Context, string, uuid.UUID, time.Time, time.Time) ([]domain.Booking, error)
 	RescheduleBooking(context.Context, domain.CommandMetadata, uuid.UUID, int, domain.Booking, []domain.Event) (domain.Booking, error)
 	TransitionBooking(context.Context, domain.CommandMetadata, uuid.UUID, int, domain.BookingStatus, string, []domain.Event) (domain.Booking, error)
+	ConfigureBookingStatus(context.Context, domain.CommandMetadata, domain.BookingStatusConfiguration) (domain.BookingStatusConfiguration, error)
+	ListBookingStatusConfigurations(context.Context, string) ([]domain.BookingStatusConfiguration, error)
+	SetBookingSubstate(context.Context, domain.CommandMetadata, uuid.UUID, int, string) (domain.Booking, error)
 	CreateGroupSession(context.Context, domain.CommandMetadata, domain.GroupSession, []domain.Allocation, domain.Event) (domain.GroupSession, error)
 	GetGroupSession(context.Context, string, uuid.UUID) (domain.GroupSession, []domain.Allocation, error)
 	SaveActionToken(context.Context, domain.ActionToken) error
@@ -893,6 +896,64 @@ func (s *Service) ListBookings(
 		return nil, err
 	}
 	return s.repository.ListBookings(ctx, organizationID, branchID, from, until)
+}
+
+func (s *Service) ConfigureBookingStatus(
+	ctx context.Context,
+	metadata domain.CommandMetadata,
+	configuration domain.BookingStatusConfiguration,
+) (domain.BookingStatusConfiguration, error) {
+	if err := metadata.Validate(); err != nil {
+		return domain.BookingStatusConfiguration{}, err
+	}
+	if configuration.OrganizationID != metadata.OrganizationID {
+		return domain.BookingStatusConfiguration{}, domain.NewError(
+			domain.CodeValidation,
+			"booking status configuration tenant does not match the command",
+		)
+	}
+	if err := configuration.Validate(); err != nil {
+		return domain.BookingStatusConfiguration{}, err
+	}
+	return s.repository.ConfigureBookingStatus(ctx, metadata, configuration)
+}
+
+func (s *Service) ListBookingStatusConfigurations(
+	ctx context.Context,
+	organizationID string,
+) ([]domain.BookingStatusConfiguration, error) {
+	if strings.TrimSpace(organizationID) == "" {
+		return nil, domain.NewError(domain.CodeValidation, "organization is required")
+	}
+	return s.repository.ListBookingStatusConfigurations(ctx, organizationID)
+}
+
+func (s *Service) SetBookingSubstate(
+	ctx context.Context,
+	metadata domain.CommandMetadata,
+	organizationID string,
+	bookingID uuid.UUID,
+	expectedVersion int,
+	substateCode string,
+) (domain.Booking, error) {
+	if err := metadata.Validate(); err != nil {
+		return domain.Booking{}, err
+	}
+	substateCode = strings.TrimSpace(substateCode)
+	if organizationID != metadata.OrganizationID || bookingID == uuid.Nil || expectedVersion <= 0 ||
+		(substateCode != "" && !domain.ValidBookingSubstateCode(substateCode)) {
+		return domain.Booking{}, domain.NewError(
+			domain.CodeValidation,
+			"booking substate command is invalid",
+		)
+	}
+	return s.repository.SetBookingSubstate(
+		ctx,
+		metadata,
+		bookingID,
+		expectedVersion,
+		substateCode,
+	)
 }
 
 func (s *Service) IssueActionToken(

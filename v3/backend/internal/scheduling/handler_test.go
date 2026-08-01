@@ -24,9 +24,17 @@ func (f authenticatorFake) Principal(*http.Request) (Principal, error) {
 
 type handlerUsecasesFake struct {
 	SchedulingUsecases
-	created       bool
-	bookingInput  CreateBookingInput
-	publicCatalog PublicCatalog
+	created                      bool
+	bookingInput                 CreateBookingInput
+	publicCatalog                PublicCatalog
+	statusConfiguration          domain.BookingStatusConfiguration
+	statusConfigurations         []domain.BookingStatusConfiguration
+	statusMetadata               domain.CommandMetadata
+	substateBookingID            uuid.UUID
+	substateCode                 string
+	substateExpectedVersion      int
+	substateMetadata             domain.CommandMetadata
+	statusConfigurationListOrgID string
 }
 
 func (f *handlerUsecasesFake) CreateBranch(
@@ -74,6 +82,45 @@ func (f *handlerUsecasesFake) CreateBooking(
 		DurationMinutes: 60,
 		Timezone:        "UTC",
 	}}, nil
+}
+
+func (f *handlerUsecasesFake) ConfigureBookingStatus(
+	_ context.Context,
+	metadata domain.CommandMetadata,
+	configuration domain.BookingStatusConfiguration,
+) (domain.BookingStatusConfiguration, error) {
+	f.statusMetadata = metadata
+	f.statusConfiguration = configuration
+	return configuration, nil
+}
+
+func (f *handlerUsecasesFake) ListBookingStatusConfigurations(
+	_ context.Context,
+	organizationID string,
+) ([]domain.BookingStatusConfiguration, error) {
+	f.statusConfigurationListOrgID = organizationID
+	return f.statusConfigurations, nil
+}
+
+func (f *handlerUsecasesFake) SetBookingSubstate(
+	_ context.Context,
+	metadata domain.CommandMetadata,
+	organizationID string,
+	bookingID uuid.UUID,
+	expectedVersion int,
+	substateCode string,
+) (domain.Booking, error) {
+	f.substateMetadata = metadata
+	f.substateBookingID = bookingID
+	f.substateExpectedVersion = expectedVersion
+	f.substateCode = substateCode
+	return domain.Booking{
+		OrganizationID: organizationID,
+		ID:             bookingID,
+		Status:         domain.BookingConfirmed,
+		SubstateCode:   substateCode,
+		Version:        expectedVersion + 1,
+	}, nil
 }
 
 func TestSchedulingHandlerEnforcesTenantAndExplicitPermission(t *testing.T) {
@@ -227,5 +274,118 @@ func TestPublicCatalogRequiresNoSessionAndDoesNotExposeTenantMetadata(t *testing
 		strings.Contains(body, "internal-professional-code") ||
 		strings.Contains(body, "internal-code") {
 		t.Fatalf("public catalog leaked internal tenant metadata: %s", body)
+	}
+}
+
+func TestSchedulingStatusCustomizationRoutesAndMetadata(t *testing.T) {
+	bookingID := uuid.New()
+	usecases := &handlerUsecasesFake{
+		statusConfigurations: []domain.BookingStatusConfiguration{{
+			OrganizationID: "org_a",
+			Status:         domain.BookingConfirmed,
+			Label:          "Confirmado",
+			Substates: []domain.BookingSubstateDefinition{{
+				Code: "arrived", Label: "Llegó", Active: true, SortOrder: 10,
+			}},
+		}},
+	}
+	principal := Principal{
+		OrganizationID: "org_a",
+		ActorID:        "operator",
+		Role:           "member",
+		Permissions: []string{
+			domain.PermissionRead,
+			domain.PermissionOperate,
+			domain.PermissionManage,
+		},
+		OrganizationStatus: "ready",
+		MembershipStatus:   "active",
+	}
+	handler := NewHTTPHandler(
+		usecases,
+		authenticatorFake{principal: principal},
+	).Handler()
+
+	configure := httptest.NewRequest(
+		http.MethodPut,
+		"/api/v1/organizations/org_a/scheduling/status-configurations/confirmed",
+		strings.NewReader(`{
+			"label":"Confirmado",
+			"substates":[
+				{"code":"arrived","label":"Llegó","active":true,"sort_order":10}
+			]
+		}`),
+	)
+	configure.Header.Set("Idempotency-Key", "configure-confirmed")
+	configure.Header.Set("X-Source-Version", "2")
+	configure.Header.Set("X-Request-ID", "request-status")
+	configureResponse := httptest.NewRecorder()
+	handler.ServeHTTP(configureResponse, configure)
+	if configureResponse.Code != http.StatusOK {
+		t.Fatalf(
+			"configure status=%d body=%s",
+			configureResponse.Code,
+			configureResponse.Body.String(),
+		)
+	}
+	if usecases.statusConfiguration.OrganizationID != "org_a" ||
+		usecases.statusConfiguration.Status != domain.BookingConfirmed ||
+		usecases.statusConfiguration.Label != "Confirmado" ||
+		len(usecases.statusConfiguration.Substates) != 1 ||
+		usecases.statusMetadata.OrganizationID != "org_a" ||
+		usecases.statusMetadata.ActorID != "operator" ||
+		usecases.statusMetadata.SourceVersion != 2 ||
+		usecases.statusMetadata.IdempotencyKey != "configure-confirmed" {
+		t.Fatalf(
+			"configuration=%+v metadata=%+v",
+			usecases.statusConfiguration,
+			usecases.statusMetadata,
+		)
+	}
+
+	list := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/organizations/org_a/scheduling/status-configurations",
+		nil,
+	)
+	listResponse := httptest.NewRecorder()
+	handler.ServeHTTP(listResponse, list)
+	if listResponse.Code != http.StatusOK ||
+		usecases.statusConfigurationListOrgID != "org_a" ||
+		!strings.Contains(listResponse.Body.String(), `"status":"confirmed"`) ||
+		!strings.Contains(listResponse.Body.String(), `"code":"arrived"`) {
+		t.Fatalf(
+			"list status=%d org=%q body=%s",
+			listResponse.Code,
+			usecases.statusConfigurationListOrgID,
+			listResponse.Body.String(),
+		)
+	}
+
+	setSubstate := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/organizations/org_a/scheduling/bookings/"+bookingID.String()+"/substate",
+		strings.NewReader(`{"expected_version":3,"substate_code":"arrived"}`),
+	)
+	setSubstate.Header.Set("Idempotency-Key", "set-arrived")
+	setSubstate.Header.Set("X-Correlation-ID", "correlation-status")
+	setSubstateResponse := httptest.NewRecorder()
+	handler.ServeHTTP(setSubstateResponse, setSubstate)
+	if setSubstateResponse.Code != http.StatusOK ||
+		usecases.substateBookingID != bookingID ||
+		usecases.substateExpectedVersion != 3 ||
+		usecases.substateCode != "arrived" ||
+		usecases.substateMetadata.IdempotencyKey != "set-arrived" ||
+		usecases.substateMetadata.CorrelationID != "correlation-status" ||
+		!strings.Contains(setSubstateResponse.Body.String(), `"substate_code":"arrived"`) {
+		t.Fatalf(
+			"substate status=%d booking=%s version=%d code=%q metadata=%+v body=%s",
+			setSubstateResponse.Code,
+			usecases.substateBookingID,
+			usecases.substateExpectedVersion,
+			usecases.substateCode,
+			usecases.substateMetadata,
+			setSubstateResponse.Body.String(),
+		)
 	}
 }

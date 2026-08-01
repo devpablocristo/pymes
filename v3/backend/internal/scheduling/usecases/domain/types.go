@@ -38,6 +38,22 @@ func (s BookingStatus) Active() bool {
 	}
 }
 
+func (s BookingStatus) Valid() bool {
+	switch s {
+	case BookingHeld,
+		BookingPendingConfirmation,
+		BookingConfirmed,
+		BookingCheckedIn,
+		BookingCompleted,
+		BookingCancelled,
+		BookingRescheduled,
+		BookingNoShow:
+		return true
+	default:
+		return false
+	}
+}
+
 func (s BookingStatus) CanTransition(to BookingStatus) bool {
 	allowed := map[BookingStatus][]BookingStatus{
 		BookingHeld:                {BookingPendingConfirmation, BookingConfirmed, BookingCancelled},
@@ -346,6 +362,7 @@ type Booking struct {
 	ServiceID          uuid.UUID
 	PartyID            string
 	Status             BookingStatus
+	SubstateCode       string
 	Participants       int
 	StartAt            time.Time
 	EndAt              time.Time
@@ -379,12 +396,63 @@ func (b Booking) Validate() error {
 	if b.Status == BookingHeld && (b.HoldExpiresAt == nil || !b.HoldExpiresAt.After(b.CreatedAt)) {
 		return NewError(CodeValidation, "held booking requires a future expiration")
 	}
+	if !b.Status.Valid() || (b.SubstateCode != "" && !bookingSubstateCodePattern.MatchString(b.SubstateCode)) {
+		return NewError(CodeValidation, "booking state is invalid")
+	}
 	if !decimalPattern.MatchString(b.Price) || len(b.Currency) != 3 ||
 		b.DurationMinutes <= 0 || strings.TrimSpace(b.Timezone) == "" {
 		return NewError(CodeValidation, "booking snapshot is incomplete")
 	}
 	if len(b.Allocations) == 0 && b.SessionID == nil {
 		return NewError(CodeValidation, "at least one allocation is required")
+	}
+	return nil
+}
+
+var bookingSubstateCodePattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,39}$`)
+
+func ValidBookingSubstateCode(code string) bool {
+	return bookingSubstateCodePattern.MatchString(strings.TrimSpace(code))
+}
+
+type BookingSubstateDefinition struct {
+	Code      string
+	Label     string
+	Active    bool
+	SortOrder int
+}
+
+type BookingStatusConfiguration struct {
+	OrganizationID string
+	Status         BookingStatus
+	Label          string
+	Substates      []BookingSubstateDefinition
+	UpdatedAt      time.Time
+}
+
+func (c BookingStatusConfiguration) Validate() error {
+	if strings.TrimSpace(c.OrganizationID) == "" || !c.Status.Valid() {
+		return NewError(CodeValidation, "organization and internal booking status are required")
+	}
+	label := strings.TrimSpace(c.Label)
+	if label == "" || len(label) > 80 {
+		return NewError(CodeValidation, "booking status label must contain at most 80 characters")
+	}
+	if len(c.Substates) > 50 {
+		return NewError(CodeValidation, "a booking status supports at most 50 custom substates")
+	}
+	seen := make(map[string]struct{}, len(c.Substates))
+	for _, substate := range c.Substates {
+		code := strings.TrimSpace(substate.Code)
+		substateLabel := strings.TrimSpace(substate.Label)
+		if !ValidBookingSubstateCode(code) || substateLabel == "" ||
+			len(substateLabel) > 80 || substate.SortOrder < 0 || substate.SortOrder > 10000 {
+			return NewError(CodeValidation, "booking substate definition is invalid")
+		}
+		if _, duplicate := seen[code]; duplicate {
+			return NewError(CodeValidation, "booking substate codes must be unique")
+		}
+		seen[code] = struct{}{}
 	}
 	return nil
 }

@@ -127,6 +127,8 @@ const (
 	ErrorCodeCREDENTIALNOTREADY             ErrorCode = "CREDENTIAL_NOT_READY"
 	ErrorCodeCREDENTIALVERSIONCONFLICT      ErrorCode = "CREDENTIAL_VERSION_CONFLICT"
 	ErrorCodeDOCUMENTNOTREVERSIBLE          ErrorCode = "DOCUMENT_NOT_REVERSIBLE"
+	ErrorCodeFEATUREDISABLED                ErrorCode = "FEATURE_DISABLED"
+	ErrorCodeFEATUREVERSIONCONFLICT         ErrorCode = "FEATURE_VERSION_CONFLICT"
 	ErrorCodeFISCALUNAVAILABLE              ErrorCode = "FISCAL_UNAVAILABLE"
 	ErrorCodeFORBIDDEN                      ErrorCode = "FORBIDDEN"
 	ErrorCodeIDEMPOTENCYKEYREQUIRED         ErrorCode = "IDEMPOTENCY_KEY_REQUIRED"
@@ -179,6 +181,10 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeCREDENTIALVERSIONCONFLICT:
 		return true
 	case ErrorCodeDOCUMENTNOTREVERSIBLE:
+		return true
+	case ErrorCodeFEATUREDISABLED:
+		return true
+	case ErrorCodeFEATUREVERSIONCONFLICT:
 		return true
 	case ErrorCodeFISCALUNAVAILABLE:
 		return true

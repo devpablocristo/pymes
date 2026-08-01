@@ -8,6 +8,7 @@ RUN CGO_ENABLED=0 go build -o /out/api ./cmd/api && \
     CGO_ENABLED=0 go build -o /out/migrate ./cmd/migrate && \
     CGO_ENABLED=0 go build -o /out/provision-org ./cmd/provision-org && \
     CGO_ENABLED=0 go build -o /out/fake-service ./cmd/fake-service && \
+    CGO_ENABLED=0 go build -o /out/pergo-fake ./cmd/pergo-fake && \
     CGO_ENABLED=0 go build -o /out/healthcheck ./cmd/healthcheck
 
 FROM gcr.io/distroless/static-debian12:nonroot AS api
@@ -34,6 +35,11 @@ FROM gcr.io/distroless/static-debian12:nonroot AS fake-service
 COPY --from=build /out/fake-service /fake-service
 COPY --from=build /out/healthcheck /healthcheck
 ENTRYPOINT ["/fake-service"]
+
+FROM gcr.io/distroless/static-debian12:nonroot AS pergo-fake
+COPY --from=build /out/pergo-fake /pergo-fake
+COPY --from=build /out/healthcheck /healthcheck
+ENTRYPOINT ["/pergo-fake"]
 
 FROM node:22-alpine AS fiscal-deps
 WORKDIR /src/fiscal-adapter

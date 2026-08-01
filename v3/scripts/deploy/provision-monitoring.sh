@@ -50,6 +50,8 @@ declare -A metric_filters=(
   [outbox_delayed]="$base_filter AND jsonPayload.outbox_oldest_age_seconds>300"
   [outbox_dead_letters]="$base_filter AND jsonPayload.outbox_dead_letters>0"
   [fiscal_uncertain]="$base_filter AND jsonPayload.fiscal_uncertain>0"
+  [notifications_stalled]="$base_filter AND jsonPayload.notifications_stalled>0"
+  [notifications_failed]="$base_filter AND jsonPayload.notifications_failed>0"
   [dependency_circuit_open]="$base_filter AND jsonPayload.dependency_circuits_open>0"
   [worker_not_ready]="$base_filter AND jsonPayload.ready=false"
 )
@@ -175,12 +177,14 @@ ensure_policy() {
 }
 
 dashboard_json() {
-  local heartbeat_metric outbox_metric delayed_metric dead_letter_metric uncertain_metric circuit_metric
+  local heartbeat_metric outbox_metric delayed_metric dead_letter_metric uncertain_metric notification_stalled_metric notification_failed_metric circuit_metric
   heartbeat_metric=$(metric_name heartbeat)
   outbox_metric=$(metric_name outbox_backlog)
   delayed_metric=$(metric_name outbox_delayed)
   dead_letter_metric=$(metric_name outbox_dead_letters)
   uncertain_metric=$(metric_name fiscal_uncertain)
+  notification_stalled_metric=$(metric_name notifications_stalled)
+  notification_failed_metric=$(metric_name notifications_failed)
   circuit_metric=$(metric_name dependency_circuit_open)
   jq -nc \
     --arg display "Pymes v3 ${PYMES_DEPLOY_ENV^^} delivery" \
@@ -189,6 +193,8 @@ dashboard_json() {
     --arg delayed "$delayed_metric" \
     --arg deadletters "$dead_letter_metric" \
     --arg uncertain "$uncertain_metric" \
+    --arg notification_stalled "$notification_stalled_metric" \
+    --arg notification_failed "$notification_failed_metric" \
     --arg circuits "$circuit_metric" '
     def chart($title; $metric):
       {
@@ -221,6 +227,8 @@ dashboard_json() {
           chart("Outbox delayed intervals"; $delayed),
           chart("Dead-letter intervals"; $deadletters),
           chart("Fiscal uncertainty intervals"; $uncertain),
+          chart("WhatsApp stalled intervals"; $notification_stalled),
+          chart("WhatsApp terminal failure intervals"; $notification_failed),
           chart("Open circuit intervals"; $circuits)
         ]
       },
@@ -257,7 +265,7 @@ ensure_dashboard() {
   fi
 }
 
-for suffix in heartbeat outbox_backlog outbox_delayed outbox_dead_letters fiscal_uncertain dependency_circuit_open worker_not_ready; do
+for suffix in heartbeat outbox_backlog outbox_delayed outbox_dead_letters fiscal_uncertain notifications_stalled notifications_failed dependency_circuit_open worker_not_ready; do
   ensure_log_metric "$suffix"
 done
 
@@ -287,6 +295,18 @@ ensure_policy "$(log_match_policy \
   "${metric_filters[fiscal_uncertain]}" \
   "warning" \
   "Reconcile by consulting the exact reserved voucher; never authorize a new number.")"
+ensure_policy "$(log_match_policy \
+  "[Pymes v3 $environment_label] WhatsApp delivery stalled" \
+  "WhatsApp delivery has not converged" \
+  "${metric_filters[notifications_stalled]}" \
+  "warning" \
+  "Recover PerGo and retry the same trace ID; never create a second notification intent.")"
+ensure_policy "$(log_match_policy \
+  "[Pymes v3 $environment_label] WhatsApp delivery failed" \
+  "WhatsApp delivery reached a terminal failure" \
+  "${metric_filters[notifications_failed]}" \
+  "warning" \
+  "Inspect only the stable failure code and provider configuration; never copy the recipient or body into logs or tickets.")"
 ensure_policy "$(log_match_policy \
   "[Pymes v3 $environment_label] Dependency circuit open" \
   "Fiscal or Accounting circuit is open" \

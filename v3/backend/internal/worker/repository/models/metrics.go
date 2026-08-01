@@ -12,6 +12,8 @@ type Metrics struct {
 	OutboxDeadLetters      int64
 	OutboxOldestAgeSeconds float64
 	FiscalUncertain        int64
+	NotificationsStalled   int64
+	NotificationsFailed    int64
 	ApplicationPending     int64
 	ReversalPending        int64
 }

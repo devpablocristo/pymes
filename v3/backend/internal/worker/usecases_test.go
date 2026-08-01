@@ -153,6 +153,7 @@ func TestLogMetricsEmitsStablePIIFreeJSON(t *testing.T) {
 			OutboxPending: 3, OutboxLeased: 1, OutboxRetrying: 2,
 			OutboxDeadLetters: 4, OutboxOldestAgeSeconds: 12.5,
 			FiscalUncertain: 5, ApplicationPending: 6, ReversalPending: 7,
+			NotificationsStalled: 8, NotificationsFailed: 9,
 		},
 		map[string]CircuitState{
 			"fiscal": runnerFixedCircuit(true), "accounting": runnerFixedCircuit(false),
@@ -167,6 +168,8 @@ func TestLogMetricsEmitsStablePIIFreeJSON(t *testing.T) {
 		"outbox_pending": float64(3), "outbox_leased": float64(1),
 		"outbox_retrying": float64(2), "outbox_dead_letters": float64(4),
 		"outbox_oldest_age_seconds": 12.5, "fiscal_uncertain": float64(5),
+		"notifications_stalled":           float64(8),
+		"notifications_failed":            float64(9),
 		"accounting_applications_pending": float64(6),
 		"accounting_reversals_pending":    float64(7),
 		"dependency_circuits_open":        float64(1),

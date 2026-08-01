@@ -1,0 +1,132 @@
+openapi: 3.1.0
+info:
+  title: PerGo message delivery contract consumed by Pymes
+  version: 1.0.0
+  description: >-
+    Subconjunto verificado en el código de PerGo. Los modelos permanecen dentro
+    del adapter notifications/pergo y nunca ingresan al dominio de Pymes.
+servers:
+  - url: http://pergo
+paths:
+  /api/v1/messages:
+    post:
+      operationId: enqueuePerGoMessage
+      security:
+        - workspaceAPIKey: []
+      parameters:
+        - name: X-Trace-ID
+          in: header
+          required: true
+          description: Identidad estable tenant-aware; PerGo la usa para deduplicar.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: '^pymes\.v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Compatibilidad hacia adelante; la identidad durable actual es X-Trace-ID.
+          schema: { type: string, minLength: 1, maxLength: 255 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageRequest' }
+      responses:
+        '202':
+          description: PerGo aceptó la entrega durable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageResponse' }
+        '400': { description: Payload inválido. }
+        '401': { description: API key de workspace inválida. }
+        '409': { description: Identidad reutilizada con otro payload. }
+        '422': { description: Ruta o canal no disponible. }
+        '429': { description: Backpressure o rate limit. }
+        '500': { description: Fallo transitorio. }
+components:
+  securitySchemes:
+    workspaceAPIKey:
+      type: http
+      scheme: bearer
+  schemas:
+    MessageRequest:
+      type: object
+      additionalProperties: false
+      required: [to, channel, body, metadata]
+      properties:
+        to:
+          type: string
+          pattern: '^[1-9][0-9]{7,14}$'
+        channel:
+          type: string
+          enum: [whatsapp, whatsapp_cloud, whatsapp_mock]
+        body: { type: string, minLength: 1, maxLength: 4096 }
+        metadata:
+          type: object
+          additionalProperties: { type: string }
+          required:
+            - pymes_org_id
+            - pymes_message_id
+            - pymes_idempotency_key
+            - pymes_correlation_id
+            - pymes_template_version
+            - pymes_notification_kind
+        template_name: { type: string }
+        language: { type: string }
+        components:
+          type: array
+          items: { $ref: '#/components/schemas/TemplateComponent' }
+    TemplateComponent:
+      type: object
+      additionalProperties: false
+      required: [type, parameters]
+      properties:
+        type: { type: string, enum: [body] }
+        parameters:
+          type: array
+          items: { $ref: '#/components/schemas/TemplateParameter' }
+    TemplateParameter:
+      type: object
+      additionalProperties: false
+      required: [type, text]
+      properties:
+        type: { type: string, const: text }
+        text: { type: string }
+    MessageResponse:
+      type: object
+      additionalProperties: false
+      required: [message_id, status, queued_at]
+      properties:
+        message_id: { type: string, minLength: 1 }
+        status: { type: string, const: queued }
+        queued_at: { type: string, format: date-time }
+    DeliveryEvent:
+      type: object
+      additionalProperties: false
+      required:
+        - event
+        - trace_id
+        - message_id
+        - channel
+        - timestamp
+        - workspace_id
+      properties:
+        event:
+          type: string
+          enum:
+            - message.sent
+            - message.delivered
+            - message.read
+            - message.failed
+        trace_id:
+          type: string
+          pattern: '^pymes\.v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'
+        message_id: { type: string }
+        channel:
+          type: string
+          enum: [whatsapp, whatsapp_cloud, whatsapp_mock]
+        timestamp: { type: string, format: date-time }
+        workspace_id: { type: string }
+        error: { type: string }

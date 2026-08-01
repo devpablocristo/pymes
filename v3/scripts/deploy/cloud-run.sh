@@ -28,6 +28,32 @@ case "$dry_run" in
   *) echo "PYMES_CLOUD_RUN_DRY_RUN must be true or false" >&2; exit 2 ;;
 esac
 
+pergo_enabled=${PYMES_PERGO_ENABLED:-false}
+case "$pergo_enabled" in
+  true|false) ;;
+  *) echo "PYMES_PERGO_ENABLED must be true or false" >&2; exit 2 ;;
+esac
+pergo_url=${PYMES_PERGO_URL:-}
+pergo_workspace_id=${PYMES_PERGO_WORKSPACE_ID:-}
+pergo_channel=${PYMES_PERGO_CHANNEL:-whatsapp}
+if [[ "$pergo_enabled" == "true" ]]; then
+  : "${pergo_url:?set PYMES_PERGO_URL when PerGo is enabled}"
+  : "${pergo_workspace_id:?set PYMES_PERGO_WORKSPACE_ID when PerGo is enabled}"
+  case "$pergo_channel" in
+    whatsapp|whatsapp_cloud) ;;
+    *) echo "PYMES_PERGO_CHANNEL must be whatsapp or whatsapp_cloud" >&2; exit 2 ;;
+  esac
+  if [[ "$pergo_url" != https://* ||
+        "$pergo_url" == *"|"* ||
+        "$pergo_url" == *","* ||
+        "$pergo_url" == *"@"* ||
+        "$pergo_url" == *"?"* ||
+        "$pergo_url" == *"#"* ]]; then
+    echo "PYMES_PERGO_URL must be an explicit HTTPS URL without credentials, query, fragment or Cloud Run delimiters" >&2
+    exit 2
+  fi
+fi
+
 project=${PYMES_GCP_PROJECT:-pymes-dev-352318}
 region=${PYMES_GCP_REGION:-us-central1}
 prefix="pymes-v3-${PYMES_DEPLOY_ENV}"
@@ -190,12 +216,20 @@ require_secret() {
 }
 
 declare -A secret_versions=()
-for secret in \
+required_secrets=(
   "$prefix-clerk-secret-key" "$prefix-clerk-webhook-secret" \
   "$prefix-database-url" "$prefix-worker-database-url" \
   "$prefix-migrate-database-url" "$prefix-fiscal-database-url" "$prefix-fiscal-migrate-database-url" \
   "$prefix-accounting-database-url" "$prefix-accounting-admin-database-url" \
-  "$prefix-accounting-migrate-database-url"; do
+  "$prefix-accounting-migrate-database-url"
+)
+if [[ "$pergo_enabled" == "true" ]]; then
+  required_secrets+=(
+    "$prefix-pergo-api-key"
+    "$prefix-pergo-webhook-secrets"
+  )
+fi
+for secret in "${required_secrets[@]}"; do
   require_secret "$secret"
 done
 
@@ -297,12 +331,25 @@ verify_private_service "$accounting_admin_service" "$provision_principal"
 fiscal_url=$(service_url "$fiscal_service")
 accounting_url=$(service_url "$accounting_service")
 accounting_admin_url=$(service_url "$accounting_admin_service")
+api_secrets="PYMES_CLERK_SECRET_KEY=$(secret_ref "$prefix-clerk-secret-key"),PYMES_CLERK_WEBHOOK_SECRET=$(secret_ref "$prefix-clerk-webhook-secret"),PYMES_DATABASE_URL=$(secret_ref "$prefix-database-url")"
+api_environment="PYMES_ENVIRONMENT=production|PYMES_CLERK_ISSUER=$PYMES_CLERK_ISSUER|PYMES_CLERK_AUDIENCE=pymes-v3|PYMES_CLERK_AUTHORIZED_PARTIES=$PYMES_CLERK_AUTHORIZED_PARTIES|PYMES_HTTP_ADDR=:8080${tracing_environment}"
+worker_secrets="PYMES_DATABASE_URL=$(secret_ref "$prefix-worker-database-url")"
+worker_environment="FISCAL_ADAPTER_URL=$fiscal_url|ACCOUNTING_URL=$accounting_url|PYMES_ENVIRONMENT=production|PYMES_INTERNAL_ISSUER=pymes-v3|PYMES_INTERNAL_KMS_KEY_VERSION=$PYMES_INTERNAL_KMS_KEY_VERSION|PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS=$PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS|PYMES_WORKER_HTTP_ADDR=:8080|PYMES_WORKER_INTERVAL_MS=250|PYMES_WORKER_METRICS_INTERVAL=60s${tracing_environment}"
+if [[ "$pergo_enabled" == "true" ]]; then
+  api_secrets+=",PERGO_WEBHOOK_SECRETS=$(secret_ref "$prefix-pergo-webhook-secrets")"
+  api_environment+="|PYMES_PERGO_ENABLED=true|PERGO_WORKSPACE_ID=$pergo_workspace_id"
+  worker_secrets+=",PERGO_API_KEY=$(secret_ref "$prefix-pergo-api-key")"
+  worker_environment+="|PYMES_PERGO_ENABLED=true|PERGO_URL=$pergo_url|PERGO_WORKSPACE_ID=$pergo_workspace_id|PERGO_CHANNEL=$pergo_channel|PERGO_TIMEOUT=5s"
+else
+  api_environment+="|PYMES_PERGO_ENABLED=false"
+  worker_environment+="|PYMES_PERGO_ENABLED=false"
+fi
 deploy "$prefix-api" "$PYMES_API_IMAGE" "$api_sa" \
-  "PYMES_CLERK_SECRET_KEY=$(secret_ref "$prefix-clerk-secret-key"),PYMES_CLERK_WEBHOOK_SECRET=$(secret_ref "$prefix-clerk-webhook-secret"),PYMES_DATABASE_URL=$(secret_ref "$prefix-database-url")" \
-  "PYMES_ENVIRONMENT=production|PYMES_CLERK_ISSUER=$PYMES_CLERK_ISSUER|PYMES_CLERK_AUDIENCE=pymes-v3|PYMES_CLERK_AUTHORIZED_PARTIES=$PYMES_CLERK_AUTHORIZED_PARTIES|PYMES_HTTP_ADDR=:8080${tracing_environment}" all 0 public throttled none
+  "$api_secrets" \
+  "$api_environment" all 0 public throttled none
 deploy "$prefix-worker" "$PYMES_WORKER_IMAGE" "$worker_sa" \
-  "PYMES_DATABASE_URL=$(secret_ref "$prefix-worker-database-url")" \
-  "FISCAL_ADAPTER_URL=$fiscal_url|ACCOUNTING_URL=$accounting_url|PYMES_ENVIRONMENT=production|PYMES_INTERNAL_ISSUER=pymes-v3|PYMES_INTERNAL_KMS_KEY_VERSION=$PYMES_INTERNAL_KMS_KEY_VERSION|PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS=$PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS|PYMES_WORKER_HTTP_ADDR=:8080|PYMES_WORKER_INTERVAL_MS=250|PYMES_WORKER_METRICS_INTERVAL=60s${tracing_environment}" internal 1 private always direct
+  "$worker_secrets" \
+  "$worker_environment" internal 1 private always direct
 
 deploy_job_template "$prefix-provision-org" "$PYMES_PROVISION_IMAGE" \
   "$provision_sa" \
@@ -310,4 +357,7 @@ deploy_job_template "$prefix-provision-org" "$PYMES_PROVISION_IMAGE" \
   "ACCOUNTING_PROVISIONING_URL=$accounting_admin_url|PYMES_ENVIRONMENT=production|PYMES_INTERNAL_ISSUER=pymes-v3|PYMES_INTERNAL_KMS_KEY_VERSION=$PYMES_INTERNAL_KMS_KEY_VERSION|PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS=$PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS"
 
 echo "deployed $prefix in shared project $project; configure Clerk webhook for $(service_url "$prefix-api")/api/v1/webhooks/clerk"
+if [[ "$pergo_enabled" == "true" ]]; then
+  echo "configure PerGo workspace=$pergo_workspace_id callback=$(service_url "$prefix-api")/api/v1/webhooks/pergo"
+fi
 echo "organization provisioning job: $prefix-provision-org (execute with explicit --id, --name, --slug and --clerk-organization-id args)"

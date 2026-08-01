@@ -94,6 +94,7 @@ func TestOperationalHTTPRendersStableMetricsWithoutTenantData(t *testing.T) {
 			OutboxPending: 3, OutboxLeased: 1, OutboxRetrying: 2,
 			OutboxDeadLetters: 4, OutboxOldestAgeSeconds: 12.5,
 			FiscalUncertain: 5, ApplicationPending: 6, ReversalPending: 7,
+			NotificationsStalled: 8, NotificationsFailed: 9,
 		}},
 		Circuits: map[string]CircuitState{
 			"fiscal": fixedCircuit(true), "accounting": fixedCircuit(false),
@@ -116,6 +117,8 @@ func TestOperationalHTTPRendersStableMetricsWithoutTenantData(t *testing.T) {
 		"pymes_outbox_dead_letters 4\n",
 		"pymes_outbox_oldest_age_seconds 12.500\n",
 		"pymes_fiscal_uncertain 5\n",
+		"pymes_notifications_stalled 8\n",
+		"pymes_notifications_failed 9\n",
 		"pymes_accounting_applications_pending 6\n",
 		"pymes_accounting_reversals_pending 7\n",
 		`pymes_dependency_circuit_open{dependency="accounting"} 0`,

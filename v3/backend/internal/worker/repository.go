@@ -83,6 +83,11 @@ func (o *Operations) Collect(
 			  ), 0),
 			  (SELECT count(*) FROM app.sales
 			   WHERE status = 'fiscal_uncertain'),
+			  (SELECT count(*) FROM app.notifications
+			   WHERE status IN ('uncertain','queued')
+			     AND updated_at < now() - interval '5 minutes'),
+			  (SELECT count(*) FROM app.notifications
+			   WHERE status = 'failed'),
 			  (SELECT count(*) FROM app.accounting_application_commands
 			   WHERE status = 'pending'),
 			  (SELECT count(*) FROM app.accounting_reversals
@@ -94,6 +99,8 @@ func (o *Operations) Collect(
 				&current.OutboxDeadLetters,
 				&current.OutboxOldestAgeSeconds,
 				&current.FiscalUncertain,
+				&current.NotificationsStalled,
+				&current.NotificationsFailed,
 				&current.ApplicationPending,
 				&current.ReversalPending,
 			)
@@ -113,6 +120,8 @@ func (o *Operations) Collect(
 		OutboxDeadLetters:      accumulator.Metrics.OutboxDeadLetters,
 		OutboxOldestAgeSeconds: accumulator.Metrics.OutboxOldestAgeSeconds,
 		FiscalUncertain:        accumulator.Metrics.FiscalUncertain,
+		NotificationsStalled:   accumulator.Metrics.NotificationsStalled,
+		NotificationsFailed:    accumulator.Metrics.NotificationsFailed,
 		ApplicationPending:     accumulator.Metrics.ApplicationPending,
 		ReversalPending:        accumulator.Metrics.ReversalPending,
 	}, nil

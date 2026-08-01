@@ -41,8 +41,8 @@ de almacenamiento:
 
 | Consumidor | Sufijo de secreto |
 |---|---|
-| API | `clerk-secret-key`, `clerk-webhook-secret`, `database-url` |
-| Worker | `worker-database-url` |
+| API | `clerk-secret-key`, `clerk-webhook-secret`, `pergo-webhook-secrets`, `database-url` |
+| Worker | `worker-database-url`, `pergo-api-key` |
 | Fiscal | `fiscal-credential`, `fiscal-database-url` |
 | Accounting | `accounting-database-url` |
 | Accounting admin | `accounting-admin-database-url` |
@@ -90,6 +90,8 @@ Faltan antes de desplegar:
   sigue siendo un placeholder y no se inventa uno;
 - endpoint público para cada webhook y su secreto de firma, que sólo pueden
   cerrarse después de desplegar el BFF;
+- URL HTTPS, workspace y canal PerGo por entorno; API y worker reciben secretos
+  distintos y el callback único es `/api/v1/webhooks/pergo`;
 - imágenes publicadas y servicios Cloud Run que usen las identidades indicadas;
 - jobs Cloud Run de migración/provisionamiento y Monitoring;
 - certificado fiscal sólo al reanudar la etapa ARCA.

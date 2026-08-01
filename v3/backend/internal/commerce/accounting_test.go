@@ -248,7 +248,7 @@ func TestFiscalClientAgainstMockAdapter(t *testing.T) {
 	if baseURL == "" {
 		t.Skip("PYMES_FISCAL_TEST_URL is required")
 	}
-	snapshot := json.RawMessage(`{"environment":"homologation","issue_date":"2026-07-31","currency":"ARS","totals":{"net":"100","vat":"21","exempt":"0","total":"121"},"recipient":{"document_type":"CUIT","document_number":"20123456789","vat_condition":"registered"},"lines":[{"description":"Servicio","quantity":"1","unit_price":"100","vat_rate":"21","net":"100"}]}`)
+	snapshot := json.RawMessage(`{"environment":"homologation","concept":"products","issue_date":"2026-07-31","currency":"ARS","totals":{"net":"100","vat":"21","exempt":"0","total":"121"},"recipient":{"document_type":"CUIT","document_number":"20123456789","vat_condition":"registered"},"lines":[{"description":"Servicio","quantity":"1","unit_price":"100","vat_rate":"21","net":"100"}]}`)
 	request := domain.FiscalRequest{RequestID: "fiscal:contract:1", OrganizationID: "org_contract", IdempotencyKey: "fiscal-contract-request-1", SourceVersion: 1, CredentialRef: "mock://credential/contract", Voucher: domain.VoucherReference{PointOfSale: 1, DocumentType: "FA", VoucherNumber: 1}, Total: domain.Money{Amount: "121", Currency: "ARS"}, SnapshotDigest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", CorrelationID: "contract", FiscalSnapshot: snapshot}
 	tokens, err := identityaccess.TokenSourceFromRuntime("worker:fiscal-contract-test")
 	if err != nil {

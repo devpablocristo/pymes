@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Pool } from "pg";
-import { MockFiscalAuthority } from "../../src/fiscal/companion/mock-authority.js";
-import type { FiscalRequest } from "../../src/fiscal/domain/fiscal.js";
-import { PostgresFiscalStore } from "../../src/fiscal/repository/postgres-store.js";
-import { FiscalService } from "../../src/fiscal/usecases/fiscal-service.js";
+import { MockFiscalAuthority } from "../../src/fiscal/mock_authority.js";
+import type { FiscalRequest } from "../../src/fiscal/usecases/domain/fiscal.js";
+import { PostgresFiscalStore } from "../../src/fiscal/repository.js";
+import { FiscalService } from "../../src/fiscal/usecases.js";
+import { PostgresCredentialRepository } from "../../src/credentials/repository.js";
+import type {
+  SealedValue,
+  StoredCredential,
+} from "../../src/credentials/usecases.js";
 
 const databaseURL = process.env.FISCAL_DATABASE_TEST_URL;
 
@@ -143,6 +148,143 @@ test("PostgreSQL RLS isolates organizations while the repository scopes every tr
   }
 });
 
+test("PostgreSQL fiscal vault enforces tenant RLS across credentials, tickets and artifacts", { skip: databaseURL === undefined }, async () => {
+  const admin = new Pool({ connectionString: databaseURL });
+  const runtimeRole = "fiscal_vault_identity_test";
+  const runtimePassword = "fiscal-vault-identity-test";
+  try {
+    await admin.query(
+      "TRUNCATE fiscal.wsaa_tickets, fiscal.points_of_sale, fiscal.encrypted_artifacts, fiscal.credentials CASCADE",
+    );
+    await admin.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${runtimeRole}') THEN
+          CREATE ROLE ${runtimeRole} LOGIN PASSWORD '${runtimePassword}'
+            NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+        ELSE
+          ALTER ROLE ${runtimeRole} LOGIN PASSWORD '${runtimePassword}'
+            NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+        END IF;
+      END
+      $$`);
+    await admin.query(`GRANT CONNECT ON DATABASE pymes_fiscal TO ${runtimeRole}`);
+    await admin.query(`GRANT USAGE ON SCHEMA fiscal TO ${runtimeRole}`);
+    await admin.query(
+      `GRANT SELECT,INSERT,UPDATE,DELETE
+         ON fiscal.credentials,fiscal.points_of_sale,fiscal.wsaa_tickets,fiscal.encrypted_artifacts
+         TO ${runtimeRole}`,
+    );
+
+    const runtimeURL = new URL(databaseURL!);
+    runtimeURL.username = runtimeRole;
+    runtimeURL.password = runtimePassword;
+    const runtime = new Pool({ connectionString: runtimeURL.toString() });
+    try {
+      const repository = new PostgresCredentialRepository(runtime);
+      const left = credentialRecord("org_vault_left");
+      const right = credentialRecord("org_vault_right");
+      await repository.insertPending(left);
+      await repository.insertPending(right);
+
+      assert.equal(
+        (await runtime.query("SELECT count(*)::int AS count FROM fiscal.credentials"))
+          .rows[0].count,
+        0,
+        "queries without an organization context fail closed",
+      );
+      assert.equal(
+        (await repository.find(left.organizationId, left.id))?.organizationId,
+        left.organizationId,
+      );
+      assert.equal(
+        (await repository.find(right.organizationId, right.id))?.organizationId,
+        right.organizationId,
+      );
+      assert.equal(
+        await repository.find(left.organizationId, "fcred_00000002"),
+        undefined,
+      );
+      await repository.upsertPointOfSale({
+        organizationId: left.organizationId,
+        credentialId: left.id,
+        environment: left.environment,
+        number: 7,
+        enabled: true,
+        validatedAt: "2026-08-01T12:30:00.000Z",
+      });
+      assert.equal(
+        (
+          await repository.findPointOfSale(
+            left.organizationId,
+            left.id,
+            left.environment,
+            7,
+          )
+        )?.validatedAt,
+        "2026-08-01T12:30:00.000Z",
+      );
+
+      await repository.saveTicket({
+        organizationId: left.organizationId,
+        credentialId: left.id,
+        environment: left.environment,
+        service: "wsfe",
+        encryptedTicket: sealed,
+        expiresAt: "2026-08-01T14:00:00.000Z",
+      });
+      await repository.saveTicket({
+        organizationId: right.organizationId,
+        credentialId: right.id,
+        environment: right.environment,
+        service: "wsfe",
+        encryptedTicket: sealed,
+        expiresAt: "2026-08-01T14:00:00.000Z",
+      });
+      assert.equal(
+        (
+          await repository.findTicket(
+            left.organizationId,
+            left.id,
+            left.environment,
+            "wsfe",
+          )
+        )?.organizationId,
+        left.organizationId,
+      );
+
+      const client = await runtime.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(
+          "SELECT set_config('app.organization_id',$1,true)",
+          [left.organizationId],
+        );
+        await assert.rejects(
+          client.query(
+            `INSERT INTO fiscal.encrypted_artifacts
+               (organization_id,artifact_id,request_id,kind,encrypted_payload)
+             VALUES($1,'fartifact_00000001','request','wsfe_authorization',$2)`,
+            [right.organizationId, sealed],
+          ),
+          (error: unknown) =>
+            typeof error === "object" &&
+            error !== null &&
+            "code" in error &&
+            (error as { code: unknown }).code === "42501",
+        );
+        await client.query("ROLLBACK");
+      } finally {
+        client.release();
+      }
+    } finally {
+      await runtime.end();
+    }
+  } finally {
+    await admin.end();
+  }
+});
+
 const request: FiscalRequest = {
   request_id: "fiscal:restart:1",
   organization_id: "org_restart",
@@ -155,6 +297,7 @@ const request: FiscalRequest = {
   document_type: "FA",
   voucher_number: 9,
   issue_date: "2026-07-30",
+  concept: "products",
   currency: "ARS",
   totals: { net: "100", vat: "21", exempt: "0", total: "121" },
   recipient: { document_type: "CUIT", document_number: "20123456789", vat_condition: "registered" },
@@ -179,5 +322,35 @@ function contextFor(value: Pick<FiscalRequest, "organization_id" | "idempotency_
       correlationId: value.correlation_id,
       tokenId: "token-1",
     },
+  };
+}
+
+const sealed: SealedValue = {
+  format: "aes-256-gcm+kms-v1",
+  ciphertext: Buffer.from("ciphertext").toString("base64"),
+  encryptedDataKey: Buffer.alloc(32, 1).toString("base64"),
+  iv: Buffer.alloc(12, 2).toString("base64"),
+  authTag: Buffer.alloc(16, 3).toString("base64"),
+  kmsKeyName: "projects/test/locations/global/keyRings/test/cryptoKeys/fiscal",
+};
+
+function credentialRecord(organizationId: string): StoredCredential {
+  return {
+    id: organizationId.endsWith("left")
+      ? "fcred_00000001"
+      : "fcred_00000002",
+    organizationId,
+    cuit: "20123456786",
+    environment: "homologation",
+    legalName: "Vault Test SA",
+    commonName: "vault-test",
+    status: "pending_certificate",
+    idempotencyKey: "credential:idempotency:1",
+    requestHash: "a".repeat(64),
+    csrPem: "-----BEGIN CERTIFICATE REQUEST-----\ntest\n-----END CERTIFICATE REQUEST-----",
+    encryptedPrivateKey: sealed,
+    version: 1,
+    createdAt: "2026-08-01T12:00:00.000Z",
+    updatedAt: "2026-08-01T12:00:00.000Z",
   };
 }

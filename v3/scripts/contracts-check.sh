@@ -10,7 +10,7 @@ trap cleanup EXIT INT TERM
 
 cd "$root_dir/backend"
 generator='github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0'
-public_go_operation_ids='getHealthz,getReadyz,createSale,createParty,getParty,createPurchase,getPurchase,createPayment,getPayment,createAccountingReversal,getAccountingFailure,createAccountingAdjustment,getSale'
+public_go_operation_ids='getHealthz,getReadyz,createSale,createParty,getParty,createPurchase,getPurchase,createPayment,getPayment,createAccountingReversal,getAccountingFailure,createAccountingAdjustment,getSale,requestFiscalCredentialCSR,getFiscalCredential,uploadFiscalCertificate,configureFiscalPointOfSale,validateFiscalPointOfSale'
 go run "$generator" --include-operation-ids "$public_go_operation_ids" --package publicapi --generate types,chi-server -o "$temporary_dir/public.gen.go" ../api/openapi.yaml
 # Resolve and generate every public operation as a contract-integrity gate.
 # The output is intentionally ephemeral: Go handlers remain context-local,

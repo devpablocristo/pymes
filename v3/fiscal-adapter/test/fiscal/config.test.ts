@@ -3,7 +3,7 @@ import test from "node:test";
 import { loadConfig } from "../../src/config.js";
 
 test("startup is fail closed unless mock mode is explicit", () => {
-  assert.throws(() => loadConfig({}), /FISCAL_ADAPTER_MODE=mock/);
+  assert.throws(() => loadConfig({}), /FISCAL_ADAPTER_MODE must be mock or arca/);
   assert.throws(() => loadConfig({ FISCAL_ADAPTER_MODE: "mock" }), /FISCAL_DATABASE_URL/);
   const base = {
     FISCAL_ADAPTER_MODE: "mock",
@@ -54,9 +54,48 @@ test("legacy key and insecure bypass require an explicit local environment", () 
   const legacy = loadConfig({
     ...base,
     PYMES_ENVIRONMENT: "development",
+    FISCAL_LOCAL_KMS_KEY_B64: Buffer.alloc(32, 9).toString("base64"),
     PYMES_ALLOW_LEGACY_INTERNAL_KEY_LOCAL: "true",
     PYMES_INTERNAL_PUBLIC_KEY_B64: "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
     PYMES_INTERNAL_KEY_ID: "local-dev-1",
   });
   assert.match(legacy.internalJWKSJSON, /"kid":"local-dev-1"/);
+});
+
+test("ARCA mode requires a production KMS key and environment-specific issuers", () => {
+  const secure = {
+    FISCAL_ADAPTER_MODE: "arca",
+    FISCAL_DATABASE_URL: "postgres://fiscal",
+    PYMES_ENVIRONMENT: "production",
+    PYMES_INTERNAL_ISSUER: "pymes-v3",
+    PYMES_INTERNAL_JWKS_JSON: JSON.stringify({
+      keys: [{
+        kty: "OKP",
+        crv: "Ed25519",
+        alg: "EdDSA",
+        kid: "workload-1",
+        x: "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ",
+      }],
+    }),
+  };
+  assert.throws(() => loadConfig(secure), /FISCAL_KMS_KEY_NAME/);
+  assert.throws(
+    () =>
+      loadConfig({
+        ...secure,
+        FISCAL_KMS_KEY_NAME:
+          "projects/pymes/locations/us-central1/keyRings/fiscal/cryptoKeys/stg",
+      }),
+    /issuer patterns/,
+  );
+  const config = loadConfig({
+    ...secure,
+    FISCAL_KMS_KEY_NAME:
+      "projects/pymes/locations/us-central1/keyRings/fiscal/cryptoKeys/stg",
+    FISCAL_ARCA_HOMOLOGATION_ISSUER_PATTERN: "ARCA.*Homolog",
+    FISCAL_ARCA_PRODUCTION_ISSUER_PATTERN: "ARCA.*Produ",
+  });
+  assert.equal(config.mode, "arca");
+  assert.equal(config.localKMSKeyB64, undefined);
+  assert.equal(config.requestTimeoutMs, 30_000);
 });

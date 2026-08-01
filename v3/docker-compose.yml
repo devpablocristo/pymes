@@ -99,6 +99,7 @@ services:
       PYMES_ENVIRONMENT: development
       PYMES_INTERNAL_ISSUER: pymes-v3
       PYMES_INTERNAL_JWKS_JSON: '{"keys":[{"kty":"OKP","crv":"Ed25519","alg":"EdDSA","use":"sig","key_ops":["verify"],"kid":"local-dev-1","x":"ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"}]}'
+      FISCAL_LOCAL_KMS_KEY_B64: BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=
       PORT: "8080"
     depends_on:
       accounting-grants: { condition: service_completed_successfully }
@@ -133,7 +134,12 @@ services:
     build: { context: ., target: api }
     environment:
       PYMES_DATABASE_URL: postgres://pymes:pymes@postgres:5432/pymes_v3?sslmode=disable
+      FISCAL_ADAPTER_URL: http://fiscal-fake:8080
       PYMES_ENVIRONMENT: development
+      PYMES_ALLOW_INSECURE_LOCAL_SERVICES: "true"
+      PYMES_INTERNAL_SIGNING_SEED_B64: AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=
+      PYMES_INTERNAL_ISSUER: pymes-v3
+      PYMES_INTERNAL_KEY_ID: local-dev-1
       PYMES_CLERK_SECRET_KEY: ${PYMES_CLERK_SECRET_KEY:-sk_test_local}
       PYMES_CLERK_JWT_KEY: ${PYMES_CLERK_JWT_KEY:-}
       PYMES_CLERK_ISSUER: ${PYMES_CLERK_ISSUER:-https://clerk.local}
@@ -146,6 +152,7 @@ services:
       PERGO_WEBHOOK_SECRETS: local-pergo-webhook-secret-32bytes
     depends_on:
       migrate: { condition: service_completed_successfully }
+      fiscal-fake: { condition: service_healthy }
     ports: ["18080:8080"]
     healthcheck:
       test: ["CMD", "/healthcheck", "http://127.0.0.1:8080/readyz"]
@@ -189,6 +196,7 @@ services:
       FISCAL_MOCK_SCENARIO: ${FISCAL_MOCK_SCENARIO:-authorized}
       FISCAL_DATABASE_URL: postgres://fiscal:fiscal@fiscal-postgres:5432/pymes_fiscal?sslmode=disable
       PYMES_ENVIRONMENT: development
+      FISCAL_LOCAL_KMS_KEY_B64: BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=
       PYMES_INTERNAL_ISSUER: pymes-v3
       PYMES_INTERNAL_JWKS_JSON: '{"keys":[{"kty":"OKP","crv":"Ed25519","alg":"EdDSA","use":"sig","key_ops":["verify"],"kid":"local-dev-1","x":"ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"}]}'
       PORT: "8080"

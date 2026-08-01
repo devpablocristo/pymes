@@ -3,7 +3,7 @@ package config
 import "testing"
 
 func TestLoadFromRequiresCompleteClerkConfiguration(t *testing.T) {
-	values := map[string]string{"PYMES_DATABASE_URL": "postgres://db", "PYMES_CLERK_ISSUER": "https://issuer", "PYMES_CLERK_AUTHORIZED_PARTIES": "https://app", "PYMES_CLERK_JWT_KEY": "pem", "PYMES_CLERK_WEBHOOK_SECRET": "whsec_test", "PYMES_SCHEDULING_ACTION_TOKEN_SECRET": "01234567890123456789012345678901"}
+	values := map[string]string{"PYMES_DATABASE_URL": "postgres://db", "FISCAL_ADAPTER_URL": "https://fiscal.internal", "PYMES_CLERK_ISSUER": "https://issuer", "PYMES_CLERK_AUTHORIZED_PARTIES": "https://app", "PYMES_CLERK_JWT_KEY": "pem", "PYMES_CLERK_WEBHOOK_SECRET": "whsec_test", "PYMES_SCHEDULING_ACTION_TOKEN_SECRET": "01234567890123456789012345678901"}
 	if _, err := LoadFrom(func(key string) string { return values[key] }); err != nil {
 		t.Fatal(err)
 	}
@@ -16,6 +16,7 @@ func TestLoadFromRequiresCompleteClerkConfiguration(t *testing.T) {
 func TestLoadFromRequiresSignedPerGoWebhookConfigurationWhenEnabled(t *testing.T) {
 	values := map[string]string{
 		"PYMES_DATABASE_URL":                   "postgres://db",
+		"FISCAL_ADAPTER_URL":                   "https://fiscal.internal",
 		"PYMES_CLERK_ISSUER":                   "https://issuer",
 		"PYMES_CLERK_AUTHORIZED_PARTIES":       "https://app",
 		"PYMES_CLERK_JWT_KEY":                  "pem",
@@ -39,5 +40,17 @@ func TestLoadFromRequiresSignedPerGoWebhookConfigurationWhenEnabled(t *testing.T
 	values["PERGO_WEBHOOK_SECRETS"] = "too-short"
 	if _, err := LoadFrom(func(key string) string { return values[key] }); err == nil {
 		t.Fatal("expected weak webhook secret to fail closed")
+	}
+}
+
+func TestLoadFromRejectsProductionIdentityBypass(t *testing.T) {
+	values := map[string]string{
+		"PYMES_ENVIRONMENT":                   "production",
+		"PYMES_DATABASE_URL":                  "postgres://db",
+		"FISCAL_ADAPTER_URL":                  "https://fiscal.internal",
+		"PYMES_ALLOW_INSECURE_LOCAL_SERVICES": "true",
+	}
+	if _, err := LoadFrom(func(key string) string { return values[key] }); err == nil {
+		t.Fatal("expected production identity bypass to fail")
 	}
 }

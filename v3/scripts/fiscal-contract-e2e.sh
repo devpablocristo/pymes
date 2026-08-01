@@ -15,6 +15,7 @@ cd "$root_dir/fiscal-adapter"
 FISCAL_ADAPTER_MODE=mock \
 FISCAL_MOCK_SCENARIO=authorized \
 FISCAL_DATABASE_URL='postgres://fiscal:fiscal@127.0.0.1:55435/pymes_fiscal?sslmode=disable' \
+FISCAL_LOCAL_KMS_KEY_B64='BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=' \
 PYMES_ENVIRONMENT=development \
 PYMES_INTERNAL_ISSUER=pymes-v3 \
 PYMES_INTERNAL_JWKS_JSON='{"keys":[{"kty":"OKP","crv":"Ed25519","alg":"EdDSA","use":"sig","key_ops":["verify"],"kid":"local-dev-1","x":"ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"}]}' \

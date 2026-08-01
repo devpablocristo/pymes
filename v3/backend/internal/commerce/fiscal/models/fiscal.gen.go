@@ -18,13 +18,42 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for CSRRequestEnvironment.
+const (
+	CSRRequestEnvironmentHomologation CSRRequestEnvironment = "homologation"
+	CSRRequestEnvironmentProduction   CSRRequestEnvironment = "production"
+)
+
+// Valid indicates whether the value is a known member of the CSRRequestEnvironment enum.
+func (e CSRRequestEnvironment) Valid() bool {
+	switch e {
+	case CSRRequestEnvironmentHomologation:
+		return true
+	case CSRRequestEnvironmentProduction:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ErrorCode.
 const (
-	AUTHORITYTIMEOUT     ErrorCode = "AUTHORITY_TIMEOUT"
-	IDEMPOTENCYKEYREUSED ErrorCode = "IDEMPOTENCY_KEY_REUSED"
-	INTERNALERROR        ErrorCode = "INTERNAL_ERROR"
-	UNAUTHORIZEDSERVICE  ErrorCode = "UNAUTHORIZED_SERVICE"
-	VALIDATIONERROR      ErrorCode = "VALIDATION_ERROR"
+	AUTHORITYTIMEOUT               ErrorCode = "AUTHORITY_TIMEOUT"
+	CERTIFICATECUITMISMATCH        ErrorCode = "CERTIFICATE_CUIT_MISMATCH"
+	CERTIFICATEENVIRONMENTMISMATCH ErrorCode = "CERTIFICATE_ENVIRONMENT_MISMATCH"
+	CERTIFICATEEXPIRED             ErrorCode = "CERTIFICATE_EXPIRED"
+	CERTIFICATEINVALID             ErrorCode = "CERTIFICATE_INVALID"
+	CERTIFICATEKEYMISMATCH         ErrorCode = "CERTIFICATE_KEY_MISMATCH"
+	CREDENTIALNOTFOUND             ErrorCode = "CREDENTIAL_NOT_FOUND"
+	CREDENTIALNOTREADY             ErrorCode = "CREDENTIAL_NOT_READY"
+	CREDENTIALVERSIONCONFLICT      ErrorCode = "CREDENTIAL_VERSION_CONFLICT"
+	HOMOLOGATIONREQUIRED           ErrorCode = "HOMOLOGATION_REQUIRED"
+	IDEMPOTENCYKEYREUSED           ErrorCode = "IDEMPOTENCY_KEY_REUSED"
+	INTERNALERROR                  ErrorCode = "INTERNAL_ERROR"
+	POINTOFSALENOTENABLED          ErrorCode = "POINT_OF_SALE_NOT_ENABLED"
+	POINTOFSALENOTVALIDATED        ErrorCode = "POINT_OF_SALE_NOT_VALIDATED"
+	UNAUTHORIZEDSERVICE            ErrorCode = "UNAUTHORIZED_SERVICE"
+	VALIDATIONERROR                ErrorCode = "VALIDATION_ERROR"
 )
 
 // Valid indicates whether the value is a known member of the ErrorCode enum.
@@ -32,13 +61,95 @@ func (e ErrorCode) Valid() bool {
 	switch e {
 	case AUTHORITYTIMEOUT:
 		return true
+	case CERTIFICATECUITMISMATCH:
+		return true
+	case CERTIFICATEENVIRONMENTMISMATCH:
+		return true
+	case CERTIFICATEEXPIRED:
+		return true
+	case CERTIFICATEINVALID:
+		return true
+	case CERTIFICATEKEYMISMATCH:
+		return true
+	case CREDENTIALNOTFOUND:
+		return true
+	case CREDENTIALNOTREADY:
+		return true
+	case CREDENTIALVERSIONCONFLICT:
+		return true
+	case HOMOLOGATIONREQUIRED:
+		return true
 	case IDEMPOTENCYKEYREUSED:
 		return true
 	case INTERNALERROR:
 		return true
+	case POINTOFSALENOTENABLED:
+		return true
+	case POINTOFSALENOTVALIDATED:
+		return true
 	case UNAUTHORIZEDSERVICE:
 		return true
 	case VALIDATIONERROR:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalCredentialEnvironment.
+const (
+	FiscalCredentialEnvironmentHomologation FiscalCredentialEnvironment = "homologation"
+	FiscalCredentialEnvironmentProduction   FiscalCredentialEnvironment = "production"
+)
+
+// Valid indicates whether the value is a known member of the FiscalCredentialEnvironment enum.
+func (e FiscalCredentialEnvironment) Valid() bool {
+	switch e {
+	case FiscalCredentialEnvironmentHomologation:
+		return true
+	case FiscalCredentialEnvironmentProduction:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalCredentialStatus.
+const (
+	FiscalCredentialStatusDisabled           FiscalCredentialStatus = "disabled"
+	FiscalCredentialStatusExpired            FiscalCredentialStatus = "expired"
+	FiscalCredentialStatusPendingCertificate FiscalCredentialStatus = "pending_certificate"
+	FiscalCredentialStatusReady              FiscalCredentialStatus = "ready"
+)
+
+// Valid indicates whether the value is a known member of the FiscalCredentialStatus enum.
+func (e FiscalCredentialStatus) Valid() bool {
+	switch e {
+	case FiscalCredentialStatusDisabled:
+		return true
+	case FiscalCredentialStatusExpired:
+		return true
+	case FiscalCredentialStatusPendingCertificate:
+		return true
+	case FiscalCredentialStatusReady:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalPointOfSaleEnvironment.
+const (
+	FiscalPointOfSaleEnvironmentHomologation FiscalPointOfSaleEnvironment = "homologation"
+	FiscalPointOfSaleEnvironmentProduction   FiscalPointOfSaleEnvironment = "production"
+)
+
+// Valid indicates whether the value is a known member of the FiscalPointOfSaleEnvironment enum.
+func (e FiscalPointOfSaleEnvironment) Valid() bool {
+	switch e {
+	case FiscalPointOfSaleEnvironmentHomologation:
+		return true
+	case FiscalPointOfSaleEnvironmentProduction:
 		return true
 	default:
 		return false
@@ -60,6 +171,27 @@ func (e FiscalRequestAssociatedVoucherDocumentType) Valid() bool {
 	case FiscalRequestAssociatedVoucherDocumentTypeFB:
 		return true
 	case FiscalRequestAssociatedVoucherDocumentTypeFC:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FiscalRequestConcept.
+const (
+	Products            FiscalRequestConcept = "products"
+	ProductsAndServices FiscalRequestConcept = "products_and_services"
+	Services            FiscalRequestConcept = "services"
+)
+
+// Valid indicates whether the value is a known member of the FiscalRequestConcept enum.
+func (e FiscalRequestConcept) Valid() bool {
+	switch e {
+	case Products:
+		return true
+	case ProductsAndServices:
+		return true
+	case Services:
 		return true
 	default:
 		return false
@@ -128,16 +260,16 @@ func (e FiscalRequestDocumentType) Valid() bool {
 
 // Defines values for FiscalRequestEnvironment.
 const (
-	Homologation FiscalRequestEnvironment = "homologation"
-	Production   FiscalRequestEnvironment = "production"
+	FiscalRequestEnvironmentHomologation FiscalRequestEnvironment = "homologation"
+	FiscalRequestEnvironmentProduction   FiscalRequestEnvironment = "production"
 )
 
 // Valid indicates whether the value is a known member of the FiscalRequestEnvironment enum.
 func (e FiscalRequestEnvironment) Valid() bool {
 	switch e {
-	case Homologation:
+	case FiscalRequestEnvironmentHomologation:
 		return true
-	case Production:
+	case FiscalRequestEnvironmentProduction:
 		return true
 	default:
 		return false
@@ -146,22 +278,22 @@ func (e FiscalRequestEnvironment) Valid() bool {
 
 // Defines values for FiscalResultStatus.
 const (
-	Authorized FiscalResultStatus = "authorized"
-	NotFound   FiscalResultStatus = "not_found"
-	Rejected   FiscalResultStatus = "rejected"
-	Uncertain  FiscalResultStatus = "uncertain"
+	FiscalResultStatusAuthorized FiscalResultStatus = "authorized"
+	FiscalResultStatusNotFound   FiscalResultStatus = "not_found"
+	FiscalResultStatusRejected   FiscalResultStatus = "rejected"
+	FiscalResultStatusUncertain  FiscalResultStatus = "uncertain"
 )
 
 // Valid indicates whether the value is a known member of the FiscalResultStatus enum.
 func (e FiscalResultStatus) Valid() bool {
 	switch e {
-	case Authorized:
+	case FiscalResultStatusAuthorized:
 		return true
-	case NotFound:
+	case FiscalResultStatusNotFound:
 		return true
-	case Rejected:
+	case FiscalResultStatusRejected:
 		return true
-	case Uncertain:
+	case FiscalResultStatusUncertain:
 		return true
 	default:
 		return false
@@ -215,13 +347,13 @@ func (e NotReadyStatusStatus) Valid() bool {
 
 // Defines values for ReadinessStatusStatus.
 const (
-	Ready ReadinessStatusStatus = "ready"
+	ReadinessStatusStatusReady ReadinessStatusStatus = "ready"
 )
 
 // Valid indicates whether the value is a known member of the ReadinessStatusStatus enum.
 func (e ReadinessStatusStatus) Valid() bool {
 	switch e {
-	case Ready:
+	case ReadinessStatusStatusReady:
 		return true
 	default:
 		return false
@@ -309,6 +441,31 @@ func (e ListDocumentTypes200JSONResponseBodyLetter) Valid() bool {
 	}
 }
 
+// CSRRequest defines model for CSRRequest.
+type CSRRequest struct {
+	CommonName  string                `json:"common_name"`
+	Cuit        string                `json:"cuit"`
+	Environment CSRRequestEnvironment `json:"environment"`
+	LegalName   string                `json:"legal_name"`
+}
+
+// CSRRequestEnvironment defines model for CSRRequest.Environment.
+type CSRRequestEnvironment string
+
+// CSRResult defines model for CSRResult.
+type CSRResult struct {
+	Credential FiscalCredential `json:"credential"`
+
+	// CsrPem CSR PEM público. La clave privada nunca sale de Fiscal.
+	CsrPem string `json:"csr_pem"`
+}
+
+// CertificateUpload defines model for CertificateUpload.
+type CertificateUpload struct {
+	CertificatePem  string `json:"certificate_pem"`
+	ExpectedVersion int    `json:"expected_version"`
+}
+
 // Decimal Decimal base diez exacto, sin signo, exponente ni JSON number.
 type Decimal = string
 
@@ -323,6 +480,43 @@ type Error struct {
 // ErrorCode defines model for Error.Code.
 type ErrorCode string
 
+// FiscalCredential defines model for FiscalCredential.
+type FiscalCredential struct {
+	CertificateExpiresAt    *time.Time                  `json:"certificate_expires_at,omitempty"`
+	CertificateFingerprint  *string                     `json:"certificate_fingerprint,omitempty"`
+	CertificateSerialNumber *string                     `json:"certificate_serial_number,omitempty"`
+	CertificateValidFrom    *time.Time                  `json:"certificate_valid_from,omitempty"`
+	CommonName              string                      `json:"common_name"`
+	CreatedAt               time.Time                   `json:"created_at"`
+	Cuit                    string                      `json:"cuit"`
+	Environment             FiscalCredentialEnvironment `json:"environment"`
+	Id                      string                      `json:"id"`
+	LegalName               string                      `json:"legal_name"`
+	OrganizationId          string                      `json:"organization_id"`
+	Status                  FiscalCredentialStatus      `json:"status"`
+	UpdatedAt               time.Time                   `json:"updated_at"`
+	Version                 int                         `json:"version"`
+}
+
+// FiscalCredentialEnvironment defines model for FiscalCredential.Environment.
+type FiscalCredentialEnvironment string
+
+// FiscalCredentialStatus defines model for FiscalCredential.Status.
+type FiscalCredentialStatus string
+
+// FiscalPointOfSale defines model for FiscalPointOfSale.
+type FiscalPointOfSale struct {
+	CredentialId   string                       `json:"credential_id"`
+	Enabled        bool                         `json:"enabled"`
+	Environment    FiscalPointOfSaleEnvironment `json:"environment"`
+	Number         int                          `json:"number"`
+	OrganizationId string                       `json:"organization_id"`
+	ValidatedAt    *time.Time                   `json:"validated_at,omitempty"`
+}
+
+// FiscalPointOfSaleEnvironment defines model for FiscalPointOfSale.Environment.
+type FiscalPointOfSaleEnvironment string
+
 // FiscalRequest idempotency_key y correlation_id deben coincidir con sus headers. source_version identifica la versión del documento Pymes y snapshot_digest su hash SHA-256 inmutable.
 type FiscalRequest struct {
 	AssociatedVoucher *struct {
@@ -331,7 +525,8 @@ type FiscalRequest struct {
 		PointOfSale   int                                        `json:"point_of_sale"`
 		VoucherNumber int                                        `json:"voucher_number"`
 	} `json:"associated_voucher,omitempty"`
-	CorrelationId string `json:"correlation_id"`
+	Concept       FiscalRequestConcept `json:"concept"`
+	CorrelationId string               `json:"correlation_id"`
 
 	// CredentialRef Referencia KMS/secret; jamás certificado o clave.
 	CredentialRef string                    `json:"credential_ref"`
@@ -365,7 +560,12 @@ type FiscalRequest struct {
 		DocumentType   string `json:"document_type"`
 		VatCondition   string `json:"vat_condition"`
 	} `json:"recipient"`
-	RequestId string `json:"request_id"`
+	RequestId     string `json:"request_id"`
+	ServicePeriod *struct {
+		From       openapi_types.Date `json:"from"`
+		PaymentDue openapi_types.Date `json:"payment_due"`
+		To         openapi_types.Date `json:"to"`
+	} `json:"service_period,omitempty"`
 
 	// SnapshotDigest Hash SHA-256 hexadecimal del documento congelado.
 	SnapshotDigest string `json:"snapshot_digest"`
@@ -390,6 +590,9 @@ type FiscalRequest struct {
 
 // FiscalRequestAssociatedVoucherDocumentType defines model for FiscalRequest.AssociatedVoucher.DocumentType.
 type FiscalRequestAssociatedVoucherDocumentType string
+
+// FiscalRequestConcept defines model for FiscalRequest.Concept.
+type FiscalRequestConcept string
 
 // FiscalRequestCurrency defines model for FiscalRequest.Currency.
 type FiscalRequestCurrency string
@@ -462,6 +665,9 @@ type VatRate = string
 // CorrelationId defines model for CorrelationId.
 type CorrelationId = string
 
+// CredentialId defines model for CredentialId.
+type CredentialId = string
+
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
 
@@ -479,6 +685,9 @@ type DomainError = Error
 
 // InternalError defines model for InternalError.
 type InternalError = Error
+
+// NotFound defines model for NotFound.
+type NotFound = Error
 
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Error
@@ -514,11 +723,66 @@ type ConsultAuthorizationParams struct {
 	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
 }
 
+// RequestFiscalCredentialCSRParams defines parameters for RequestFiscalCredentialCSR.
+type RequestFiscalCredentialCSRParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
+}
+
+// GetFiscalCredentialParams defines parameters for GetFiscalCredential.
+type GetFiscalCredentialParams struct {
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
+}
+
+// UploadFiscalCertificateParams defines parameters for UploadFiscalCertificate.
+type UploadFiscalCertificateParams struct {
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
+}
+
+// ConfigureFiscalPointOfSaleJSONBody defines parameters for ConfigureFiscalPointOfSale.
+type ConfigureFiscalPointOfSaleJSONBody struct {
+	Enabled bool `json:"enabled"`
+}
+
+// ConfigureFiscalPointOfSaleParams defines parameters for ConfigureFiscalPointOfSale.
+type ConfigureFiscalPointOfSaleParams struct {
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
+}
+
+// ValidateFiscalPointOfSaleJSONBody defines parameters for ValidateFiscalPointOfSale.
+type ValidateFiscalPointOfSaleJSONBody struct {
+	// Enabled Habilita el punto sólo después de validar.
+	Enabled bool `json:"enabled"`
+}
+
+// ValidateFiscalPointOfSaleParams defines parameters for ValidateFiscalPointOfSale.
+type ValidateFiscalPointOfSaleParams struct {
+	// XCorrelationID Identificador estable propagado de extremo a extremo.
+	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
+}
+
 // RequestAuthorizationJSONRequestBody defines body for RequestAuthorization for application/json ContentType.
 type RequestAuthorizationJSONRequestBody = FiscalRequest
 
 // ConsultAuthorizationJSONRequestBody defines body for ConsultAuthorization for application/json ContentType.
 type ConsultAuthorizationJSONRequestBody = FiscalRequest
+
+// RequestFiscalCredentialCSRJSONRequestBody defines body for RequestFiscalCredentialCSR for application/json ContentType.
+type RequestFiscalCredentialCSRJSONRequestBody = CSRRequest
+
+// UploadFiscalCertificateJSONRequestBody defines body for UploadFiscalCertificate for application/json ContentType.
+type UploadFiscalCertificateJSONRequestBody = CertificateUpload
+
+// ConfigureFiscalPointOfSaleJSONRequestBody defines body for ConfigureFiscalPointOfSale for application/json ContentType.
+type ConfigureFiscalPointOfSaleJSONRequestBody ConfigureFiscalPointOfSaleJSONBody
+
+// ValidateFiscalPointOfSaleJSONRequestBody defines body for ValidateFiscalPointOfSale for application/json ContentType.
+type ValidateFiscalPointOfSaleJSONRequestBody ValidateFiscalPointOfSaleJSONBody
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -616,6 +880,45 @@ type ClientInterface interface {
 	// Takes a body of the `application/json` content type.
 	ConsultAuthorization(ctx context.Context, organizationId OrganizationId, requestId string, params *ConsultAuthorizationParams, body ConsultAuthorizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// RequestFiscalCredentialCSRWithBody performs a POST /internal/v1/organizations/{organizationId}/credentials/csr (the `RequestFiscalCredentialCSR` operationId) request,
+	// with any type of body and a specified content type.
+	RequestFiscalCredentialCSRWithBody(ctx context.Context, organizationId OrganizationId, params *RequestFiscalCredentialCSRParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RequestFiscalCredentialCSR performs a POST /internal/v1/organizations/{organizationId}/credentials/csr (the `RequestFiscalCredentialCSR` operationId) request.
+	// Takes a body of the `application/json` content type.
+	RequestFiscalCredentialCSR(ctx context.Context, organizationId OrganizationId, params *RequestFiscalCredentialCSRParams, body RequestFiscalCredentialCSRJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFiscalCredential performs a GET /internal/v1/organizations/{organizationId}/credentials/{credentialId} (the `GetFiscalCredential` operationId) request.
+	GetFiscalCredential(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, params *GetFiscalCredentialParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadFiscalCertificateWithBody performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId} (the `UploadFiscalCertificate` operationId) request,
+	// with any type of body and a specified content type.
+	UploadFiscalCertificateWithBody(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, params *UploadFiscalCertificateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadFiscalCertificate performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId} (the `UploadFiscalCertificate` operationId) request.
+	// Takes a body of the `application/json` content type.
+	UploadFiscalCertificate(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, params *UploadFiscalCertificateParams, body UploadFiscalCertificateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ConfigureFiscalPointOfSaleWithBody performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale} (the `ConfigureFiscalPointOfSale` operationId) request,
+	// with any type of body and a specified content type.
+	ConfigureFiscalPointOfSaleWithBody(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ConfigureFiscalPointOfSaleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ConfigureFiscalPointOfSale performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale} (the `ConfigureFiscalPointOfSale` operationId) request.
+	// Takes a body of the `application/json` content type.
+	ConfigureFiscalPointOfSale(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ConfigureFiscalPointOfSaleParams, body ConfigureFiscalPointOfSaleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ValidateFiscalPointOfSaleWithBody performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+	ValidateFiscalPointOfSaleWithBody(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ValidateFiscalPointOfSale performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request.
+	// Takes a body of the `application/json` content type.
+	//
+	// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+	ValidateFiscalPointOfSale(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, body ValidateFiscalPointOfSaleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// FiscalMetrics performs a GET /metrics (the `FiscalMetrics` operationId) request.
 	FiscalMetrics(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -695,6 +998,135 @@ func (c *Client) ConsultAuthorizationWithBody(ctx context.Context, organizationI
 // Takes a body of the `application/json` content type.
 func (c *Client) ConsultAuthorization(ctx context.Context, organizationId OrganizationId, requestId string, params *ConsultAuthorizationParams, body ConsultAuthorizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewConsultAuthorizationRequest(c.Server, organizationId, requestId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RequestFiscalCredentialCSRWithBody performs a POST /internal/v1/organizations/{organizationId}/credentials/csr (the `RequestFiscalCredentialCSR` operationId) request,
+// with any type of body and a specified content type.
+func (c *Client) RequestFiscalCredentialCSRWithBody(ctx context.Context, organizationId OrganizationId, params *RequestFiscalCredentialCSRParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRequestFiscalCredentialCSRRequestWithBody(c.Server, organizationId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RequestFiscalCredentialCSR performs a POST /internal/v1/organizations/{organizationId}/credentials/csr (the `RequestFiscalCredentialCSR` operationId) request.
+// Takes a body of the `application/json` content type.
+func (c *Client) RequestFiscalCredentialCSR(ctx context.Context, organizationId OrganizationId, params *RequestFiscalCredentialCSRParams, body RequestFiscalCredentialCSRJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRequestFiscalCredentialCSRRequest(c.Server, organizationId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFiscalCredential performs a GET /internal/v1/organizations/{organizationId}/credentials/{credentialId} (the `GetFiscalCredential` operationId) request.
+func (c *Client) GetFiscalCredential(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, params *GetFiscalCredentialParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFiscalCredentialRequest(c.Server, organizationId, credentialId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UploadFiscalCertificateWithBody performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId} (the `UploadFiscalCertificate` operationId) request,
+// with any type of body and a specified content type.
+func (c *Client) UploadFiscalCertificateWithBody(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, params *UploadFiscalCertificateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadFiscalCertificateRequestWithBody(c.Server, organizationId, credentialId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UploadFiscalCertificate performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId} (the `UploadFiscalCertificate` operationId) request.
+// Takes a body of the `application/json` content type.
+func (c *Client) UploadFiscalCertificate(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, params *UploadFiscalCertificateParams, body UploadFiscalCertificateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadFiscalCertificateRequest(c.Server, organizationId, credentialId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ConfigureFiscalPointOfSaleWithBody performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale} (the `ConfigureFiscalPointOfSale` operationId) request,
+// with any type of body and a specified content type.
+func (c *Client) ConfigureFiscalPointOfSaleWithBody(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ConfigureFiscalPointOfSaleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewConfigureFiscalPointOfSaleRequestWithBody(c.Server, organizationId, credentialId, pointOfSale, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ConfigureFiscalPointOfSale performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale} (the `ConfigureFiscalPointOfSale` operationId) request.
+// Takes a body of the `application/json` content type.
+func (c *Client) ConfigureFiscalPointOfSale(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ConfigureFiscalPointOfSaleParams, body ConfigureFiscalPointOfSaleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewConfigureFiscalPointOfSaleRequest(c.Server, organizationId, credentialId, pointOfSale, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ValidateFiscalPointOfSaleWithBody performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request,
+// with any type of body and a specified content type.
+//
+// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+func (c *Client) ValidateFiscalPointOfSaleWithBody(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewValidateFiscalPointOfSaleRequestWithBody(c.Server, organizationId, credentialId, pointOfSale, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ValidateFiscalPointOfSale performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request.
+// Takes a body of the `application/json` content type.
+//
+// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+func (c *Client) ValidateFiscalPointOfSale(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, body ValidateFiscalPointOfSaleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewValidateFiscalPointOfSaleRequest(c.Server, organizationId, credentialId, pointOfSale, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -943,6 +1375,344 @@ func NewConsultAuthorizationRequestWithBody(server string, organizationId Organi
 	return req, nil
 }
 
+// NewRequestFiscalCredentialCSRRequest calls the generic RequestFiscalCredentialCSR builder with application/json body
+func NewRequestFiscalCredentialCSRRequest(server string, organizationId OrganizationId, params *RequestFiscalCredentialCSRParams, body RequestFiscalCredentialCSRJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRequestFiscalCredentialCSRRequestWithBody(server, organizationId, params, "application/json", bodyReader)
+}
+
+// NewRequestFiscalCredentialCSRRequestWithBody constructs an http.Request for the RequestFiscalCredentialCSR method, with any body, and a specified content type
+func NewRequestFiscalCredentialCSRRequestWithBody(server string, organizationId OrganizationId, params *RequestFiscalCredentialCSRParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/v1/organizations/%s/credentials/csr", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Idempotency-Key", headerParam0)
+
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam1)
+
+	}
+
+	return req, nil
+}
+
+// NewGetFiscalCredentialRequest constructs an http.Request for the GetFiscalCredential method
+func NewGetFiscalCredentialRequest(server string, organizationId OrganizationId, credentialId CredentialId, params *GetFiscalCredentialParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "credentialId", credentialId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/v1/organizations/%s/credentials/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewUploadFiscalCertificateRequest calls the generic UploadFiscalCertificate builder with application/json body
+func NewUploadFiscalCertificateRequest(server string, organizationId OrganizationId, credentialId CredentialId, params *UploadFiscalCertificateParams, body UploadFiscalCertificateJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUploadFiscalCertificateRequestWithBody(server, organizationId, credentialId, params, "application/json", bodyReader)
+}
+
+// NewUploadFiscalCertificateRequestWithBody constructs an http.Request for the UploadFiscalCertificate method, with any body, and a specified content type
+func NewUploadFiscalCertificateRequestWithBody(server string, organizationId OrganizationId, credentialId CredentialId, params *UploadFiscalCertificateParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "credentialId", credentialId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/v1/organizations/%s/credentials/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewConfigureFiscalPointOfSaleRequest calls the generic ConfigureFiscalPointOfSale builder with application/json body
+func NewConfigureFiscalPointOfSaleRequest(server string, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ConfigureFiscalPointOfSaleParams, body ConfigureFiscalPointOfSaleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewConfigureFiscalPointOfSaleRequestWithBody(server, organizationId, credentialId, pointOfSale, params, "application/json", bodyReader)
+}
+
+// NewConfigureFiscalPointOfSaleRequestWithBody constructs an http.Request for the ConfigureFiscalPointOfSale method, with any body, and a specified content type
+func NewConfigureFiscalPointOfSaleRequestWithBody(server string, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ConfigureFiscalPointOfSaleParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "credentialId", credentialId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "pointOfSale", pointOfSale, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/v1/organizations/%s/credentials/%s/points-of-sale/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewValidateFiscalPointOfSaleRequest calls the generic ValidateFiscalPointOfSale builder with application/json body
+func NewValidateFiscalPointOfSaleRequest(server string, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, body ValidateFiscalPointOfSaleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewValidateFiscalPointOfSaleRequestWithBody(server, organizationId, credentialId, pointOfSale, params, "application/json", bodyReader)
+}
+
+// NewValidateFiscalPointOfSaleRequestWithBody constructs an http.Request for the ValidateFiscalPointOfSale method, with any body, and a specified content type
+func NewValidateFiscalPointOfSaleRequestWithBody(server string, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "credentialId", credentialId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "pointOfSale", pointOfSale, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/v1/organizations/%s/credentials/%s/points-of-sale/%s/validate", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Correlation-ID", params.XCorrelationID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Correlation-ID", headerParam0)
+
+	}
+
+	return req, nil
+}
+
 // NewFiscalMetricsRequest constructs an http.Request for the FiscalMetrics method
 func NewFiscalMetricsRequest(server string) (*http.Request, error) {
 	var err error
@@ -1070,6 +1840,55 @@ type ClientWithResponsesInterface interface {
 	// ConsultAuthorizationWithResponse performs a POST /internal/v1/organizations/{organizationId}/authorizations/{requestId}/consult (the `ConsultAuthorization` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	ConsultAuthorizationWithResponse(ctx context.Context, organizationId OrganizationId, requestId string, params *ConsultAuthorizationParams, body ConsultAuthorizationJSONRequestBody, reqEditors ...RequestEditorFn) (*ConsultAuthorizationResponse, error)
+
+	// RequestFiscalCredentialCSRWithBodyWithResponse performs a POST /internal/v1/organizations/{organizationId}/credentials/csr (the `RequestFiscalCredentialCSR` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	RequestFiscalCredentialCSRWithBodyWithResponse(ctx context.Context, organizationId OrganizationId, params *RequestFiscalCredentialCSRParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RequestFiscalCredentialCSRResponse, error)
+
+	// RequestFiscalCredentialCSRWithResponse performs a POST /internal/v1/organizations/{organizationId}/credentials/csr (the `RequestFiscalCredentialCSR` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	RequestFiscalCredentialCSRWithResponse(ctx context.Context, organizationId OrganizationId, params *RequestFiscalCredentialCSRParams, body RequestFiscalCredentialCSRJSONRequestBody, reqEditors ...RequestEditorFn) (*RequestFiscalCredentialCSRResponse, error)
+
+	// GetFiscalCredentialWithResponse performs a GET /internal/v1/organizations/{organizationId}/credentials/{credentialId} (the `GetFiscalCredential` operationId) request.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	GetFiscalCredentialWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, params *GetFiscalCredentialParams, reqEditors ...RequestEditorFn) (*GetFiscalCredentialResponse, error)
+
+	// UploadFiscalCertificateWithBodyWithResponse performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId} (the `UploadFiscalCertificate` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	UploadFiscalCertificateWithBodyWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, params *UploadFiscalCertificateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadFiscalCertificateResponse, error)
+
+	// UploadFiscalCertificateWithResponse performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId} (the `UploadFiscalCertificate` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	UploadFiscalCertificateWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, params *UploadFiscalCertificateParams, body UploadFiscalCertificateJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadFiscalCertificateResponse, error)
+
+	// ConfigureFiscalPointOfSaleWithBodyWithResponse performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale} (the `ConfigureFiscalPointOfSale` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	ConfigureFiscalPointOfSaleWithBodyWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ConfigureFiscalPointOfSaleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ConfigureFiscalPointOfSaleResponse, error)
+
+	// ConfigureFiscalPointOfSaleWithResponse performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale} (the `ConfigureFiscalPointOfSale` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	ConfigureFiscalPointOfSaleWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ConfigureFiscalPointOfSaleParams, body ConfigureFiscalPointOfSaleJSONRequestBody, reqEditors ...RequestEditorFn) (*ConfigureFiscalPointOfSaleResponse, error)
+
+	// ValidateFiscalPointOfSaleWithBodyWithResponse performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	ValidateFiscalPointOfSaleWithBodyWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ValidateFiscalPointOfSaleResponse, error)
+
+	// ValidateFiscalPointOfSaleWithResponse performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+	ValidateFiscalPointOfSaleWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, body ValidateFiscalPointOfSaleJSONRequestBody, reqEditors ...RequestEditorFn) (*ValidateFiscalPointOfSaleResponse, error)
 
 	// FiscalMetricsWithResponse performs a GET /metrics (the `FiscalMetrics` operationId) request.
 	//
@@ -1352,6 +2171,365 @@ func (r ConsultAuthorizationResponse) ContentType() string {
 	return ""
 }
 
+type RequestFiscalCredentialCSRResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *CSRResult
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *DomainError
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *InternalError
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r RequestFiscalCredentialCSRResponse) GetJSON201() *CSRResult {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RequestFiscalCredentialCSRResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RequestFiscalCredentialCSRResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r RequestFiscalCredentialCSRResponse) GetApplicationproblemJSON422() *DomainError {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r RequestFiscalCredentialCSRResponse) GetApplicationproblemJSON500() *InternalError {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r RequestFiscalCredentialCSRResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RequestFiscalCredentialCSRResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RequestFiscalCredentialCSRResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RequestFiscalCredentialCSRResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetFiscalCredentialResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FiscalCredential
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *DomainError
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *InternalError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetFiscalCredentialResponse) GetJSON200() *FiscalCredential {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetFiscalCredentialResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetFiscalCredentialResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r GetFiscalCredentialResponse) GetApplicationproblemJSON422() *DomainError {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r GetFiscalCredentialResponse) GetApplicationproblemJSON500() *InternalError {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFiscalCredentialResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFiscalCredentialResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFiscalCredentialResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFiscalCredentialResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UploadFiscalCertificateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FiscalCredential
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *DomainError
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *InternalError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UploadFiscalCertificateResponse) GetJSON200() *FiscalCredential {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UploadFiscalCertificateResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UploadFiscalCertificateResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r UploadFiscalCertificateResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UploadFiscalCertificateResponse) GetApplicationproblemJSON422() *DomainError {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r UploadFiscalCertificateResponse) GetApplicationproblemJSON500() *InternalError {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r UploadFiscalCertificateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadFiscalCertificateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadFiscalCertificateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UploadFiscalCertificateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ConfigureFiscalPointOfSaleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FiscalPointOfSale
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *DomainError
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *InternalError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ConfigureFiscalPointOfSaleResponse) GetJSON200() *FiscalPointOfSale {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ConfigureFiscalPointOfSaleResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ConfigureFiscalPointOfSaleResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ConfigureFiscalPointOfSaleResponse) GetApplicationproblemJSON422() *DomainError {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r ConfigureFiscalPointOfSaleResponse) GetApplicationproblemJSON500() *InternalError {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ConfigureFiscalPointOfSaleResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ConfigureFiscalPointOfSaleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ConfigureFiscalPointOfSaleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ConfigureFiscalPointOfSaleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ValidateFiscalPointOfSaleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FiscalPointOfSale
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *DomainError
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *InternalError
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *AuthorityUnavailable
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ValidateFiscalPointOfSaleResponse) GetJSON200() *FiscalPointOfSale {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ValidateFiscalPointOfSaleResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ValidateFiscalPointOfSaleResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ValidateFiscalPointOfSaleResponse) GetApplicationproblemJSON422() *DomainError {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r ValidateFiscalPointOfSaleResponse) GetApplicationproblemJSON500() *InternalError {
+	return r.ApplicationproblemJSON500
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r ValidateFiscalPointOfSaleResponse) GetApplicationproblemJSON503() *AuthorityUnavailable {
+	return r.ApplicationproblemJSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ValidateFiscalPointOfSaleResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ValidateFiscalPointOfSaleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ValidateFiscalPointOfSaleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ValidateFiscalPointOfSaleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type FiscalMetricsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1505,6 +2683,109 @@ func (c *ClientWithResponses) ConsultAuthorizationWithResponse(ctx context.Conte
 		return nil, err
 	}
 	return ParseConsultAuthorizationResponse(rsp)
+}
+
+// RequestFiscalCredentialCSRWithBodyWithResponse performs a POST /internal/v1/organizations/{organizationId}/credentials/csr (the `RequestFiscalCredentialCSR` operationId) request,
+// with any type of body and a specified content type.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) RequestFiscalCredentialCSRWithBodyWithResponse(ctx context.Context, organizationId OrganizationId, params *RequestFiscalCredentialCSRParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RequestFiscalCredentialCSRResponse, error) {
+	rsp, err := c.RequestFiscalCredentialCSRWithBody(ctx, organizationId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRequestFiscalCredentialCSRResponse(rsp)
+}
+
+// RequestFiscalCredentialCSRWithResponse performs a POST /internal/v1/organizations/{organizationId}/credentials/csr (the `RequestFiscalCredentialCSR` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) RequestFiscalCredentialCSRWithResponse(ctx context.Context, organizationId OrganizationId, params *RequestFiscalCredentialCSRParams, body RequestFiscalCredentialCSRJSONRequestBody, reqEditors ...RequestEditorFn) (*RequestFiscalCredentialCSRResponse, error) {
+	rsp, err := c.RequestFiscalCredentialCSR(ctx, organizationId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRequestFiscalCredentialCSRResponse(rsp)
+}
+
+// GetFiscalCredentialWithResponse performs a GET /internal/v1/organizations/{organizationId}/credentials/{credentialId} (the `GetFiscalCredential` operationId) request.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) GetFiscalCredentialWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, params *GetFiscalCredentialParams, reqEditors ...RequestEditorFn) (*GetFiscalCredentialResponse, error) {
+	rsp, err := c.GetFiscalCredential(ctx, organizationId, credentialId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFiscalCredentialResponse(rsp)
+}
+
+// UploadFiscalCertificateWithBodyWithResponse performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId} (the `UploadFiscalCertificate` operationId) request,
+// with any type of body and a specified content type.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) UploadFiscalCertificateWithBodyWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, params *UploadFiscalCertificateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadFiscalCertificateResponse, error) {
+	rsp, err := c.UploadFiscalCertificateWithBody(ctx, organizationId, credentialId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadFiscalCertificateResponse(rsp)
+}
+
+// UploadFiscalCertificateWithResponse performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId} (the `UploadFiscalCertificate` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) UploadFiscalCertificateWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, params *UploadFiscalCertificateParams, body UploadFiscalCertificateJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadFiscalCertificateResponse, error) {
+	rsp, err := c.UploadFiscalCertificate(ctx, organizationId, credentialId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadFiscalCertificateResponse(rsp)
+}
+
+// ConfigureFiscalPointOfSaleWithBodyWithResponse performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale} (the `ConfigureFiscalPointOfSale` operationId) request,
+// with any type of body and a specified content type.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) ConfigureFiscalPointOfSaleWithBodyWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ConfigureFiscalPointOfSaleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ConfigureFiscalPointOfSaleResponse, error) {
+	rsp, err := c.ConfigureFiscalPointOfSaleWithBody(ctx, organizationId, credentialId, pointOfSale, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseConfigureFiscalPointOfSaleResponse(rsp)
+}
+
+// ConfigureFiscalPointOfSaleWithResponse performs a PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale} (the `ConfigureFiscalPointOfSale` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) ConfigureFiscalPointOfSaleWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ConfigureFiscalPointOfSaleParams, body ConfigureFiscalPointOfSaleJSONRequestBody, reqEditors ...RequestEditorFn) (*ConfigureFiscalPointOfSaleResponse, error) {
+	rsp, err := c.ConfigureFiscalPointOfSale(ctx, organizationId, credentialId, pointOfSale, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseConfigureFiscalPointOfSaleResponse(rsp)
+}
+
+// ValidateFiscalPointOfSaleWithBodyWithResponse performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request,
+// with any type of body and a specified content type.
+//
+// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) ValidateFiscalPointOfSaleWithBodyWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ValidateFiscalPointOfSaleResponse, error) {
+	rsp, err := c.ValidateFiscalPointOfSaleWithBody(ctx, organizationId, credentialId, pointOfSale, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseValidateFiscalPointOfSaleResponse(rsp)
+}
+
+// ValidateFiscalPointOfSaleWithResponse performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+func (c *ClientWithResponses) ValidateFiscalPointOfSaleWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, body ValidateFiscalPointOfSaleJSONRequestBody, reqEditors ...RequestEditorFn) (*ValidateFiscalPointOfSaleResponse, error) {
+	rsp, err := c.ValidateFiscalPointOfSale(ctx, organizationId, credentialId, pointOfSale, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseValidateFiscalPointOfSaleResponse(rsp)
 }
 
 // FiscalMetricsWithResponse performs a GET /metrics (the `FiscalMetrics` operationId) request.
@@ -1708,6 +2989,290 @@ func ParseConsultAuthorizationResponse(rsp *http.Response) (*ConsultAuthorizatio
 			return nil, err
 		}
 		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest DomainError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest AuthorityUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRequestFiscalCredentialCSRResponse parses an HTTP response from a RequestFiscalCredentialCSRWithResponse call
+func ParseRequestFiscalCredentialCSRResponse(rsp *http.Response) (*RequestFiscalCredentialCSRResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RequestFiscalCredentialCSRResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest CSRResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest DomainError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetFiscalCredentialResponse parses an HTTP response from a GetFiscalCredentialWithResponse call
+func ParseGetFiscalCredentialResponse(rsp *http.Response) (*GetFiscalCredentialResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFiscalCredentialResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FiscalCredential
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest DomainError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUploadFiscalCertificateResponse parses an HTTP response from a UploadFiscalCertificateWithResponse call
+func ParseUploadFiscalCertificateResponse(rsp *http.Response) (*UploadFiscalCertificateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadFiscalCertificateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FiscalCredential
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest DomainError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseConfigureFiscalPointOfSaleResponse parses an HTTP response from a ConfigureFiscalPointOfSaleWithResponse call
+func ParseConfigureFiscalPointOfSaleResponse(rsp *http.Response) (*ConfigureFiscalPointOfSaleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ConfigureFiscalPointOfSaleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FiscalPointOfSale
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest DomainError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseValidateFiscalPointOfSaleResponse parses an HTTP response from a ValidateFiscalPointOfSaleWithResponse call
+func ParseValidateFiscalPointOfSaleResponse(rsp *http.Response) (*ValidateFiscalPointOfSaleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ValidateFiscalPointOfSaleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FiscalPointOfSale
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest DomainError

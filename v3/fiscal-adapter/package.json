@@ -6,17 +6,22 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test dist/test/fiscal/*.test.js",
+    "test:real": "npm run build && node --test dist/test/fiscal/arca-real.test.js dist/test/fiscal/credentials.test.js dist/test/fiscal/csr-certificate.test.js dist/test/fiscal/wsaa-tickets.test.js",
     "test:postgres": "npm run build && node --test dist/test/integration/postgres.test.js",
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
     "start": "node dist/src/cmd/api.js",
-    "ci": "npm run typecheck && npm test"
+    "ci": "npm run typecheck && npm test && npm audit --omit=dev"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/node-forge": "1.3.14",
     "@types/pg": "^8.20.0",
     "typescript": "^5.9.0"
   },
   "dependencies": {
+    "@devpablocristo/arca-facturacion": "2.4.0",
+    "@google-cloud/kms": "5.7.0",
+    "node-forge": "1.4.0",
     "pg": "^8.22.0"
   }
 }

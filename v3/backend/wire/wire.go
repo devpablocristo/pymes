@@ -112,11 +112,36 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 			Err:  fmt.Errorf("Clerk webhook verifier: %w", err),
 		}
 	}
+	internalTokens, err := identity.TokenSourceFromRuntimeContext(
+		ctx,
+		"api:fiscal-settings",
+	)
+	if err != nil {
+		database.Close()
+		_ = shutdownTracing(context.Background())
+		return nil, &APIStartupError{
+			Code: "WORKLOAD_IDENTITY_INVALID",
+			Err:  fmt.Errorf("internal fiscal identity: %w", err),
+		}
+	}
+	var platformTokens commerce.PlatformTokenSource
+	if !cfg.AllowInsecureLocalServices {
+		platformTokens = identity.NewMetadataIDTokenSource()
+	}
 	store := commerce.New(pool)
 	identities := identity.New(pool)
 	organizations := organization.New(pool)
+	fiscalCredentials := commerce.HTTPFiscalClient{
+		BaseURL:        cfg.FiscalURL,
+		Client:         commerce.NewServiceHTTPClient(),
+		Tokens:         internalTokens,
+		PlatformTokens: platformTokens,
+	}
 	commands := commerce.Commands{
-		Store: store, AccountingAdjustments: store, Now: store.Clock,
+		Store:                 store,
+		AccountingAdjustments: store,
+		FiscalCredentials:     fiscalCredentials,
+		Now:                   store.Clock,
 	}
 	clerkAuthenticator := identity.ClerkAuthenticator{
 		Memberships: identities,
@@ -127,6 +152,7 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 		[]byte(cfg.SchedulingActionTokenSecret),
 	)
 	if err != nil {
+		_ = internalTokens.Close()
 		database.Close()
 		_ = shutdownTracing(context.Background())
 		return nil, &APIStartupError{
@@ -175,6 +201,7 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 		ctx, cfg.Calendars, pool, clerkAuthenticator,
 	)
 	if err != nil {
+		_ = internalTokens.Close()
 		database.Close()
 		_ = shutdownTracing(context.Background())
 		return nil, &APIStartupError{
@@ -231,13 +258,10 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 		identity.NewWebhook(webhooks, identity.ReceiveWebhook{Inbox: identities}),
 		contextRoutes...,
 	)
-	var resources []closeResource
-	if calendarResource != nil {
-		resources = append(resources, calendarResource)
-	}
 	return &App{
 		Handler: observability.HTTP(handler, nil), database: database,
-		shutdownTracing: shutdownTracing, resources: resources,
+		shutdownTracing: shutdownTracing,
+		resources:       compactCloseResources(internalTokens, calendarResource),
 	}, nil
 }
 

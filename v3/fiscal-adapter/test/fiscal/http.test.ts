@@ -1,14 +1,24 @@
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
-import { InMemoryFiscalLedger } from "../../src/fiscal/companion/in-memory-ledger.js";
-import { MockFiscalAuthority } from "../../src/fiscal/companion/mock-authority.js";
-import { FiscalError, type FiscalProblem, type FiscalRequest, type FiscalResult } from "../../src/fiscal/domain/fiscal.js";
-import { createFiscalHTTPServer, type FiscalApplication } from "../../src/fiscal/handler/http.js";
-import type { InternalAuthorizer, InternalIdentity } from "../../src/fiscal/ports/internal-authorizer.js";
-import type { FiscalRuntimeObserver } from "../../src/fiscal/ports/runtime-observer.js";
-import { FiscalService } from "../../src/fiscal/usecases/fiscal-service.js";
-import { InsecureLocalAuthorizer } from "../../src/identity/access/authorizer.js";
+import { InMemoryFiscalLedger } from "../../src/fiscal/in_memory_ledger.js";
+import { MockFiscalAuthority } from "../../src/fiscal/mock_authority.js";
+import {
+  FiscalError,
+  type FiscalProblem,
+  type FiscalRequest,
+  type FiscalResult,
+} from "../../src/fiscal/usecases/domain/fiscal.js";
+import {
+  createFiscalHTTPServer,
+  type FiscalApplication,
+  type FiscalRuntimeObserver,
+  type InternalAuthorizer,
+} from "../../src/fiscal/handler.js";
+import type { InternalIdentity } from "../../src/fiscal/usecases.js";
+import { FiscalService } from "../../src/fiscal/usecases.js";
+import { InsecureLocalAuthorizer } from "../../src/identity/insecure_local.js";
+import type { CredentialApplication } from "../../src/credentials/handler.js";
 
 const request: FiscalRequest = {
   request_id: "fiscal:sale-http:1",
@@ -22,6 +32,7 @@ const request: FiscalRequest = {
   document_type: "FB",
   voucher_number: 8,
   issue_date: "2026-07-30",
+  concept: "products",
   currency: "ARS",
   totals: { net: "100", vat: "21", exempt: "0", total: "121" },
   recipient: { document_type: "CUIT", document_number: "20123456789", vat_condition: "registered" },
@@ -111,6 +122,113 @@ test("catalog is implemented and private routes reject invalid workload identity
     });
     assert.equal(authorize.status, 401);
   });
+});
+
+test("credential onboarding returns only snake-case metadata and the public CSR", async () => {
+  const credential = {
+    id: "fcred_00000001",
+    organizationId: "org_http",
+    cuit: "20123456786",
+    environment: "homologation" as const,
+    legalName: "Cliente HTTP SA",
+    commonName: "cliente-http",
+    status: "pending_certificate" as const,
+    version: 1,
+    createdAt: "2026-08-01T12:00:00.000Z",
+    updatedAt: "2026-08-01T12:00:00.000Z",
+  };
+  const credentials: CredentialApplication = {
+    async requestCSR() {
+      return { credential, csrPem: "-----BEGIN CERTIFICATE REQUEST-----" };
+    },
+    async uploadCertificate() {
+      return { ...credential, status: "ready", version: 2 };
+    },
+    async configurePointOfSale() {
+      return {
+        organizationId: credential.organizationId,
+        credentialId: credential.id,
+        environment: credential.environment,
+        number: 4,
+        enabled: true,
+      };
+    },
+    async validatePointOfSale() {
+      return {
+        organizationId: credential.organizationId,
+        credentialId: credential.id,
+        environment: credential.environment,
+        number: 4,
+        enabled: true,
+        validatedAt: "2026-08-01T12:30:00.000Z",
+      };
+    },
+    async getCredential() {
+      return credential;
+    },
+  };
+  await withHTTP(
+    new FiscalService(
+      new MockFiscalAuthority(),
+      new InMemoryFiscalLedger(),
+    ),
+    new InsecureLocalAuthorizer(),
+    async (origin) => {
+      const response = await fetch(
+        `${origin}/internal/v1/organizations/org_http/credentials/csr`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "idempotency-key": "credential:http:1",
+            "x-correlation-id": "credential:http:1",
+          },
+          body: JSON.stringify({
+            cuit: credential.cuit,
+            environment: credential.environment,
+            legal_name: credential.legalName,
+            common_name: credential.commonName,
+          }),
+        },
+      );
+      assert.equal(response.status, 201);
+      const body = (await response.json()) as Record<string, unknown>;
+      assert.equal(body.csr_pem, "-----BEGIN CERTIFICATE REQUEST-----");
+      assert.equal("csrPem" in body, false);
+      const metadata = body.credential as Record<string, unknown>;
+      assert.equal(metadata.organization_id, "org_http");
+      assert.equal(metadata.legal_name, "Cliente HTTP SA");
+      assert.equal("organizationId" in metadata, false);
+      assert.equal(JSON.stringify(body).includes("privateKeyPem"), false);
+      assert.equal(
+        JSON.stringify(body).includes("encryptedPrivateKey"),
+        false,
+      );
+
+      const validation = await fetch(
+        `${origin}/internal/v1/organizations/org_http/credentials/fcred_00000001/points-of-sale/4/validate`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-correlation-id": "credential:http:validate",
+          },
+          body: JSON.stringify({ enabled: true }),
+        },
+      );
+      assert.equal(validation.status, 200);
+      const pointOfSale = (await validation.json()) as Record<
+        string,
+        unknown
+      >;
+      assert.equal(pointOfSale.organization_id, "org_http");
+      assert.equal(
+        pointOfSale.validated_at,
+        "2026-08-01T12:30:00.000Z",
+      );
+    },
+    credentials,
+  );
 });
 
 test("HTTP statuses distinguish rejected, not found, conflict, validation and timeout", async () => {
@@ -233,8 +351,14 @@ async function withHTTP(
   application: FiscalApplication,
   authorizer: InternalAuthorizer,
   run: (origin: string) => Promise<void>,
+  credentials?: CredentialApplication,
 ): Promise<void> {
-  const server = createFiscalHTTPServer(application, authorizer, healthyRuntime);
+  const server = createFiscalHTTPServer(
+    application,
+    authorizer,
+    healthyRuntime,
+    credentials,
+  );
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   try {
     const { port } = server.address() as AddressInfo;

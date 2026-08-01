@@ -41,9 +41,30 @@ type AccountingAdjustmentStore interface {
 	) (domain.AccountingAdjustment, error)
 }
 
+type FiscalCredentialProvider interface {
+	RequestCredentialCSR(
+		context.Context,
+		string,
+		string,
+		string,
+		domain.FiscalCredentialCSRInput,
+	) (domain.FiscalCredentialCSRResult, error)
+	GetCredential(context.Context, string, string, string) (domain.FiscalCredential, error)
+	UploadCertificate(
+		context.Context,
+		string,
+		string,
+		string,
+		domain.FiscalCertificateUpload,
+	) (domain.FiscalCredential, error)
+	ConfigurePointOfSale(context.Context, string, string, string, int, bool) (domain.FiscalPointOfSale, error)
+	ValidatePointOfSale(context.Context, string, string, string, int, bool) (domain.FiscalPointOfSale, error)
+}
+
 type Commands struct {
 	Store                 CommandStore
 	AccountingAdjustments AccountingAdjustmentStore
+	FiscalCredentials     FiscalCredentialProvider
 	Now                   func() time.Time
 }
 
@@ -60,6 +81,111 @@ func (u Commands) Clock() time.Time {
 	}
 	return u.Now()
 }
+
+func (u Commands) RequestFiscalCredentialCSR(
+	ctx context.Context,
+	organizationID,
+	idempotencyKey,
+	correlationID string,
+	input domain.FiscalCredentialCSRInput,
+) (domain.FiscalCredentialCSRResult, error) {
+	if u.FiscalCredentials == nil ||
+		organizationID == "" ||
+		idempotencyKey == "" ||
+		correlationID == "" ||
+		!input.Valid() {
+		return domain.FiscalCredentialCSRResult{}, fmt.Errorf("VALIDATION_ERROR")
+	}
+	return u.FiscalCredentials.RequestCredentialCSR(
+		ctx,
+		organizationID,
+		idempotencyKey,
+		correlationID,
+		input,
+	)
+}
+
+func (u Commands) GetFiscalCredential(
+	ctx context.Context,
+	organizationID,
+	credentialID,
+	correlationID string,
+) (domain.FiscalCredential, error) {
+	if u.FiscalCredentials == nil || organizationID == "" || credentialID == "" || correlationID == "" {
+		return domain.FiscalCredential{}, fmt.Errorf("VALIDATION_ERROR")
+	}
+	return u.FiscalCredentials.GetCredential(ctx, organizationID, credentialID, correlationID)
+}
+
+func (u Commands) UploadFiscalCertificate(
+	ctx context.Context,
+	organizationID,
+	credentialID,
+	correlationID string,
+	input domain.FiscalCertificateUpload,
+) (domain.FiscalCredential, error) {
+	if u.FiscalCredentials == nil ||
+		organizationID == "" ||
+		credentialID == "" ||
+		correlationID == "" ||
+		!input.Valid() {
+		return domain.FiscalCredential{}, fmt.Errorf("VALIDATION_ERROR")
+	}
+	return u.FiscalCredentials.UploadCertificate(ctx, organizationID, credentialID, correlationID, input)
+}
+
+func (u Commands) ConfigureFiscalPointOfSale(
+	ctx context.Context,
+	organizationID,
+	credentialID,
+	correlationID string,
+	pointOfSale int,
+	enabled bool,
+) (domain.FiscalPointOfSale, error) {
+	if u.FiscalCredentials == nil ||
+		organizationID == "" ||
+		credentialID == "" ||
+		correlationID == "" ||
+		pointOfSale < 1 ||
+		pointOfSale > 99999 {
+		return domain.FiscalPointOfSale{}, fmt.Errorf("VALIDATION_ERROR")
+	}
+	return u.FiscalCredentials.ConfigurePointOfSale(
+		ctx,
+		organizationID,
+		credentialID,
+		correlationID,
+		pointOfSale,
+		enabled,
+	)
+}
+
+func (u Commands) ValidateFiscalPointOfSale(
+	ctx context.Context,
+	organizationID,
+	credentialID,
+	correlationID string,
+	pointOfSale int,
+	enabled bool,
+) (domain.FiscalPointOfSale, error) {
+	if u.FiscalCredentials == nil ||
+		organizationID == "" ||
+		credentialID == "" ||
+		correlationID == "" ||
+		pointOfSale < 1 ||
+		pointOfSale > 99999 {
+		return domain.FiscalPointOfSale{}, fmt.Errorf("VALIDATION_ERROR")
+	}
+	return u.FiscalCredentials.ValidatePointOfSale(
+		ctx,
+		organizationID,
+		credentialID,
+		correlationID,
+		pointOfSale,
+		enabled,
+	)
+}
+
 func (u Commands) CreateParty(ctx context.Context, party domain.Party) (domain.Party, error) {
 	if u.Store == nil || party.ID == "" || party.OrganizationID == "" || party.DisplayName == "" {
 		return domain.Party{}, fmt.Errorf("VALIDATION_ERROR")

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { generateKeyPairSync, sign, type JsonWebKey, type KeyPairKeyObjectResult } from "node:crypto";
 import test from "node:test";
-import { FiscalError } from "../../src/fiscal/domain/fiscal.js";
+import { FiscalError } from "../../src/fiscal/usecases/domain/fiscal.js";
 import {
   Ed25519JWTAuthorizer,
   legacyPublicKeyJWKS,
-} from "../../src/identity/access/ed25519-jwt-authorizer.js";
+} from "../../src/identity/internal_jwt.js";
 
 const now = new Date("2026-07-30T12:00:00.000Z");
 const current = generateKeyPairSync("ed25519");

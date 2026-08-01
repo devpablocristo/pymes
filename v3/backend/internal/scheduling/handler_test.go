@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/usecases/domain"
 	"github.com/google/uuid"
@@ -24,6 +25,7 @@ func (f authenticatorFake) Principal(*http.Request) (Principal, error) {
 type handlerUsecasesFake struct {
 	SchedulingUsecases
 	created       bool
+	bookingInput  CreateBookingInput
 	publicCatalog PublicCatalog
 }
 
@@ -47,6 +49,31 @@ func (f *handlerUsecasesFake) PublicCatalog(
 	string,
 ) (PublicCatalog, error) {
 	return f.publicCatalog, nil
+}
+
+func (f *handlerUsecasesFake) CreateBooking(
+	_ context.Context,
+	_ domain.CommandMetadata,
+	input CreateBookingInput,
+) ([]domain.Booking, error) {
+	f.created = true
+	f.bookingInput = input
+	return []domain.Booking{{
+		OrganizationID:  input.OrganizationID,
+		ID:              uuid.New(),
+		BranchID:        input.BranchID,
+		ServiceID:       input.ServiceID,
+		Status:          domain.BookingPendingConfirmation,
+		Participants:    input.Participants,
+		StartAt:         input.StartAt,
+		EndAt:           input.StartAt.Add(time.Hour),
+		Version:         1,
+		ServiceName:     "Consulta",
+		Price:           "100",
+		Currency:        "ARS",
+		DurationMinutes: 60,
+		Timezone:        "UTC",
+	}}, nil
 }
 
 func TestSchedulingHandlerEnforcesTenantAndExplicitPermission(t *testing.T) {
@@ -114,6 +141,33 @@ func TestSchedulingHasNoPublicPhoneLookupAuthenticationRoute(t *testing.T) {
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusMethodNotAllowed && response.Code != http.StatusNotFound {
 		t.Fatalf("phone lookup unexpectedly exposed: status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestPublicBookingCannotInjectInternalStatus(t *testing.T) {
+	usecases := &handlerUsecasesFake{}
+	handler := NewHTTPHandler(usecases, nil).Handler()
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/public/scheduling/acme/bookings",
+		strings.NewReader(`{
+			"branch_id":"11111111-1111-1111-1111-111111111111",
+			"service_id":"22222222-2222-2222-2222-222222222222",
+			"customer":{"name":"Ada"},
+			"start_at":"2026-08-03T12:00:00Z",
+			"participants":1,
+			"status":"confirmed"
+		}`),
+	)
+	request.Header.Set("Idempotency-Key", "public-status-injection")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if usecases.created {
+		t.Fatal("public status injection reached the booking use case")
 	}
 }
 

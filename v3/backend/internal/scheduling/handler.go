@@ -452,6 +452,15 @@ func (h *HTTPHandler) createBooking(
 	if !httphelpers.Decode(w, request, &input) {
 		return
 	}
+	if public && input.Status != "" {
+		httphelpers.WriteProblem(
+			w,
+			http.StatusBadRequest,
+			domain.CodeValidation,
+			"public bookings cannot select an internal status",
+		)
+		return
+	}
 	if input.ID == uuid.Nil {
 		input.ID = uuid.New()
 	}

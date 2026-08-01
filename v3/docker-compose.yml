@@ -141,6 +141,9 @@ services:
       PYMES_CLERK_AUTHORIZED_PARTIES: ${PYMES_CLERK_AUTHORIZED_PARTIES:-http://localhost:18080}
       PYMES_CLERK_WEBHOOK_SECRET: ${PYMES_CLERK_WEBHOOK_SECRET:-whsec_dGVzdHRlc3R0ZXN0dGVzdHRlc3R0ZXN0dGVzdA==}
       PYMES_SCHEDULING_ACTION_TOKEN_SECRET: ${PYMES_SCHEDULING_ACTION_TOKEN_SECRET:-local-scheduling-action-secret-32-bytes}
+      PYMES_PERGO_ENABLED: "true"
+      PERGO_WORKSPACE_ID: pymes-local
+      PERGO_WEBHOOK_SECRETS: local-pergo-webhook-secret-32bytes
     depends_on:
       migrate: { condition: service_completed_successfully }
     ports: ["18080:8080"]
@@ -163,10 +166,17 @@ services:
       PYMES_INTERNAL_KEY_ID: local-dev-1
       PYMES_WORKER_INTERVAL_MS: "250"
       PYMES_WORKER_HTTP_ADDR: :8080
+      PYMES_PERGO_ENABLED: "true"
+      PERGO_URL: http://pergo-fake:8080
+      PERGO_API_KEY: local-pergo-api-key
+      PERGO_WORKSPACE_ID: pymes-local
+      PERGO_CHANNEL: whatsapp_mock
+      PERGO_TIMEOUT: 750ms
     depends_on:
       migrate: { condition: service_completed_successfully }
       fiscal-fake: { condition: service_healthy }
       accounting: { condition: service_healthy }
+      pergo-fake: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "/healthcheck", "http://127.0.0.1:8080/readyz"]
       interval: 2s
@@ -195,6 +205,22 @@ services:
     build: { context: ., target: fake-service }
     environment: { FAKE_KIND: accounting }
     ports: ["18083:8080"]
+    healthcheck:
+      test: ["CMD", "/healthcheck", "http://127.0.0.1:8080/readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  pergo-fake:
+    build: { context: ., target: pergo-fake }
+    environment:
+      PERGO_API_KEY: local-pergo-api-key
+      PERGO_WORKSPACE_ID: pymes-local
+      PERGO_WEBHOOK_URL: http://api:8080/api/v1/webhooks/pergo
+      PERGO_WEBHOOK_SECRET: local-pergo-webhook-secret-32bytes
+      PERGO_FAKE_DELAY: 2s
+    depends_on:
+      api: { condition: service_healthy }
+    ports: ["18085:8080"]
     healthcheck:
       test: ["CMD", "/healthcheck", "http://127.0.0.1:8080/readyz"]
       interval: 2s

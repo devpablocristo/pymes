@@ -22,6 +22,7 @@ El detalle que distingue implementación local de dependencias externas está en
 | Operación | Probes contra DB, heartbeat JSON agregado sin PII, timeouts, circuit breakers, DLQ durable, replay idempotente con auditoría inmutable, métricas/alertas/dashboard Cloud Monitoring reproducibles, migraciones repetibles y backup/restore separado. | `make observability-e2e`, `make monitoring-config-check`, `make replay-smoke`, `make recovery-e2e`, `make backup-restore-smoke` y [runbook](10-runbook-operacion.md). |
 | Seguridad de dependencias | Go 1.26.5, `pgx`, `x/text`, `go-jose` y `grpc` en versiones corregidas; auditoría de los tres runtimes bloquea CI. | `make security`: cero vulnerabilidades alcanzables en Go y cero vulnerabilidades npm. |
 | Contratos | OpenAPI público y privados, código Go generado y control de drift. | `make api-check`. |
+| Notifications/PerGo | Intenciones tenant, feature flag, outbox, adapter PerGo, trace ID tenant-aware, estados monotónicos, webhook HMAC con rotación e inbox inmutable; teléfono, cuerpo y variables redactados. | Tests Go/PostgreSQL y `make notifications-e2e`; [diseño y runbook específico](11-notifications-pergo.md). |
 
 ## Diferido por decisión del producto
 

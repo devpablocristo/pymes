@@ -77,6 +77,72 @@ paths:
           content:
             text/plain:
               schema: { type: string, pattern: '^(AUTH_NOT_CONFIGURED|IAM_UNAVAILABLE)\n?$' }
+  /api/v1/webhooks/pergo:
+    post:
+      operationId: pergoWebhook
+      summary: Recibe estados de entrega firmados por PerGo.
+      description: >-
+        Endpoint exclusivo para PerGo. Verifica X-PerGo-Signature sobre el
+        cuerpo crudo, una ventana temporal máxima de cinco minutos, el workspace
+        configurado y el trace_id determinístico tenant-aware de Pymes. La
+        organización nunca se acepta desde el path. El inbox hace que reintentos
+        del mismo webhook sean idempotentes.
+      security: []
+      parameters:
+        - name: X-PerGo-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: '^t=[0-9]+,v1=[0-9a-f]{64}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PerGoDeliveryEvent' }
+      responses:
+        '204': { description: Estado autenticado, aplicado o ya procesado. }
+        '400':
+          description: Evento inválido o no aplicable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Firma inválida, ausente o vencida.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: La intención no existe dentro de la organización.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: Integración no configurada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/organizations/{organizationId}/notifications/{notificationId}:
+    get:
+      operationId: getNotification
+      summary: Consulta el estado comercial de una notificación.
+      description: >-
+        Nunca expone teléfono, cuerpo, variables ni credenciales del proveedor.
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - name: notificationId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 255 }
+      responses:
+        '200':
+          description: Proyección de entrega.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Notification' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
   /api/v1/organizations/{organizationId}/sales:
     post:
       operationId: createSale
@@ -360,6 +426,84 @@ components:
             - ACCOUNTING_ADJUSTMENT_NOT_ALLOWED
             - VALIDATION_ERROR
             - COMMAND_REJECTED
+            - NOTIFICATIONS_UNAVAILABLE
+            - PERGO_WEBHOOK_NOT_CONFIGURED
+            - PERGO_WEBHOOK_SIGNATURE_INVALID
+            - PERGO_WEBHOOK_INVALID
+            - NOTIFICATION_NOT_FOUND
+    PerGoDeliveryEvent:
+      type: object
+      additionalProperties: false
+      required:
+        - event
+        - trace_id
+        - message_id
+        - channel
+        - timestamp
+        - workspace_id
+      properties:
+        event:
+          type: string
+          enum:
+            - message.queued
+            - message.sent
+            - message.delivered
+            - message.read
+            - message.failed
+        trace_id:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: '^pymes\.v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'
+        message_id: { type: string, minLength: 1, maxLength: 255 }
+        channel:
+          type: string
+          enum: [whatsapp, whatsapp_cloud, whatsapp_mock]
+        timestamp: { type: string, format: date-time }
+        workspace_id: { type: string, minLength: 1, maxLength: 255 }
+        error:
+          type: string
+          description: No se persiste ni se expone; Pymes conserva sólo un código estable.
+    Notification:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - organization_id
+        - kind
+        - aggregate_type
+        - aggregate_id
+        - template_name
+        - template_version
+        - locale
+        - send_at
+        - status
+        - correlation_id
+        - created_at
+        - updated_at
+      properties:
+        id: { type: string }
+        organization_id: { type: string }
+        kind:
+          type: string
+          enum: [confirmation, reminder, rescheduled, cancellation, waitlist]
+        aggregate_type: { type: string }
+        aggregate_id: { type: string }
+        template_name: { type: string }
+        template_version: { type: integer, minimum: 1 }
+        locale: { type: string }
+        send_at: { type: string, format: date-time }
+        status:
+          type: string
+          enum: [pending, uncertain, queued, sent, delivered, read, failed]
+        external_message_id: { type: string, readOnly: true }
+        correlation_id: { type: string }
+        failure_code:
+          type: string
+          readOnly: true
+          pattern: '^[A-Z0-9_]{1,80}$'
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
     AccountingFailureRef:
       type: object
       readOnly: true

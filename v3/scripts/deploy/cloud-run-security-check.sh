@@ -41,7 +41,7 @@ require_count() {
 }
 
 run_dry() {
-  local environment="$1" output="$2" endpoint="${3:-}"
+  local environment="$1" output="$2" endpoint="${3:-}" pergo="${4:-false}"
   local prefix="pymes-v3-$environment"
   local kms_version="projects/$project/locations/$region/keyRings/$prefix/cryptoKeys/internal-jwt-signing/cryptoKeyVersions/1"
   local -a common_environment=(
@@ -64,6 +64,14 @@ run_dry() {
     "PYMES_INTERNAL_KMS_KEY_VERSION=$kms_version"
     'PYMES_INTERNAL_JWKS_JSON={"keys":[{"kid":"dry-run-public-key"}]}'
   )
+  if [[ "$pergo" == "true" ]]; then
+    common_environment+=(
+      "PYMES_PERGO_ENABLED=true"
+      "PYMES_PERGO_URL=https://pergo.$environment.dry-run.invalid"
+      "PYMES_PERGO_WORKSPACE_ID=pymes-$environment"
+      "PYMES_PERGO_CHANNEL=whatsapp_cloud"
+    )
+  fi
 
   if [[ -n "$endpoint" ]]; then
     env -u GOOGLE_APPLICATION_CREDENTIALS \
@@ -82,6 +90,37 @@ run_dry() {
       "${common_environment[@]}" \
       "$deploy_script" >"$output"
   fi
+}
+
+check_pergo_environment() {
+  local environment="$1" output="$2"
+  local prefix="pymes-v3-$environment"
+  local api_line worker_line
+
+  api_line=$(grep -F -- "DRY-RUN gcloud run deploy $prefix-api " "$output") ||
+    fail "missing PerGo-enabled API deploy command"
+  worker_line=$(grep -F -- "DRY-RUN gcloud run deploy $prefix-worker " "$output") ||
+    fail "missing PerGo-enabled worker deploy command"
+
+  [[ "$api_line" == *"PYMES_PERGO_ENABLED=true"* &&
+     "$api_line" == *"PERGO_WORKSPACE_ID=pymes-$environment"* &&
+     "$api_line" == *"PERGO_WEBHOOK_SECRETS=$prefix-pergo-webhook-secrets:DRY_RUN"* ]] ||
+    fail "API is missing PerGo webhook configuration"
+  [[ "$api_line" != *"PERGO_API_KEY="* &&
+     "$api_line" != *"PERGO_URL="* ]] ||
+    fail "API received PerGo delivery credentials"
+
+  [[ "$worker_line" == *"PYMES_PERGO_ENABLED=true"* &&
+     "$worker_line" == *"PERGO_URL=https://pergo.$environment.dry-run.invalid"* &&
+     "$worker_line" == *"PERGO_WORKSPACE_ID=pymes-$environment"* &&
+     "$worker_line" == *"PERGO_CHANNEL=whatsapp_cloud"* &&
+     "$worker_line" == *"PERGO_API_KEY=$prefix-pergo-api-key:DRY_RUN"* ]] ||
+    fail "worker is missing PerGo delivery configuration"
+  [[ "$worker_line" != *"PERGO_WEBHOOK_SECRETS="* ]] ||
+    fail "worker received PerGo webhook verification secret"
+
+  require_text "$output" \
+    "configure PerGo workspace=pymes-$environment callback=https://$prefix-api.$region.run.internal.invalid/api/v1/webhooks/pergo"
 }
 
 check_environment() {
@@ -142,9 +181,12 @@ check_environment() {
 for environment in stg prd; do
   output="$scratch_dir/$environment.out"
   traced_output="$scratch_dir/$environment-traced.out"
+  pergo_output="$scratch_dir/$environment-pergo.out"
   run_dry "$environment" "$output"
   run_dry "$environment" "$traced_output" "https://otel-collector.$environment.dry-run.invalid:4318"
+  run_dry "$environment" "$pergo_output" "" true
   check_environment "$environment" "$output" "$traced_output"
+  check_pergo_environment "$environment" "$pergo_output"
   echo "PASS cloud-run security dry-run environment=$environment resources_created=0"
 done
 

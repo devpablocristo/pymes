@@ -124,8 +124,13 @@ const (
 	ErrorCodeINVALIDAPPLICATIONDOCUMENT     ErrorCode = "INVALID_APPLICATION_DOCUMENT"
 	ErrorCodeINVALIDSOURCEDOCUMENT          ErrorCode = "INVALID_SOURCE_DOCUMENT"
 	ErrorCodeNOTFOUND                       ErrorCode = "NOT_FOUND"
+	ErrorCodeNOTIFICATIONNOTFOUND           ErrorCode = "NOTIFICATION_NOT_FOUND"
+	ErrorCodeNOTIFICATIONSUNAVAILABLE       ErrorCode = "NOTIFICATIONS_UNAVAILABLE"
 	ErrorCodeOPENITEMAMOUNTEXCEEDED         ErrorCode = "OPEN_ITEM_AMOUNT_EXCEEDED"
 	ErrorCodeORGNOTPROVISIONED              ErrorCode = "ORG_NOT_PROVISIONED"
+	ErrorCodePERGOWEBHOOKINVALID            ErrorCode = "PERGO_WEBHOOK_INVALID"
+	ErrorCodePERGOWEBHOOKNOTCONFIGURED      ErrorCode = "PERGO_WEBHOOK_NOT_CONFIGURED"
+	ErrorCodePERGOWEBHOOKSIGNATUREINVALID   ErrorCode = "PERGO_WEBHOOK_SIGNATURE_INVALID"
 	ErrorCodePERIODLOCKED                   ErrorCode = "PERIOD_LOCKED"
 	ErrorCodeSOURCEVERSIONREQUIRED          ErrorCode = "SOURCE_VERSION_REQUIRED"
 	ErrorCodeVALIDATIONERROR                ErrorCode = "VALIDATION_ERROR"
@@ -154,9 +159,19 @@ func (e ErrorCode) Valid() bool {
 		return true
 	case ErrorCodeNOTFOUND:
 		return true
+	case ErrorCodeNOTIFICATIONNOTFOUND:
+		return true
+	case ErrorCodeNOTIFICATIONSUNAVAILABLE:
+		return true
 	case ErrorCodeOPENITEMAMOUNTEXCEEDED:
 		return true
 	case ErrorCodeORGNOTPROVISIONED:
+		return true
+	case ErrorCodePERGOWEBHOOKINVALID:
+		return true
+	case ErrorCodePERGOWEBHOOKNOTCONFIGURED:
+		return true
+	case ErrorCodePERGOWEBHOOKSIGNATUREINVALID:
 		return true
 	case ErrorCodePERIODLOCKED:
 		return true

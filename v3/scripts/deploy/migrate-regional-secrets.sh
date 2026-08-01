@@ -113,6 +113,8 @@ for environment in "${environments[@]}"; do
   secrets=(
     "$prefix-clerk-secret-key"
     "$prefix-clerk-webhook-secret"
+    "$prefix-pergo-api-key"
+    "$prefix-pergo-webhook-secrets"
     "$prefix-fiscal-credential"
     "$prefix-database-url"
     "$prefix-worker-database-url"
@@ -132,9 +134,11 @@ for environment in "${environments[@]}"; do
 
   grant_accessor "$prefix-clerk-secret-key" "pymes-v3-api-${environment}"
   grant_accessor "$prefix-clerk-webhook-secret" "pymes-v3-api-${environment}"
+  grant_accessor "$prefix-pergo-webhook-secrets" "pymes-v3-api-${environment}"
   grant_accessor "$prefix-database-url" "pymes-v3-api-${environment}"
   grant_accessor "$prefix-database-url" "pymes-v3-provision-${environment}"
   grant_accessor "$prefix-worker-database-url" "pymes-v3-worker-${environment}"
+  grant_accessor "$prefix-pergo-api-key" "pymes-v3-worker-${environment}"
   grant_accessor "$prefix-fiscal-credential" "pymes-v3-fiscal-${environment}"
   grant_accessor "$prefix-fiscal-database-url" "pymes-v3-fiscal-${environment}"
   grant_accessor "$prefix-accounting-database-url" "pymes-v3-accounting-${environment}"

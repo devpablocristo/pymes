@@ -798,7 +798,15 @@ func (s *Service) RescheduleBooking(
 		"version":               replacement.Version,
 	}
 	events := lifecycleAndProjectionEvents(
-		metadata, replacement.ID.String(), domain.EventBookingRescheduled, payload,
+		metadata,
+		replacement.ID.String(),
+		domain.EventBookingRescheduled,
+		payload,
+		bookingNotificationPayload(
+			replacement,
+			domain.EventBookingRescheduled,
+			map[string]any{"supersedes_booking_id": current.ID},
+		),
 	)
 	return s.repository.RescheduleBooking(
 		ctx, metadata, current.ID, input.ExpectedVersion, replacement, events,
@@ -851,7 +859,21 @@ func (s *Service) TransitionBooking(
 	if reason != "" {
 		payload["reason"] = reason
 	}
-	events := lifecycleAndProjectionEvents(metadata, bookingID.String(), eventType, payload)
+	projected := current
+	projected.Status = to
+	projected.Version = expectedVersion + 1
+	projected.CancellationReason = reason
+	events := lifecycleAndProjectionEvents(
+		metadata,
+		bookingID.String(),
+		eventType,
+		payload,
+		bookingNotificationPayload(
+			projected,
+			eventType,
+			map[string]any{"reason": reason},
+		),
+	)
 	return s.repository.TransitionBooking(ctx, metadata, bookingID, expectedVersion, to, reason, events)
 }
 
@@ -1231,12 +1253,15 @@ func (s *Service) RunMaintenance(ctx context.Context, limit int) (domain.Mainten
 			"end_at":      offeredSlot.EndAt,
 		}
 		notificationPayload := map[string]any{
-			"waitlist_id":  candidate.ID,
-			"action_token": raw,
-			"expires_at":   expiresAt,
-			"start_at":     offeredSlot.StartAt,
-			"end_at":       offeredSlot.EndAt,
-			"allocations":  offeredSlot.Allocations,
+			"aggregate_type": "waitlist",
+			"aggregate_id":   candidate.ID,
+			"waitlist_id":    candidate.ID,
+			"recipient_e164": candidate.CustomerPhone,
+			"customer_name":  candidate.CustomerName,
+			"action_token":   raw,
+			"expires_at":     expiresAt,
+			"start_at":       offeredSlot.StartAt,
+			"end_at":         offeredSlot.EndAt,
 		}
 		events := []domain.Event{
 			newEvent(metadata, candidate.ID.String(), domain.EventWaitlistOffered, lifecyclePayload),
@@ -1467,36 +1492,71 @@ func bookingEvents(
 		"end_at":     booking.EndAt,
 		"version":    booking.Version,
 	}
-	events := lifecycleAndProjectionEvents(metadata, booking.ID.String(), eventType, payload)
-	if len(rawActions) > 0 && len(rawActions[0]) > 0 {
-		var notificationPayload map[string]any
-		if err := json.Unmarshal(events[2].Payload, &notificationPayload); err == nil {
-			notificationPayload["action_tokens"] = rawActions[0]
-			events[2] = newEvent(
-				metadata,
-				booking.ID.String(),
-				domain.EventNotificationRequested,
-				notificationPayload,
-			)
-		}
+	var actions map[string]string
+	if len(rawActions) > 0 {
+		actions = rawActions[0]
 	}
-	return events
+	return lifecycleAndProjectionEvents(
+		metadata,
+		booking.ID.String(),
+		eventType,
+		payload,
+		bookingNotificationPayload(
+			booking,
+			eventType,
+			map[string]any{"action_tokens": actions},
+		),
+	)
 }
 
 func lifecycleAndProjectionEvents(
 	metadata domain.CommandMetadata,
 	aggregateID, lifecycleType string,
 	payload map[string]any,
+	notificationPayload ...map[string]any,
 ) []domain.Event {
+	notification := payload
+	if len(notificationPayload) > 0 && notificationPayload[0] != nil {
+		notification = notificationPayload[0]
+	}
 	return []domain.Event{
 		newEvent(metadata, aggregateID, lifecycleType, payload),
 		newProjectionEvent(
 			metadata, aggregateID, domain.EventCalendarSyncRequested, lifecycleType, payload,
 		),
 		newProjectionEvent(
-			metadata, aggregateID, domain.EventNotificationRequested, lifecycleType, payload,
+			metadata,
+			aggregateID,
+			domain.EventNotificationRequested,
+			lifecycleType,
+			notification,
 		),
 	}
+}
+
+func bookingNotificationPayload(
+	booking domain.Booking,
+	trigger string,
+	extra map[string]any,
+) map[string]any {
+	payload := map[string]any{
+		"aggregate_type": "booking",
+		"aggregate_id":   booking.ID,
+		"booking_id":     booking.ID,
+		"trigger":        trigger,
+		"recipient_e164": booking.CustomerPhone,
+		"customer_name":  booking.CustomerName,
+		"service_name":   booking.ServiceName,
+		"start_at":       booking.StartAt,
+		"end_at":         booking.EndAt,
+		"timezone":       booking.Timezone,
+	}
+	for key, value := range extra {
+		if value != nil && value != "" {
+			payload[key] = value
+		}
+	}
+	return payload
 }
 
 func newProjectionEvent(

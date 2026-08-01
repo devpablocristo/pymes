@@ -22,6 +22,16 @@ type WorkerConfig struct {
 	MetricsInterval             time.Duration
 	LeaseDuration               time.Duration
 	ShutdownTimeout             time.Duration
+	PerGo                       PerGoWorker
+}
+
+type PerGoWorker struct {
+	Enabled     bool
+	BaseURL     string
+	APIKey      string
+	WorkspaceID string
+	Channel     string
+	Timeout     time.Duration
 }
 
 type WorkerConfigError struct {
@@ -112,6 +122,46 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 			Err:  err,
 		}
 	}
+	pergoEnabled, err := parseWorkerBoolean(
+		"PYMES_PERGO_ENABLED",
+		strings.TrimSpace(getenv("PYMES_PERGO_ENABLED")),
+	)
+	if err != nil {
+		return WorkerConfig{}, &WorkerConfigError{
+			Code: "PERGO_CONFIG_INVALID",
+			Err:  err,
+		}
+	}
+	pergoTimeout := 5 * time.Second
+	if value := strings.TrimSpace(getenv("PERGO_TIMEOUT")); value != "" {
+		pergoTimeout, err = time.ParseDuration(value)
+		if err != nil || pergoTimeout < 100*time.Millisecond ||
+			pergoTimeout > 30*time.Second {
+			return WorkerConfig{}, workerConfigError(
+				"PERGO_CONFIG_INVALID",
+				"PERGO_TIMEOUT must be between 100ms and 30s",
+			)
+		}
+	}
+	pergo := PerGoWorker{
+		Enabled:     pergoEnabled,
+		BaseURL:     strings.TrimRight(strings.TrimSpace(getenv("PERGO_URL")), "/"),
+		APIKey:      strings.TrimSpace(getenv("PERGO_API_KEY")),
+		WorkspaceID: strings.TrimSpace(getenv("PERGO_WORKSPACE_ID")),
+		Channel:     defaultValue(getenv("PERGO_CHANNEL"), "whatsapp"),
+		Timeout:     pergoTimeout,
+	}
+	if pergo.Enabled &&
+		(pergo.BaseURL == "" || pergo.APIKey == "" ||
+			pergo.WorkspaceID == "" ||
+			(pergo.Channel != "whatsapp" &&
+				pergo.Channel != "whatsapp_cloud" &&
+				pergo.Channel != "whatsapp_mock")) {
+		return WorkerConfig{}, workerConfigError(
+			"PERGO_CONFIG_INVALID",
+			"complete PerGo worker configuration is required",
+		)
+	}
 	dispatchInterval := time.Second
 	if strings.TrimSpace(getenv("PYMES_WORKER_INTERVAL_MS")) != "" {
 		dispatchInterval = 250 * time.Millisecond
@@ -132,6 +182,7 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 		MetricsInterval:             metricsInterval,
 		LeaseDuration:               30 * time.Second,
 		ShutdownTimeout:             5 * time.Second,
+		PerGo:                       pergo,
 	}, nil
 }
 

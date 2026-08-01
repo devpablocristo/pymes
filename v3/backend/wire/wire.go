@@ -5,22 +5,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/devpablocristo/platform/sdks/clerk/go"
-	"github.com/devpablocristo/pymes/v3/backend/cmd/config"
-	"github.com/devpablocristo/pymes/v3/backend/internal/commerce"
-	"github.com/devpablocristo/pymes/v3/backend/internal/fakeservice"
-	"github.com/devpablocristo/pymes/v3/backend/internal/identity"
-	"github.com/devpablocristo/pymes/v3/backend/internal/observability"
-	"github.com/devpablocristo/pymes/v3/backend/internal/organization"
-	"github.com/devpablocristo/pymes/v3/backend/internal/postgres"
-	"github.com/devpablocristo/pymes/v3/backend/internal/scheduling"
-	"github.com/devpablocristo/pymes/v3/backend/internal/worker"
 	"log/slog"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	clerk "github.com/devpablocristo/platform/sdks/clerk/go"
+	"github.com/devpablocristo/pymes/v3/backend/cmd/config"
+	"github.com/devpablocristo/pymes/v3/backend/internal/commerce"
+	"github.com/devpablocristo/pymes/v3/backend/internal/fakeservice"
+	"github.com/devpablocristo/pymes/v3/backend/internal/identity"
+	identitydomain "github.com/devpablocristo/pymes/v3/backend/internal/identity/usecases/domain"
+	"github.com/devpablocristo/pymes/v3/backend/internal/notifications"
+	"github.com/devpablocristo/pymes/v3/backend/internal/observability"
+	"github.com/devpablocristo/pymes/v3/backend/internal/organization"
+	"github.com/devpablocristo/pymes/v3/backend/internal/postgres"
+	"github.com/devpablocristo/pymes/v3/backend/internal/scheduling"
+	"github.com/devpablocristo/pymes/v3/backend/internal/worker"
 )
 
 func InitializeFakeService(kind string) (http.Handler, error) {
@@ -132,17 +135,52 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 		schedulingUsecases,
 		scheduling.NewIdentityAuthenticator(clerkAuthenticator),
 	).Handler()
-	handler := composePublicHTTP(
-		api.Handler(),
-		identity.NewWebhook(webhooks, identity.ReceiveWebhook{Inbox: identities}),
-		publicContextRoute{
+	notificationStore := notifications.NewPostgres(pool)
+	var notificationHTTP http.Handler
+	if cfg.PerGo.Enabled {
+		secrets := make([][]byte, 0, len(cfg.PerGo.WebhookSecrets))
+		for _, value := range cfg.PerGo.WebhookSecrets {
+			secrets = append(secrets, []byte(value))
+		}
+		notificationHTTP = notifications.NewHandler(
+			notifications.ReadNotification{Repository: notificationStore},
+			notificationAuthenticator{source: clerkAuthenticator},
+			notifications.ProcessDeliveryWebhook{
+				Repository:        notificationStore,
+				ExpectedWorkspace: cfg.PerGo.WorkspaceID,
+			},
+			notifications.PerGoSignatureVerifier{
+				Secrets: secrets, Tolerance: 5 * time.Minute,
+			},
+		).Routes()
+	}
+	contextRoutes := []publicContextRoute{
+		{
 			Pattern: "/api/v1/organizations/{organizationId}/scheduling/",
 			Handler: schedulingHTTP,
 		},
-		publicContextRoute{
+		{
 			Pattern: "/api/v1/public/scheduling/",
 			Handler: schedulingHTTP,
 		},
+	}
+	if notificationHTTP != nil {
+		contextRoutes = append(
+			contextRoutes,
+			publicContextRoute{
+				Pattern: "GET /api/v1/organizations/{organizationId}/notifications/{notificationId}",
+				Handler: notificationHTTP,
+			},
+			publicContextRoute{
+				Pattern: "POST /api/v1/webhooks/pergo",
+				Handler: notificationHTTP,
+			},
+		)
+	}
+	handler := composePublicHTTP(
+		api.Handler(),
+		identity.NewWebhook(webhooks, identity.ReceiveWebhook{Inbox: identities}),
+		contextRoutes...,
 	)
 	return &App{
 		Handler: observability.HTTP(handler, nil), database: database,
@@ -164,6 +202,29 @@ func APIStartupErrorCode(err error) string {
 		return startupErr.Code
 	}
 	return "DEPENDENCY_UNAVAILABLE"
+}
+
+type principalSource interface {
+	Principal(*http.Request) (identitydomain.Principal, error)
+}
+
+type notificationAuthenticator struct {
+	source principalSource
+}
+
+func (auth notificationAuthenticator) Authenticate(
+	request *http.Request,
+) (notifications.Actor, error) {
+	principal, err := auth.source.Principal(request)
+	if err != nil {
+		return notifications.Actor{}, err
+	}
+	return notifications.Actor{
+		OrganizationID:   principal.OrganizationID,
+		ActorID:          principal.ActorID,
+		Role:             string(principal.Role),
+		MembershipStatus: principal.MembershipStatus,
+	}, nil
 }
 
 type publicContextRoute struct {
@@ -239,7 +300,7 @@ func InitializeWorker(
 	fiscalHTTP := commerce.NewServiceHTTPClient()
 	accountingHTTP := commerce.NewServiceHTTPClient()
 	commerceStore := commerce.New(pool)
-	dispatcher := commerce.DurableWorker{
+	commerceDispatcher := commerce.DurableWorker{
 		Store: commerceStore,
 		Fiscal: commerce.HTTPFiscalClient{
 			BaseURL: cfg.FiscalURL, Client: fiscalHTTP,
@@ -274,6 +335,25 @@ func InitializeWorker(
 		),
 		100,
 	)
+	dispatchers := worker.Dispatchers{commerceDispatcher, schedulingWorker}
+	if cfg.PerGo.Enabled {
+		notificationStore := notifications.NewPostgres(pool)
+		notificationDispatcher := notifications.NewWorker(
+			notificationStore,
+			notifications.NewPerGo(
+				cfg.PerGo.BaseURL,
+				cfg.PerGo.APIKey,
+				cfg.PerGo.Channel,
+				nil,
+				cfg.PerGo.Timeout,
+			),
+			notifications.ProjectSchedulingNotification{
+				Repository: notificationStore,
+			},
+		)
+		notificationDispatcher.LeaseFor = cfg.LeaseDuration
+		dispatchers = append(dispatchers, notificationDispatcher)
+	}
 	operations := worker.New(pool)
 	circuits := map[string]worker.CircuitState{
 		"fiscal": fiscalHTTP, "accounting": accountingHTTP,
@@ -290,7 +370,7 @@ func InitializeWorker(
 			ReadHeaderTimeout: 2 * time.Second,
 		},
 		Runner: worker.Runner{
-			Dispatcher: worker.Dispatchers{dispatcher, schedulingWorker},
+			Dispatcher: dispatchers,
 			Metrics:    operations, Circuits: circuits, Logger: logger,
 			DispatchEvery:  cfg.DispatchInterval,
 			MetricsEvery:   cfg.MetricsInterval,

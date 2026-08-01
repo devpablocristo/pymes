@@ -70,6 +70,8 @@ func (h HTTP) metrics(w http.ResponseWriter, r *http.Request) {
 			"pymes_outbox_dead_letters %d\n"+
 			"pymes_outbox_oldest_age_seconds %.3f\n"+
 			"pymes_fiscal_uncertain %d\n"+
+			"pymes_notifications_stalled %d\n"+
+			"pymes_notifications_failed %d\n"+
 			"pymes_accounting_applications_pending %d\n"+
 			"pymes_accounting_reversals_pending %d\n",
 		metrics.OutboxPending,
@@ -78,6 +80,8 @@ func (h HTTP) metrics(w http.ResponseWriter, r *http.Request) {
 		metrics.OutboxDeadLetters,
 		metrics.OutboxOldestAgeSeconds,
 		metrics.FiscalUncertain,
+		metrics.NotificationsStalled,
+		metrics.NotificationsFailed,
 		metrics.ApplicationPending,
 		metrics.ReversalPending,
 	)

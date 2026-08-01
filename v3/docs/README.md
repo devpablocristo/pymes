@@ -26,8 +26,9 @@ implementada es:
 10. [Runbook de operación y recuperación](10-runbook-operacion.md)
 11. [Arquitectura vertical Go](go-architecture.md)
 12. [Agenda multi-tenant](scheduling.md)
-13. [ADRs](adr/)
-14. [Contratos OpenAPI internos](../contracts/)
+13. [Notificaciones WhatsApp mediante PerGo](11-notifications-pergo.md)
+14. [ADRs](adr/)
+15. [Contratos OpenAPI internos](../contracts/)
 
 Los diagramas Mermaid describen la arquitectura objetivo. Toda API marcada
 `internal` sólo admite credenciales de servicio: ningún navegador llega a los

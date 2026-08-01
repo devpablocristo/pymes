@@ -14,6 +14,8 @@ func AddMetrics(target *models.MetricsAccumulator, current models.Metrics) {
 		target.Metrics.OutboxOldestAgeSeconds = current.OutboxOldestAgeSeconds
 	}
 	target.Metrics.FiscalUncertain += current.FiscalUncertain
+	target.Metrics.NotificationsStalled += current.NotificationsStalled
+	target.Metrics.NotificationsFailed += current.NotificationsFailed
 	target.Metrics.ApplicationPending += current.ApplicationPending
 	target.Metrics.ReversalPending += current.ReversalPending
 }

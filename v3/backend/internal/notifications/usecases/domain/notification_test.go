@@ -1,0 +1,57 @@
+package domain
+
+import (
+	"errors"
+	"testing"
+	"time"
+)
+
+func validIntent() Intent {
+	return Intent{
+		ID: "notification-1", OrganizationID: "org-1",
+		Kind: KindConfirmation, AggregateType: "booking",
+		AggregateID: "booking-1", RecipientE164: "+5491112345678",
+		TemplateName: "booking.confirmation", TemplateVersion: 2,
+		Locale: "es_AR", Variables: map[string]string{"customer": "Pablo"},
+		Body: "Tu turno está confirmado.", SendAt: time.Unix(100, 0).UTC(),
+		Status: StatusPending, IdempotencyKey: "booking-1:confirmation:v2",
+		CorrelationID: "correlation-1", RequestID: "request-1",
+		ActorRef: "system:scheduling", SourceVersion: 1,
+	}
+}
+
+func TestIntentValidationAndDigestAreDeterministic(t *testing.T) {
+	intent := validIntent()
+	if err := intent.Validate(); err != nil {
+		t.Fatalf("valid intent rejected: %v", err)
+	}
+	first, err := intent.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	intent.Variables = map[string]string{"customer": "Pablo"}
+	second, err := intent.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second || len(first) != 64 {
+		t.Fatalf("digest mismatch %q %q", first, second)
+	}
+	intent.RecipientE164 = "1112345678"
+	if !errors.Is(intent.Validate(), ErrInvalidIntent) {
+		t.Fatal("expected invalid E.164 recipient")
+	}
+}
+
+func TestNextStatusNeverRegresses(t *testing.T) {
+	status, err := NextStatus(StatusQueued, "message.delivered")
+	if err != nil || status != StatusDelivered {
+		t.Fatalf("delivered transition = %q, %v", status, err)
+	}
+	if _, err := NextStatus(StatusDelivered, "message.sent"); !errors.Is(err, ErrInvalidTransition) {
+		t.Fatal("expected stale sent event to be rejected")
+	}
+	if _, err := NextStatus(StatusRead, "message.failed"); !errors.Is(err, ErrInvalidTransition) {
+		t.Fatal("expected terminal read state")
+	}
+}

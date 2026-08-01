@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -10,10 +11,16 @@ type Clerk struct {
 	SecretKey, JWTKey, Issuer, Audience, WebhookSecret string
 	AuthorizedParties                                  []string
 }
+type PerGoAPI struct {
+	Enabled        bool
+	WorkspaceID    string
+	WebhookSecrets []string
+}
 type Config struct {
 	HTTPAddr, DatabaseURL, Environment string
 	SchedulingActionTokenSecret        string
 	Clerk                              Clerk
+	PerGo                              PerGoAPI
 }
 
 func Load() (Config, error) { return LoadFrom(os.Getenv) }
@@ -22,6 +29,12 @@ func LoadFrom(getenv func(string) string) (Config, error) {
 		return Config{}, fmt.Errorf("environment reader is required")
 	}
 	env := strings.ToLower(defaultValue(getenv("PYMES_ENVIRONMENT"), "development"))
+	pergoEnabled, err := strconv.ParseBool(
+		defaultValue(getenv("PYMES_PERGO_ENABLED"), "false"),
+	)
+	if err != nil {
+		return Config{}, fmt.Errorf("PYMES_PERGO_ENABLED must be a boolean")
+	}
 	cfg := Config{
 		HTTPAddr:                    defaultValue(getenv("PYMES_HTTP_ADDR"), ":8080"),
 		DatabaseURL:                 strings.TrimSpace(getenv("PYMES_DATABASE_URL")),
@@ -34,6 +47,11 @@ func LoadFrom(getenv func(string) string) (Config, error) {
 			Audience:          defaultValue(getenv("PYMES_CLERK_AUDIENCE"), "pymes-v3"),
 			AuthorizedParties: csv(getenv("PYMES_CLERK_AUTHORIZED_PARTIES")),
 			WebhookSecret:     strings.TrimSpace(getenv("PYMES_CLERK_WEBHOOK_SECRET")),
+		},
+		PerGo: PerGoAPI{
+			Enabled:        pergoEnabled,
+			WorkspaceID:    strings.TrimSpace(getenv("PERGO_WORKSPACE_ID")),
+			WebhookSecrets: csv(getenv("PERGO_WEBHOOK_SECRETS")),
 		},
 	}
 	if cfg.DatabaseURL == "" {
@@ -48,7 +66,26 @@ func LoadFrom(getenv func(string) string) (Config, error) {
 	if len(cfg.SchedulingActionTokenSecret) < 32 {
 		return Config{}, fmt.Errorf("PYMES_SCHEDULING_ACTION_TOKEN_SECRET must contain at least 32 bytes")
 	}
+	if cfg.PerGo.Enabled &&
+		(cfg.PerGo.WorkspaceID == "" ||
+			!validPerGoWebhookSecrets(cfg.PerGo.WebhookSecrets)) {
+		return Config{}, fmt.Errorf(
+			"PERGO_WORKSPACE_ID and strong PERGO_WEBHOOK_SECRETS are required when PerGo is enabled",
+		)
+	}
 	return cfg, nil
+}
+
+func validPerGoWebhookSecrets(secrets []string) bool {
+	if len(secrets) == 0 {
+		return false
+	}
+	for _, secret := range secrets {
+		if len(secret) < 32 {
+			return false
+		}
+	}
+	return true
 }
 func defaultValue(value, fallback string) string {
 	if trimmed := strings.TrimSpace(value); trimmed != "" {

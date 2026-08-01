@@ -133,3 +133,31 @@ func TestLoadWorkerFromPreservesFastLocalLoop(t *testing.T) {
 		t.Fatalf("worker config=%+v", cfg)
 	}
 }
+
+func TestLoadWorkerFromValidatesPerGoOnlyWhenEnabled(t *testing.T) {
+	values := map[string]string{
+		"PYMES_DATABASE_URL":                   "postgres://db",
+		"FISCAL_ADAPTER_URL":                   "http://fiscal",
+		"ACCOUNTING_URL":                       "http://accounting",
+		"PYMES_SCHEDULING_ACTION_TOKEN_SECRET": "01234567890123456789012345678901",
+		"PYMES_PERGO_ENABLED":                  "true",
+		"PERGO_URL":                            "http://pergo/",
+		"PERGO_API_KEY":                        "secret",
+		"PERGO_WORKSPACE_ID":                   "workspace-1",
+		"PERGO_CHANNEL":                        "whatsapp_mock",
+		"PERGO_TIMEOUT":                        "750ms",
+	}
+	cfg, err := LoadWorkerFrom(func(key string) string { return values[key] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.PerGo.Enabled || cfg.PerGo.BaseURL != "http://pergo" ||
+		cfg.PerGo.Timeout != 750*time.Millisecond {
+		t.Fatalf("PerGo config = %+v", cfg.PerGo)
+	}
+	delete(values, "PERGO_API_KEY")
+	if _, err := LoadWorkerFrom(func(key string) string { return values[key] }); err == nil ||
+		WorkerErrorCode(err) != "PERGO_CONFIG_INVALID" {
+		t.Fatalf("missing key error = %v", err)
+	}
+}

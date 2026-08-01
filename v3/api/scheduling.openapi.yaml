@@ -126,7 +126,7 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/IdempotencyKey' }
         - { $ref: '#/components/parameters/SourceVersion' }
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PublicBookingInput' } } } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BookingInput' } } } }
       responses:
         '201': { description: Turno o serie creada, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Booking' } } } } }
         '400': { $ref: '#/components/responses/SchedulingError' }
@@ -252,7 +252,7 @@ paths:
         - { $ref: '#/components/parameters/OrganizationSlug' }
         - { $ref: '#/components/parameters/IdempotencyKey' }
         - { $ref: '#/components/parameters/SourceVersion' }
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BookingInput' } } } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PublicBookingInput' } } } }
       responses:
         '201': { description: Turno público creado sin datos internos del cliente, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PublicBooking' } } } } }
         '400': { $ref: '#/components/responses/SchedulingError' }

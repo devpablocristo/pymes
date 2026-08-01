@@ -42,9 +42,14 @@ function unwrap<T>(result: ApiResult<T>): T {
 async function authenticatedHeaders(identity: RequestIdentity): Promise<Headers> {
   const headers = new Headers();
   const token = await identity.getToken();
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+  if (!token) {
+    throw new SchedulingApiError(
+      "FORBIDDEN",
+      "La sesión venció. Volvé a iniciar sesión.",
+      401,
+    );
   }
+  headers.set("Authorization", `Bearer ${token}`);
   return headers;
 }
 

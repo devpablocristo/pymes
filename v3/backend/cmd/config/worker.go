@@ -21,6 +21,7 @@ type WorkerConfig struct {
 	MetricsInterval            time.Duration
 	LeaseDuration              time.Duration
 	ShutdownTimeout            time.Duration
+	Calendars                  Calendars
 }
 
 type WorkerConfigError struct {
@@ -83,6 +84,13 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 			"FISCAL_ADAPTER_URL and ACCOUNTING_URL are required",
 		)
 	}
+	calendars, err := loadCalendars(getenv, environment)
+	if err != nil {
+		return WorkerConfig{}, &WorkerConfigError{
+			Code: "CALENDAR_CONFIG_INVALID",
+			Err:  err,
+		}
+	}
 	metricsInterval, err := parseWorkerMetricsInterval(
 		strings.TrimSpace(getenv("PYMES_WORKER_METRICS_INTERVAL")),
 	)
@@ -121,6 +129,7 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 		MetricsInterval:            metricsInterval,
 		LeaseDuration:              30 * time.Second,
 		ShutdownTimeout:            5 * time.Second,
+		Calendars:                  calendars,
 	}, nil
 }
 

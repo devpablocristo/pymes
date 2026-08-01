@@ -2,11 +2,14 @@
 package wire
 
 import (
+	cloudkms "cloud.google.com/go/kms/apiv1"
 	"context"
 	"errors"
 	"fmt"
 	"github.com/devpablocristo/platform/sdks/clerk/go"
 	"github.com/devpablocristo/pymes/v3/backend/cmd/config"
+	"github.com/devpablocristo/pymes/v3/backend/internal/calendars"
+	googlemodels "github.com/devpablocristo/pymes/v3/backend/internal/calendars/google_calendar/models"
 	"github.com/devpablocristo/pymes/v3/backend/internal/commerce"
 	"github.com/devpablocristo/pymes/v3/backend/internal/fakeservice"
 	"github.com/devpablocristo/pymes/v3/backend/internal/identity"
@@ -14,6 +17,8 @@ import (
 	"github.com/devpablocristo/pymes/v3/backend/internal/organization"
 	"github.com/devpablocristo/pymes/v3/backend/internal/postgres"
 	"github.com/devpablocristo/pymes/v3/backend/internal/worker"
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"log/slog"
 	"net/http"
 	"os"
@@ -32,6 +37,7 @@ type App struct {
 	Handler         http.Handler
 	database        *postgres.Database
 	shutdownTracing func(context.Context) error
+	resources       []closeResource
 	closeOnce       sync.Once
 	closeErr        error
 }
@@ -41,14 +47,26 @@ func (a *App) Close() error {
 		return nil
 	}
 	a.closeOnce.Do(func() {
+		var closeErrors []error
+		for index := len(a.resources) - 1; index >= 0; index-- {
+			if a.resources[index] == nil {
+				continue
+			}
+			if err := a.resources[index].Close(); err != nil {
+				closeErrors = append(closeErrors, err)
+			}
+		}
 		if a.shutdownTracing != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			a.closeErr = a.shutdownTracing(ctx)
+			if err := a.shutdownTracing(ctx); err != nil {
+				closeErrors = append(closeErrors, err)
+			}
 			cancel()
 		}
 		if a.database != nil {
 			a.database.Close()
 		}
+		a.closeErr = errors.Join(closeErrors...)
 	})
 	return a.closeErr
 }
@@ -93,13 +111,38 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 	}
 	store := commerce.New(pool)
 	identities := identity.New(pool)
+	authenticator := identity.ClerkAuthenticator{
+		Memberships: identities, Verifier: sessions,
+	}
 	api := commerce.NewHTTPServer(commerce.Commands{
 		Store: store, AccountingAdjustments: store, Now: store.Clock,
-	}, identity.ClerkAuthenticator{Memberships: identities, Verifier: sessions})
-	handler := composePublicHTTP(api.Handler(), identity.NewWebhook(webhooks, identity.ReceiveWebhook{Inbox: identities}))
+	}, authenticator)
+	calendarHTTP, calendarResource, err := initializeCalendarAPI(
+		ctx, cfg.Calendars, pool, authenticator,
+	)
+	if err != nil {
+		database.Close()
+		_ = shutdownTracing(context.Background())
+		return nil, &APIStartupError{
+			Code: "CALENDAR_DEPENDENCY_UNAVAILABLE",
+			Err:  err,
+		}
+	}
+	handler := composePublicHTTP(
+		api.Handler(),
+		identity.NewWebhook(
+			webhooks,
+			identity.ReceiveWebhook{Inbox: identities},
+		),
+		calendarHTTP,
+	)
+	var resources []closeResource
+	if calendarResource != nil {
+		resources = append(resources, calendarResource)
+	}
 	return &App{
 		Handler: observability.HTTP(handler, nil), database: database,
-		shutdownTracing: shutdownTracing,
+		shutdownTracing: shutdownTracing, resources: resources,
 	}, nil
 }
 
@@ -119,11 +162,79 @@ func APIStartupErrorCode(err error) string {
 	return "DEPENDENCY_UNAVAILABLE"
 }
 
-func composePublicHTTP(api, clerkWebhook http.Handler) http.Handler {
-	mux := http.NewServeMux()
-	mux.Handle("/", api)
-	mux.Handle("POST /api/v1/webhooks/clerk", clerkWebhook)
-	return mux
+type publicRouteRegistrar interface {
+	RegisterRoutes(chi.Router)
+}
+
+func composePublicHTTP(
+	api, clerkWebhook http.Handler,
+	registrars ...publicRouteRegistrar,
+) http.Handler {
+	router := chi.NewRouter()
+	for _, registrar := range registrars {
+		if registrar != nil {
+			registrar.RegisterRoutes(router)
+		}
+	}
+	router.Method(
+		http.MethodPost,
+		"/api/v1/webhooks/clerk",
+		clerkWebhook,
+	)
+	router.Mount("/", api)
+	return router
+}
+
+func initializeCalendarAPI(
+	ctx context.Context,
+	cfg config.Calendars,
+	pool *pgxpool.Pool,
+	auth calendars.CalendarAuthenticator,
+) (publicRouteRegistrar, closeResource, error) {
+	if !cfg.Enabled {
+		return nil, nil, nil
+	}
+	cipher, resource, err := initializeCalendarCipher(ctx, cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	provider, err := calendars.NewGoogleCalendar(
+		googlemodels.Configuration{
+			ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret,
+			RedirectURL: cfg.RedirectURL, AuthURL: cfg.AuthURL,
+			TokenURL: cfg.TokenURL, RevokeURL: cfg.RevokeURL,
+			CalendarURL: cfg.CalendarURL,
+		},
+	)
+	if err != nil {
+		if resource != nil {
+			_ = resource.Close()
+		}
+		return nil, nil, fmt.Errorf("configure Google Calendar: %w", err)
+	}
+	store := calendars.NewStore(pool, cipher)
+	handler := calendars.NewCalendarHTTP(
+		calendars.Commands{Repository: store, Google: provider},
+		auth,
+	)
+	return handler, resource, nil
+}
+
+func initializeCalendarCipher(
+	ctx context.Context,
+	cfg config.Calendars,
+) (calendars.SecretCipher, closeResource, error) {
+	if len(cfg.LocalKey) != 0 {
+		cipher, err := calendars.NewLocalEnvelopeCipher(cfg.LocalKey)
+		return cipher, nil, err
+	}
+	client, err := cloudkms.NewKeyManagementClient(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("open calendar KMS client: %w", err)
+	}
+	return calendars.NewKMSEnvelopeCipher(
+		client, cfg.KMSKeyName,
+	), client, nil
 }
 
 func InitializeWorker(

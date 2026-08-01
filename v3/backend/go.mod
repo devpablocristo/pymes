@@ -7,6 +7,7 @@ require (
 	github.com/devpablocristo/platform/databases/postgres/go v0.5.0
 	github.com/devpablocristo/platform/observability/go v0.2.1
 	github.com/devpablocristo/platform/sdks/clerk/go v0.5.1
+	github.com/devpablocristo/platform/sdks/google-calendar/go v0.2.1
 	github.com/go-chi/chi/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.21.0

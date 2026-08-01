@@ -13,6 +13,7 @@ type Clerk struct {
 type Config struct {
 	HTTPAddr, DatabaseURL, Environment string
 	Clerk                              Clerk
+	Calendars                          Calendars
 }
 
 func Load() (Config, error) { return LoadFrom(os.Getenv) }
@@ -21,7 +22,11 @@ func LoadFrom(getenv func(string) string) (Config, error) {
 		return Config{}, fmt.Errorf("environment reader is required")
 	}
 	env := strings.ToLower(defaultValue(getenv("PYMES_ENVIRONMENT"), "development"))
-	cfg := Config{HTTPAddr: defaultValue(getenv("PYMES_HTTP_ADDR"), ":8080"), DatabaseURL: strings.TrimSpace(getenv("PYMES_DATABASE_URL")), Environment: env, Clerk: Clerk{SecretKey: strings.TrimSpace(getenv("PYMES_CLERK_SECRET_KEY")), JWTKey: strings.TrimSpace(getenv("PYMES_CLERK_JWT_KEY")), Issuer: strings.TrimRight(strings.TrimSpace(getenv("PYMES_CLERK_ISSUER")), "/"), Audience: defaultValue(getenv("PYMES_CLERK_AUDIENCE"), "pymes-v3"), AuthorizedParties: csv(getenv("PYMES_CLERK_AUTHORIZED_PARTIES")), WebhookSecret: strings.TrimSpace(getenv("PYMES_CLERK_WEBHOOK_SECRET"))}}
+	calendars, err := loadCalendars(getenv, env)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg := Config{HTTPAddr: defaultValue(getenv("PYMES_HTTP_ADDR"), ":8080"), DatabaseURL: strings.TrimSpace(getenv("PYMES_DATABASE_URL")), Environment: env, Clerk: Clerk{SecretKey: strings.TrimSpace(getenv("PYMES_CLERK_SECRET_KEY")), JWTKey: strings.TrimSpace(getenv("PYMES_CLERK_JWT_KEY")), Issuer: strings.TrimRight(strings.TrimSpace(getenv("PYMES_CLERK_ISSUER")), "/"), Audience: defaultValue(getenv("PYMES_CLERK_AUDIENCE"), "pymes-v3"), AuthorizedParties: csv(getenv("PYMES_CLERK_AUTHORIZED_PARTIES")), WebhookSecret: strings.TrimSpace(getenv("PYMES_CLERK_WEBHOOK_SECRET"))}, Calendars: calendars}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("PYMES_DATABASE_URL is required")
 	}

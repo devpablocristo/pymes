@@ -24,9 +24,10 @@ implementada es:
 8. [Auditoría de cierre](08-auditoria-cierre.md)
 9. [Seguridad GCP STG/PRD](09-gcp-stg-prd.md)
 10. [Runbook de operación y recuperación](10-runbook-operacion.md)
-11. [Arquitectura vertical Go](go-architecture.md)
-12. [ADRs](adr/)
-13. [Contratos OpenAPI internos](../contracts/)
+11. [Google Calendar y Meet](11-google-calendar-meet.md)
+12. [Arquitectura vertical Go](go-architecture.md)
+13. [ADRs](adr/)
+14. [Contratos OpenAPI internos](../contracts/)
 
 Los diagramas Mermaid describen la arquitectura objetivo. Toda API marcada
 `internal` sólo admite credenciales de servicio: ningún navegador llega a los

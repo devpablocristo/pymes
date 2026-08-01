@@ -19,7 +19,7 @@
     "typescript": "^5.9.0"
   },
   "dependencies": {
-    "@devpablocristo/arca-facturacion": "2.4.0",
+    "@devpablocristo/arca-facturacion": "2.5.0",
     "@google-cloud/kms": "5.7.0",
     "node-forge": "1.4.0",
     "pg": "^8.22.0"

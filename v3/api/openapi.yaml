@@ -5,6 +5,7 @@ info:
   description: API pública de Pymes v3. Los importes se representan como strings decimales.
 security:
   - clerkBearer: []
+  - clerkSessionCookie: []
 paths:
   /healthz:
     get:
@@ -143,6 +144,108 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/v1/organizations/{organizationId}/calendars/google/oauth/start:
+    post:
+      operationId: startGoogleCalendarOAuth
+      summary: Inicia una conexión OAuth de Google Calendar para la organización.
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoogleCalendarOAuthStartInput' }
+      responses:
+        '201':
+          description: Estado OAuth durable, de propósito único y ligado a la sesión Clerk.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoogleCalendarOAuthStart' }
+        '400': { $ref: '#/components/responses/InvalidCommand' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/v1/calendars/google/oauth/callback:
+    get:
+      operationId: completeGoogleCalendarOAuth
+      summary: Completa OAuth directamente en el BFF sin entregar el código a la web.
+      description: >-
+        Google redirige a esta ruta global. El BFF vuelve a autenticar la misma
+        sesión Clerk y consume el state una sola vez, ligado a tenant, actor,
+        sesión y vencimiento.
+      parameters:
+        - name: state
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 1024 }
+        - name: code
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 4096 }
+        - name: error
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 255 }
+      responses:
+        '200':
+          description: Conexión creada o reconciliada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CalendarConnection' }
+        '400': { $ref: '#/components/responses/InvalidCommand' }
+        '401':
+          description: La conexión requiere una nueva autorización.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '410':
+          description: El estado OAuth venció.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/DomainError' }
+        '503':
+          description: Google Calendar o IAM no está disponible.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/organizations/{organizationId}/calendars/connections:
+    get:
+      operationId: listCalendarConnections
+      summary: Lista conexiones Calendar sin exponer grants ni tokens.
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+      responses:
+        '200':
+          description: Conexiones visibles dentro de la organización.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CalendarConnection' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/v1/organizations/{organizationId}/calendars/connections/{connectionId}:
+    delete:
+      operationId: disconnectCalendarConnection
+      summary: Revoca y desconecta una conexión Calendar de la organización.
+      parameters:
+        - { $ref: '#/components/parameters/OrganizationId' }
+        - name: connectionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Conexión revocada o desconexión ya convergida. }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503':
+          description: Google Calendar o IAM no está disponible.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /api/v1/organizations/{organizationId}/sales:
     post:
       operationId: createSale
@@ -358,6 +461,13 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: JWT de sesión Clerk validado por el BFF.
+    clerkSessionCookie:
+      type: apiKey
+      in: cookie
+      name: __session
+      description: >-
+        JWT de sesión Clerk aceptado sólo cuando navegador y BFF comparten el
+        mismo origen; permite completar redirects OAuth sin exponer el código.
   parameters:
     OrganizationId: { name: organizationId, in: path, required: true, schema: { type: string } }
     IdempotencyKey:
@@ -431,6 +541,56 @@ components:
             - PERGO_WEBHOOK_SIGNATURE_INVALID
             - PERGO_WEBHOOK_INVALID
             - NOTIFICATION_NOT_FOUND
+            - OAUTH_PROVIDER_DENIED
+            - OAUTH_STATE_INVALID
+            - OAUTH_STATE_EXPIRED
+            - CALENDAR_REAUTH_REQUIRED
+            - CALENDAR_PROVIDER_UNAVAILABLE
+            - INTERNAL_ERROR
+    GoogleCalendarOAuthStartInput:
+      type: object
+      additionalProperties: false
+      required: [time_zone, free_busy_enabled, meet_enabled]
+      properties:
+        time_zone:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Zona IANA usada por el calendario secundario.
+        free_busy_enabled: { type: boolean }
+        meet_enabled: { type: boolean }
+    GoogleCalendarOAuthStart:
+      type: object
+      additionalProperties: false
+      required: [connection_id, authorization_url, expires_at]
+      properties:
+        connection_id: { type: string, format: uuid }
+        authorization_url: { type: string, format: uri }
+        expires_at: { type: string, format: date-time }
+    CalendarConnection:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - provider
+        - status
+        - calendar_connected
+        - time_zone
+        - free_busy_enabled
+        - meet_enabled
+        - version
+      properties:
+        id: { type: string, format: uuid }
+        provider: { type: string, const: google }
+        status:
+          type: string
+          enum: [pending, active, reauth_required, revoked]
+        calendar_connected: { type: boolean }
+        time_zone: { type: string, minLength: 1, maxLength: 255 }
+        free_busy_enabled: { type: boolean }
+        meet_enabled: { type: boolean }
+        access_token_expires_at: { type: string, format: date-time }
+        version: { type: integer, minimum: 1 }
     PerGoDeliveryEvent:
       type: object
       additionalProperties: false

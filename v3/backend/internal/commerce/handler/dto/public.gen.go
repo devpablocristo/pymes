@@ -116,16 +116,22 @@ func (e AccountingFailureRefCode) Valid() bool {
 const (
 	ErrorCodeACCOUNTINGADJUSTMENTNOTALLOWED ErrorCode = "ACCOUNTING_ADJUSTMENT_NOT_ALLOWED"
 	ErrorCodeAUTHNOTCONFIGURED              ErrorCode = "AUTH_NOT_CONFIGURED"
+	ErrorCodeCALENDARPROVIDERUNAVAILABLE    ErrorCode = "CALENDAR_PROVIDER_UNAVAILABLE"
+	ErrorCodeCALENDARREAUTHREQUIRED         ErrorCode = "CALENDAR_REAUTH_REQUIRED"
 	ErrorCodeCOMMANDREJECTED                ErrorCode = "COMMAND_REJECTED"
 	ErrorCodeDOCUMENTNOTREVERSIBLE          ErrorCode = "DOCUMENT_NOT_REVERSIBLE"
 	ErrorCodeFORBIDDEN                      ErrorCode = "FORBIDDEN"
 	ErrorCodeIDEMPOTENCYKEYREQUIRED         ErrorCode = "IDEMPOTENCY_KEY_REQUIRED"
 	ErrorCodeIDEMPOTENCYKEYREUSED           ErrorCode = "IDEMPOTENCY_KEY_REUSED"
+	ErrorCodeINTERNALERROR                  ErrorCode = "INTERNAL_ERROR"
 	ErrorCodeINVALIDAPPLICATIONDOCUMENT     ErrorCode = "INVALID_APPLICATION_DOCUMENT"
 	ErrorCodeINVALIDSOURCEDOCUMENT          ErrorCode = "INVALID_SOURCE_DOCUMENT"
 	ErrorCodeNOTFOUND                       ErrorCode = "NOT_FOUND"
 	ErrorCodeNOTIFICATIONNOTFOUND           ErrorCode = "NOTIFICATION_NOT_FOUND"
 	ErrorCodeNOTIFICATIONSUNAVAILABLE       ErrorCode = "NOTIFICATIONS_UNAVAILABLE"
+	ErrorCodeOAUTHPROVIDERDENIED            ErrorCode = "OAUTH_PROVIDER_DENIED"
+	ErrorCodeOAUTHSTATEEXPIRED              ErrorCode = "OAUTH_STATE_EXPIRED"
+	ErrorCodeOAUTHSTATEINVALID              ErrorCode = "OAUTH_STATE_INVALID"
 	ErrorCodeOPENITEMAMOUNTEXCEEDED         ErrorCode = "OPEN_ITEM_AMOUNT_EXCEEDED"
 	ErrorCodeORGNOTPROVISIONED              ErrorCode = "ORG_NOT_PROVISIONED"
 	ErrorCodePERGOWEBHOOKINVALID            ErrorCode = "PERGO_WEBHOOK_INVALID"
@@ -143,6 +149,10 @@ func (e ErrorCode) Valid() bool {
 		return true
 	case ErrorCodeAUTHNOTCONFIGURED:
 		return true
+	case ErrorCodeCALENDARPROVIDERUNAVAILABLE:
+		return true
+	case ErrorCodeCALENDARREAUTHREQUIRED:
+		return true
 	case ErrorCodeCOMMANDREJECTED:
 		return true
 	case ErrorCodeDOCUMENTNOTREVERSIBLE:
@@ -153,6 +163,8 @@ func (e ErrorCode) Valid() bool {
 		return true
 	case ErrorCodeIDEMPOTENCYKEYREUSED:
 		return true
+	case ErrorCodeINTERNALERROR:
+		return true
 	case ErrorCodeINVALIDAPPLICATIONDOCUMENT:
 		return true
 	case ErrorCodeINVALIDSOURCEDOCUMENT:
@@ -162,6 +174,12 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeNOTIFICATIONNOTFOUND:
 		return true
 	case ErrorCodeNOTIFICATIONSUNAVAILABLE:
+		return true
+	case ErrorCodeOAUTHPROVIDERDENIED:
+		return true
+	case ErrorCodeOAUTHSTATEEXPIRED:
+		return true
+	case ErrorCodeOAUTHSTATEINVALID:
 		return true
 	case ErrorCodeOPENITEMAMOUNTEXCEEDED:
 		return true

@@ -31,7 +31,7 @@ func (a ClerkAuthenticator) Principal(request *http.Request) (identitydomain.Pri
 	if a.Memberships == nil || a.Verifier == nil {
 		return identitydomain.Principal{}, errors.New("clerk verifier unavailable")
 	}
-	token, err := clerkhelpers.BearerToken(request.Header)
+	token, err := clerkhelpers.SessionToken(request)
 	if err != nil {
 		return identitydomain.Principal{}, err
 	}

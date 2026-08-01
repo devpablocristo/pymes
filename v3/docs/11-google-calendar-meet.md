@@ -48,10 +48,15 @@ Scopes mínimos:
 
 El callback termina directamente en el BFF mediante
 `GET /api/v1/calendars/google/oauth/callback`; no incluye organización en el
-path y la web nunca recibe ni reenvía el código. El `state` contiene una pista
-base64url sólo para seleccionar el contexto RLS: el BFF autentica la sesión
-Clerk y valida después el hash completo contra organización, actor, sesión,
-vencimiento y consumo único antes de intercambiar el código.
+path y la web nunca recibe ni reenvía el código. Web y BFF deben publicarse
+bajo el mismo origen mediante routing por path para que Clerk envíe su cookie
+`__session` durante la navegación de retorno; las llamadas API cross-origin
+continúan usando `Authorization: Bearer`. El BFF valida criptográficamente
+ambos transportes y nunca usa una cookie si existe un header Authorization
+malformado. El `state` contiene una pista base64url sólo para seleccionar el
+contexto RLS: el BFF autentica la misma sesión Clerk y valida después el hash
+completo contra organización, actor, sesión, vencimiento y consumo único antes
+de intercambiar el código.
 
 ## Cifrado
 

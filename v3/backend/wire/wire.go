@@ -300,7 +300,7 @@ func InitializeWorker(
 	fiscalHTTP := commerce.NewServiceHTTPClient()
 	accountingHTTP := commerce.NewServiceHTTPClient()
 	commerceStore := commerce.New(pool)
-	dispatcher := commerce.DurableWorker{
+	commerceDispatcher := commerce.DurableWorker{
 		Store: commerceStore,
 		Fiscal: commerce.HTTPFiscalClient{
 			BaseURL: cfg.FiscalURL, Client: fiscalHTTP,
@@ -335,22 +335,21 @@ func InitializeWorker(
 		),
 		100,
 	)
-	dispatchers := worker.Dispatchers{dispatcher, schedulingWorker}
+	dispatchers := worker.Dispatchers{commerceDispatcher, schedulingWorker}
 	if cfg.PerGo.Enabled {
 		notificationStore := notifications.NewPostgres(pool)
-		dispatchers = append(
-			dispatchers,
-			notifications.NewWorker(
-				notificationStore,
-				notifications.NewPerGo(
-					cfg.PerGo.BaseURL,
-					cfg.PerGo.APIKey,
-					cfg.PerGo.Channel,
-					nil,
-					cfg.PerGo.Timeout,
-				),
+		notificationDispatcher := notifications.NewWorker(
+			notificationStore,
+			notifications.NewPerGo(
+				cfg.PerGo.BaseURL,
+				cfg.PerGo.APIKey,
+				cfg.PerGo.Channel,
+				nil,
+				cfg.PerGo.Timeout,
 			),
 		)
+		notificationDispatcher.LeaseFor = cfg.LeaseDuration
+		dispatchers = append(dispatchers, notificationDispatcher)
 	}
 	operations := worker.New(pool)
 	circuits := map[string]worker.CircuitState{

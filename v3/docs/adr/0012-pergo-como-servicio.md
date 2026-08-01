@@ -23,7 +23,10 @@ transporte y entrega.
 
 La integración vive exclusivamente en `notifications/pergo.go`, con modelos y
 helpers propios. Scheduling comunica la intención mediante el outbox; no llama
-al adapter. El relay conserva leases, backoff, DLQ y replay.
+al adapter. El dispatcher autónomo de Notifications conserva leases, backoff,
+DLQ y replay, y su consulta SQL sólo puede alquilar
+`NotificationRequested`. Commerce y los demás contextos usan allowlists
+separadas.
 
 Pymes entrega una identidad tenant-aware y determinística en `X-Trace-ID`.
 PerGo la devuelve sin cambios en el webhook firmado. El BFF obtiene
@@ -51,4 +54,3 @@ por lo que backups y acceso a PostgreSQL se tratan como PII.
 La sincronización es eventualmente consistente. El estado comercial permanece
 en Pymes y el external message ID es sólo una proyección; ningún estado de
 entrega modifica por sí solo el turno.
-

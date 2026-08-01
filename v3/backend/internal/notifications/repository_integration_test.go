@@ -221,3 +221,125 @@ func TestPostgresNotificationConcurrentReplayCreatesOneIntentAndOutbox(
 		t.Fatalf("intents=%d events=%d", intents, events)
 	}
 }
+
+func TestPostgresNotificationLeaseCannotStealAnotherContextEvent(
+	t *testing.T,
+) {
+	pool := notificationTestPool(t)
+	organizationID := "notification-org-lease-" + uuid.NewString()
+	enableNotifications(t, pool, organizationID)
+	repository := NewPostgres(pool)
+	now := time.Date(2026, 8, 2, 12, 0, 0, 0, time.UTC)
+	repository.Clock = func() time.Time { return now }
+	intent := integrationIntent(
+		organizationID,
+		"notification-lease",
+		"confirmation-lease",
+	)
+	intent.SendAt = now.Add(-time.Minute)
+	if _, err := (RequestNotification{Repository: repository}).Execute(
+		context.Background(),
+		intent,
+	); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := pool.BeginTx(context.Background(), pgx.TxOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	if _, err = tx.Exec(
+		context.Background(),
+		"SELECT set_config('app.org_id',$1,true)",
+		organizationID,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(context.Background(), `
+		INSERT INTO app.outbox(
+			id,org_id,topic,payload,payload_hash,idempotency_key,
+			request_id,actor_ref,source_version,snapshot_digest,
+			correlation_id,available_at,created_at
+		)
+		VALUES(
+			$1,$2,'BookingCreated','{}',repeat('a',64),$3,
+			'request-foreign','system:scheduling',1,repeat('b',64),
+			'correlation-foreign',$4,$4
+		)`,
+		uuid.New(),
+		organizationID,
+		"booking-created-foreign",
+		now.Add(-time.Minute),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err = tx.Commit(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	leased, err := repository.LeaseNotifications(
+		context.Background(),
+		10000,
+		time.Minute,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var notificationEvent domain.OutboxEvent
+	for _, event := range leased {
+		if event.Topic != NotificationRequestedTopic {
+			t.Fatalf("foreign context event leased: %+v", event)
+		}
+		if event.OrganizationID == organizationID {
+			notificationEvent = event
+		}
+	}
+	if notificationEvent.ID == "" {
+		t.Fatalf("own notification was not leased: %+v", leased)
+	}
+	if err = repository.RetryNotification(
+		context.Background(),
+		notificationEvent,
+	); err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(3 * time.Second)
+	leased, err = repository.LeaseNotifications(
+		context.Background(),
+		10000,
+		time.Minute,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	notificationEvent = domain.OutboxEvent{}
+	for _, event := range leased {
+		if event.Topic != NotificationRequestedTopic {
+			t.Fatalf("foreign context event leased on retry: %+v", event)
+		}
+		if event.OrganizationID == organizationID {
+			notificationEvent = event
+		}
+	}
+	if notificationEvent.ID == "" {
+		t.Fatalf("own notification was not re-leased: %+v", leased)
+	}
+	if err = repository.MarkNotificationPublished(
+		context.Background(),
+		notificationEvent,
+	); err != nil {
+		t.Fatal(err)
+	}
+	var foreignPublished bool
+	if err = pool.QueryRow(context.Background(), `
+		SELECT published_at IS NOT NULL
+		FROM app.outbox
+		WHERE org_id=$1 AND topic='BookingCreated'`,
+		organizationID,
+	).Scan(&foreignPublished); err != nil {
+		t.Fatal(err)
+	}
+	if foreignPublished {
+		t.Fatal("notifications relay published a foreign context event")
+	}
+}

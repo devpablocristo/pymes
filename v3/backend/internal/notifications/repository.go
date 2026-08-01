@@ -316,6 +316,261 @@ func (repository *Postgres) ApplyDeliveryEvent(
 	return false, nil
 }
 
+func (repository *Postgres) LeaseNotifications(
+	ctx context.Context,
+	limit int,
+	duration time.Duration,
+) ([]domain.OutboxEvent, error) {
+	if repository == nil || repository.pool == nil {
+		return nil, errors.New("notification database is required")
+	}
+	if limit < 1 || duration <= 0 {
+		return nil, nil
+	}
+	rows, err := repository.pool.Query(
+		ctx,
+		`SELECT id FROM app.organizations
+		 WHERE status <> 'suspended'
+		 ORDER BY id`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	var organizationIDs []string
+	for rows.Next() {
+		var organizationID string
+		if err = rows.Scan(&organizationID); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		organizationIDs = append(organizationIDs, organizationID)
+	}
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close()
+
+	now := repository.now()
+	leaseToken := uuid.NewString()
+	events := make([]domain.OutboxEvent, 0, limit)
+	for len(events) < limit {
+		leasedThisRound := 0
+		for _, organizationID := range organizationIDs {
+			if len(events) >= limit {
+				break
+			}
+			tx, beginErr := repository.pool.BeginTx(ctx, pgx.TxOptions{})
+			if beginErr != nil {
+				return nil, beginErr
+			}
+			if beginErr = repositoryhelpers.SetOrganization(
+				ctx,
+				tx,
+				organizationID,
+			); beginErr != nil {
+				_ = tx.Rollback(ctx)
+				return nil, beginErr
+			}
+			event, leaseErr := repositoryhelpers.ScanOutboxEvent(
+				tx.QueryRow(ctx, `
+					WITH candidate AS (
+					  SELECT id
+					  FROM app.outbox
+					  WHERE org_id=$1
+					    AND topic='NotificationRequested'
+					    AND published_at IS NULL
+					    AND available_at <= $2
+					    AND (
+					      lease_expires_at IS NULL
+					      OR lease_expires_at <= $2
+					    )
+					  ORDER BY available_at,created_at
+					  FOR UPDATE SKIP LOCKED
+					  LIMIT 1
+					)
+					UPDATE app.outbox value
+					SET lease_token=$3,
+					    lease_expires_at=$4,
+					    attempts=value.attempts+1
+					FROM candidate
+					WHERE value.id=candidate.id
+					RETURNING
+					  value.id,value.org_id,value.topic,value.payload,
+					  value.payload_hash,value.idempotency_key,
+					  value.request_id,value.actor_ref,value.source_version,
+					  value.snapshot_digest,value.correlation_id,
+					  value.available_at,value.attempts,value.lease_token,
+					  value.lease_expires_at`,
+					organizationID,
+					now,
+					leaseToken,
+					now.Add(duration),
+				),
+			)
+			if errors.Is(leaseErr, pgx.ErrNoRows) {
+				_ = tx.Rollback(ctx)
+				continue
+			}
+			if leaseErr != nil {
+				_ = tx.Rollback(ctx)
+				return nil, leaseErr
+			}
+			if leaseErr = tx.Commit(ctx); leaseErr != nil {
+				return nil, leaseErr
+			}
+			events = append(events, event)
+			leasedThisRound++
+		}
+		if leasedThisRound == 0 {
+			break
+		}
+	}
+	return events, nil
+}
+
+func (repository *Postgres) MarkNotificationPublished(
+	ctx context.Context,
+	event domain.OutboxEvent,
+) error {
+	return repository.updateNotificationLease(
+		ctx,
+		event,
+		`UPDATE app.outbox
+		 SET published_at=$1,lease_token=NULL,lease_expires_at=NULL
+		 WHERE org_id=$2 AND id=$3
+		   AND topic='NotificationRequested'
+		   AND lease_token=$4`,
+		repository.now(),
+	)
+}
+
+func (repository *Postgres) RetryNotification(
+	ctx context.Context,
+	event domain.OutboxEvent,
+) error {
+	attempt := event.Attempts
+	if attempt < 1 {
+		attempt = 1
+	}
+	exponent := attempt - 1
+	if exponent > 6 {
+		exponent = 6
+	}
+	backoff := time.Second * time.Duration(1<<exponent)
+	jitterDigest := sha256.Sum256([]byte(event.ID))
+	jitterMillis := (int(jitterDigest[0])<<8 | int(jitterDigest[1])) % 1000
+	return repository.updateNotificationLease(
+		ctx,
+		event,
+		`UPDATE app.outbox
+		 SET available_at=$1,lease_token=NULL,lease_expires_at=NULL
+		 WHERE org_id=$2 AND id=$3
+		   AND topic='NotificationRequested'
+		   AND lease_token=$4`,
+		repository.now().Add(
+			backoff+time.Duration(jitterMillis)*time.Millisecond,
+		),
+	)
+}
+
+func (repository *Postgres) updateNotificationLease(
+	ctx context.Context,
+	event domain.OutboxEvent,
+	statement string,
+	timestamp time.Time,
+) error {
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err = repositoryhelpers.SetOrganization(
+		ctx,
+		tx,
+		event.OrganizationID,
+	); err != nil {
+		return err
+	}
+	tag, err := tx.Exec(
+		ctx,
+		statement,
+		timestamp,
+		event.OrganizationID,
+		event.ID,
+		event.LeaseToken,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return domain.ErrLeaseLost
+	}
+	return tx.Commit(ctx)
+}
+
+func (repository *Postgres) DeadLetterNotification(
+	ctx context.Context,
+	event domain.OutboxEvent,
+	failureCode string,
+) error {
+	failureCode = stableFailureCode(failureCode)
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err = repositoryhelpers.SetOrganization(
+		ctx,
+		tx,
+		event.OrganizationID,
+	); err != nil {
+		return err
+	}
+	tag, err := tx.Exec(ctx, `
+		INSERT INTO app.outbox_dead_letters(
+			id,org_id,topic,payload,payload_hash,idempotency_key,
+			request_id,actor_ref,source_version,snapshot_digest,
+			correlation_id,attempts,failure_code,failed_at
+		)
+		SELECT
+			id,org_id,topic,payload,payload_hash,idempotency_key,
+			request_id,actor_ref,source_version,snapshot_digest,
+			correlation_id,attempts,$1,$2
+		FROM app.outbox
+		WHERE org_id=$3 AND id=$4
+		  AND topic='NotificationRequested'
+		  AND lease_token=$5`,
+		failureCode,
+		repository.now(),
+		event.OrganizationID,
+		event.ID,
+		event.LeaseToken,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return domain.ErrLeaseLost
+	}
+	tag, err = tx.Exec(ctx, `
+		DELETE FROM app.outbox
+		WHERE org_id=$1 AND id=$2
+		  AND topic='NotificationRequested'
+		  AND lease_token=$3`,
+		event.OrganizationID,
+		event.ID,
+		event.LeaseToken,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return domain.ErrLeaseLost
+	}
+	return tx.Commit(ctx)
+}
+
 func (repository *Postgres) now() time.Time {
 	if repository.Clock == nil {
 		return time.Now().UTC()

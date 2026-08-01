@@ -10,10 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type Scanner interface {
-	Scan(...any) error
-}
-
 func SetOrganization(ctx context.Context, tx pgx.Tx, organizationID string) error {
 	if tx == nil || organizationID == "" {
 		return errors.New("notification tenant transaction is required")
@@ -26,7 +22,7 @@ func SetOrganization(ctx context.Context, tx pgx.Tx, organizationID string) erro
 	return err
 }
 
-func ScanIntent(scanner Scanner) (domain.Intent, error) {
+func ScanIntent(scanner pgx.Row) (domain.Intent, error) {
 	var row repositorymodels.IntentRow
 	err := scanner.Scan(
 		&row.ID, &row.OrganizationID, &row.Kind, &row.AggregateType,
@@ -41,4 +37,19 @@ func ScanIntent(scanner Scanner) (domain.Intent, error) {
 		return domain.Intent{}, err
 	}
 	return row.Domain()
+}
+
+func ScanOutboxEvent(scanner pgx.Row) (domain.OutboxEvent, error) {
+	var row repositorymodels.OutboxEvent
+	err := scanner.Scan(
+		&row.ID, &row.OrganizationID, &row.Topic, &row.Payload,
+		&row.PayloadHash, &row.IdempotencyKey, &row.RequestID,
+		&row.ActorRef, &row.SourceVersion, &row.SnapshotDigest,
+		&row.CorrelationID, &row.AvailableAt, &row.Attempts,
+		&row.LeaseToken, &row.LeaseExpiresAt,
+	)
+	if err != nil {
+		return domain.OutboxEvent{}, err
+	}
+	return row.Domain(), nil
 }

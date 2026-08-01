@@ -26,9 +26,10 @@ No recibe teléfono, cuerpo ni variables y nunca llama directamente a PerGo.
 2. `notifications.Postgres.Create` comprueba el feature flag tenant,
    persiste `app.notifications` y agrega `NotificationRequested` al outbox en
    una sola transacción.
-3. El relay existente toma un lease y delega el tópico al consumer de
-   Notifications. PostgreSQL sólo alquila la allowlist declarada por los
-   consumers activos, por lo que otro worker/contexto no puede robar el evento.
+3. El dispatcher de Notifications toma un lease exclusivamente sobre
+   `NotificationRequested`. Commerce, Scheduling y Calendars tienen
+   dispatchers y allowlists independientes, por lo que ningún contexto puede
+   robar o publicar el evento de otro.
 4. El adapter llama `POST /api/v1/messages` con la API key de workspace.
 5. `X-Trace-ID` contiene, codificados en base64url, organización e ID de
    notificación: `pymes.v1.<organization>.<notification>`.
@@ -135,6 +136,7 @@ Ante una caída:
 1. confirmar API, worker, PostgreSQL y PerGo mediante sus probes;
 2. observar backlog/reintentos agregados, sin inspeccionar cuerpo o teléfono;
 3. recuperar PerGo o conectividad;
-4. dejar que venza el lease y que el relay use la misma identidad;
+4. dejar que venza el lease y que el dispatcher de Notifications use la misma
+   identidad;
 5. verificar convergencia por notification ID y external message ID;
 6. no crear otra intención ni editar manualmente el estado.

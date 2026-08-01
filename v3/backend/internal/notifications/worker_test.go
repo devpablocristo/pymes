@@ -5,12 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/notifications/usecases/domain"
 )
 
 type workerStore struct {
-	intent domain.Intent
+	intent       domain.Intent
+	event        domain.OutboxEvent
+	published    bool
+	retried      bool
+	deadLettered bool
+	failureCode  string
 }
 
 func (store *workerStore) Get(context.Context, string, string) (domain.Intent, error) {
@@ -35,6 +41,50 @@ func (store *workerStore) MarkFailed(_ context.Context, _ domain.Intent, code st
 	store.intent.FailureCode = code
 	return nil
 }
+func (store *workerStore) LeaseNotifications(
+	context.Context,
+	int,
+	time.Duration,
+) ([]domain.OutboxEvent, error) {
+	if store.published || store.deadLettered {
+		return nil, nil
+	}
+	store.event.Attempts++
+	store.event.LeaseToken = "lease"
+	return []domain.OutboxEvent{store.event}, nil
+}
+func (store *workerStore) RetryNotification(
+	_ context.Context,
+	event domain.OutboxEvent,
+) error {
+	if event.ID != store.event.ID {
+		return domain.ErrLeaseLost
+	}
+	store.retried = true
+	return nil
+}
+func (store *workerStore) DeadLetterNotification(
+	_ context.Context,
+	event domain.OutboxEvent,
+	code string,
+) error {
+	if event.ID != store.event.ID {
+		return domain.ErrLeaseLost
+	}
+	store.deadLettered = true
+	store.failureCode = code
+	return nil
+}
+func (store *workerStore) MarkNotificationPublished(
+	_ context.Context,
+	event domain.OutboxEvent,
+) error {
+	if event.ID != store.event.ID {
+		return domain.ErrLeaseLost
+	}
+	store.published = true
+	return nil
+}
 
 type deliveryProvider func(context.Context, domain.Intent) (DeliveryReceipt, error)
 
@@ -56,8 +106,18 @@ func pendingIntent() domain.Intent {
 	}
 }
 
+func requestedEvent() domain.OutboxEvent {
+	return domain.OutboxEvent{
+		ID: "outbox-1", OrganizationID: "org-1",
+		Topic: NotificationRequestedTopic, Payload: requestedPayload(),
+	}
+}
+
 func TestWorkerRetriesTimeoutBeforeProcessingAndConverges(t *testing.T) {
-	store := &workerStore{intent: pendingIntent()}
+	store := &workerStore{
+		intent: pendingIntent(),
+		event:  requestedEvent(),
+	}
 	attempts := 0
 	worker := Worker{
 		Store: store,
@@ -75,24 +135,34 @@ func TestWorkerRetriesTimeoutBeforeProcessingAndConverges(t *testing.T) {
 			return DeliveryReceipt{ExternalMessageID: "external-1"}, nil
 		}),
 	}
-	handled, err := worker.Consume(
-		context.Background(), NotificationRequestedTopic, "org-1",
-		requestedPayload(),
-	)
-	if !handled || err == nil || store.intent.Status != domain.StatusUncertain {
-		t.Fatalf("first attempt handled=%v err=%v status=%q", handled, err, store.intent.Status)
+	err := worker.DispatchOnce(context.Background())
+	if err != nil || !store.retried ||
+		store.intent.Status != domain.StatusUncertain {
+		t.Fatalf(
+			"first attempt err=%v retried=%v status=%q",
+			err,
+			store.retried,
+			store.intent.Status,
+		)
 	}
-	_, err = worker.Consume(
-		context.Background(), NotificationRequestedTopic, "org-1",
-		requestedPayload(),
-	)
-	if err != nil || store.intent.Status != domain.StatusQueued || attempts != 2 {
-		t.Fatalf("recovery err=%v status=%q attempts=%d", err, store.intent.Status, attempts)
+	err = worker.DispatchOnce(context.Background())
+	if err != nil || !store.published ||
+		store.intent.Status != domain.StatusQueued || attempts != 2 {
+		t.Fatalf(
+			"recovery err=%v published=%v status=%q attempts=%d",
+			err,
+			store.published,
+			store.intent.Status,
+			attempts,
+		)
 	}
 }
 
 func TestWorkerLostResponseWebhookPreventsDuplicateSend(t *testing.T) {
-	store := &workerStore{intent: pendingIntent()}
+	store := &workerStore{
+		intent: pendingIntent(),
+		event:  requestedEvent(),
+	}
 	attempts := 0
 	worker := Worker{
 		Store: store,
@@ -108,24 +178,32 @@ func TestWorkerLostResponseWebhookPreventsDuplicateSend(t *testing.T) {
 			}
 		}),
 	}
-	_, err := worker.Consume(
-		context.Background(), NotificationRequestedTopic, "org-1",
-		requestedPayload(),
-	)
-	if err == nil || store.intent.Status != domain.StatusSent {
-		t.Fatalf("lost response err=%v status=%q", err, store.intent.Status)
+	err := worker.DispatchOnce(context.Background())
+	if err != nil || !store.retried ||
+		store.intent.Status != domain.StatusSent {
+		t.Fatalf(
+			"lost response err=%v retried=%v status=%q",
+			err,
+			store.retried,
+			store.intent.Status,
+		)
 	}
-	handled, err := worker.Consume(
-		context.Background(), NotificationRequestedTopic, "org-1",
-		requestedPayload(),
-	)
-	if !handled || err != nil || attempts != 1 {
-		t.Fatalf("retry handled=%v err=%v sends=%d", handled, err, attempts)
+	err = worker.DispatchOnce(context.Background())
+	if err != nil || !store.published || attempts != 1 {
+		t.Fatalf(
+			"retry err=%v published=%v sends=%d",
+			err,
+			store.published,
+			attempts,
+		)
 	}
 }
 
 func TestWorkerTerminalProviderFailureDoesNotRetry(t *testing.T) {
-	store := &workerStore{intent: pendingIntent()}
+	store := &workerStore{
+		intent: pendingIntent(),
+		event:  requestedEvent(),
+	}
 	worker := Worker{
 		Store: store,
 		Provider: deliveryProvider(func(
@@ -138,11 +216,48 @@ func TestWorkerTerminalProviderFailureDoesNotRetry(t *testing.T) {
 			}
 		}),
 	}
-	handled, err := worker.Consume(
-		context.Background(), NotificationRequestedTopic, "org-1",
-		requestedPayload(),
-	)
-	if !handled || err != nil || store.intent.Status != domain.StatusFailed {
-		t.Fatalf("handled=%v err=%v status=%q", handled, err, store.intent.Status)
+	err := worker.DispatchOnce(context.Background())
+	if err != nil || !store.published || store.retried ||
+		store.intent.Status != domain.StatusFailed {
+		t.Fatalf(
+			"err=%v published=%v retried=%v status=%q",
+			err,
+			store.published,
+			store.retried,
+			store.intent.Status,
+		)
+	}
+}
+
+func TestWorkerDeadLettersExhaustedRetryWithoutPII(t *testing.T) {
+	store := &workerStore{
+		intent: pendingIntent(),
+		event:  requestedEvent(),
+	}
+	worker := Worker{
+		Store: store,
+		Provider: deliveryProvider(func(
+			context.Context,
+			domain.Intent,
+		) (DeliveryReceipt, error) {
+			return DeliveryReceipt{}, &ProviderError{
+				StableCode: "PERGO_UNAVAILABLE",
+				Retry:      true,
+			}
+		}),
+		MaxAttempts: 1,
+	}
+	if err := worker.DispatchOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !store.deadLettered ||
+		store.failureCode != "PERGO_DELIVERY_FAILED" ||
+		store.published {
+		t.Fatalf(
+			"dead_lettered=%v code=%q published=%v",
+			store.deadLettered,
+			store.failureCode,
+			store.published,
+		)
 	}
 }

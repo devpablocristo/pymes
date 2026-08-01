@@ -40,6 +40,7 @@ var (
 	ErrIdempotencyKeyReused = errors.New("IDEMPOTENCY_KEY_REUSED")
 	ErrInvalidIntent        = errors.New("NOTIFICATION_INVALID")
 	ErrInvalidTransition    = errors.New("NOTIFICATION_STATE_INVALID")
+	ErrLeaseLost            = errors.New("NOTIFICATION_LEASE_LOST")
 )
 
 var (
@@ -86,6 +87,24 @@ type DeliveryEvent struct {
 	Timestamp      time.Time
 	WorkspaceID    string
 	ErrorCode      string
+}
+
+type OutboxEvent struct {
+	ID             string
+	OrganizationID string
+	Topic          string
+	Payload        json.RawMessage
+	PayloadHash    string
+	IdempotencyKey string
+	RequestID      string
+	ActorRef       string
+	SourceVersion  int
+	SnapshotDigest string
+	CorrelationID  string
+	AvailableAt    time.Time
+	Attempts       int
+	LeaseToken     string
+	LeaseExpiresAt time.Time
 }
 
 func (i Intent) Validate() error {

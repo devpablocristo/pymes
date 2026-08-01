@@ -4,8 +4,8 @@ package notifications
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"time"
 
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/notifications/usecases/domain"
 	workerhelpers "github.com/devpablocristo/pymes/v3/backend/internal/notifications/worker/helpers"
@@ -20,53 +20,119 @@ type DeliveryStateStore interface {
 	MarkFailed(context.Context, domain.Intent, string) error
 }
 
+type NotificationRelayStore interface {
+	DeliveryStateStore
+	LeaseNotifications(
+		context.Context,
+		int,
+		time.Duration,
+	) ([]domain.OutboxEvent, error)
+	RetryNotification(context.Context, domain.OutboxEvent) error
+	DeadLetterNotification(
+		context.Context,
+		domain.OutboxEvent,
+		string,
+	) error
+	MarkNotificationPublished(context.Context, domain.OutboxEvent) error
+}
+
 type Worker struct {
-	Store    DeliveryStateStore
-	Provider DeliveryProvider
+	Store       NotificationRelayStore
+	Provider    DeliveryProvider
+	LeaseFor    time.Duration
+	MaxAttempts int
 }
 
 func NewWorker(
-	store DeliveryStateStore,
+	store NotificationRelayStore,
 	provider DeliveryProvider,
 ) Worker {
 	return Worker{Store: store, Provider: provider}
 }
 
-func (Worker) Topics() []string {
-	return []string{NotificationRequestedTopic}
+func (worker Worker) DispatchOnce(ctx context.Context) error {
+	if worker.Store == nil || worker.Provider == nil {
+		return fmt.Errorf("notification worker dependencies are not configured")
+	}
+	leaseFor := worker.LeaseFor
+	if leaseFor <= 0 {
+		leaseFor = 30 * time.Second
+	}
+	events, err := worker.Store.LeaseNotifications(ctx, 20, leaseFor)
+	if err != nil {
+		return err
+	}
+	for _, event := range events {
+		if err = worker.dispatch(ctx, event); err != nil {
+			maxAttempts := worker.MaxAttempts
+			if maxAttempts <= 0 {
+				maxAttempts = 10
+			}
+			if event.Attempts >= maxAttempts {
+				if deadLetterErr := worker.Store.DeadLetterNotification(
+					ctx,
+					event,
+					"PERGO_DELIVERY_FAILED",
+				); deadLetterErr != nil {
+					return fmt.Errorf(
+						"dead-letter notification %s: %w (delivery: %v)",
+						event.ID,
+						deadLetterErr,
+						err,
+					)
+				}
+				continue
+			}
+			if retryErr := worker.Store.RetryNotification(
+				ctx,
+				event,
+			); retryErr != nil {
+				return fmt.Errorf(
+					"retry notification %s: %w (delivery: %v)",
+					event.ID,
+					retryErr,
+					err,
+				)
+			}
+			continue
+		}
+		if err = worker.Store.MarkNotificationPublished(
+			ctx,
+			event,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-// Consume is compatible with the outbox consumer port owned by the existing
-// relay. It deliberately receives primitives so notifications does not import
-// commerce or worker persistence models.
-func (worker Worker) Consume(
+func (worker Worker) dispatch(
 	ctx context.Context,
-	topic string,
-	organizationID string,
-	payload json.RawMessage,
-) (bool, error) {
-	if topic != NotificationRequestedTopic {
-		return false, nil
+	outboxEvent domain.OutboxEvent,
+) error {
+	if outboxEvent.Topic != NotificationRequestedTopic {
+		return fmt.Errorf("unexpected notification topic %q", outboxEvent.Topic)
 	}
-	if worker.Store == nil || worker.Provider == nil {
-		return true, fmt.Errorf("notification worker dependencies are not configured")
-	}
-	event, err := workerhelpers.DecodeRequested(payload)
+	event, err := workerhelpers.DecodeRequested(outboxEvent.Payload)
 	if err != nil {
-		return true, fmt.Errorf("decode notification request: %w", err)
+		return fmt.Errorf("decode notification request: %w", err)
 	}
-	intent, err := worker.Store.Get(ctx, organizationID, event.NotificationID)
+	intent, err := worker.Store.Get(
+		ctx,
+		outboxEvent.OrganizationID,
+		event.NotificationID,
+	)
 	if err != nil {
-		return true, err
+		return err
 	}
-	if intent.OrganizationID != organizationID {
-		return true, fmt.Errorf("notification organization mismatch")
+	if intent.OrganizationID != outboxEvent.OrganizationID {
+		return fmt.Errorf("notification organization mismatch")
 	}
 	if intent.TerminalForDispatch() {
-		return true, nil
+		return nil
 	}
 	if !intent.CanDispatch() {
-		return true, domain.ErrInvalidTransition
+		return domain.ErrInvalidTransition
 	}
 	receipt, err := worker.Provider.Send(ctx, intent)
 	if err == nil {
@@ -75,28 +141,28 @@ func (worker Worker) Consume(
 			intent,
 			receipt.ExternalMessageID,
 		); markErr != nil {
-			return true, markErr
+			return markErr
 		}
-		return true, nil
+		return nil
 	}
 	providerError, known := AsProviderError(err)
 	if !known {
 		if markErr := worker.Store.MarkUncertain(
 			ctx, intent, "PERGO_RESPONSE_UNCERTAIN",
 		); markErr != nil {
-			return true, markErr
+			return markErr
 		}
-		return true, err
+		return err
 	}
 	code := workerhelpers.FailureCode(providerError.StableCode)
 	if providerError.Retry || providerError.Unknown {
 		if markErr := worker.Store.MarkUncertain(ctx, intent, code); markErr != nil {
-			return true, markErr
+			return markErr
 		}
-		return true, err
+		return err
 	}
 	if markErr := worker.Store.MarkFailed(ctx, intent, code); markErr != nil {
-		return true, markErr
+		return markErr
 	}
-	return true, nil
+	return nil
 }

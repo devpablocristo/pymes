@@ -16,7 +16,6 @@ import {
   type InternalAuthorizer,
 } from "./fiscal/handler.js";
 import { PostgresFiscalStore } from "./fiscal/repository.js";
-import { observePoolErrors } from "./fiscal/repository/pool-errors.js";
 import { FiscalService } from "./fiscal/usecases.js";
 import { observePoolErrors } from "./fiscal/repository/helpers/pool-errors.js";
 import { Ed25519JWTAuthorizer } from "./identity/internal_jwt.js";

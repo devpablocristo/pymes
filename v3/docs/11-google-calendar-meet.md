@@ -7,6 +7,11 @@ Pymes proyecta turnos confirmados hacia un calendario secundario llamado
 del proveedor no modifica ni bloquea la reserva local. El MVP es unidireccional
 Pymes → Google; `watch`, `syncToken`, Outlook y Teams quedan fuera.
 
+La variable global `PYMES_GOOGLE_CALENDAR_ENABLED` debe configurar el workload
+y la organización debe tener `google_calendar_enabled=true`. Rutas, proyección
+y reconciliación fallan cerradas por tenant; desactivar el flag no borra la
+conexión ni revoca tokens automáticamente.
+
 El contexto `internal/calendars` es dueño de OAuth, conexiones tenant, mappings,
 outbox, idempotencia y reconciliación. El SDK publicado
 `github.com/devpablocristo/platform/sdks/google-calendar/go` es un cliente

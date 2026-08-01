@@ -18,6 +18,10 @@ type CalendarAuthenticator interface {
 	Principal(*http.Request) (identitydomain.Principal, error)
 }
 
+type HandlerFeatureGate interface {
+	Enabled(context.Context, string, string) (bool, error)
+}
+
 type CalendarCommands interface {
 	StartGoogleOAuth(context.Context, StartOAuthInput) (OAuthStart, error)
 	CompleteGoogleOAuth(context.Context, CompleteOAuthInput) (domain.Connection, error)
@@ -28,13 +32,15 @@ type CalendarCommands interface {
 type CalendarHTTP struct {
 	Commands CalendarCommands
 	Auth     CalendarAuthenticator
+	Features HandlerFeatureGate
 }
 
 func NewCalendarHTTP(
 	commands CalendarCommands,
 	auth CalendarAuthenticator,
+	features HandlerFeatureGate,
 ) CalendarHTTP {
-	return CalendarHTTP{Commands: commands, Auth: auth}
+	return CalendarHTTP{Commands: commands, Auth: auth, Features: features}
 }
 
 func (handler CalendarHTTP) Handler() http.Handler {
@@ -201,6 +207,27 @@ func (handler CalendarHTTP) authorize(
 	}
 	if principal.SessionID == "" {
 		handlerhelpers.WriteError(w, http.StatusForbidden, "FORBIDDEN")
+		return identitydomain.Principal{}, false
+	}
+	if handler.Features == nil {
+		handlerhelpers.WriteDomainError(w, domain.ErrFeatureDisabled)
+		return identitydomain.Principal{}, false
+	}
+	enabled, err := handler.Features.Enabled(
+		request.Context(),
+		organizationID,
+		"google_calendar_enabled",
+	)
+	if err != nil {
+		handlerhelpers.WriteError(
+			w,
+			http.StatusServiceUnavailable,
+			"CALENDAR_PROVIDER_UNAVAILABLE",
+		)
+		return identitydomain.Principal{}, false
+	}
+	if !enabled {
+		handlerhelpers.WriteDomainError(w, domain.ErrFeatureDisabled)
 		return identitydomain.Principal{}, false
 	}
 	return principal, true

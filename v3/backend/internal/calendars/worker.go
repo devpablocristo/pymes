@@ -39,9 +39,14 @@ type CalendarEventProvider interface {
 	DeleteEvent(context.Context, domain.OAuthGrant, string, string, string) error
 }
 
+type WorkerFeatureGate interface {
+	Enabled(context.Context, string, string) (bool, error)
+}
+
 type CalendarWorker struct {
 	Store       SyncStateStore
 	Provider    CalendarEventProvider
+	Features    WorkerFeatureGate
 	Now         func() time.Time
 	LeaseFor    time.Duration
 	MaxAttempts int
@@ -52,7 +57,7 @@ func (CalendarWorker) Topics() []string {
 }
 
 func (worker CalendarWorker) DispatchOnce(ctx context.Context) error {
-	if worker.Store == nil || worker.Provider == nil {
+	if worker.Store == nil || worker.Provider == nil || worker.Features == nil {
 		return fmt.Errorf("calendar worker dependencies are not configured")
 	}
 	leaseFor := worker.LeaseFor
@@ -103,8 +108,19 @@ func (worker CalendarWorker) Consume(
 	if topic != CalendarSyncRequestedTopic {
 		return false, nil
 	}
-	if worker.Store == nil || worker.Provider == nil {
+	if worker.Store == nil || worker.Provider == nil || worker.Features == nil {
 		return true, fmt.Errorf("calendar worker dependencies are not configured")
+	}
+	enabled, err := worker.Features.Enabled(
+		ctx,
+		organizationID,
+		"google_calendar_enabled",
+	)
+	if err != nil {
+		return true, err
+	}
+	if !enabled {
+		return true, nil
 	}
 	command, err := workerhelpers.DecodeSyncRequested(
 		organizationID, payload,
@@ -406,7 +422,7 @@ func (worker CalendarWorker) persistFailure(
 }
 
 func (worker CalendarWorker) Reconcile(ctx context.Context) error {
-	if worker.Store == nil || worker.Provider == nil {
+	if worker.Store == nil || worker.Provider == nil || worker.Features == nil {
 		return fmt.Errorf("calendar worker dependencies are not configured")
 	}
 	if err := worker.reconcileConnections(ctx); err != nil {
@@ -417,6 +433,17 @@ func (worker CalendarWorker) Reconcile(ctx context.Context) error {
 		return err
 	}
 	for _, event := range events {
+		enabled, err := worker.Features.Enabled(
+			ctx,
+			event.OrganizationID,
+			"google_calendar_enabled",
+		)
+		if err != nil {
+			return err
+		}
+		if !enabled {
+			continue
+		}
 		connection, grant, err := worker.Store.GetConnection(
 			ctx, event.OrganizationID, event.ConnectionID,
 		)
@@ -459,6 +486,17 @@ func (worker CalendarWorker) reconcileConnections(ctx context.Context) error {
 		return err
 	}
 	for _, pending := range connections {
+		enabled, err := worker.Features.Enabled(
+			ctx,
+			pending.OrganizationID,
+			"google_calendar_enabled",
+		)
+		if err != nil {
+			return err
+		}
+		if !enabled {
+			continue
+		}
 		connection, grant, err := worker.Store.GetConnection(
 			ctx, pending.OrganizationID, pending.ID,
 		)

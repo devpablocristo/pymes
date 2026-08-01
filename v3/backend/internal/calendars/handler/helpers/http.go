@@ -55,6 +55,8 @@ func WriteDomainError(w http.ResponseWriter, err error) {
 		WriteError(w, http.StatusNotFound, "NOT_FOUND")
 	case errors.Is(err, domain.ErrReauthRequired):
 		WriteError(w, http.StatusUnauthorized, "CALENDAR_REAUTH_REQUIRED")
+	case errors.Is(err, domain.ErrFeatureDisabled):
+		WriteError(w, http.StatusForbidden, "FEATURE_DISABLED")
 	case errors.Is(err, domain.ErrProviderUnavailable),
 		errors.Is(err, domain.ErrUncertain):
 		WriteError(w, http.StatusServiceUnavailable, "CALENDAR_PROVIDER_UNAVAILABLE")

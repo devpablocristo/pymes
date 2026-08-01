@@ -254,7 +254,9 @@ func TestCalendarWorkerPreservesETagWhenUpdateMustRetry(t *testing.T) {
 		updateErr: domain.ErrProviderUnavailable,
 	}
 	worker := CalendarWorker{
-		Store: store, Provider: google, Now: func() time.Time { return now },
+		Store: store, Provider: google,
+		Features: calendarFeatureGate{enabled: true},
+		Now:      func() time.Time { return now },
 	}
 	payload, err := json.Marshal(map[string]any{
 		"command_id": "command-2", "booking_id": "booking",
@@ -304,6 +306,47 @@ func workerGrant() domain.OAuthGrant {
 	}
 }
 
+func TestCalendarWorkerSkipsDisabledTenantBeforeCallingGoogle(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+	store := &calendarWorkerStore{
+		connection: domain.Connection{
+			ID: "connection", OrganizationID: "org", ActorID: "user",
+			Provider: "google", Status: domain.ConnectionActive,
+			CalendarID: "calendar", TimeZone: "UTC",
+			Scopes: []string{scopeCalendarCreated}, MeetEnabled: true,
+			Version: 1,
+		},
+		grant:  workerGrant(),
+		events: make(map[string]domain.ExternalEvent),
+	}
+	google := &calendarWorkerGoogle{}
+	worker := CalendarWorker{
+		Store: store, Provider: google,
+		Features: calendarFeatureGate{enabled: false},
+		Now:      func() time.Time { return now },
+	}
+	handled, err := worker.Consume(
+		context.Background(),
+		CalendarSyncRequestedTopic,
+		"org",
+		syncPayload(t, true),
+	)
+	if err != nil || !handled {
+		t.Fatalf("handled=%v err=%v", handled, err)
+	}
+	if google.createCalls != 0 ||
+		len(google.updateETags) != 0 ||
+		google.getCalls != 0 {
+		t.Fatalf(
+			"google calls create=%d update=%d get=%d",
+			google.createCalls,
+			len(google.updateETags),
+			google.getCalls,
+		)
+	}
+}
+
 func TestCalendarWorkerReconcilesLostCreateWithoutDuplicate(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
@@ -319,7 +362,9 @@ func TestCalendarWorkerReconcilesLostCreateWithoutDuplicate(t *testing.T) {
 	}
 	google := &calendarWorkerGoogle{loseAfterPersist: true}
 	worker := CalendarWorker{
-		Store: store, Provider: google, Now: func() time.Time { return now },
+		Store: store, Provider: google,
+		Features: calendarFeatureGate{enabled: true},
+		Now:      func() time.Time { return now },
 	}
 	payload := syncPayload(t, true)
 	handled, err := worker.Consume(
@@ -360,7 +405,9 @@ func TestCalendarWorkerCompletesAsynchronousMeetReconciliation(t *testing.T) {
 	}
 	google := &calendarWorkerGoogle{}
 	worker := CalendarWorker{
-		Store: store, Provider: google, Now: func() time.Time { return now },
+		Store: store, Provider: google,
+		Features: calendarFeatureGate{enabled: true},
+		Now:      func() time.Time { return now },
 	}
 	if _, err := worker.Consume(
 		context.Background(), CalendarSyncRequestedTopic, "org",
@@ -406,7 +453,9 @@ func TestCalendarWorkerRecordsMeetFailureWithoutBlockingBookingProjection(
 	}
 	google := &calendarWorkerGoogle{}
 	worker := CalendarWorker{
-		Store: store, Provider: google, Now: func() time.Time { return now },
+		Store: store, Provider: google,
+		Features: calendarFeatureGate{enabled: true},
+		Now:      func() time.Time { return now },
 	}
 	if _, err := worker.Consume(
 		context.Background(), CalendarSyncRequestedTopic, "org",
@@ -446,7 +495,9 @@ func TestCalendarWorkerDoesNotRequestMeetWhenConnectionDisablesIt(t *testing.T) 
 	}
 	google := &calendarWorkerGoogle{}
 	worker := CalendarWorker{
-		Store: store, Provider: google, Now: func() time.Time { return now },
+		Store: store, Provider: google,
+		Features: calendarFeatureGate{enabled: true},
+		Now:      func() time.Time { return now },
 	}
 	if _, err := worker.Consume(
 		context.Background(), CalendarSyncRequestedTopic, "org",
@@ -481,6 +532,7 @@ func TestCalendarWorkerMarksRevokedTokenForReauth(t *testing.T) {
 	google := &calendarWorkerGoogleReauth{}
 	worker := CalendarWorker{
 		Store: store, Provider: google,
+		Features: calendarFeatureGate{enabled: true},
 		Now: func() time.Time {
 			return time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
 		},

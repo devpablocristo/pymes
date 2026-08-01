@@ -35,7 +35,8 @@ const (
 )
 
 var (
-	ErrDisabled             = errors.New("WHATSAPP_DISABLED")
+	ErrFeatureDisabled      = errors.New("FEATURE_DISABLED")
+	ErrDisabled             = ErrFeatureDisabled
 	ErrNotFound             = errors.New("NOTIFICATION_NOT_FOUND")
 	ErrIdempotencyKeyReused = errors.New("IDEMPOTENCY_KEY_REUSED")
 	ErrInvalidIntent        = errors.New("NOTIFICATION_INVALID")

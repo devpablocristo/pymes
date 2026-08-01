@@ -57,9 +57,12 @@ func enableNotifications(
 		t.Fatal(err)
 	}
 	if _, err = tx.Exec(ctx, `
-		INSERT INTO app.notification_settings(org_id,whatsapp_enabled)
-		VALUES($1,true)
-		ON CONFLICT (org_id) DO UPDATE SET whatsapp_enabled=true`,
+		INSERT INTO app.organization_feature_flags(
+		  org_id,whatsapp_enabled,updated_by
+		)
+		VALUES($1,true,'test')
+		ON CONFLICT (org_id) DO UPDATE
+		  SET whatsapp_enabled=true,updated_by='test'`,
 		organizationID,
 	); err != nil {
 		t.Fatal(err)

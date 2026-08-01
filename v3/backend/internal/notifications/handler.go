@@ -59,11 +59,16 @@ type WebhookVerifier interface {
 	Verify([]byte, string) error
 }
 
+type HandlerFeatureGate interface {
+	Enabled(context.Context, string, string) (bool, error)
+}
+
 type Handler struct {
 	Reader   NotificationReader
 	Auth     SessionAuthenticator
 	Webhooks DeliveryWebhookProcessor
 	Verifier WebhookVerifier
+	Features HandlerFeatureGate
 }
 
 func NewHandler(
@@ -71,10 +76,11 @@ func NewHandler(
 	auth SessionAuthenticator,
 	webhooks DeliveryWebhookProcessor,
 	verifier WebhookVerifier,
+	features HandlerFeatureGate,
 ) Handler {
 	return Handler{
 		Reader: reader, Auth: auth,
-		Webhooks: webhooks, Verifier: verifier,
+		Webhooks: webhooks, Verifier: verifier, Features: features,
 	}
 }
 
@@ -113,6 +119,35 @@ func (handler Handler) Get(writer http.ResponseWriter, request *http.Request) {
 		handlerhelpers.WriteJSON(
 			writer, http.StatusForbidden,
 			handlerdto.Error{Code: "FORBIDDEN"},
+		)
+		return
+	}
+	if handler.Features == nil {
+		handlerhelpers.WriteJSON(
+			writer,
+			http.StatusForbidden,
+			handlerdto.Error{Code: "FEATURE_DISABLED"},
+		)
+		return
+	}
+	enabled, err := handler.Features.Enabled(
+		request.Context(),
+		organizationID,
+		"whatsapp_enabled",
+	)
+	if err != nil {
+		handlerhelpers.WriteJSON(
+			writer,
+			http.StatusServiceUnavailable,
+			handlerdto.Error{Code: "NOTIFICATIONS_UNAVAILABLE"},
+		)
+		return
+	}
+	if !enabled {
+		handlerhelpers.WriteJSON(
+			writer,
+			http.StatusForbidden,
+			handlerdto.Error{Code: "FEATURE_DISABLED"},
 		)
 		return
 	}

@@ -72,7 +72,7 @@ func (repository *Postgres) create(
 	var enabled bool
 	if err = tx.QueryRow(ctx, `
 		SELECT whatsapp_enabled
-		FROM app.notification_settings
+		FROM app.organization_feature_flags
 		WHERE org_id=$1`,
 		intent.OrganizationID,
 	).Scan(&enabled); err != nil {

@@ -162,6 +162,7 @@ func TestWorkerProjectsSchedulingRequestBeforePerGoDelivery(t *testing.T) {
 	worker := Worker{
 		Store:      store,
 		Projection: projection,
+		Features:   notificationFeatureGate{enabled: true},
 		Provider: deliveryProvider(func(
 			_ context.Context,
 			intent domain.Intent,
@@ -186,6 +187,37 @@ func TestWorkerProjectsSchedulingRequestBeforePerGoDelivery(t *testing.T) {
 	}
 }
 
+func TestWorkerAcknowledgesDisabledTenantWithoutCallingPerGo(t *testing.T) {
+	t.Parallel()
+	store := &workerStore{
+		intent: pendingIntent(),
+		event:  requestedEvent(),
+	}
+	sends := 0
+	worker := Worker{
+		Store:    store,
+		Features: notificationFeatureGate{enabled: false},
+		Provider: deliveryProvider(func(
+			context.Context,
+			domain.Intent,
+		) (DeliveryReceipt, error) {
+			sends++
+			return DeliveryReceipt{}, nil
+		}),
+	}
+	if err := worker.DispatchOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if sends != 0 || !store.published || store.retried {
+		t.Fatalf(
+			"sends=%d published=%v retried=%v",
+			sends,
+			store.published,
+			store.retried,
+		)
+	}
+}
+
 func TestWorkerRetriesTimeoutBeforeProcessingAndConverges(t *testing.T) {
 	store := &workerStore{
 		intent: pendingIntent(),
@@ -193,7 +225,8 @@ func TestWorkerRetriesTimeoutBeforeProcessingAndConverges(t *testing.T) {
 	}
 	attempts := 0
 	worker := Worker{
-		Store: store,
+		Store:    store,
+		Features: notificationFeatureGate{enabled: true},
 		Provider: deliveryProvider(func(
 			context.Context,
 			domain.Intent,
@@ -238,7 +271,8 @@ func TestWorkerLostResponseWebhookPreventsDuplicateSend(t *testing.T) {
 	}
 	attempts := 0
 	worker := Worker{
-		Store: store,
+		Store:    store,
+		Features: notificationFeatureGate{enabled: true},
 		Provider: deliveryProvider(func(
 			context.Context,
 			domain.Intent,
@@ -278,7 +312,8 @@ func TestWorkerTerminalProviderFailureDoesNotRetry(t *testing.T) {
 		event:  requestedEvent(),
 	}
 	worker := Worker{
-		Store: store,
+		Store:    store,
+		Features: notificationFeatureGate{enabled: true},
 		Provider: deliveryProvider(func(
 			context.Context,
 			domain.Intent,
@@ -308,7 +343,8 @@ func TestWorkerDeadLettersExhaustedRetryWithoutPII(t *testing.T) {
 		event:  requestedEvent(),
 	}
 	worker := Worker{
-		Store: store,
+		Store:    store,
+		Features: notificationFeatureGate{enabled: true},
 		Provider: deliveryProvider(func(
 			context.Context,
 			domain.Intent,

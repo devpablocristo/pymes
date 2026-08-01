@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,6 +24,19 @@ type actorAuth struct {
 
 func (auth actorAuth) Authenticate(*http.Request) (Actor, error) {
 	return auth.actor, auth.err
+}
+
+type notificationFeatureGate struct {
+	enabled bool
+	err     error
+}
+
+func (gate notificationFeatureGate) Enabled(
+	context.Context,
+	string,
+	string,
+) (bool, error) {
+	return gate.enabled, gate.err
 }
 
 type notificationReader struct{ intent domain.Intent }
@@ -49,6 +63,7 @@ func (processor *webhookProcessor) Execute(
 
 func TestHandlerNeverExposesRecipientBodyOrVariables(t *testing.T) {
 	handler := Handler{
+		Features: notificationFeatureGate{enabled: true},
 		Auth: actorAuth{actor: Actor{
 			OrganizationID: "org-1", ActorID: "user-1",
 			Role: "member", MembershipStatus: "active",
@@ -75,6 +90,33 @@ func TestHandlerNeverExposesRecipientBodyOrVariables(t *testing.T) {
 		if bytes.Contains(response.Body.Bytes(), []byte(secret)) {
 			t.Fatalf("sensitive value %q leaked in response", secret)
 		}
+	}
+}
+
+func TestHandlerRejectsTenantWhenWhatsAppFeatureIsDisabled(t *testing.T) {
+	t.Parallel()
+	handler := Handler{
+		Features: notificationFeatureGate{enabled: false},
+		Auth: actorAuth{actor: Actor{
+			OrganizationID: "org-1", ActorID: "user-1",
+			Role: "member", MembershipStatus: "active",
+		}},
+		Reader: notificationReader{intent: domain.Intent{
+			ID: "notification-1", OrganizationID: "org-1",
+		}},
+	}
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/organizations/org-1/notifications/notification-1",
+		nil,
+	)
+	request.SetPathValue("organizationId", "org-1")
+	request.SetPathValue("notificationId", "notification-1")
+	response := httptest.NewRecorder()
+	handler.Get(response, request)
+	if response.Code != http.StatusForbidden ||
+		!strings.Contains(response.Body.String(), `"FEATURE_DISABLED"`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body)
 	}
 }
 

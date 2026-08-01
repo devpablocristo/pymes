@@ -36,10 +36,12 @@ ON CONFLICT (id) DO UPDATE SET status='ready';
 
 BEGIN;
 SELECT set_config('app.org_id', :'organization_id', true);
-INSERT INTO app.notification_settings(org_id,whatsapp_enabled)
-VALUES(:'organization_id',true)
+INSERT INTO app.organization_feature_flags(
+  org_id,whatsapp_enabled,updated_by
+)
+VALUES(:'organization_id',true,'e2e')
 ON CONFLICT (org_id) DO UPDATE
-SET whatsapp_enabled=true,updated_at=now();
+SET whatsapp_enabled=true,updated_at=now(),updated_by='e2e';
 INSERT INTO app.notifications(
   org_id,id,kind,aggregate_type,aggregate_id,recipient_e164,template_name,
   template_version,locale,variables,body,send_at,status,idempotency_key,
@@ -91,10 +93,12 @@ ON CONFLICT (id) DO UPDATE SET status='ready';
 
 BEGIN;
 SELECT set_config('app.org_id', :'organization_id', true);
-INSERT INTO app.notification_settings(org_id,whatsapp_enabled)
-VALUES(:'organization_id',true)
+INSERT INTO app.organization_feature_flags(
+  org_id,whatsapp_enabled,updated_by
+)
+VALUES(:'organization_id',true,'e2e')
 ON CONFLICT (org_id) DO UPDATE
-SET whatsapp_enabled=true,updated_at=now();
+SET whatsapp_enabled=true,updated_at=now(),updated_by='e2e';
 INSERT INTO app.outbox(
   id,org_id,topic,payload,payload_hash,idempotency_key,request_id,actor_ref,
   source_version,snapshot_digest,correlation_id,available_at

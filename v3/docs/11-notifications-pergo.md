@@ -23,7 +23,8 @@ No recibe teléfono, cuerpo ni variables y nunca llama directamente a PerGo.
 
 1. El caso de uso de Scheduling crea una intención con identidad e idempotency
    key estables.
-2. `notifications.Postgres.Create` comprueba el feature flag tenant,
+2. `notifications.Postgres.Create` comprueba
+   `organization_feature_flags.whatsapp_enabled`,
    persiste `app.notifications` y agrega `NotificationRequested` al outbox en
    una sola transacción.
 3. El dispatcher de Notifications toma un lease exclusivamente sobre
@@ -83,9 +84,12 @@ La migración `016_notifications_pergo.sql` crea:
 - `notifications`;
 - `notification_webhook_inbox`.
 
-Las tres tablas tienen `org_id`, RLS habilitada y forzada. Las identidades
-durables son compuestas por tenant y la configuración `whatsapp_enabled`
-falla cerrada. El inbox no admite `UPDATE`, `DELETE` ni `TRUNCATE`.
+`notification_settings` queda como estructura histórica de migración; el
+runtime no la consulta. La única fuente de verdad es
+`organization_feature_flags`, creada por `018_organization_feature_flags.sql`.
+Las tablas tenant tienen `org_id`, RLS habilitada y forzada. Las identidades
+durables son compuestas por tenant y `whatsapp_enabled` falla cerrado. El inbox
+no admite `UPDATE`, `DELETE` ni `TRUNCATE`.
 
 Teléfono, cuerpo y variables son datos operativos privados: no se incluyen en
 logs, métricas, errores ni respuestas públicas. Backups y acceso SQL deben

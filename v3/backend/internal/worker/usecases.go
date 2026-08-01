@@ -3,6 +3,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -12,6 +13,28 @@ import (
 
 type Dispatcher interface {
 	DispatchOnce(context.Context) error
+}
+
+// Dispatchers composes independently owned context workers without giving any
+// of them access to another context's repository. One failure does not starve
+// the remaining dispatchers in the same tick.
+type Dispatchers []Dispatcher
+
+func (dispatchers Dispatchers) DispatchOnce(ctx context.Context) error {
+	var result error
+	for index, dispatcher := range dispatchers {
+		if ctx.Err() != nil {
+			return errors.Join(result, ctx.Err())
+		}
+		if dispatcher == nil {
+			result = errors.Join(result, fmt.Errorf("dispatcher %d is not configured", index))
+			continue
+		}
+		if err := dispatcher.DispatchOnce(ctx); err != nil {
+			result = errors.Join(result, fmt.Errorf("dispatcher %d: %w", index, err))
+		}
+	}
+	return result
 }
 
 type MetricsReader interface {

@@ -28,7 +28,7 @@ Se adoptan como dependencias directas y fijadas:
 - `platform/observability/go v0.2.1`, detrás del paquete local de
   observabilidad;
 - `platform/databases/postgres/go v0.5.0`, detrás de
-  `internal/infrastructure/postgres`.
+  `internal/postgres`.
 
 La composición abre API, worker y `provision-org` mediante
 `postgres.OpenWithConfig`, con nombres de aplicación distintos y configuración
@@ -63,7 +63,7 @@ V3 conserva por eso sus adapters locales `app.outbox`,
 
 ## Verificación
 
-`internal/infrastructure/platform_alignment_test.go` fija las tres versiones
+`internal/postgres/platform_alignment_test.go` fija las tres versiones
 adoptadas, prohíbe imports accidentales de los dos stores incompatibles y
 comprueba que las migraciones retengan claves tenant, RLS, hashes, inbox, DLQ y
 metadatos de origen.

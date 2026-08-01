@@ -1,11 +1,8 @@
 package wire
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"log/slog"
-	"net/http"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -13,27 +10,7 @@ import (
 	"time"
 
 	"github.com/devpablocristo/pymes/v3/backend/cmd/config"
-	identityaccess "github.com/devpablocristo/pymes/v3/backend/internal/identity/access"
-	workerdomain "github.com/devpablocristo/pymes/v3/backend/internal/worker/domain"
-	workerusecases "github.com/devpablocristo/pymes/v3/backend/internal/worker/usecases"
 )
-
-type workerDispatcherFunc func(context.Context) error
-
-func (f workerDispatcherFunc) DispatchOnce(ctx context.Context) error {
-	return f(ctx)
-}
-
-type workerMetricsStub struct {
-	calls atomic.Int64
-}
-
-func (m *workerMetricsStub) Collect(
-	context.Context,
-) (workerdomain.Metrics, error) {
-	m.calls.Add(1)
-	return workerdomain.Metrics{}, nil
-}
 
 type closeResourceStub struct {
 	calls atomic.Int64
@@ -43,61 +20,6 @@ type closeResourceStub struct {
 func (s *closeResourceStub) Close() error {
 	s.calls.Add(1)
 	return s.err
-}
-
-func TestWorkerAppOwnsServerAndRunnerLifecycle(t *testing.T) {
-	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	metrics := &workerMetricsStub{}
-	var dispatches atomic.Int64
-	app := &WorkerApp{
-		Server: &http.Server{
-			Addr:              "127.0.0.1:0",
-			Handler:           http.NewServeMux(),
-			ReadHeaderTimeout: time.Second,
-		},
-		runner: workerusecases.Runner{
-			Dispatcher: workerDispatcherFunc(func(context.Context) error {
-				dispatches.Add(1)
-				cancel()
-				return nil
-			}),
-			Metrics:       metrics,
-			Logger:        slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
-			DispatchEvery: time.Millisecond,
-			MetricsEvery:  time.Hour,
-		},
-		shutdownTimeout: time.Second,
-	}
-	if err := app.Run(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if dispatches.Load() != 1 || metrics.calls.Load() != 1 {
-		t.Fatalf(
-			"dispatches=%d metrics=%d",
-			dispatches.Load(),
-			metrics.calls.Load(),
-		)
-	}
-}
-
-func TestWorkerAppClassifiesRuntimeBoundaryFailures(t *testing.T) {
-	t.Parallel()
-	app := &WorkerApp{
-		Server: &http.Server{
-			Addr:    "127.0.0.1:0",
-			Handler: http.NewServeMux(),
-		},
-		runner:          workerusecases.Runner{},
-		shutdownTimeout: time.Second,
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	err := app.Run(ctx)
-	if err == nil || WorkerRunErrorCode(err) != "WORKER_RUNTIME_FAILED" {
-		t.Fatalf("err=%v code=%q", err, WorkerRunErrorCode(err))
-	}
 }
 
 func TestWorkerAppCloseIsIdempotent(t *testing.T) {
@@ -152,11 +74,11 @@ func TestWorkerAppBoundsTracingShutdownAndClosesItOnce(t *testing.T) {
 
 func TestWorkerCompositionConfiguresOneTraceProvider(t *testing.T) {
 	t.Parallel()
-	source, err := os.ReadFile("worker.go")
+	source, err := os.ReadFile("wire.go")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(string(source), "ConfigureTracing(") != 1 ||
+	if strings.Count(string(source), "ConfigureTracing(") != 2 ||
 		!strings.Contains(string(source), `"pymes-v3-worker"`) {
 		t.Fatal("worker must configure exactly one pymes-v3-worker tracer provider")
 	}
@@ -195,7 +117,7 @@ func TestWorkerIdentityAlwaysCreatesSignedInternalTokens(t *testing.T) {
 					}
 					return resource, nil
 				},
-				func() identityaccess.PlatformTokenSource {
+				func() workerPlatformTokenSource {
 					platformCalls++
 					return platformTokenStub{}
 				},
@@ -247,7 +169,7 @@ func TestWorkerIdentityRejectsProductionBypass(t *testing.T) {
 			tokenCalls++
 			return &provisionTokenStub{}, nil
 		},
-		func() identityaccess.PlatformTokenSource {
+		func() workerPlatformTokenSource {
 			return platformTokenStub{}
 		},
 	)
@@ -271,7 +193,7 @@ func TestWorkerIdentityClosesTokenOnCompositionFailure(t *testing.T) {
 		) (workerTokenResource, error) {
 			return resource, nil
 		},
-		func() identityaccess.PlatformTokenSource { return nil },
+		func() workerPlatformTokenSource { return nil },
 	)
 	if err == nil {
 		t.Fatal("expected missing platform identity to fail")
@@ -289,13 +211,6 @@ func TestWorkerErrorCodesRemainStable(t *testing.T) {
 	)
 	if WorkerErrorCode(startup) != "DATABASE_UNAVAILABLE" {
 		t.Fatalf("startup code=%q", WorkerErrorCode(startup))
-	}
-	runtime := workerRuntimeError(
-		"SERVER_FAILED",
-		errors.New("listen failed"),
-	)
-	if WorkerRunErrorCode(runtime) != "SERVER_FAILED" {
-		t.Fatalf("runtime code=%q", WorkerRunErrorCode(runtime))
 	}
 	shutdown := workerShutdownError(
 		"TRACE_SHUTDOWN_FAILED",

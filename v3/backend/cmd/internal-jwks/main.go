@@ -11,8 +11,7 @@ import (
 	"strings"
 	"time"
 
-	kms "cloud.google.com/go/kms/apiv1"
-	identityaccess "github.com/devpablocristo/pymes/v3/backend/internal/identity/access"
+	"github.com/devpablocristo/pymes/v3/backend/wire"
 )
 
 func main() {
@@ -22,24 +21,16 @@ func main() {
 	versions := []string{strings.TrimSpace(os.Getenv("PYMES_INTERNAL_KMS_KEY_VERSION"))}
 	versions = append(versions, csv(os.Getenv("PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS"))...)
 
-	client, err := kms.NewKeyManagementClient(ctx)
+	app, err := wire.InitializeInternalJWKS(ctx, versions)
 	if err != nil {
 		log.Fatalf("create KMS client: %v", err)
 	}
 	defer func() {
-		if closeErr := client.Close(); closeErr != nil {
+		if closeErr := app.Close(); closeErr != nil {
 			log.Printf("close KMS client: %v", closeErr)
 		}
 	}()
-	keys, err := identityaccess.LoadKMSVerificationKeys(ctx, client, versions)
-	if err != nil {
-		log.Fatal(err)
-	}
-	encoded, err := identityaccess.JWKSJSON(keys)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Print(encoded)
+	fmt.Print(app.JSON)
 }
 
 func csv(value string) []string {

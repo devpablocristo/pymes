@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help build migration-image-check test fiscal-test accounting-test quality security fiscal-e2e accounting-e2e commercial-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate db-integration backup-restore-smoke e2e ci up down backup restore
+.PHONY: help build migration-image-check test fiscal-test accounting-test quality security fiscal-e2e accounting-e2e commercial-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate architecture-check db-integration backup-restore-smoke e2e ci up down backup restore
 
 ACCOUNTING_BUILD_CONTEXT ?= ../../open-accounting
 
@@ -21,6 +21,7 @@ help:
 	@echo "  make monitoring-config-check  Valida Monitoring STG/PRD sin llamar a GCP"
 	@echo "  make api-check       Valida los contratos OpenAPI YAML"
 	@echo "  make api-generate    Regenera servidor/tipos/clientes desde OpenAPI"
+	@echo "  make architecture-check  Valida estructura vertical, imports, composición y lifecycle Go"
 	@echo "  make db-integration  Aplica migraciones dos veces sobre PostgreSQL local"
 	@echo "  make backup-restore-smoke  Prueba backup y restore de las tres bases"
 	@echo "  make e2e             Ejecuta las invariantes de la vertical comercial"
@@ -72,11 +73,14 @@ api-check:
 	./scripts/contracts-check.sh
 
 api-generate:
-	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --exclude-operation-ids clerkWebhook --package publicapi --generate types,chi-server -o internal/contracts/publicapi/public.gen.go ../api/openapi.yaml
-	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --package accountingapi --generate types,client -o internal/contracts/accountingapi/accounting.gen.go ../contracts/accounting.openapi.yaml
-	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --package accountingapi --generate chi-server -o internal/contracts/accountingapi/accounting.server.gen.go ../contracts/accounting.openapi.yaml
-	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --package fiscalapi --generate types,client -o internal/contracts/fiscalapi/fiscal.gen.go ../contracts/fiscal.openapi.yaml
-	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --package fiscalapi --generate chi-server -o internal/contracts/fiscalapi/fiscal.server.gen.go ../contracts/fiscal.openapi.yaml
+	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --exclude-operation-ids clerkWebhook --package publicapi --generate types,chi-server -o internal/commerce/handler/dto/public.gen.go ../api/openapi.yaml
+	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --package accountingapi --generate types,client -o internal/commerce/accounting/models/accounting.gen.go ../contracts/accounting.openapi.yaml
+	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --package accountingapi --generate chi-server -o internal/commerce/accounting/models/accounting.server.gen.go ../contracts/accounting.openapi.yaml
+	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --package fiscalapi --generate types,client -o internal/commerce/fiscal/models/fiscal.gen.go ../contracts/fiscal.openapi.yaml
+	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --package fiscalapi --generate chi-server -o internal/commerce/fiscal/models/fiscal.server.gen.go ../contracts/fiscal.openapi.yaml
+
+architecture-check:
+	cd backend && go test -count=1 ./internal/architecture
 
 up:
 	docker compose up --build --detach --wait
@@ -94,7 +98,7 @@ e2e:
 	$(MAKE) observability-e2e
 	$(MAKE) recovery-e2e
 	$(MAKE) replay-smoke
-	cd backend && PYMES_DATABASE_TEST_URL='postgres://pymes:pymes@127.0.0.1:55434/pymes_v3?sslmode=disable' go test ./internal/commerce/repository -run 'TestDurableWorkerRecoversLostFiscalAndAccountingResponses' -count=1
+	cd backend && PYMES_DATABASE_TEST_URL='postgres://pymes:pymes@127.0.0.1:55434/pymes_v3?sslmode=disable' go test ./internal/commerce -run 'TestDurableWorkerRecoversLostFiscalAndAccountingResponses' -count=1
 	$(MAKE) fiscal-e2e
 	$(MAKE) accounting-e2e
 
@@ -125,6 +129,7 @@ backup-restore-smoke:
 
 ci:
 	$(MAKE) api-check
+	$(MAKE) architecture-check
 	$(MAKE) quality
 	$(MAKE) security
 	$(MAKE) test

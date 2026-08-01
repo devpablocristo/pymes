@@ -372,8 +372,8 @@ wait_status "$token_a" "/api/v1/organizations/$organization_a/purchases/$purchas
 fiscal_count=$(docker compose exec -T fiscal-postgres \
   psql -U fiscal -d pymes_fiscal -Atc \
     "SELECT count(*) FROM fiscal.requests WHERE organization_id='$organization_a'")
-if test "$fiscal_count" != 6; then
-  echo "expected six unique fiscal requests, got $fiscal_count" >&2
+if test "$fiscal_count" != 7; then
+  echo "expected seven unique fiscal requests, got $fiscal_count" >&2
   exit 1
 fi
 

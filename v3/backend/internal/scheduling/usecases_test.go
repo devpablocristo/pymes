@@ -477,6 +477,204 @@ func (f *waitlistRepositoryFake) CreateWaitlistEntry(
 	return value, nil
 }
 
+type statusRepositoryFake struct {
+	Repository
+	configured              domain.BookingStatusConfiguration
+	configureMetadata       domain.CommandMetadata
+	configureCalls          int
+	configurations          []domain.BookingStatusConfiguration
+	listOrganizationID      string
+	substateBookingID       uuid.UUID
+	substateExpectedVersion int
+	substateCode            string
+	substateMetadata        domain.CommandMetadata
+	substateCalls           int
+}
+
+func (f *statusRepositoryFake) ConfigureBookingStatus(
+	_ context.Context,
+	metadata domain.CommandMetadata,
+	configuration domain.BookingStatusConfiguration,
+) (domain.BookingStatusConfiguration, error) {
+	f.configureCalls++
+	f.configureMetadata = metadata
+	f.configured = configuration
+	return configuration, nil
+}
+
+func (f *statusRepositoryFake) ListBookingStatusConfigurations(
+	_ context.Context,
+	organizationID string,
+) ([]domain.BookingStatusConfiguration, error) {
+	f.listOrganizationID = organizationID
+	return f.configurations, nil
+}
+
+func (f *statusRepositoryFake) SetBookingSubstate(
+	_ context.Context,
+	metadata domain.CommandMetadata,
+	bookingID uuid.UUID,
+	expectedVersion int,
+	substateCode string,
+) (domain.Booking, error) {
+	f.substateCalls++
+	f.substateMetadata = metadata
+	f.substateBookingID = bookingID
+	f.substateExpectedVersion = expectedVersion
+	f.substateCode = substateCode
+	return domain.Booking{
+		OrganizationID: metadata.OrganizationID,
+		ID:             bookingID,
+		Status:         domain.BookingConfirmed,
+		SubstateCode:   substateCode,
+		Version:        expectedVersion + 1,
+	}, nil
+}
+
+func TestBookingStatusCustomizationValidatesAndDelegates(t *testing.T) {
+	organizationID := "org-status"
+	bookingID := uuid.New()
+	repository := &statusRepositoryFake{
+		configurations: []domain.BookingStatusConfiguration{{
+			OrganizationID: organizationID,
+			Status:         domain.BookingConfirmed,
+			Label:          "Confirmado",
+		}},
+	}
+	service := NewService(repository, algorithmsFake{}, nil)
+	metadata := testMetadata(organizationID, "status-configure", "status-configure")
+	configuration := domain.BookingStatusConfiguration{
+		OrganizationID: organizationID,
+		Status:         domain.BookingConfirmed,
+		Label:          "Confirmado",
+		Substates: []domain.BookingSubstateDefinition{{
+			Code: "arrived", Label: "Llegó", Active: true, SortOrder: 10,
+		}},
+	}
+
+	configured, err := service.ConfigureBookingStatus(
+		context.Background(),
+		metadata,
+		configuration,
+	)
+	if err != nil ||
+		repository.configureCalls != 1 ||
+		repository.configureMetadata.IdempotencyKey != metadata.IdempotencyKey ||
+		configured.Status != domain.BookingConfirmed {
+		t.Fatalf(
+			"configured=%+v calls=%d metadata=%+v err=%v",
+			configured,
+			repository.configureCalls,
+			repository.configureMetadata,
+			err,
+		)
+	}
+
+	mismatched := configuration
+	mismatched.OrganizationID = "org-other"
+	if _, err := service.ConfigureBookingStatus(
+		context.Background(),
+		metadata,
+		mismatched,
+	); domain.ErrorCodeOf(err) != domain.CodeValidation ||
+		repository.configureCalls != 1 {
+		t.Fatalf(
+			"tenant mismatch err=%v calls=%d",
+			err,
+			repository.configureCalls,
+		)
+	}
+
+	configurations, err := service.ListBookingStatusConfigurations(
+		context.Background(),
+		organizationID,
+	)
+	if err != nil ||
+		len(configurations) != 1 ||
+		repository.listOrganizationID != organizationID {
+		t.Fatalf(
+			"configurations=%+v org=%q err=%v",
+			configurations,
+			repository.listOrganizationID,
+			err,
+		)
+	}
+	if _, err := service.ListBookingStatusConfigurations(
+		context.Background(),
+		" ",
+	); domain.ErrorCodeOf(err) != domain.CodeValidation {
+		t.Fatalf("blank organization err=%v", err)
+	}
+
+	booking, err := service.SetBookingSubstate(
+		context.Background(),
+		metadata,
+		organizationID,
+		bookingID,
+		3,
+		" arrived ",
+	)
+	if err != nil ||
+		repository.substateCalls != 1 ||
+		repository.substateBookingID != bookingID ||
+		repository.substateExpectedVersion != 3 ||
+		repository.substateCode != "arrived" ||
+		repository.substateMetadata.IdempotencyKey != metadata.IdempotencyKey ||
+		booking.SubstateCode != "arrived" {
+		t.Fatalf(
+			"booking=%+v calls=%d booking_id=%s version=%d code=%q metadata=%+v err=%v",
+			booking,
+			repository.substateCalls,
+			repository.substateBookingID,
+			repository.substateExpectedVersion,
+			repository.substateCode,
+			repository.substateMetadata,
+			err,
+		)
+	}
+	for _, test := range []struct {
+		name           string
+		organizationID string
+		bookingID      uuid.UUID
+		version        int
+		code           string
+	}{
+		{
+			name: "tenant mismatch", organizationID: "org-other",
+			bookingID: bookingID, version: 3, code: "arrived",
+		},
+		{
+			name: "missing booking", organizationID: organizationID,
+			bookingID: uuid.Nil, version: 3, code: "arrived",
+		},
+		{
+			name: "invalid version", organizationID: organizationID,
+			bookingID: bookingID, version: 0, code: "arrived",
+		},
+		{
+			name: "invalid code", organizationID: organizationID,
+			bookingID: bookingID, version: 3, code: "Arrived!",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := service.SetBookingSubstate(
+				context.Background(),
+				metadata,
+				test.organizationID,
+				test.bookingID,
+				test.version,
+				test.code,
+			)
+			if domain.ErrorCodeOf(err) != domain.CodeValidation {
+				t.Fatalf("err=%v", err)
+			}
+		})
+	}
+	if repository.substateCalls != 1 {
+		t.Fatalf("invalid commands reached repository: calls=%d", repository.substateCalls)
+	}
+}
+
 type maintenanceRepositoryFake struct {
 	Repository
 	candidate domain.WaitlistEntry

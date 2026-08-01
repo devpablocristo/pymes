@@ -24,6 +24,8 @@ const (
 	operationCreateWaitlist = "scheduling.waitlist.create"
 	operationCreateQueue    = "scheduling.queue.create"
 	operationAdvanceQueue   = "scheduling.queue.advance"
+	operationConfigureState = "scheduling.booking_state.configure"
+	operationSetSubstate    = "scheduling.booking.substate"
 )
 
 type PostgresRepository struct {
@@ -156,19 +158,20 @@ func (r *PostgresRepository) insertBookingTx(ctx context.Context, tx pgx.Tx, boo
 	_, err := tx.Exec(ctx, `
 		INSERT INTO app.scheduling_bookings (
 			org_id,id,series_id,session_id,supersedes_id,occurrence,
-			branch_id,service_id,party_id,status,participants,starts_at,ends_at,
+			branch_id,service_id,party_id,status,substate_code,participants,starts_at,ends_at,
 			occupies_from,occupies_until,hold_expires_at,version,
 			service_name_snapshot,price_snapshot,currency_snapshot,
 				duration_minutes_snapshot,timezone_snapshot,
 				customer_name_snapshot,customer_email_snapshot,customer_phone_snapshot,
 				notes,cancellation_reason,created_by,created_at,updated_at
 			) VALUES (
-				$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-				$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30
+				$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
+				$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31
 			)`,
 		booking.OrganizationID, booking.ID, booking.SeriesID, booking.SessionID, booking.SupersedesID,
 		booking.Occurrence, booking.BranchID, booking.ServiceID, booking.PartyID, booking.Status,
-		booking.Participants, booking.StartAt, booking.EndAt, booking.OccupiesFrom, booking.OccupiesUntil,
+		repositoryhelpers.NullableText(booking.SubstateCode), booking.Participants, booking.StartAt, booking.EndAt,
+		booking.OccupiesFrom, booking.OccupiesUntil,
 		booking.HoldExpiresAt, booking.Version, booking.ServiceName, booking.Price, booking.Currency,
 		booking.DurationMinutes, booking.Timezone, booking.CustomerName, booking.CustomerEmail,
 		booking.CustomerPhone, booking.Notes, booking.CancellationReason,
@@ -321,7 +324,7 @@ func (r *PostgresRepository) RescheduleBooking(
 	}
 	tag, err := tx.Exec(ctx, `
 		UPDATE app.scheduling_bookings
-		SET status='rescheduled',version=version+1,updated_at=now()
+		SET status='rescheduled',substate_code=NULL,version=version+1,updated_at=now()
 		WHERE org_id=$1 AND id=$2 AND version=$3`,
 		metadata.OrganizationID, bookingID, expectedVersion,
 	)
@@ -404,7 +407,7 @@ func (r *PostgresRepository) TransitionBooking(
 	}
 	tag, err := tx.Exec(ctx, `
 			UPDATE app.scheduling_bookings
-			SET status=$4,version=version+1,updated_at=now(),
+			SET status=$4,substate_code=NULL,version=version+1,updated_at=now(),
 			    hold_expires_at=CASE WHEN $4='held' THEN hold_expires_at ELSE NULL END,
 			    cancellation_reason=CASE WHEN $4='cancelled' THEN $5 ELSE cancellation_reason END
 			WHERE org_id=$1 AND id=$2 AND version=$3`,

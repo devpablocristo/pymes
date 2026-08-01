@@ -110,6 +110,33 @@ paths:
         '400': { $ref: '#/components/responses/SchedulingError' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/SchedulingError' }
+  /api/v1/organizations/{organizationId}/scheduling/status-configurations:
+    parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
+    get:
+      operationId: listSchedulingBookingStatusConfigurations
+      responses:
+        '200':
+          description: Etiquetas y subestados configurados sin alterar el estado interno
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BookingStatusConfiguration' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/organizations/{organizationId}/scheduling/status-configurations/{status}:
+    parameters:
+      - { $ref: '#/components/parameters/OrganizationId' }
+      - { name: status, in: path, required: true, schema: { $ref: '#/components/schemas/BookingStatus' } }
+      - { $ref: '#/components/parameters/IdempotencyKey' }
+      - { $ref: '#/components/parameters/SourceVersion' }
+    put:
+      operationId: configureSchedulingBookingStatus
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BookingStatusConfigurationInput' } } } }
+      responses:
+        '200': { description: Configuración aplicada, content: { application/json: { schema: { $ref: '#/components/schemas/BookingStatusConfiguration' } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/SchedulingError' }
   /api/v1/organizations/{organizationId}/scheduling/bookings:
     parameters: [{ $ref: '#/components/parameters/OrganizationId' }]
     get:
@@ -153,6 +180,20 @@ paths:
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RescheduleInput' } } } }
       responses:
         '200': { description: Turno reemplazante, content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } } }
+        '400': { $ref: '#/components/responses/SchedulingError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/SchedulingError' }
+  /api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}/substate:
+    parameters:
+      - { $ref: '#/components/parameters/OrganizationId' }
+      - { $ref: '#/components/parameters/BookingId' }
+      - { $ref: '#/components/parameters/IdempotencyKey' }
+      - { $ref: '#/components/parameters/SourceVersion' }
+    post:
+      operationId: setSchedulingBookingSubstate
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SetBookingSubstateInput' } } } }
+      responses:
+        '200': { description: Subestado aplicado sin cambiar el estado interno, content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } } }
         '400': { $ref: '#/components/responses/SchedulingError' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/SchedulingError' }
@@ -590,6 +631,49 @@ components:
         allocations: { type: array, items: { $ref: '#/components/schemas/Allocation' } }
         notes: { type: string }
         recurrence: { $ref: '#/components/schemas/Recurrence' }
+    BookingStatus:
+      type: string
+      enum: [held, pending_confirmation, confirmed, checked_in, completed, cancelled, rescheduled, no_show]
+    BookingSubstateDefinition:
+      type: object
+      additionalProperties: false
+      required: [code, label, active, sort_order]
+      properties:
+        code: { type: string, pattern: '^[a-z][a-z0-9_-]{0,39}$' }
+        label: { type: string, minLength: 1, maxLength: 80 }
+        active: { type: boolean }
+        sort_order: { type: integer, minimum: 0, maximum: 10000 }
+    BookingStatusConfigurationInput:
+      type: object
+      additionalProperties: false
+      required: [label, substates]
+      properties:
+        label: { type: string, minLength: 1, maxLength: 80 }
+        substates:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/BookingSubstateDefinition' }
+    BookingStatusConfiguration:
+      type: object
+      required: [status, label, substates, updated_at]
+      properties:
+        status: { $ref: '#/components/schemas/BookingStatus' }
+        label: { type: string, minLength: 1, maxLength: 80 }
+        substates:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/BookingSubstateDefinition' }
+        updated_at: { type: string, format: date-time }
+    SetBookingSubstateInput:
+      type: object
+      additionalProperties: false
+      required: [expected_version, substate_code]
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        substate_code:
+          type: string
+          description: Código configurado para el estado interno actual; vacío elimina el subestado.
+          pattern: '^$|^[a-z][a-z0-9_-]{0,39}$'
     Booking:
       type: object
       required: [id, branch_id, service_id, party_id, status, participants, start_at, end_at, version, service_name, price, currency, duration_minutes, timezone, allocations]
@@ -601,7 +685,8 @@ components:
         branch_id: { type: string, format: uuid }
         service_id: { type: string, format: uuid }
         party_id: { type: string }
-        status: { type: string, enum: [held, pending_confirmation, confirmed, checked_in, completed, cancelled, rescheduled, no_show] }
+        status: { $ref: '#/components/schemas/BookingStatus' }
+        substate_code: { type: string, pattern: '^[a-z][a-z0-9_-]{0,39}$' }
         participants: { type: integer }
         start_at: { type: string, format: date-time }
         end_at: { type: string, format: date-time }

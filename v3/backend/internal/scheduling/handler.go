@@ -44,6 +44,9 @@ type SchedulingUsecases interface {
 	ListBookings(context.Context, string, uuid.UUID, time.Time, time.Time) ([]domain.Booking, error)
 	RescheduleBooking(context.Context, domain.CommandMetadata, RescheduleInput) (domain.Booking, error)
 	TransitionBooking(context.Context, domain.CommandMetadata, string, uuid.UUID, int, domain.BookingStatus, string) (domain.Booking, error)
+	ConfigureBookingStatus(context.Context, domain.CommandMetadata, domain.BookingStatusConfiguration) (domain.BookingStatusConfiguration, error)
+	ListBookingStatusConfigurations(context.Context, string) ([]domain.BookingStatusConfiguration, error)
+	SetBookingSubstate(context.Context, domain.CommandMetadata, string, uuid.UUID, int, string) (domain.Booking, error)
 	CreateWaitlistEntry(context.Context, domain.CommandMetadata, CreateWaitlistInput) (domain.WaitlistEntry, error)
 	ListWaitlist(context.Context, string, uuid.UUID) ([]domain.WaitlistEntry, error)
 	CreateQueueTicket(context.Context, domain.CommandMetadata, domain.QueueTicket) (domain.QueueTicket, error)
@@ -78,6 +81,8 @@ func (h *HTTPHandler) Handler() http.Handler {
 		router.Post("/blocks", h.createBlock)
 		router.Get("/blocks", h.listBlocks)
 		router.Post("/sessions", h.createGroupSession)
+		router.Put("/status-configurations/{status}", h.configureBookingStatus)
+		router.Get("/status-configurations", h.listBookingStatusConfigurations)
 		router.Post("/bookings", h.createAdminBooking)
 		router.Get("/bookings", h.listBookings)
 		router.Get("/bookings/{bookingId}", h.getBooking)
@@ -87,6 +92,7 @@ func (h *HTTPHandler) Handler() http.Handler {
 		router.Post("/bookings/{bookingId}/complete", h.transition(domain.BookingCompleted, domain.PermissionOperate))
 		router.Post("/bookings/{bookingId}/no-show", h.transition(domain.BookingNoShow, domain.PermissionOperate))
 		router.Post("/bookings/{bookingId}/reschedule", h.rescheduleBooking)
+		router.Post("/bookings/{bookingId}/substate", h.setBookingSubstate)
 		router.Post("/waitlist", h.createAdminWaitlist)
 		router.Get("/waitlist", h.listWaitlist)
 		router.Post("/queue", h.createQueueTicket)
@@ -592,6 +598,100 @@ func (h *HTTPHandler) transition(
 		}
 		httphelpers.WriteJSON(w, http.StatusOK, dto.BookingFromDomain(result))
 	}
+}
+
+func (h *HTTPHandler) configureBookingStatus(w http.ResponseWriter, request *http.Request) {
+	organizationID, principal, ok := h.authorize(w, request, domain.PermissionManage)
+	if !ok {
+		return
+	}
+	status := domain.BookingStatus(chi.URLParam(request, "status"))
+	var input dto.ConfigureBookingStatus
+	if !httphelpers.Decode(w, request, &input) {
+		return
+	}
+	metadata, ok := commandMetadata(
+		w,
+		request,
+		organizationID,
+		principal.ActorID,
+		map[string]any{"status": status, "configuration": input},
+	)
+	if !ok {
+		return
+	}
+	substates := make([]domain.BookingSubstateDefinition, 0, len(input.Substates))
+	for _, value := range input.Substates {
+		substates = append(substates, domain.BookingSubstateDefinition{
+			Code: value.Code, Label: value.Label, Active: value.Active, SortOrder: value.SortOrder,
+		})
+	}
+	result, err := h.usecases.ConfigureBookingStatus(
+		request.Context(),
+		metadata,
+		domain.BookingStatusConfiguration{
+			OrganizationID: organizationID,
+			Status:         status,
+			Label:          input.Label,
+			Substates:      substates,
+		},
+	)
+	if err != nil {
+		httphelpers.WriteError(w, err)
+		return
+	}
+	httphelpers.WriteJSON(w, http.StatusOK, dto.BookingStatusConfigurationFromDomain(result))
+}
+
+func (h *HTTPHandler) listBookingStatusConfigurations(w http.ResponseWriter, request *http.Request) {
+	organizationID, _, ok := h.authorize(w, request, domain.PermissionRead)
+	if !ok {
+		return
+	}
+	result, err := h.usecases.ListBookingStatusConfigurations(request.Context(), organizationID)
+	if err != nil {
+		httphelpers.WriteError(w, err)
+		return
+	}
+	httphelpers.WriteJSON(w, http.StatusOK, dto.BookingStatusConfigurationsFromDomain(result))
+}
+
+func (h *HTTPHandler) setBookingSubstate(w http.ResponseWriter, request *http.Request) {
+	organizationID, principal, ok := h.authorize(w, request, domain.PermissionOperate)
+	if !ok {
+		return
+	}
+	bookingID, ok := parseUUID(w, chi.URLParam(request, "bookingId"))
+	if !ok {
+		return
+	}
+	var input dto.SetBookingSubstate
+	if !httphelpers.Decode(w, request, &input) {
+		return
+	}
+	metadata, ok := commandMetadata(
+		w,
+		request,
+		organizationID,
+		principal.ActorID,
+		map[string]any{"booking_id": bookingID, "substate": input},
+	)
+	if !ok {
+		return
+	}
+	result, err := h.usecases.SetBookingSubstate(
+		request.Context(),
+		metadata,
+		organizationID,
+		bookingID,
+		input.ExpectedVersion,
+		input.SubstateCode,
+	)
+	if err != nil {
+		httphelpers.WriteError(w, err)
+		return
+	}
+	httphelpers.WriteJSON(w, http.StatusOK, dto.BookingFromDomain(result))
 }
 
 func (h *HTTPHandler) createAdminWaitlist(w http.ResponseWriter, request *http.Request) {

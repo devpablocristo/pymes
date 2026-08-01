@@ -199,6 +199,31 @@ BEGIN
 END
 $$;
 
+CREATE TABLE IF NOT EXISTS app.scheduling_booking_status_configurations (
+  org_id text NOT NULL REFERENCES app.organizations(id) ON DELETE CASCADE,
+  status text NOT NULL CHECK (status IN (
+    'held','pending_confirmation','confirmed','checked_in','completed',
+    'cancelled','rescheduled','no_show'
+  )),
+  label text NOT NULL CHECK (length(btrim(label)) BETWEEN 1 AND 80),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (org_id, status)
+);
+
+CREATE TABLE IF NOT EXISTS app.scheduling_booking_substates (
+  org_id text NOT NULL,
+  status text NOT NULL,
+  code text NOT NULL CHECK (code ~ '^[a-z][a-z0-9_-]{0,39}$'),
+  label text NOT NULL CHECK (length(btrim(label)) BETWEEN 1 AND 80),
+  active boolean NOT NULL DEFAULT true,
+  sort_order integer NOT NULL DEFAULT 0 CHECK (sort_order BETWEEN 0 AND 10000),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (org_id, status, code),
+  FOREIGN KEY (org_id, status)
+    REFERENCES app.scheduling_booking_status_configurations(org_id, status)
+    ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS app.scheduling_bookings (
   org_id text NOT NULL REFERENCES app.organizations(id) ON DELETE CASCADE,
   id uuid NOT NULL,
@@ -213,6 +238,7 @@ CREATE TABLE IF NOT EXISTS app.scheduling_bookings (
     'held','pending_confirmation','confirmed','checked_in','completed',
     'cancelled','rescheduled','no_show'
   )),
+  substate_code text,
   participants integer NOT NULL CHECK (participants BETWEEN 1 AND 100000),
   starts_at timestamptz NOT NULL,
   ends_at timestamptz NOT NULL,
@@ -255,6 +281,23 @@ CREATE TABLE IF NOT EXISTS app.scheduling_bookings (
 );
 ALTER TABLE app.scheduling_bookings
   ADD COLUMN IF NOT EXISTS cancellation_reason text NOT NULL DEFAULT '';
+ALTER TABLE app.scheduling_bookings
+  ADD COLUMN IF NOT EXISTS substate_code text;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'scheduling_bookings_substate_fk'
+      AND conrelid = 'app.scheduling_bookings'::regclass
+  ) THEN
+    ALTER TABLE app.scheduling_bookings
+      ADD CONSTRAINT scheduling_bookings_substate_fk
+      FOREIGN KEY (org_id, status, substate_code)
+      REFERENCES app.scheduling_booking_substates(org_id, status, code);
+  END IF;
+END
+$$;
 CREATE INDEX IF NOT EXISTS scheduling_bookings_range_idx
   ON app.scheduling_bookings USING gist (org_id, branch_id, tstzrange(occupies_from, occupies_until, '[)'));
 CREATE INDEX IF NOT EXISTS scheduling_bookings_party_idx
@@ -547,6 +590,8 @@ BEGIN
     'scheduling_recurrence_series',
     'scheduling_group_sessions',
     'scheduling_session_resource_allocations',
+    'scheduling_booking_status_configurations',
+    'scheduling_booking_substates',
     'scheduling_bookings',
     'scheduling_booking_resource_allocations',
     'scheduling_group_participants',

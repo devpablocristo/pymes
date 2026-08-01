@@ -732,7 +732,7 @@ func scanBooking(
 ) (domain.Booking, error) {
 	query := `
 		SELECT org_id,id,series_id,session_id,supersedes_id,occurrence,
-		       branch_id,service_id,party_id,status,participants,starts_at,ends_at,
+		       branch_id,service_id,party_id,status,COALESCE(substate_code,''),participants,starts_at,ends_at,
 		       occupies_from,occupies_until,hold_expires_at,version,
 		       service_name_snapshot,price_snapshot::text,currency_snapshot,
 			       duration_minutes_snapshot,timezone_snapshot,
@@ -747,7 +747,8 @@ func scanBooking(
 	err := tx.QueryRow(ctx, query, organizationID, id).Scan(
 		&value.OrganizationID, &value.ID, &value.SeriesID, &value.SessionID,
 		&value.SupersedesID, &value.Occurrence, &value.BranchID, &value.ServiceID,
-		&value.PartyID, &value.Status, &value.Participants, &value.StartAt, &value.EndAt,
+		&value.PartyID, &value.Status, &value.SubstateCode, &value.Participants,
+		&value.StartAt, &value.EndAt,
 		&value.OccupiesFrom, &value.OccupiesUntil, &value.HoldExpiresAt, &value.Version,
 		&value.ServiceName, &value.Price, &value.Currency, &value.DurationMinutes,
 		&value.Timezone, &value.CustomerName, &value.CustomerEmail, &value.CustomerPhone,

@@ -77,6 +77,58 @@ COMMIT;
 SQL
 }
 
+queue_scheduling_projection() {
+  event_id=$1
+  booking_id=$2
+  psql_app \
+    -v ON_ERROR_STOP=1 \
+    -v organization_id="$organization_id" \
+    -v event_id="$event_id" \
+    -v booking_id="$booking_id" <<'SQL' >/dev/null
+INSERT INTO app.organizations(id,name,slug,status)
+VALUES(:'organization_id','Notifications E2E',:'organization_id','ready')
+ON CONFLICT (id) DO UPDATE SET status='ready';
+
+BEGIN;
+SELECT set_config('app.org_id', :'organization_id', true);
+INSERT INTO app.notification_settings(org_id,whatsapp_enabled)
+VALUES(:'organization_id',true)
+ON CONFLICT (org_id) DO UPDATE
+SET whatsapp_enabled=true,updated_at=now();
+INSERT INTO app.outbox(
+  id,org_id,topic,payload,payload_hash,idempotency_key,request_id,actor_ref,
+  source_version,snapshot_digest,correlation_id,available_at
+)
+VALUES(
+  :'event_id'::uuid,
+  :'organization_id',
+  'NotificationRequested',
+  jsonb_build_object(
+    'trigger','BookingConfirmed',
+    'aggregate_type','booking',
+    'aggregate_id',:'booking_id',
+    'booking_id',:'booking_id',
+    'recipient_e164','+5491112345678',
+    'customer_name','Ada',
+    'service_name','Consulta',
+    'start_at','2026-08-03T15:00:00Z',
+    'end_at','2026-08-03T16:00:00Z',
+    'timezone','America/Argentina/Buenos_Aires'
+  ),
+  repeat('c',64),
+  'scheduling:NotificationRequested:' || :'booking_id' || ':source:1',
+  'request:projection',
+  'system:scheduling',
+  1,
+  repeat('d',64),
+  'correlation:projection',
+  now()
+)
+ON CONFLICT (org_id,topic,idempotency_key) DO NOTHING;
+COMMIT;
+SQL
+}
+
 notification_status() {
   notification_id=$1
   psql_app \
@@ -123,6 +175,38 @@ set_scenario success
 queue_notification notification-success
 wait_status notification-success sent
 wait_published notification-success
+
+projection_event_id=$(
+  psql_app -qAt -v ON_ERROR_STOP=1 -v organization_id="$organization_id" <<'SQL'
+SELECT (
+  substr(md5(:'organization_id' || ':scheduling-projection'),1,8) || '-' ||
+  substr(md5(:'organization_id' || ':scheduling-projection'),9,4) || '-' ||
+  '4' || substr(md5(:'organization_id' || ':scheduling-projection'),14,3) || '-' ||
+  '8' || substr(md5(:'organization_id' || ':scheduling-projection'),18,3) || '-' ||
+  substr(md5(:'organization_id' || ':scheduling-projection'),21,12)
+)::uuid;
+SQL
+)
+projection_notification_id="scheduling:$projection_event_id"
+queue_scheduling_projection "$projection_event_id" booking-projection-e2e
+wait_status "$projection_notification_id" sent
+wait_published_idempotency=$(
+  psql_app \
+    -qAt -v ON_ERROR_STOP=1 \
+    -c "SELECT set_config('app.org_id', '$organization_id', false); SELECT count(*) || ':' || count(*) FILTER (WHERE published_at IS NOT NULL) FROM app.outbox WHERE org_id='$organization_id' AND topic='NotificationRequested' AND idempotency_key='scheduling:NotificationRequested:booking-projection-e2e:source:1';" |
+    tail -n 1
+)
+projection_count=$(
+  psql_app \
+    -qAt -v ON_ERROR_STOP=1 \
+    -c "SELECT set_config('app.org_id', '$organization_id', false); SELECT count(*) FROM app.notifications WHERE org_id='$organization_id' AND idempotency_key='scheduling:NotificationRequested:booking-projection-e2e:source:1';" |
+    tail -n 1
+)
+if [ "$wait_published_idempotency" != "1:1" ] ||
+  [ "$projection_count" != "1" ]; then
+  echo "scheduling projection did not converge: outbox=$wait_published_idempotency notifications=$projection_count" >&2
+  exit 1
+fi
 
 set_scenario timeout_after
 queue_notification notification-timeout-after
@@ -177,4 +261,4 @@ if [ "$invalid_status" != "401" ]; then
   exit 1
 fi
 
-echo "notifications e2e: success, response loss, outage recovery and webhook dedup verified"
+echo "notifications e2e: scheduling projection, success, response loss, outage recovery and webhook dedup verified"

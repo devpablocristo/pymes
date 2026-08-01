@@ -23,6 +23,7 @@ type WorkerConfig struct {
 	LeaseDuration               time.Duration
 	ShutdownTimeout             time.Duration
 	PerGo                       PerGoWorker
+	Calendars                   Calendars
 }
 
 type PerGoWorker struct {
@@ -102,6 +103,13 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 			"ACTION_TOKEN_SECRET_INVALID",
 			"PYMES_SCHEDULING_ACTION_TOKEN_SECRET must contain at least 32 bytes",
 		)
+	}
+	calendars, err := loadCalendars(getenv, environment)
+	if err != nil {
+		return WorkerConfig{}, &WorkerConfigError{
+			Code: "CALENDAR_CONFIG_INVALID",
+			Err:  err,
+		}
 	}
 	metricsInterval, err := parseWorkerMetricsInterval(
 		strings.TrimSpace(getenv("PYMES_WORKER_METRICS_INTERVAL")),
@@ -183,6 +191,7 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 		LeaseDuration:               30 * time.Second,
 		ShutdownTimeout:             5 * time.Second,
 		PerGo:                       pergo,
+		Calendars:                   calendars,
 	}, nil
 }
 

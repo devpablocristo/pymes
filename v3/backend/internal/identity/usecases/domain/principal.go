@@ -15,6 +15,7 @@ const (
 type Principal struct {
 	OrganizationID     string
 	ActorID            string
+	SessionID          string
 	Role               Role
 	Permissions        []string
 	OrganizationStatus string

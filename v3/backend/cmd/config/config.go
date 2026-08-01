@@ -21,6 +21,7 @@ type Config struct {
 	SchedulingActionTokenSecret        string
 	Clerk                              Clerk
 	PerGo                              PerGoAPI
+	Calendars                          Calendars
 }
 
 func Load() (Config, error) { return LoadFrom(os.Getenv) }
@@ -29,6 +30,10 @@ func LoadFrom(getenv func(string) string) (Config, error) {
 		return Config{}, fmt.Errorf("environment reader is required")
 	}
 	env := strings.ToLower(defaultValue(getenv("PYMES_ENVIRONMENT"), "development"))
+	calendars, err := loadCalendars(getenv, env)
+	if err != nil {
+		return Config{}, err
+	}
 	pergoEnabled, err := strconv.ParseBool(
 		defaultValue(getenv("PYMES_PERGO_ENABLED"), "false"),
 	)
@@ -53,6 +58,7 @@ func LoadFrom(getenv func(string) string) (Config, error) {
 			WorkspaceID:    strings.TrimSpace(getenv("PERGO_WORKSPACE_ID")),
 			WebhookSecrets: csv(getenv("PERGO_WEBHOOK_SECRETS")),
 		},
+		Calendars: calendars,
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("PYMES_DATABASE_URL is required")

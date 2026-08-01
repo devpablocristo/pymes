@@ -41,6 +41,23 @@ func TestWorkerAppCloseIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestWorkerAppClosesCalendarResourcesExactlyOnce(t *testing.T) {
+	t.Parallel()
+	resource := &closeResourceStub{}
+	app := &WorkerApp{
+		resources: compactCloseResources(nil, resource),
+	}
+	if err := app.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if resource.calls.Load() != 1 {
+		t.Fatalf("calendar resource close calls=%d", resource.calls.Load())
+	}
+}
+
 func TestWorkerAppBoundsTracingShutdownAndClosesItOnce(t *testing.T) {
 	t.Parallel()
 	var calls atomic.Int64

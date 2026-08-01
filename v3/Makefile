@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help build migration-image-check test fiscal-test accounting-test quality security fiscal-e2e accounting-e2e commercial-e2e scheduling-e2e notifications-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate architecture-check db-integration backup-restore-smoke e2e ci up down backup restore
+.PHONY: help build migration-image-check test fiscal-test accounting-test quality security fiscal-e2e accounting-e2e commercial-e2e scheduling-e2e notifications-e2e calendars-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate architecture-check db-integration backup-restore-smoke e2e ci up down backup restore
 
 ACCOUNTING_BUILD_CONTEXT ?= ../../open-accounting
 PUBLIC_GO_OPERATION_IDS := getHealthz,getReadyz,createSale,createParty,getParty,createPurchase,getPurchase,createPayment,getPayment,createAccountingReversal,getAccountingFailure,createAccountingAdjustment,getSale
@@ -18,6 +18,7 @@ help:
 	@echo "  make commercial-e2e  Recorre la vertical pública completa contra servicios reales/mocks"
 	@echo "  make scheduling-e2e  Valida Agenda HTTP/PostgreSQL, aislamiento y concurrencia"
 	@echo "  make notifications-e2e  Valida PerGo, reintentos y webhooks firmados"
+	@echo "  make calendars-e2e   Valida OAuth, cifrado, Google/Meet fake, RLS y recuperación"
 	@echo "  make observability-e2e  Comprueba salud, readiness y métricas del stack"
 	@echo "  make recovery-e2e   Comprueba caída y recuperación independiente de servicios y bases"
 	@echo "  make replay-smoke   Comprueba replay DLQ idempotente y auditoría inmutable"
@@ -100,6 +101,7 @@ e2e:
 	$(MAKE) scheduling-e2e
 	$(MAKE) commercial-e2e
 	$(MAKE) notifications-e2e
+	$(MAKE) calendars-e2e
 	$(MAKE) backup-restore-smoke
 	$(MAKE) observability-e2e
 	$(MAKE) recovery-e2e
@@ -124,6 +126,9 @@ scheduling-e2e:
 
 notifications-e2e:
 	./scripts/notifications-e2e.sh
+
+calendars-e2e:
+	./scripts/calendars-e2e.sh
 
 observability-e2e:
 	./scripts/observability-e2e.sh

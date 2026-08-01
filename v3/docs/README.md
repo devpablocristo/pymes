@@ -27,8 +27,9 @@ implementada es:
 11. [Arquitectura vertical Go](go-architecture.md)
 12. [Agenda multi-tenant](scheduling.md)
 13. [Notificaciones WhatsApp mediante PerGo](11-notifications-pergo.md)
-14. [ADRs](adr/)
-15. [Contratos OpenAPI internos](../contracts/)
+14. [Google Calendar y Meet](11-google-calendar-meet.md)
+15. [ADRs](adr/)
+16. [Contratos OpenAPI internos](../contracts/)
 
 Los diagramas Mermaid describen la arquitectura objetivo. Toda API marcada
 `internal` sólo admite credenciales de servicio: ningún navegador llega a los

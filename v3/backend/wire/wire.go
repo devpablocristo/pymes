@@ -2,6 +2,7 @@
 package wire
 
 import (
+	cloudkms "cloud.google.com/go/kms/apiv1"
 	"context"
 	"errors"
 	"fmt"
@@ -14,6 +15,8 @@ import (
 
 	clerk "github.com/devpablocristo/platform/sdks/clerk/go"
 	"github.com/devpablocristo/pymes/v3/backend/cmd/config"
+	"github.com/devpablocristo/pymes/v3/backend/internal/calendars"
+	googlemodels "github.com/devpablocristo/pymes/v3/backend/internal/calendars/google_calendar/models"
 	"github.com/devpablocristo/pymes/v3/backend/internal/commerce"
 	"github.com/devpablocristo/pymes/v3/backend/internal/fakeservice"
 	"github.com/devpablocristo/pymes/v3/backend/internal/identity"
@@ -24,6 +27,7 @@ import (
 	"github.com/devpablocristo/pymes/v3/backend/internal/postgres"
 	"github.com/devpablocristo/pymes/v3/backend/internal/scheduling"
 	"github.com/devpablocristo/pymes/v3/backend/internal/worker"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func InitializeFakeService(kind string) (http.Handler, error) {
@@ -36,6 +40,7 @@ type App struct {
 	Handler         http.Handler
 	database        *postgres.Database
 	shutdownTracing func(context.Context) error
+	resources       []closeResource
 	closeOnce       sync.Once
 	closeErr        error
 }
@@ -45,14 +50,26 @@ func (a *App) Close() error {
 		return nil
 	}
 	a.closeOnce.Do(func() {
+		var closeErrors []error
+		for index := len(a.resources) - 1; index >= 0; index-- {
+			if a.resources[index] == nil {
+				continue
+			}
+			if err := a.resources[index].Close(); err != nil {
+				closeErrors = append(closeErrors, err)
+			}
+		}
 		if a.shutdownTracing != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			a.closeErr = a.shutdownTracing(ctx)
+			if err := a.shutdownTracing(ctx); err != nil {
+				closeErrors = append(closeErrors, err)
+			}
 			cancel()
 		}
 		if a.database != nil {
 			a.database.Close()
 		}
+		a.closeErr = errors.Join(closeErrors...)
 	})
 	return a.closeErr
 }
@@ -154,6 +171,17 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 			},
 		).Routes()
 	}
+	calendarHTTP, calendarResource, err := initializeCalendarAPI(
+		ctx, cfg.Calendars, pool, clerkAuthenticator,
+	)
+	if err != nil {
+		database.Close()
+		_ = shutdownTracing(context.Background())
+		return nil, &APIStartupError{
+			Code: "CALENDAR_DEPENDENCY_UNAVAILABLE",
+			Err:  err,
+		}
+	}
 	contextRoutes := []publicContextRoute{
 		{
 			Pattern: "/api/v1/organizations/{organizationId}/scheduling/",
@@ -177,14 +205,39 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 			},
 		)
 	}
+	if calendarHTTP != nil {
+		contextRoutes = append(
+			contextRoutes,
+			publicContextRoute{
+				Pattern: "POST /api/v1/organizations/{organizationId}/calendars/google/oauth/start",
+				Handler: calendarHTTP,
+			},
+			publicContextRoute{
+				Pattern: "GET /api/v1/calendars/google/oauth/callback",
+				Handler: calendarHTTP,
+			},
+			publicContextRoute{
+				Pattern: "GET /api/v1/organizations/{organizationId}/calendars/connections",
+				Handler: calendarHTTP,
+			},
+			publicContextRoute{
+				Pattern: "DELETE /api/v1/organizations/{organizationId}/calendars/connections/{connectionId}",
+				Handler: calendarHTTP,
+			},
+		)
+	}
 	handler := composePublicHTTP(
 		api.Handler(),
 		identity.NewWebhook(webhooks, identity.ReceiveWebhook{Inbox: identities}),
 		contextRoutes...,
 	)
+	var resources []closeResource
+	if calendarResource != nil {
+		resources = append(resources, calendarResource)
+	}
 	return &App{
 		Handler: observability.HTTP(handler, nil), database: database,
-		shutdownTracing: shutdownTracing,
+		shutdownTracing: shutdownTracing, resources: resources,
 	}, nil
 }
 
@@ -243,6 +296,95 @@ func composePublicHTTP(
 	mux.Handle("/", api)
 	mux.Handle("POST /api/v1/webhooks/clerk", clerkWebhook)
 	return mux
+}
+
+func initializeCalendarAPI(
+	ctx context.Context,
+	cfg config.Calendars,
+	pool *pgxpool.Pool,
+	auth calendars.CalendarAuthenticator,
+) (http.Handler, closeResource, error) {
+	if !cfg.Enabled {
+		return nil, nil, nil
+	}
+	cipher, resource, err := initializeCalendarCipher(ctx, cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	provider, err := calendars.NewGoogleCalendar(
+		googlemodels.Configuration{
+			ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret,
+			RedirectURL: cfg.RedirectURL, AuthURL: cfg.AuthURL,
+			TokenURL: cfg.TokenURL, RevokeURL: cfg.RevokeURL,
+			CalendarURL: cfg.CalendarURL,
+		},
+	)
+	if err != nil {
+		if resource != nil {
+			_ = resource.Close()
+		}
+		return nil, nil, fmt.Errorf("configure Google Calendar: %w", err)
+	}
+	store := calendars.NewStore(pool, cipher)
+	handler := calendars.NewCalendarHTTP(
+		calendars.Commands{Repository: store, Google: provider},
+		auth,
+	)
+	return handler.Handler(), resource, nil
+}
+
+func initializeCalendarCipher(
+	ctx context.Context,
+	cfg config.Calendars,
+) (calendars.SecretCipher, closeResource, error) {
+	if len(cfg.LocalKey) != 0 {
+		cipher, err := calendars.NewLocalEnvelopeCipher(cfg.LocalKey)
+		return cipher, nil, err
+	}
+	client, err := cloudkms.NewKeyManagementClient(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("open calendar KMS client: %w", err)
+	}
+	return calendars.NewKMSEnvelopeCipher(
+		client, cfg.KMSKeyName,
+	), client, nil
+}
+
+func initializeCalendarWorker(
+	ctx context.Context,
+	cfg config.Calendars,
+	pool *pgxpool.Pool,
+	leaseFor time.Duration,
+) (worker.Dispatcher, closeResource, error) {
+	if !cfg.Enabled {
+		return nil, nil, nil
+	}
+	cipher, resource, err := initializeCalendarCipher(ctx, cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	provider, err := calendars.NewGoogleCalendar(
+		googlemodels.Configuration{
+			ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret,
+			RedirectURL: cfg.RedirectURL, AuthURL: cfg.AuthURL,
+			TokenURL: cfg.TokenURL, RevokeURL: cfg.RevokeURL,
+			CalendarURL: cfg.CalendarURL,
+		},
+	)
+	if err != nil {
+		if resource != nil {
+			_ = resource.Close()
+		}
+		return nil, nil, fmt.Errorf("configure Google Calendar worker: %w", err)
+	}
+	if leaseFor <= 0 {
+		leaseFor = 30 * time.Second
+	}
+	return calendars.CalendarWorker{
+		Store:    calendars.NewStore(pool, cipher),
+		Provider: provider,
+		LeaseFor: leaseFor,
+	}, resource, nil
 }
 
 func InitializeWorker(
@@ -354,6 +496,26 @@ func InitializeWorker(
 		notificationDispatcher.LeaseFor = cfg.LeaseDuration
 		dispatchers = append(dispatchers, notificationDispatcher)
 	}
+	calendarDispatcher, calendarResource, calendarErr := initializeCalendarWorker(
+		ctx,
+		cfg.Calendars,
+		pool,
+		cfg.LeaseDuration,
+	)
+	if calendarErr != nil {
+		if identity != nil {
+			_ = identity.Close()
+		}
+		database.Close()
+		_ = shutdownTracing(context.Background())
+		return nil, workerStartupError(
+			"CALENDAR_DEPENDENCY_UNAVAILABLE",
+			calendarErr,
+		)
+	}
+	if calendarDispatcher != nil {
+		dispatchers = append(dispatchers, calendarDispatcher)
+	}
 	operations := worker.New(pool)
 	circuits := map[string]worker.CircuitState{
 		"fiscal": fiscalHTTP, "accounting": accountingHTTP,
@@ -378,6 +540,7 @@ func InitializeWorker(
 			RunOnce:        cfg.RunOnce,
 		},
 		database: database, identity: identity,
+		resources:       compactCloseResources(calendarResource),
 		shutdownTracing: shutdownTracing,
 		shutdownTimeout: cfg.ShutdownTimeout,
 	}, nil
@@ -461,11 +624,22 @@ type closeResource interface {
 	Close() error
 }
 
+func compactCloseResources(resources ...closeResource) []closeResource {
+	compacted := make([]closeResource, 0, len(resources))
+	for _, resource := range resources {
+		if resource != nil {
+			compacted = append(compacted, resource)
+		}
+	}
+	return compacted
+}
+
 type WorkerApp struct {
 	Server          *http.Server
 	Runner          worker.Runner
 	database        *postgres.Database
 	identity        closeResource
+	resources       []closeResource
 	shutdownTracing func(context.Context) error
 	shutdownTimeout time.Duration
 	closeOnce       sync.Once
@@ -504,6 +678,14 @@ func (a *WorkerApp) Close() error {
 	}
 	a.closeOnce.Do(func() {
 		var shutdownErrors []error
+		for index := len(a.resources) - 1; index >= 0; index-- {
+			if err := a.resources[index].Close(); err != nil {
+				shutdownErrors = append(
+					shutdownErrors,
+					workerShutdownError("KMS_CLIENT_CLOSE_FAILED", err),
+				)
+			}
+		}
 		if a.identity != nil {
 			if err := a.identity.Close(); err != nil {
 				shutdownErrors = append(

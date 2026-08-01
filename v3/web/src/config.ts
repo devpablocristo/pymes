@@ -13,9 +13,10 @@ function enabled(value: string | undefined): boolean {
 
 export function loadWebConfig(): WebConfig {
   const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.trim() || null;
-  const allowInsecureLocalAuth = enabled(import.meta.env.VITE_ALLOW_INSECURE_LOCAL_AUTH);
-  const useFakeApi = enabled(import.meta.env.VITE_USE_FAKE_API);
   const e2eBuild = import.meta.env.MODE === "e2e";
+  const allowInsecureLocalAuth =
+    e2eBuild || enabled(import.meta.env.VITE_ALLOW_INSECURE_LOCAL_AUTH);
+  const useFakeApi = e2eBuild || enabled(import.meta.env.VITE_USE_FAKE_API);
   if (import.meta.env.PROD && !e2eBuild && allowInsecureLocalAuth) {
     throw new Error("VITE_ALLOW_INSECURE_LOCAL_AUTH no puede habilitarse en producción.");
   }
@@ -27,7 +28,11 @@ export function loadWebConfig(): WebConfig {
     clerkPublishableKey,
     allowInsecureLocalAuth,
     useFakeApi,
-    localOrganizationId: import.meta.env.VITE_PYMES_ORGANIZATION_ID?.trim() || null,
-    publicOrganizationSlug: import.meta.env.VITE_PYMES_ORGANIZATION_SLUG?.trim() || "demo",
+    localOrganizationId:
+      import.meta.env.VITE_PYMES_ORGANIZATION_ID?.trim() ||
+      (e2eBuild ? "org_e2e" : null),
+    publicOrganizationSlug:
+      import.meta.env.VITE_PYMES_ORGANIZATION_SLUG?.trim() ||
+      (e2eBuild ? "centro-norte" : "demo"),
   };
 }

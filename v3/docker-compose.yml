@@ -184,6 +184,7 @@ services:
       FISCAL_MOCK_SCENARIO: ${FISCAL_MOCK_SCENARIO:-authorized}
       FISCAL_DATABASE_URL: postgres://fiscal:fiscal@fiscal-postgres:5432/pymes_fiscal?sslmode=disable
       PYMES_ENVIRONMENT: development
+      FISCAL_LOCAL_KMS_KEY_B64: BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=
       PYMES_INTERNAL_ISSUER: pymes-v3
       PYMES_INTERNAL_JWKS_JSON: '{"keys":[{"kty":"OKP","crv":"Ed25519","alg":"EdDSA","use":"sig","key_ops":["verify"],"kid":"local-dev-1","x":"ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"}]}'
       PORT: "8080"

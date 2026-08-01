@@ -244,6 +244,7 @@ export function AdminSchedulingPage() {
       notify("success", "Solicitud agregada a la lista de espera.");
     } catch (error) {
       notify("error", errorMessage(error));
+      throw error;
     } finally {
       setPending(null);
     }

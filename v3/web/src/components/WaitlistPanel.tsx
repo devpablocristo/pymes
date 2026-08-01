@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
+import { ClientCommandIdentity } from "../api/clientCommandIdentity";
 import type { Service, WaitlistEntry, WaitlistInput } from "../domain/scheduling";
 
 export function WaitlistPanel({
@@ -23,20 +24,26 @@ export function WaitlistPanel({
   const [email, setEmail] = useState("");
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
   const [day, setDay] = useState(DateTime.now().setZone(timezone).plus({ days: 1 }).toISODate() ?? "");
+  const commandIdentity = useRef(new ClientCommandIdentity());
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const from = DateTime.fromISO(day, { zone: timezone }).startOf("day");
     const customer: WaitlistInput["customer"] = { name };
     if (email) customer.email = email;
-    await onCreate({
+    const payload: Omit<WaitlistInput, "id"> = {
       branch_id: branchId,
       service_id: serviceId,
       customer,
       preferred_from: from.toUTC().toISO()!,
       preferred_until: from.endOf("day").toUTC().toISO()!,
       participants: 1,
+    };
+    await onCreate({
+      id: commandIdentity.current.forPayload(payload),
+      ...payload,
     });
+    commandIdentity.current.reset();
     setName("");
     setEmail("");
   }

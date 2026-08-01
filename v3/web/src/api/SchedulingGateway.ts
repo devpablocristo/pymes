@@ -69,6 +69,6 @@ export interface SchedulingGateway {
   consumePublicAction(token: string, input: PublicActionInput): Promise<void>;
 }
 
-export function newIdempotencyKey(prefix: string): string {
-  return `${prefix}:${crypto.randomUUID()}`;
+export function newIdempotencyKey(prefix: string, sourceID?: string): string {
+  return `${prefix}:${sourceID || crypto.randomUUID()}`;
 }

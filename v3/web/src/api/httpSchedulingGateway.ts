@@ -58,17 +58,21 @@ type MutationContext = {
   params: { "Idempotency-Key": string; "X-Source-Version": number };
 };
 
-async function authenticatedMutation(identity: RequestIdentity, mutation: string): Promise<MutationContext> {
+async function authenticatedMutation(
+  identity: RequestIdentity,
+  mutation: string,
+  sourceID?: string,
+): Promise<MutationContext> {
   const headers = await authenticatedHeaders(identity);
-  const key = newIdempotencyKey(mutation);
+  const key = newIdempotencyKey(mutation, sourceID);
   headers.set("Idempotency-Key", key);
   headers.set("X-Source-Version", "1");
   return { headers, params: { "Idempotency-Key": key, "X-Source-Version": 1 } };
 }
 
-function publicMutation(mutation: string): MutationContext {
+function publicMutation(mutation: string, sourceID?: string): MutationContext {
   const headers = new Headers();
-  const key = newIdempotencyKey(mutation);
+  const key = newIdempotencyKey(mutation, sourceID);
   headers.set("Idempotency-Key", key);
   headers.set("X-Source-Version", "1");
   return { headers, params: { "Idempotency-Key": key, "X-Source-Version": 1 } };
@@ -117,7 +121,18 @@ export function createHttpSchedulingGateway(baseUrl: string): SchedulingGateway 
       );
     },
     async createBooking(identity, input) {
-      const mutation = await authenticatedMutation(identity, "booking:create");
+      if (!input.id) {
+        throw new SchedulingApiError(
+          "VALIDATION_ERROR",
+          "La creación del turno requiere un command ID estable.",
+          400,
+        );
+      }
+      const mutation = await authenticatedMutation(
+        identity,
+        "booking:create",
+        input.id,
+      );
       return unwrap(
         await client.POST("/api/v1/organizations/{organizationId}/scheduling/bookings", {
           params: { path: { organizationId: identity.organizationId }, header: mutation.params },
@@ -127,7 +142,11 @@ export function createHttpSchedulingGateway(baseUrl: string): SchedulingGateway 
       );
     },
     async rescheduleBooking(identity, bookingId, expectedVersion, startAt, durationMinutes, allocations) {
-      const mutation = await authenticatedMutation(identity, `booking:${bookingId}:reschedule`);
+      const mutation = await authenticatedMutation(
+        identity,
+        `booking:${bookingId}:reschedule`,
+        `v${expectedVersion}`,
+      );
       const body = allocations
         ? { expected_version: expectedVersion, start_at: startAt, duration_minutes: durationMinutes, allocations }
         : { expected_version: expectedVersion, start_at: startAt, duration_minutes: durationMinutes };
@@ -140,7 +159,11 @@ export function createHttpSchedulingGateway(baseUrl: string): SchedulingGateway 
       );
     },
     async transitionBooking(identity, bookingId, action: BookingAction, expectedVersion, reason) {
-      const mutation = await authenticatedMutation(identity, `booking:${bookingId}:${action}`);
+      const mutation = await authenticatedMutation(
+        identity,
+        `booking:${bookingId}:${action}`,
+        `v${expectedVersion}`,
+      );
       const body = reason ? { expected_version: expectedVersion, reason } : { expected_version: expectedVersion };
       return unwrap(
         await client.POST("/api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}/{action}", {
@@ -205,7 +228,18 @@ export function createHttpSchedulingGateway(baseUrl: string): SchedulingGateway 
       );
     },
     async createWaitlistEntry(identity, input: WaitlistInput) {
-      const mutation = await authenticatedMutation(identity, "waitlist:create");
+      if (!input.id) {
+        throw new SchedulingApiError(
+          "VALIDATION_ERROR",
+          "La lista de espera requiere un command ID estable.",
+          400,
+        );
+      }
+      const mutation = await authenticatedMutation(
+        identity,
+        "waitlist:create",
+        input.id,
+      );
       return unwrap(
         await client.POST("/api/v1/organizations/{organizationId}/scheduling/waitlist", {
           params: { path: { organizationId: identity.organizationId }, header: mutation.params },
@@ -226,7 +260,18 @@ export function createHttpSchedulingGateway(baseUrl: string): SchedulingGateway 
       );
     },
     async createQueueTicket(identity, input: QueueTicketInput) {
-      const mutation = await authenticatedMutation(identity, "queue:create");
+      if (!input.id) {
+        throw new SchedulingApiError(
+          "VALIDATION_ERROR",
+          "La cola requiere un command ID estable.",
+          400,
+        );
+      }
+      const mutation = await authenticatedMutation(
+        identity,
+        "queue:create",
+        input.id,
+      );
       return unwrap(
         await client.POST("/api/v1/organizations/{organizationId}/scheduling/queue", {
           params: { path: { organizationId: identity.organizationId }, header: mutation.params },
@@ -236,7 +281,11 @@ export function createHttpSchedulingGateway(baseUrl: string): SchedulingGateway 
       );
     },
     async advanceQueueTicket(identity, ticketId, input: QueueAdvanceInput) {
-      const mutation = await authenticatedMutation(identity, `queue:${ticketId}:${input.status}`);
+      const mutation = await authenticatedMutation(
+        identity,
+        `queue:${ticketId}:${input.status}`,
+        `v${input.expected_version}`,
+      );
       return unwrap(
         await client.POST("/api/v1/organizations/{organizationId}/scheduling/queue/{ticketId}", {
           params: {
@@ -264,7 +313,14 @@ export function createHttpSchedulingGateway(baseUrl: string): SchedulingGateway 
       );
     },
     async createPublicBooking(organizationSlug, input) {
-      const mutation = publicMutation("public-booking:create");
+      if (!input.id) {
+        throw new SchedulingApiError(
+          "VALIDATION_ERROR",
+          "La reserva requiere un command ID estable.",
+          400,
+        );
+      }
+      const mutation = publicMutation("public-booking:create", input.id);
       return unwrap(
         await client.POST("/api/v1/public/scheduling/{organizationSlug}/bookings", {
           params: { path: { organizationSlug }, header: mutation.params },
@@ -274,7 +330,14 @@ export function createHttpSchedulingGateway(baseUrl: string): SchedulingGateway 
       );
     },
     async createPublicWaitlistEntry(organizationSlug, input: WaitlistInput) {
-      const mutation = publicMutation("public-waitlist:create");
+      if (!input.id) {
+        throw new SchedulingApiError(
+          "VALIDATION_ERROR",
+          "La lista de espera requiere un command ID estable.",
+          400,
+        );
+      }
+      const mutation = publicMutation("public-waitlist:create", input.id);
       return unwrap(
         await client.POST("/api/v1/public/scheduling/{organizationSlug}/waitlist", {
           params: { path: { organizationSlug }, header: mutation.params },

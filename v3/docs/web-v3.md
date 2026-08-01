@@ -53,6 +53,12 @@ build de producción.
 - booking público por sucursal, servicio, profesional opcional, slot y cliente;
 - acciones públicas por token de propósito único.
 
+Los formularios de creación conservan un command ID mientras su snapshot no
+cambie. Un reenvío idéntico después de perder la respuesta reutiliza la misma
+`Idempotency-Key`; editar el formulario genera otro command ID. Las
+reprogramaciones, transiciones y avances de cola ligan la clave a la versión
+optimista que intentan modificar.
+
 FullCalendar permanece en Standard `6.1.21`, con Luxon 3 y `luxon3`. No se
 incluyen Premium, RRule ni FullCalendar 7.
 

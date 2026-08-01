@@ -1,7 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { formatSchedulingDateOnly } from "@devpablocristo/platform-scheduling/next";
 import { DateTime } from "luxon";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { ClientCommandIdentity } from "../api/clientCommandIdentity";
 import { useSchedulingGateway } from "../api/GatewayContext";
 import { errorMessage } from "../api/errors";
 import type { PublicBooking, PublicCatalog, Slot } from "../domain/scheduling";
@@ -39,6 +46,8 @@ export function PublicBookingPage({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [waitlisted, setWaitlisted] = useState(false);
+  const bookingCommand = useRef(new ClientCommandIdentity());
+  const waitlistCommand = useRef(new ClientCommandIdentity());
   const steps: ReadonlyArray<{ label: string; number: Step }> = [
     { label: "Servicio", number: 1 },
     { label: "Horario", number: 2 },
@@ -107,7 +116,7 @@ export function PublicBookingPage({
     setError(null);
     try {
       const customer = { name, ...(email ? { email } : {}), ...(phone ? { phone } : {}) };
-      const created = await gateway.createPublicBooking(organizationSlug, {
+      const payload = {
         branch_id: branchId,
         service_id: service.id,
         customer,
@@ -115,7 +124,12 @@ export function PublicBookingPage({
         participants,
         allocations: selectedSlot.allocations,
         ...(notes ? { notes } : {}),
+      };
+      const created = await gateway.createPublicBooking(organizationSlug, {
+        id: bookingCommand.current.forPayload(payload),
+        ...payload,
       });
+      bookingCommand.current.reset();
       setBooking(created[0] ?? null);
       setStep(4);
     } catch (caught) {
@@ -135,14 +149,19 @@ export function PublicBookingPage({
     }
     setPending(true);
     try {
-      await gateway.createPublicWaitlistEntry(organizationSlug, {
+      const payload = {
         branch_id: branchId,
         service_id: service.id,
         customer: { name, ...(email ? { email } : {}), ...(phone ? { phone } : {}) },
         preferred_from: from,
         preferred_until: until,
         participants,
+      };
+      await gateway.createPublicWaitlistEntry(organizationSlug, {
+        id: waitlistCommand.current.forPayload(payload),
+        ...payload,
       });
+      waitlistCommand.current.reset();
       setWaitlisted(true);
       setStep(4);
     } catch (caught) {

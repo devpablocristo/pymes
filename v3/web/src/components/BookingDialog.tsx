@@ -1,5 +1,12 @@
 import { DateTime } from "luxon";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { ClientCommandIdentity } from "../api/clientCommandIdentity";
 import type {
   Allocation,
   Booking,
@@ -73,12 +80,19 @@ export function BookingDialog({
   const [participants, setParticipants] = useState(1);
   const [notes, setNotes] = useState("");
   const [allocationIds, setAllocationIds] = useState<string[]>([]);
+  const commandIdentity = useRef(new ClientCommandIdentity());
 
   const selectedService = services.find((item) => item.id === serviceId);
   const branchResources = useMemo(
     () => resources.filter((resource) => resource.branch_id === selectedBranchId),
     [resources, selectedBranchId],
   );
+
+  useEffect(() => {
+    if (!open) {
+      commandIdentity.current.reset();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -130,7 +144,7 @@ export function BookingDialog({
     const customer: BookingInput["customer"] = { name: customerName };
     if (customerEmail) customer.email = customerEmail;
     if (customerPhone) customer.phone = customerPhone;
-    const input: BookingInput = {
+    const payload: Omit<BookingInput, "id"> = {
       branch_id: selectedBranchId,
       service_id: selectedService.id,
       customer,
@@ -139,7 +153,11 @@ export function BookingDialog({
       status: selectedService.confirmation_required ? "pending_confirmation" : "confirmed",
       allocations,
     };
-    if (notes) input.notes = notes;
+    if (notes) payload.notes = notes;
+    const input: BookingInput = {
+      id: commandIdentity.current.forPayload(payload),
+      ...payload,
+    };
     await onCreate(input);
   }
 

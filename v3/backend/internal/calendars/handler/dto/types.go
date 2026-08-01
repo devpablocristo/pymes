@@ -14,11 +14,6 @@ type OAuthStartResponse struct {
 	ExpiresAt        time.Time `json:"expires_at"`
 }
 
-type CompleteGoogleOAuthRequest struct {
-	State string `json:"state"`
-	Code  string `json:"code"`
-}
-
 type ConnectionResponse struct {
 	ID                string    `json:"id"`
 	Provider          string    `json:"provider"`

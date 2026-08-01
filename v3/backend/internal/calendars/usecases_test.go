@@ -207,8 +207,8 @@ func TestOAuthFlowBindsStateToSessionAndReconcilesLostCalendarResponse(
 	if _, err := commands.CompleteGoogleOAuth(
 		context.Background(),
 		CompleteOAuthInput{
-			OrganizationID: "org-a", ActorID: "user-a",
-			SessionBinding: "other-session", State: google.state, Code: "code",
+			ActorID: "user-a", SessionBinding: "other-session",
+			State: google.state, Code: "code",
 		},
 	); !errors.Is(err, domain.ErrOAuthStateInvalid) {
 		t.Fatalf("cross-session callback = %v", err)
@@ -216,8 +216,8 @@ func TestOAuthFlowBindsStateToSessionAndReconcilesLostCalendarResponse(
 	connection, err := commands.CompleteGoogleOAuth(
 		context.Background(),
 		CompleteOAuthInput{
-			OrganizationID: "org-a", ActorID: "user-a",
-			SessionBinding: "session-a", State: google.state, Code: "code",
+			ActorID: "user-a", SessionBinding: "session-a",
+			State: google.state, Code: "code",
 		},
 	)
 	if err != nil {
@@ -231,8 +231,8 @@ func TestOAuthFlowBindsStateToSessionAndReconcilesLostCalendarResponse(
 	if _, err := commands.CompleteGoogleOAuth(
 		context.Background(),
 		CompleteOAuthInput{
-			OrganizationID: "org-a", ActorID: "user-a",
-			SessionBinding: "session-a", State: google.state, Code: "code",
+			ActorID: "user-a", SessionBinding: "session-a",
+			State: google.state, Code: "code",
 		},
 	); !errors.Is(err, domain.ErrOAuthStateConsumed) {
 		t.Fatalf("replayed callback = %v", err)

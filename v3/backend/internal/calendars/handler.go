@@ -48,8 +48,8 @@ func (handler CalendarHTTP) RegisterRoutes(router chi.Router) {
 		"/api/v1/organizations/{organizationID}/calendars/google/oauth/start",
 		handler.startGoogleOAuth,
 	)
-	router.Post(
-		"/api/v1/organizations/{organizationID}/calendars/google/oauth/complete",
+	router.Get(
+		"/api/v1/calendars/google/oauth/callback",
 		handler.completeGoogleOAuth,
 	)
 	router.Get(
@@ -101,22 +101,27 @@ func (handler CalendarHTTP) completeGoogleOAuth(
 	w http.ResponseWriter,
 	request *http.Request,
 ) {
-	organizationID := chi.URLParam(request, "organizationID")
+	state := request.URL.Query().Get("state")
+	organizationID, err := domain.OrganizationFromOAuthState(state)
+	if err != nil {
+		handlerhelpers.WriteDomainError(w, err)
+		return
+	}
 	principal, ok := handler.authorize(w, request, organizationID, true)
 	if !ok {
 		return
 	}
-	var input handlerdto.CompleteGoogleOAuthRequest
-	if handlerhelpers.DecodeJSON(request, &input) != nil {
-		handlerhelpers.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR")
+	if request.URL.Query().Get("error") != "" {
+		handlerhelpers.WriteError(
+			w, http.StatusBadRequest, "OAUTH_PROVIDER_DENIED",
+		)
 		return
 	}
 	connection, err := handler.Commands.CompleteGoogleOAuth(
 		identityusecases.WithPrincipal(request.Context(), principal),
 		CompleteOAuthInput{
-			OrganizationID: organizationID, ActorID: principal.ActorID,
-			SessionBinding: principal.SessionID,
-			State:          input.State, Code: input.Code,
+			ActorID: principal.ActorID, SessionBinding: principal.SessionID,
+			State: state, Code: request.URL.Query().Get("code"),
 		},
 	)
 	if err != nil {

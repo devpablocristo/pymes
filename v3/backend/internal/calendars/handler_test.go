@@ -1,6 +1,7 @@
 package calendars
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -105,10 +106,17 @@ func TestCalendarBFFBindsOAuthToVerifiedClerkSessionAndHidesTokens(
 		commands.startInput.OrganizationID != "org-a" {
 		t.Fatalf("start input = %+v", commands.startInput)
 	}
+	state, err := domain.RoutedOAuthState(
+		"org-a", bytes.Repeat([]byte{0x42}, 32),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	completeRequest := httptest.NewRequest(
-		http.MethodPost,
-		"/api/v1/organizations/org-a/calendars/google/oauth/complete",
-		strings.NewReader(`{"state":"opaque","code":"authorization-code"}`),
+		http.MethodGet,
+		"/api/v1/calendars/google/oauth/callback?state="+state+
+			"&code=authorization-code",
+		nil,
 	)
 	completeResponse := httptest.NewRecorder()
 	handler.ServeHTTP(completeResponse, completeRequest)
@@ -120,7 +128,7 @@ func TestCalendarBFFBindsOAuthToVerifiedClerkSessionAndHidesTokens(
 	}
 	body := completeResponse.Body.String()
 	for _, forbidden := range []string{
-		"authorization-code", "opaque", `"access_token":`,
+		"authorization-code", state, `"access_token":`,
 		`"refresh_token":`, `"calendar_id":`,
 	} {
 		if strings.Contains(body, forbidden) {
@@ -129,6 +137,37 @@ func TestCalendarBFFBindsOAuthToVerifiedClerkSessionAndHidesTokens(
 	}
 	if commands.completeInput.SessionBinding != "session-a" {
 		t.Fatalf("complete input = %+v", commands.completeInput)
+	}
+	if commands.completeInput.State != state {
+		t.Fatalf("complete state was not forwarded")
+	}
+}
+
+func TestCalendarBFFCallbackRejectsTenantHintOutsideClerkSession(t *testing.T) {
+	t.Parallel()
+	state, err := domain.RoutedOAuthState(
+		"org-a", bytes.Repeat([]byte{0x33}, 32),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := NewCalendarHTTP(
+		&calendarHandlerCommands{},
+		calendarHandlerAuth{principal: identitydomain.Principal{
+			OrganizationID: "org-b", ActorID: "user-b",
+			SessionID: "session-b", Role: identitydomain.RoleOwner,
+			OrganizationStatus: "ready", MembershipStatus: "active",
+		}},
+	).Handler()
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/calendars/google/oauth/callback?state="+state+"&code=code",
+		nil,
+	)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body)
 	}
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -88,7 +87,10 @@ func (commands Commands) StartGoogleOAuth(
 	if _, err := io.ReadFull(reader, rawState); err != nil {
 		return OAuthStart{}, fmt.Errorf("generate OAuth state: %w", err)
 	}
-	state := base64.RawURLEncoding.EncodeToString(rawState)
+	state, err := domain.RoutedOAuthState(input.OrganizationID, rawState)
+	if err != nil {
+		return OAuthStart{}, err
+	}
 	stateHash := sha256.Sum256([]byte(state))
 	now := commands.clock()
 	scopes := []string{scopeCalendarCreated, scopeCalendarListRead}
@@ -128,7 +130,6 @@ func (commands Commands) StartGoogleOAuth(
 }
 
 type CompleteOAuthInput struct {
-	OrganizationID string
 	ActorID        string
 	SessionBinding string
 	State          string
@@ -140,14 +141,18 @@ func (commands Commands) CompleteGoogleOAuth(
 	input CompleteOAuthInput,
 ) (domain.Connection, error) {
 	if commands.Repository == nil || commands.Google == nil ||
-		input.OrganizationID == "" || input.ActorID == "" ||
-		input.SessionBinding == "" || strings.TrimSpace(input.State) == "" ||
+		input.ActorID == "" || input.SessionBinding == "" ||
+		strings.TrimSpace(input.State) == "" ||
 		strings.TrimSpace(input.Code) == "" {
 		return domain.Connection{}, fmt.Errorf("VALIDATION_ERROR")
 	}
+	organizationID, err := domain.OrganizationFromOAuthState(input.State)
+	if err != nil {
+		return domain.Connection{}, err
+	}
 	stateHash := sha256.Sum256([]byte(input.State))
 	state, err := commands.Repository.ConsumeOAuthState(
-		ctx, input.OrganizationID, input.ActorID, input.SessionBinding,
+		ctx, organizationID, input.ActorID, input.SessionBinding,
 		hex.EncodeToString(stateHash[:]), commands.clock(),
 	)
 	if err != nil {

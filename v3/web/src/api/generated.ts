@@ -76,6 +76,117 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/webhooks/pergo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recibe estados de entrega firmados por PerGo.
+         * @description Endpoint exclusivo para PerGo. Verifica X-PerGo-Signature sobre el cuerpo crudo, una ventana temporal máxima de cinco minutos, el workspace configurado y el trace_id determinístico tenant-aware de Pymes. La organización nunca se acepta desde el path. El inbox hace que reintentos del mismo webhook sean idempotentes.
+         */
+        post: operations["pergoWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/notifications/{notificationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Consulta el estado comercial de una notificación.
+         * @description Nunca expone teléfono, cuerpo, variables ni credenciales del proveedor.
+         */
+        get: operations["getNotification"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/calendars/google/oauth/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Inicia una conexión OAuth de Google Calendar para la organización. */
+        post: operations["startGoogleCalendarOAuth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendars/google/oauth/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Completa OAuth directamente en el BFF sin entregar el código a la web.
+         * @description Google redirige a esta ruta global. El BFF vuelve a autenticar la misma sesión Clerk y consume el state una sola vez, ligado a tenant, actor, sesión y vencimiento.
+         */
+        get: operations["completeGoogleCalendarOAuth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/calendars/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lista conexiones Calendar sin exponer grants ni tokens. */
+        get: operations["listCalendarConnections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/calendars/connections/{connectionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoca y desconecta una conexión Calendar de la organización. */
+        delete: operations["disconnectCalendarConnection"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations/{organizationId}/sales": {
         parameters: {
             query?: never;
@@ -387,6 +498,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations/{organizationId}/scheduling/status-configurations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["parameters-OrganizationId"];
+            };
+            cookie?: never;
+        };
+        get: operations["listSchedulingBookingStatusConfigurations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/scheduling/status-configurations/{status}": {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
+            };
+            path: {
+                organizationId: components["parameters"]["parameters-OrganizationId"];
+                status: components["schemas"]["BookingStatus"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["configureSchedulingBookingStatus"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations/{organizationId}/scheduling/bookings": {
         parameters: {
             query?: never;
@@ -440,6 +591,28 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["rescheduleSchedulingBooking"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}/substate": {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
+            };
+            path: {
+                organizationId: components["parameters"]["parameters-OrganizationId"];
+                bookingId: components["parameters"]["BookingId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["setSchedulingBookingSubstate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -607,6 +780,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations/{organizationId}/fiscal/credentials/csr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Genera dentro de Fiscal la clave privada tenant y devuelve sólo el CSR público. */
+        post: operations["requestFiscalCredentialCSR"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Consulta metadatos fiscales sin devolver material criptográfico. */
+        get: operations["getFiscalCredential"];
+        /** Entrega a Fiscal el certificado emitido por ARCA para la clave tenant. */
+        put: operations["uploadFiscalCertificate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}/points-of-sale/{pointOfSale}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["configureFiscalPointOfSale"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Valida WSAA/WSFE sin emitir un comprobante y opcionalmente habilita el punto. */
+        post: operations["validateFiscalPointOfSale"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/features": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Consulta los rollouts habilitados para la organización autenticada.
+         * @description Devuelve únicamente configuración de producto. No expone credenciales, secretos ni configuración interna de los proveedores.
+         */
+        get: operations["getOrganizationFeatures"];
+        /**
+         * Reemplaza atómicamente los cuatro rollouts de una organización.
+         * @description Requiere owner/admin, organización ready y expected_version. Todos los flags tienen default seguro false y el cambio queda auditado.
+         */
+        put: operations["updateOrganizationFeatures"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -626,7 +891,148 @@ export interface components {
         };
         Error: {
             /** @enum {string} */
-            code: "AUTH_NOT_CONFIGURED" | "FORBIDDEN" | "ORG_NOT_PROVISIONED" | "NOT_FOUND" | "IDEMPOTENCY_KEY_REQUIRED" | "SOURCE_VERSION_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "DOCUMENT_NOT_REVERSIBLE" | "INVALID_APPLICATION_DOCUMENT" | "INVALID_SOURCE_DOCUMENT" | "OPEN_ITEM_AMOUNT_EXCEEDED" | "PERIOD_LOCKED" | "ACCOUNTING_ADJUSTMENT_NOT_ALLOWED" | "VALIDATION_ERROR" | "COMMAND_REJECTED";
+            code: "AUTH_NOT_CONFIGURED" | "FORBIDDEN" | "ORG_NOT_PROVISIONED" | "NOT_FOUND" | "IDEMPOTENCY_KEY_REQUIRED" | "SOURCE_VERSION_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "DOCUMENT_NOT_REVERSIBLE" | "INVALID_APPLICATION_DOCUMENT" | "INVALID_SOURCE_DOCUMENT" | "OPEN_ITEM_AMOUNT_EXCEEDED" | "PERIOD_LOCKED" | "ACCOUNTING_ADJUSTMENT_NOT_ALLOWED" | "CREDENTIAL_NOT_FOUND" | "CREDENTIAL_NOT_READY" | "CREDENTIAL_VERSION_CONFLICT" | "CERTIFICATE_INVALID" | "CERTIFICATE_CUIT_MISMATCH" | "CERTIFICATE_ENVIRONMENT_MISMATCH" | "POINT_OF_SALE_NOT_VALIDATED" | "AUTHORITY_TIMEOUT" | "FISCAL_UNAVAILABLE" | "VALIDATION_ERROR" | "COMMAND_REJECTED" | "NOTIFICATIONS_UNAVAILABLE" | "PERGO_WEBHOOK_NOT_CONFIGURED" | "PERGO_WEBHOOK_SIGNATURE_INVALID" | "PERGO_WEBHOOK_INVALID" | "NOTIFICATION_NOT_FOUND" | "OAUTH_PROVIDER_DENIED" | "OAUTH_STATE_INVALID" | "OAUTH_STATE_EXPIRED" | "FEATURE_DISABLED" | "FEATURE_VERSION_CONFLICT" | "CALENDAR_REAUTH_REQUIRED" | "CALENDAR_PROVIDER_UNAVAILABLE" | "INTERNAL_ERROR";
+        };
+        OrganizationFeatureFlagsUpdate: {
+            /** @default false */
+            scheduling_enabled: boolean;
+            /** @default false */
+            whatsapp_enabled: boolean;
+            /** @default false */
+            google_calendar_enabled: boolean;
+            /** @default false */
+            fiscal_real_enabled: boolean;
+            /** Format: int64 */
+            expected_version: number;
+        };
+        OrganizationFeatureFlags: {
+            readonly organization_id: string;
+            scheduling_enabled: boolean;
+            whatsapp_enabled: boolean;
+            google_calendar_enabled: boolean;
+            fiscal_real_enabled: boolean;
+            /** Format: int64 */
+            readonly version: number;
+            /** Format: date-time */
+            readonly updated_at: string;
+            readonly updated_by: string;
+        };
+        GoogleCalendarOAuthStartInput: {
+            /** @description Zona IANA usada por el calendario secundario. */
+            time_zone: string;
+            free_busy_enabled: boolean;
+            meet_enabled: boolean;
+        };
+        GoogleCalendarOAuthStart: {
+            /** Format: uuid */
+            connection_id: string;
+            /** Format: uri */
+            authorization_url: string;
+            /** Format: date-time */
+            expires_at: string;
+        };
+        CalendarConnection: {
+            /** Format: uuid */
+            id: string;
+            /** @constant */
+            provider: "google";
+            /** @enum {string} */
+            status: "pending" | "active" | "reauth_required" | "revoked";
+            calendar_connected: boolean;
+            time_zone: string;
+            free_busy_enabled: boolean;
+            meet_enabled: boolean;
+            /** Format: date-time */
+            access_token_expires_at?: string;
+            version: number;
+        };
+        PerGoDeliveryEvent: {
+            /** @enum {string} */
+            event: "message.queued" | "message.sent" | "message.delivered" | "message.read" | "message.failed";
+            trace_id: string;
+            message_id: string;
+            /** @enum {string} */
+            channel: "whatsapp" | "whatsapp_cloud" | "whatsapp_mock";
+            /** Format: date-time */
+            timestamp: string;
+            workspace_id: string;
+            /** @description No se persiste ni se expone; Pymes conserva sólo un código estable. */
+            error?: string;
+        };
+        Notification: {
+            id: string;
+            organization_id: string;
+            /** @enum {string} */
+            kind: "confirmation" | "reminder" | "rescheduled" | "cancellation" | "waitlist";
+            aggregate_type: string;
+            aggregate_id: string;
+            template_name: string;
+            template_version: number;
+            locale: string;
+            /** Format: date-time */
+            send_at: string;
+            /** @enum {string} */
+            status: "pending" | "uncertain" | "queued" | "sent" | "delivered" | "read" | "failed";
+            readonly external_message_id?: string;
+            correlation_id: string;
+            readonly failure_code?: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        FiscalCredentialCSRInput: {
+            cuit: string;
+            legal_name: string;
+            common_name: string;
+            /** @enum {string} */
+            environment: "homologation" | "production";
+        };
+        FiscalCredential: {
+            /** Format: uuid */
+            id: string;
+            organization_id: string;
+            cuit: string;
+            legal_name: string;
+            common_name: string;
+            /** @enum {string} */
+            environment: "homologation" | "production";
+            /** @enum {string} */
+            status: "pending_certificate" | "ready" | "expired" | "disabled";
+            version: number;
+            readonly certificate_fingerprint?: string;
+            readonly certificate_serial_number?: string;
+            /** Format: date-time */
+            readonly certificate_valid_from?: string;
+            /** Format: date-time */
+            readonly certificate_expires_at?: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        FiscalCredentialCSRResult: {
+            credential: components["schemas"]["FiscalCredential"];
+            /** @description CSR público para registrar en ARCA; nunca contiene la clave privada. */
+            readonly csr_pem: string;
+        };
+        FiscalCertificateUpload: {
+            certificate_pem: string;
+            expected_version: number;
+        };
+        FiscalPointOfSaleConfiguration: {
+            enabled: boolean;
+        };
+        FiscalPointOfSale: {
+            organization_id: string;
+            /** Format: uuid */
+            credential_id: string;
+            /** @enum {string} */
+            environment: "homologation" | "production";
+            number: number;
+            enabled: boolean;
+            /** Format: date-time */
+            readonly validated_at?: string;
         };
         AccountingFailureRef: {
             /** Format: uuid */
@@ -710,6 +1116,20 @@ export interface components {
                 environment: "homologation" | "production";
                 /** Format: date */
                 issue_date: string;
+                /**
+                 * @description Concepto WSFE; se congela como products cuando el cliente lo omite.
+                 * @default products
+                 * @enum {string}
+                 */
+                concept: "products" | "services" | "products_and_services";
+                service_period?: {
+                    /** Format: date */
+                    from: string;
+                    /** Format: date */
+                    to: string;
+                    /** Format: date */
+                    payment_due: string;
+                };
                 totals: Record<string, never>;
                 recipient: Record<string, never>;
                 lines: Record<string, never>[];
@@ -1025,6 +1445,25 @@ export interface components {
             /** @enum {string} */
             status: "open" | "closed" | "cancelled" | "completed";
         };
+        /** @enum {string} */
+        BookingStatus: "held" | "pending_confirmation" | "confirmed" | "checked_in" | "completed" | "cancelled" | "rescheduled" | "no_show";
+        BookingSubstateDefinition: {
+            code: string;
+            label: string;
+            active: boolean;
+            sort_order: number;
+        };
+        BookingStatusConfiguration: {
+            status: components["schemas"]["BookingStatus"];
+            label: string;
+            substates: components["schemas"]["BookingSubstateDefinition"][];
+            /** Format: date-time */
+            updated_at: string;
+        };
+        BookingStatusConfigurationInput: {
+            label: string;
+            substates: components["schemas"]["BookingSubstateDefinition"][];
+        };
         Booking: {
             /** Format: uuid */
             id: string;
@@ -1039,8 +1478,8 @@ export interface components {
             /** Format: uuid */
             service_id: string;
             party_id: string;
-            /** @enum {string} */
-            status: "held" | "pending_confirmation" | "confirmed" | "checked_in" | "completed" | "cancelled" | "rescheduled" | "no_show";
+            status: components["schemas"]["BookingStatus"];
+            substate_code?: string;
             participants: number;
             /** Format: date-time */
             start_at: string;
@@ -1103,6 +1542,11 @@ export interface components {
             /** @description Duración snapshot nueva para resize; omitida conserva la actual. */
             duration_minutes?: number;
             allocations?: components["schemas"]["Allocation"][];
+        };
+        SetBookingSubstateInput: {
+            expected_version: number;
+            /** @description Código configurado para el estado interno actual; vacío elimina el subestado. */
+            substate_code: string;
         };
         TransitionInput: {
             expected_version: number;
@@ -1217,6 +1661,24 @@ export interface components {
             branches: components["schemas"]["PublicSchedulingBranch"][];
             services: components["schemas"]["PublicSchedulingService"][];
             resources: components["schemas"]["PublicSchedulingResource"][];
+        };
+        PublicBookingInput: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            branch_id: string;
+            /** Format: uuid */
+            service_id: string;
+            /** Format: uuid */
+            session_id?: string;
+            customer: components["schemas"]["Customer"];
+            /** Format: date-time */
+            start_at: string;
+            participants: number;
+            hold_minutes?: number;
+            allocations?: components["schemas"]["Allocation"][];
+            notes?: string;
+            recurrence?: components["schemas"]["Recurrence"];
         };
         PublicBooking: {
             /** Format: uuid */
@@ -1335,6 +1797,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description Fiscal o ARCA no están disponibles; no se expone detalle sensible. */
+        FiscalUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description Falta membresía activa, tenant listo o permiso scheduling. */
         "responses-Forbidden": {
             headers: {
@@ -1356,6 +1827,8 @@ export interface components {
     };
     parameters: {
         OrganizationId: string;
+        FiscalCredentialId: string;
+        FiscalPointOfSaleNumber: number;
         /** @description Clave pública estable. Queda vinculada a organización, operación, source ID y source version. */
         IdempotencyKey: string;
         /** @description Versión positiva del snapshot de origen incluida en la identidad idempotente. */
@@ -1498,6 +1971,233 @@ export interface operations {
                 };
                 content: {
                     "text/plain": string;
+                };
+            };
+        };
+    };
+    pergoWebhook: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-PerGo-Signature": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PerGoDeliveryEvent"];
+            };
+        };
+        responses: {
+            /** @description Estado autenticado */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Evento inválido o no aplicable. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Firma inválida, ausente o vencida. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description La intención no existe dentro de la organización. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Integración no configurada. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getNotification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+                notificationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Proyección de entrega. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Notification"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    startGoogleCalendarOAuth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoogleCalendarOAuthStartInput"];
+            };
+        };
+        responses: {
+            /** @description Estado OAuth durable, de propósito único y ligado a la sesión Clerk. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleCalendarOAuthStart"];
+                };
+            };
+            400: components["responses"]["InvalidCommand"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["DomainError"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    completeGoogleCalendarOAuth: {
+        parameters: {
+            query: {
+                state: string;
+                code?: string;
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Conexión creada o reconciliada. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarConnection"];
+                };
+            };
+            400: components["responses"]["InvalidCommand"];
+            /** @description La conexión requiere una nueva autorización. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description El estado OAuth venció. */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            422: components["responses"]["DomainError"];
+            /** @description Google Calendar o IAM no está disponible. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listCalendarConnections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Conexiones visibles dentro de la organización. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarConnection"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    disconnectCalendarConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+                connectionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Conexión revocada o desconexión ya convergida. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description Google Calendar o IAM no está disponible. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -2176,6 +2876,62 @@ export interface operations {
             409: components["responses"]["SchedulingError"];
         };
     };
+    listSchedulingBookingStatusConfigurations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["parameters-OrganizationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Etiquetas y subestados configurados sin alterar el estado interno */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingStatusConfiguration"][];
+                };
+            };
+            403: components["responses"]["responses-Forbidden"];
+        };
+    };
+    configureSchedulingBookingStatus: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
+            };
+            path: {
+                organizationId: components["parameters"]["parameters-OrganizationId"];
+                status: components["schemas"]["BookingStatus"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingStatusConfigurationInput"];
+            };
+        };
+        responses: {
+            /** @description Configuración aplicada */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingStatusConfiguration"];
+                };
+            };
+            400: components["responses"]["SchedulingError"];
+            403: components["responses"]["responses-Forbidden"];
+            409: components["responses"]["SchedulingError"];
+        };
+    };
     listSchedulingBookings: {
         parameters: {
             query: {
@@ -2280,6 +3036,39 @@ export interface operations {
         };
         responses: {
             /** @description Turno reemplazante */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Booking"];
+                };
+            };
+            400: components["responses"]["SchedulingError"];
+            403: components["responses"]["responses-Forbidden"];
+            409: components["responses"]["SchedulingError"];
+        };
+    };
+    setSchedulingBookingSubstate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["parameters-IdempotencyKey"];
+                "X-Source-Version"?: components["parameters"]["parameters-SourceVersion"];
+            };
+            path: {
+                organizationId: components["parameters"]["parameters-OrganizationId"];
+                bookingId: components["parameters"]["BookingId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetBookingSubstateInput"];
+            };
+        };
+        responses: {
+            /** @description Subestado aplicado sin cambiar el estado interno */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2538,7 +3327,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["BookingInput"];
+                "application/json": components["schemas"]["PublicBookingInput"];
             };
         };
         responses: {
@@ -2618,6 +3407,231 @@ export interface operations {
             401: components["responses"]["SchedulingError"];
             409: components["responses"]["SchedulingError"];
             410: components["responses"]["SchedulingError"];
+        };
+    };
+    requestFiscalCredentialCSR: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Clave pública estable. Queda vinculada a organización, operación, source ID y source version. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FiscalCredentialCSRInput"];
+            };
+        };
+        responses: {
+            /** @description Clave generada y cifrada; la clave privada nunca atraviesa el BFF. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalCredentialCSRResult"];
+                };
+            };
+            400: components["responses"]["InvalidCommand"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["IdempotencyConflict"];
+            422: components["responses"]["DomainError"];
+            503: components["responses"]["FiscalUnavailable"];
+        };
+    };
+    getFiscalCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+                credentialId: components["parameters"]["FiscalCredentialId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Metadatos de la credencial tenant. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalCredential"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["DomainError"];
+            503: components["responses"]["FiscalUnavailable"];
+        };
+    };
+    uploadFiscalCertificate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+                credentialId: components["parameters"]["FiscalCredentialId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FiscalCertificateUpload"];
+            };
+        };
+        responses: {
+            /** @description Certificado validado y cifrado dentro de Fiscal. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalCredential"];
+                };
+            };
+            400: components["responses"]["InvalidCommand"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["IdempotencyConflict"];
+            422: components["responses"]["DomainError"];
+            503: components["responses"]["FiscalUnavailable"];
+        };
+    };
+    configureFiscalPointOfSale: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+                credentialId: components["parameters"]["FiscalCredentialId"];
+                pointOfSale: components["parameters"]["FiscalPointOfSaleNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FiscalPointOfSaleConfiguration"];
+            };
+        };
+        responses: {
+            /** @description Punto de venta configurado. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalPointOfSale"];
+                };
+            };
+            400: components["responses"]["InvalidCommand"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["DomainError"];
+            503: components["responses"]["FiscalUnavailable"];
+        };
+    };
+    validateFiscalPointOfSale: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+                credentialId: components["parameters"]["FiscalCredentialId"];
+                pointOfSale: components["parameters"]["FiscalPointOfSaleNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FiscalPointOfSaleConfiguration"];
+            };
+        };
+        responses: {
+            /** @description Credencial y punto de venta validados contra ARCA. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalPointOfSale"];
+                };
+            };
+            400: components["responses"]["InvalidCommand"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["DomainError"];
+            503: components["responses"]["FiscalUnavailable"];
+        };
+    };
+    getOrganizationFeatures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Configuración tenant y versión optimista. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationFeatureFlags"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["AuthUnavailable"];
+        };
+    };
+    updateOrganizationFeatures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: components["parameters"]["OrganizationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrganizationFeatureFlagsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Configuración actualizada. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationFeatureFlags"];
+                };
+            };
+            400: components["responses"]["InvalidCommand"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description expected_version no coincide con la versión actual. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            422: components["responses"]["DomainError"];
+            503: components["responses"]["AuthUnavailable"];
         };
     };
 }

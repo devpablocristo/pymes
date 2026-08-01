@@ -449,12 +449,18 @@ paths:
     $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1blocks'
   /api/v1/organizations/{organizationId}/scheduling/sessions:
     $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1sessions'
+  /api/v1/organizations/{organizationId}/scheduling/status-configurations:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1status-configurations'
+  /api/v1/organizations/{organizationId}/scheduling/status-configurations/{status}:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1status-configurations~1{status}'
   /api/v1/organizations/{organizationId}/scheduling/bookings:
     $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1bookings'
   /api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}:
     $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1bookings~1{bookingId}'
   /api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}/reschedule:
     $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1bookings~1{bookingId}~1reschedule'
+  /api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}/substate:
+    $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1bookings~1{bookingId}~1substate'
   /api/v1/organizations/{organizationId}/scheduling/bookings/{bookingId}/{action}:
     $ref: './scheduling.openapi.yaml#/paths/~1api~1v1~1organizations~1{organizationId}~1scheduling~1bookings~1{bookingId}~1{action}'
   /api/v1/organizations/{organizationId}/scheduling/waitlist:

@@ -1,7 +1,8 @@
 .DEFAULT_GOAL := help
-.PHONY: help build migration-image-check test fiscal-test accounting-test quality security fiscal-e2e accounting-e2e commercial-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate architecture-check db-integration backup-restore-smoke e2e ci up down backup restore
+.PHONY: help build migration-image-check test fiscal-test accounting-test quality security fiscal-e2e accounting-e2e commercial-e2e scheduling-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate architecture-check db-integration backup-restore-smoke e2e ci up down backup restore
 
 ACCOUNTING_BUILD_CONTEXT ?= ../../open-accounting
+PUBLIC_GO_OPERATION_IDS := getHealthz,getReadyz,createSale,createParty,getParty,createPurchase,getPurchase,createPayment,getPayment,createAccountingReversal,getAccountingFailure,createAccountingAdjustment,getSale
 
 help:
 	@echo "Pymes v3"
@@ -15,6 +16,7 @@ help:
 	@echo "  make fiscal-e2e      Valida el cliente Go contra el backend fiscal mock"
 	@echo "  make accounting-e2e  Valida el cliente Go contra Open Accounting headless"
 	@echo "  make commercial-e2e  Recorre la vertical pública completa contra servicios reales/mocks"
+	@echo "  make scheduling-e2e  Valida Agenda HTTP/PostgreSQL, aislamiento y concurrencia"
 	@echo "  make observability-e2e  Comprueba salud, readiness y métricas del stack"
 	@echo "  make recovery-e2e   Comprueba caída y recuperación independiente de servicios y bases"
 	@echo "  make replay-smoke   Comprueba replay DLQ idempotente y auditoría inmutable"
@@ -69,11 +71,11 @@ security:
 	cd fiscal-adapter && npm audit --omit=dev
 
 api-check:
-	python3 -c 'import yaml; [yaml.safe_load(open(p)) for p in ["api/openapi.yaml", "contracts/accounting.openapi.yaml", "contracts/fiscal.openapi.yaml", "monitoring/alerts.yml"]]'
+	python3 -c 'import yaml; [yaml.safe_load(open(p)) for p in ["api/openapi.yaml", "api/scheduling.openapi.yaml", "contracts/accounting.openapi.yaml", "contracts/fiscal.openapi.yaml", "monitoring/alerts.yml"]]'
 	./scripts/contracts-check.sh
 
 api-generate:
-	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --exclude-operation-ids clerkWebhook --package publicapi --generate types,chi-server -o internal/commerce/handler/dto/public.gen.go ../api/openapi.yaml
+	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --include-operation-ids "$(PUBLIC_GO_OPERATION_IDS)" --package publicapi --generate types,chi-server -o internal/commerce/handler/dto/public.gen.go ../api/openapi.yaml
 	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --package accountingapi --generate types,client -o internal/commerce/accounting/models/accounting.gen.go ../contracts/accounting.openapi.yaml
 	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --package accountingapi --generate chi-server -o internal/commerce/accounting/models/accounting.server.gen.go ../contracts/accounting.openapi.yaml
 	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --package fiscalapi --generate types,client -o internal/commerce/fiscal/models/fiscal.gen.go ../contracts/fiscal.openapi.yaml
@@ -93,6 +95,7 @@ db-integration:
 
 e2e:
 	$(MAKE) db-integration
+	$(MAKE) scheduling-e2e
 	$(MAKE) commercial-e2e
 	$(MAKE) backup-restore-smoke
 	$(MAKE) observability-e2e
@@ -112,6 +115,9 @@ accounting-e2e:
 
 commercial-e2e:
 	./scripts/commercial-vertical-e2e.sh
+
+scheduling-e2e:
+	./scripts/scheduling-e2e.sh
 
 observability-e2e:
 	./scripts/observability-e2e.sh

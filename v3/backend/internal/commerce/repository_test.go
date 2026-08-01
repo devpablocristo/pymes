@@ -413,7 +413,24 @@ func TestStorePersistsSaleAndLeasesOutbox(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	events, err := store.Lease(context.Background(), 1, time.Minute)
+	events, err := store.LeaseTopics(
+		context.Background(),
+		[]string{"NotificationRequested"},
+		1,
+		time.Minute,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 0 {
+		t.Fatalf("foreign context leased commerce event: %+v", events)
+	}
+	events, err = store.LeaseTopics(
+		context.Background(),
+		[]string{"FiscalAuthorizationRequested"},
+		1,
+		time.Minute,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

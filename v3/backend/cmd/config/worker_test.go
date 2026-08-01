@@ -8,9 +8,10 @@ import (
 func TestLoadWorkerFromPreservesSecureRuntimeDefaults(t *testing.T) {
 	t.Parallel()
 	values := map[string]string{
-		"PYMES_DATABASE_URL": "postgres://db",
-		"FISCAL_ADAPTER_URL": "http://fiscal",
-		"ACCOUNTING_URL":     "http://accounting",
+		"PYMES_DATABASE_URL":                   "postgres://db",
+		"FISCAL_ADAPTER_URL":                   "http://fiscal",
+		"ACCOUNTING_URL":                       "http://accounting",
+		"PYMES_SCHEDULING_ACTION_TOKEN_SECRET": "01234567890123456789012345678901",
 	}
 	cfg, err := LoadWorkerFrom(func(key string) string {
 		return values[key]
@@ -33,9 +34,10 @@ func TestLoadWorkerFromPreservesSecureRuntimeDefaults(t *testing.T) {
 func TestLoadWorkerFromValidatesIdentityDependenciesAndIntervals(t *testing.T) {
 	t.Parallel()
 	base := map[string]string{
-		"PYMES_DATABASE_URL": "postgres://db",
-		"FISCAL_ADAPTER_URL": "http://fiscal",
-		"ACCOUNTING_URL":     "http://accounting",
+		"PYMES_DATABASE_URL":                   "postgres://db",
+		"FISCAL_ADAPTER_URL":                   "http://fiscal",
+		"ACCOUNTING_URL":                       "http://accounting",
+		"PYMES_SCHEDULING_ACTION_TOKEN_SECRET": "01234567890123456789012345678901",
 	}
 	tests := []struct {
 		name   string
@@ -55,6 +57,13 @@ func TestLoadWorkerFromValidatesIdentityDependenciesAndIntervals(t *testing.T) {
 				delete(values, "ACCOUNTING_URL")
 			},
 			code: "DEPENDENCY_URL_MISSING",
+		},
+		{
+			name: "missing scheduling action token secret",
+			change: func(values map[string]string) {
+				delete(values, "PYMES_SCHEDULING_ACTION_TOKEN_SECRET")
+			},
+			code: "ACTION_TOKEN_SECRET_INVALID",
 		},
 		{
 			name: "production insecure bypass",
@@ -101,14 +110,15 @@ func TestLoadWorkerFromValidatesIdentityDependenciesAndIntervals(t *testing.T) {
 func TestLoadWorkerFromPreservesFastLocalLoop(t *testing.T) {
 	t.Parallel()
 	values := map[string]string{
-		"PYMES_DATABASE_URL":                  "postgres://db",
-		"FISCAL_ADAPTER_URL":                  "http://fiscal",
-		"ACCOUNTING_URL":                      "http://accounting",
-		"PYMES_ENVIRONMENT":                   "test",
-		"PYMES_ALLOW_INSECURE_LOCAL_SERVICES": "TRUE",
-		"PYMES_WORKER_INTERVAL_MS":            "250",
-		"PYMES_WORKER_METRICS_INTERVAL":       "15s",
-		"PYMES_WORKER_RUN_ONCE":               "TRUE",
+		"PYMES_DATABASE_URL":                   "postgres://db",
+		"FISCAL_ADAPTER_URL":                   "http://fiscal",
+		"ACCOUNTING_URL":                       "http://accounting",
+		"PYMES_SCHEDULING_ACTION_TOKEN_SECRET": "01234567890123456789012345678901",
+		"PYMES_ENVIRONMENT":                    "test",
+		"PYMES_ALLOW_INSECURE_LOCAL_SERVICES":  "TRUE",
+		"PYMES_WORKER_INTERVAL_MS":             "250",
+		"PYMES_WORKER_METRICS_INTERVAL":        "15s",
+		"PYMES_WORKER_RUN_ONCE":                "TRUE",
 	}
 	cfg, err := LoadWorkerFrom(func(key string) string {
 		return values[key]

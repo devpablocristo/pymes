@@ -1,3 +1,4 @@
+// architecture:adapter external
 package scheduling
 
 import (

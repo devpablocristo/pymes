@@ -10,17 +10,18 @@ import (
 )
 
 type WorkerConfig struct {
-	HTTPAddr                   string
-	DatabaseURL                string
-	FiscalURL                  string
-	AccountingURL              string
-	Environment                string
-	AllowInsecureLocalServices bool
-	RunOnce                    bool
-	DispatchInterval           time.Duration
-	MetricsInterval            time.Duration
-	LeaseDuration              time.Duration
-	ShutdownTimeout            time.Duration
+	HTTPAddr                    string
+	DatabaseURL                 string
+	FiscalURL                   string
+	AccountingURL               string
+	Environment                 string
+	SchedulingActionTokenSecret string
+	AllowInsecureLocalServices  bool
+	RunOnce                     bool
+	DispatchInterval            time.Duration
+	MetricsInterval             time.Duration
+	LeaseDuration               time.Duration
+	ShutdownTimeout             time.Duration
 }
 
 type WorkerConfigError struct {
@@ -83,6 +84,15 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 			"FISCAL_ADAPTER_URL and ACCOUNTING_URL are required",
 		)
 	}
+	actionTokenSecret := strings.TrimSpace(
+		getenv("PYMES_SCHEDULING_ACTION_TOKEN_SECRET"),
+	)
+	if len(actionTokenSecret) < 32 {
+		return WorkerConfig{}, workerConfigError(
+			"ACTION_TOKEN_SECRET_INVALID",
+			"PYMES_SCHEDULING_ACTION_TOKEN_SECRET must contain at least 32 bytes",
+		)
+	}
 	metricsInterval, err := parseWorkerMetricsInterval(
 		strings.TrimSpace(getenv("PYMES_WORKER_METRICS_INTERVAL")),
 	)
@@ -111,16 +121,17 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 			getenv("PYMES_WORKER_HTTP_ADDR"),
 			":8080",
 		),
-		DatabaseURL:                databaseURL,
-		FiscalURL:                  fiscalURL,
-		AccountingURL:              accountingURL,
-		Environment:                environment,
-		AllowInsecureLocalServices: allowInsecure,
-		RunOnce:                    runOnce,
-		DispatchInterval:           dispatchInterval,
-		MetricsInterval:            metricsInterval,
-		LeaseDuration:              30 * time.Second,
-		ShutdownTimeout:            5 * time.Second,
+		DatabaseURL:                 databaseURL,
+		FiscalURL:                   fiscalURL,
+		AccountingURL:               accountingURL,
+		Environment:                 environment,
+		SchedulingActionTokenSecret: actionTokenSecret,
+		AllowInsecureLocalServices:  allowInsecure,
+		RunOnce:                     runOnce,
+		DispatchInterval:            dispatchInterval,
+		MetricsInterval:             metricsInterval,
+		LeaseDuration:               30 * time.Second,
+		ShutdownTimeout:             5 * time.Second,
 	}, nil
 }
 

@@ -31,6 +31,28 @@ func (s organizationScopedPeriodStore) Lease(
 	limit int,
 	duration time.Duration,
 ) ([]domain.Event, error) {
+	return s.leaseTopics(ctx, nil, true, limit, duration)
+}
+
+func (s organizationScopedPeriodStore) LeaseTopics(
+	ctx context.Context,
+	topics []string,
+	limit int,
+	duration time.Duration,
+) ([]domain.Event, error) {
+	if len(topics) == 0 {
+		return nil, nil
+	}
+	return s.leaseTopics(ctx, topics, false, limit, duration)
+}
+
+func (s organizationScopedPeriodStore) leaseTopics(
+	ctx context.Context,
+	topics []string,
+	allTopics bool,
+	limit int,
+	duration time.Duration,
+) ([]domain.Event, error) {
 	if limit < 1 || duration <= 0 {
 		return nil, nil
 	}
@@ -54,6 +76,7 @@ func (s organizationScopedPeriodStore) Lease(
 			  SELECT id FROM app.outbox
 			  WHERE org_id=$1 AND published_at IS NULL AND available_at <= $2
 			    AND (lease_expires_at IS NULL OR lease_expires_at <= $2)
+			    AND ($5 OR topic=ANY($6::text[]))
 			  ORDER BY available_at,created_at
 			  FOR UPDATE SKIP LOCKED
 			  LIMIT 1
@@ -67,7 +90,7 @@ func (s organizationScopedPeriodStore) Lease(
 			          value.actor_ref,value.source_version,value.snapshot_digest,
 			          value.correlation_id,value.available_at,value.attempts,
 			          value.lease_token,value.lease_expires_at`,
-			s.organizationID, now, token, now.Add(duration),
+			s.organizationID, now, token, now.Add(duration), allTopics, topics,
 		).Scan(
 			&event.ID, &event.OrganizationID, &event.Topic, &event.Payload,
 			&event.PayloadHash, &event.IdempotencyKey, &event.RequestID,

@@ -20,6 +20,34 @@ type Postgres struct {
 }
 
 func New(pool *pgxpool.Pool) *Postgres { return &Postgres{pool: pool, now: time.Now} }
+
+func (r *Postgres) ResolveBySlug(
+	ctx context.Context,
+	slug string,
+) (domain.Organization, error) {
+	var result domain.Organization
+	err := r.pool.QueryRow(ctx, `
+		SELECT id,name,slug,status,created_at,updated_at
+		FROM app.organizations
+		WHERE slug=$1`,
+		slug,
+	).Scan(
+		&result.ID,
+		&result.Name,
+		&result.Slug,
+		&result.Status,
+		&result.CreatedAt,
+		&result.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Organization{}, domain.ErrUnknown
+	}
+	if err != nil {
+		return domain.Organization{}, err
+	}
+	return result, nil
+}
+
 func (r *Postgres) Create(ctx context.Context, organization domain.Organization) (domain.Organization, error) {
 	row := r.pool.QueryRow(ctx, `INSERT INTO app.organizations (id,name,slug,status,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$5) ON CONFLICT (id) DO UPDATE SET id=app.organizations.id RETURNING id,name,slug,status,created_at,updated_at`, organization.ID, organization.Name, organization.Slug, organization.Status, r.now().UTC())
 	var result domain.Organization

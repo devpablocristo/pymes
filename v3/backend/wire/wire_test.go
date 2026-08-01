@@ -34,3 +34,42 @@ func TestComposePublicHTTPKeepsGeneratedAPIAndClerkWebhookDisjoint(t *testing.T)
 		t.Fatalf("generated API route: status=%d api_calls=%d webhook_calls=%d", apiResponse.Code, apiCalls, webhookCalls)
 	}
 }
+
+func TestComposePublicHTTPRoutesSchedulingWithoutCommerceCoupling(t *testing.T) {
+	t.Parallel()
+	apiCalls := 0
+	schedulingCalls := 0
+	handler := composePublicHTTP(
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			apiCalls++
+			w.WriteHeader(http.StatusNoContent)
+		}),
+		http.NotFoundHandler(),
+		publicContextRoute{
+			Pattern: "/api/v1/organizations/{organizationId}/scheduling/",
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				schedulingCalls++
+				w.WriteHeader(http.StatusAccepted)
+			}),
+		},
+	)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(
+		response,
+		httptest.NewRequest(
+			http.MethodGet,
+			"/api/v1/organizations/org-a/scheduling/bookings",
+			nil,
+		),
+	)
+	if response.Code != http.StatusAccepted ||
+		schedulingCalls != 1 ||
+		apiCalls != 0 {
+		t.Fatalf(
+			"status=%d scheduling_calls=%d api_calls=%d",
+			response.Code,
+			schedulingCalls,
+			apiCalls,
+		)
+	}
+}

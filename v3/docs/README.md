@@ -25,8 +25,9 @@ implementada es:
 9. [Seguridad GCP STG/PRD](09-gcp-stg-prd.md)
 10. [Runbook de operación y recuperación](10-runbook-operacion.md)
 11. [Arquitectura vertical Go](go-architecture.md)
-12. [ADRs](adr/)
-13. [Contratos OpenAPI internos](../contracts/)
+12. [Agenda multi-tenant](scheduling.md)
+13. [ADRs](adr/)
+14. [Contratos OpenAPI internos](../contracts/)
 
 Los diagramas Mermaid describen la arquitectura objetivo. Toda API marcada
 `internal` sólo admite credenciales de servicio: ningún navegador llega a los

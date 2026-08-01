@@ -25,6 +25,18 @@ func Allocations(values []Allocation) []domain.Allocation {
 	return result
 }
 
+func AllocationsFromDomain(values []domain.Allocation) []Allocation {
+	result := make([]Allocation, 0, len(values))
+	for _, value := range values {
+		result = append(result, Allocation{
+			ResourceID: value.ResourceID,
+			Mode:       value.Mode,
+			Units:      value.Units,
+		})
+	}
+	return result
+}
+
 type CreateBranch struct {
 	ID       uuid.UUID `json:"id"`
 	Code     string    `json:"code"`
@@ -106,6 +118,85 @@ type Customer struct {
 	Phone   string `json:"phone,omitempty"`
 }
 
+type PublicCatalog struct {
+	Branches  []PublicBranch   `json:"branches"`
+	Services  []PublicService  `json:"services"`
+	Resources []PublicResource `json:"resources"`
+}
+
+type PublicBranch struct {
+	ID       uuid.UUID `json:"id"`
+	Slug     string    `json:"slug"`
+	Name     string    `json:"name"`
+	Timezone string    `json:"timezone"`
+	Address  string    `json:"address"`
+}
+
+type PublicService struct {
+	ID                   uuid.UUID              `json:"id"`
+	Code                 string                 `json:"code"`
+	Name                 string                 `json:"name"`
+	Description          string                 `json:"description"`
+	DurationMinutes      int                    `json:"duration_minutes"`
+	BufferBeforeMinutes  int                    `json:"buffer_before_minutes"`
+	BufferAfterMinutes   int                    `json:"buffer_after_minutes"`
+	SlotMinutes          int                    `json:"slot_minutes"`
+	Price                string                 `json:"price"`
+	Currency             string                 `json:"currency"`
+	FulfillmentMode      domain.FulfillmentMode `json:"fulfillment_mode"`
+	MaxParticipants      int                    `json:"max_participants"`
+	AllowGroup           bool                   `json:"allow_group"`
+	AllowWaitlist        bool                   `json:"allow_waitlist"`
+	ConfirmationRequired bool                   `json:"confirmation_required"`
+}
+
+type PublicResource struct {
+	ID       uuid.UUID           `json:"id"`
+	BranchID uuid.UUID           `json:"branch_id"`
+	Name     string              `json:"name"`
+	Kind     domain.ResourceKind `json:"kind"`
+	Capacity int                 `json:"capacity"`
+	Timezone string              `json:"timezone"`
+}
+
+func PublicCatalogFromDomain(
+	branches []domain.Branch,
+	services []domain.Service,
+	resources []domain.Resource,
+) PublicCatalog {
+	result := PublicCatalog{
+		Branches:  make([]PublicBranch, 0, len(branches)),
+		Services:  make([]PublicService, 0, len(services)),
+		Resources: make([]PublicResource, 0, len(resources)),
+	}
+	for _, branch := range branches {
+		result.Branches = append(result.Branches, PublicBranch{
+			ID: branch.ID, Slug: branch.Slug, Name: branch.Name,
+			Timezone: branch.Timezone, Address: branch.Address,
+		})
+	}
+	for _, service := range services {
+		result.Services = append(result.Services, PublicService{
+			ID: service.ID, Code: service.Code, Name: service.Name,
+			Description: service.Description, DurationMinutes: service.DurationMinutes,
+			BufferBeforeMinutes: service.BufferBeforeMinutes,
+			BufferAfterMinutes:  service.BufferAfterMinutes,
+			SlotMinutes:         service.SlotMinutes, Price: service.Price,
+			Currency: service.Currency, FulfillmentMode: service.Mode,
+			MaxParticipants: service.MaxParticipants, AllowGroup: service.AllowGroup,
+			AllowWaitlist:        service.AllowWaitlist,
+			ConfirmationRequired: service.ConfirmationRequired,
+		})
+	}
+	for _, resource := range resources {
+		result.Resources = append(result.Resources, PublicResource{
+			ID: resource.ID, BranchID: resource.BranchID, Name: resource.Name,
+			Kind: resource.Kind, Capacity: resource.Capacity, Timezone: resource.Timezone,
+		})
+	}
+	return result
+}
+
 type Recurrence struct {
 	Frequency  domain.RecurrenceFrequency `json:"frequency"`
 	Interval   int                        `json:"interval"`
@@ -164,17 +255,21 @@ type AvailabilityQuery struct {
 type Reschedule struct {
 	ExpectedVersion int          `json:"expected_version"`
 	StartAt         time.Time    `json:"start_at"`
+	DurationMinutes int          `json:"duration_minutes,omitempty"`
 	Allocations     []Allocation `json:"allocations,omitempty"`
 }
 
 type Transition struct {
-	ExpectedVersion int `json:"expected_version"`
+	ExpectedVersion int    `json:"expected_version"`
+	Reason          string `json:"reason,omitempty"`
 }
 
 type Action struct {
 	Purpose         domain.ActionPurpose `json:"purpose"`
 	ExpectedVersion int                  `json:"expected_version"`
 	StartAt         *time.Time           `json:"start_at,omitempty"`
+	DurationMinutes int                  `json:"duration_minutes,omitempty"`
+	Reason          string               `json:"reason,omitempty"`
 }
 
 type CreateWaitlist struct {
@@ -201,24 +296,29 @@ type AdvanceQueueTicket struct {
 }
 
 type Booking struct {
-	ID              uuid.UUID            `json:"id"`
-	SeriesID        *uuid.UUID           `json:"series_id,omitempty"`
-	SessionID       *uuid.UUID           `json:"session_id,omitempty"`
-	SupersedesID    *uuid.UUID           `json:"supersedes_id,omitempty"`
-	BranchID        uuid.UUID            `json:"branch_id"`
-	ServiceID       uuid.UUID            `json:"service_id"`
-	PartyID         string               `json:"party_id"`
-	Status          domain.BookingStatus `json:"status"`
-	Participants    int                  `json:"participants"`
-	StartAt         time.Time            `json:"start_at"`
-	EndAt           time.Time            `json:"end_at"`
-	Version         int                  `json:"version"`
-	ServiceName     string               `json:"service_name"`
-	Price           string               `json:"price"`
-	Currency        string               `json:"currency"`
-	DurationMinutes int                  `json:"duration_minutes"`
-	Timezone        string               `json:"timezone"`
-	Allocations     []domain.Allocation  `json:"allocations"`
+	ID                 uuid.UUID            `json:"id"`
+	SeriesID           *uuid.UUID           `json:"series_id,omitempty"`
+	SessionID          *uuid.UUID           `json:"session_id,omitempty"`
+	SupersedesID       *uuid.UUID           `json:"supersedes_id,omitempty"`
+	BranchID           uuid.UUID            `json:"branch_id"`
+	ServiceID          uuid.UUID            `json:"service_id"`
+	PartyID            string               `json:"party_id"`
+	Status             domain.BookingStatus `json:"status"`
+	Participants       int                  `json:"participants"`
+	StartAt            time.Time            `json:"start_at"`
+	EndAt              time.Time            `json:"end_at"`
+	Version            int                  `json:"version"`
+	ServiceName        string               `json:"service_name"`
+	Price              string               `json:"price"`
+	Currency           string               `json:"currency"`
+	DurationMinutes    int                  `json:"duration_minutes"`
+	Timezone           string               `json:"timezone"`
+	CustomerName       string               `json:"customer_name"`
+	CustomerEmail      string               `json:"customer_email,omitempty"`
+	CustomerPhone      string               `json:"customer_phone,omitempty"`
+	Notes              string               `json:"notes,omitempty"`
+	CancellationReason string               `json:"cancellation_reason,omitempty"`
+	Allocations        []domain.Allocation  `json:"allocations"`
 }
 
 func BookingFromDomain(value domain.Booking) Booking {
@@ -229,8 +329,50 @@ func BookingFromDomain(value domain.Booking) Booking {
 		Participants: value.Participants, StartAt: value.StartAt, EndAt: value.EndAt,
 		Version: value.Version, ServiceName: value.ServiceName, Price: value.Price,
 		Currency: value.Currency, DurationMinutes: value.DurationMinutes,
-		Timezone: value.Timezone, Allocations: value.Allocations,
+		Timezone: value.Timezone, CustomerName: value.CustomerName,
+		CustomerEmail: value.CustomerEmail, CustomerPhone: value.CustomerPhone,
+		Notes: value.Notes, CancellationReason: value.CancellationReason,
+		Allocations: value.Allocations,
 	}
+}
+
+type PublicBooking struct {
+	ID              uuid.UUID            `json:"id"`
+	SeriesID        *uuid.UUID           `json:"series_id,omitempty"`
+	SessionID       *uuid.UUID           `json:"session_id,omitempty"`
+	SupersedesID    *uuid.UUID           `json:"supersedes_id,omitempty"`
+	BranchID        uuid.UUID            `json:"branch_id"`
+	ServiceID       uuid.UUID            `json:"service_id"`
+	Status          domain.BookingStatus `json:"status"`
+	Participants    int                  `json:"participants"`
+	StartAt         time.Time            `json:"start_at"`
+	EndAt           time.Time            `json:"end_at"`
+	Version         int                  `json:"version"`
+	ServiceName     string               `json:"service_name"`
+	Price           string               `json:"price"`
+	Currency        string               `json:"currency"`
+	DurationMinutes int                  `json:"duration_minutes"`
+	Timezone        string               `json:"timezone"`
+}
+
+func PublicBookingFromDomain(value domain.Booking) PublicBooking {
+	return PublicBooking{
+		ID: value.ID, SeriesID: value.SeriesID, SessionID: value.SessionID,
+		SupersedesID: value.SupersedesID, BranchID: value.BranchID,
+		ServiceID: value.ServiceID, Status: value.Status,
+		Participants: value.Participants, StartAt: value.StartAt, EndAt: value.EndAt,
+		Version: value.Version, ServiceName: value.ServiceName, Price: value.Price,
+		Currency: value.Currency, DurationMinutes: value.DurationMinutes,
+		Timezone: value.Timezone,
+	}
+}
+
+func PublicBookingsFromDomain(values []domain.Booking) []PublicBooking {
+	result := make([]PublicBooking, 0, len(values))
+	for _, value := range values {
+		result = append(result, PublicBookingFromDomain(value))
+	}
+	return result
 }
 
 func BookingsFromDomain(values []domain.Booking) []Booking {
@@ -458,24 +600,64 @@ func GroupSessionFromDomain(value domain.GroupSession) GroupSession {
 }
 
 type WaitlistEntry struct {
-	ID             uuid.UUID             `json:"id"`
-	BranchID       uuid.UUID             `json:"branch_id"`
-	ServiceID      uuid.UUID             `json:"service_id"`
-	PartyID        string                `json:"party_id"`
-	PreferredFrom  time.Time             `json:"preferred_from"`
-	PreferredUntil time.Time             `json:"preferred_until"`
-	Participants   int                   `json:"participants"`
-	Status         domain.WaitlistStatus `json:"status"`
-	OfferExpiresAt *time.Time            `json:"offer_expires_at,omitempty"`
-	Version        int                   `json:"version"`
+	ID                 uuid.UUID             `json:"id"`
+	BranchID           uuid.UUID             `json:"branch_id"`
+	ServiceID          uuid.UUID             `json:"service_id"`
+	PartyID            string                `json:"party_id"`
+	CustomerName       string                `json:"customer_name"`
+	CustomerEmail      string                `json:"customer_email,omitempty"`
+	CustomerPhone      string                `json:"customer_phone,omitempty"`
+	PreferredFrom      time.Time             `json:"preferred_from"`
+	PreferredUntil     time.Time             `json:"preferred_until"`
+	Participants       int                   `json:"participants"`
+	Status             domain.WaitlistStatus `json:"status"`
+	OfferExpiresAt     *time.Time            `json:"offer_expires_at,omitempty"`
+	OfferedStartAt     *time.Time            `json:"offered_start_at,omitempty"`
+	OfferedEndAt       *time.Time            `json:"offered_end_at,omitempty"`
+	OfferedAllocations []Allocation          `json:"offered_allocations,omitempty"`
+	AcceptedBookingID  *uuid.UUID            `json:"accepted_booking_id,omitempty"`
+	Version            int                   `json:"version"`
 }
 
 func WaitlistEntryFromDomain(value domain.WaitlistEntry) WaitlistEntry {
 	return WaitlistEntry{
 		ID: value.ID, BranchID: value.BranchID, ServiceID: value.ServiceID,
-		PartyID: value.PartyID, PreferredFrom: value.PreferredFrom,
+		PartyID: value.PartyID, CustomerName: value.CustomerName,
+		CustomerEmail: value.CustomerEmail, CustomerPhone: value.CustomerPhone,
+		PreferredFrom:  value.PreferredFrom,
 		PreferredUntil: value.PreferredUntil, Participants: value.Participants,
-		Status: value.Status, OfferExpiresAt: value.OfferExpiresAt, Version: value.Version,
+		Status: value.Status, OfferExpiresAt: value.OfferExpiresAt,
+		OfferedStartAt: value.OfferedStartAt, OfferedEndAt: value.OfferedEndAt,
+		OfferedAllocations: AllocationsFromDomain(value.OfferedAllocations),
+		AcceptedBookingID:  value.AcceptedBookingID, Version: value.Version,
+	}
+}
+
+type PublicWaitlistEntry struct {
+	ID                 uuid.UUID             `json:"id"`
+	BranchID           uuid.UUID             `json:"branch_id"`
+	ServiceID          uuid.UUID             `json:"service_id"`
+	PreferredFrom      time.Time             `json:"preferred_from"`
+	PreferredUntil     time.Time             `json:"preferred_until"`
+	Participants       int                   `json:"participants"`
+	Status             domain.WaitlistStatus `json:"status"`
+	OfferExpiresAt     *time.Time            `json:"offer_expires_at,omitempty"`
+	OfferedStartAt     *time.Time            `json:"offered_start_at,omitempty"`
+	OfferedEndAt       *time.Time            `json:"offered_end_at,omitempty"`
+	OfferedAllocations []Allocation          `json:"offered_allocations,omitempty"`
+	AcceptedBookingID  *uuid.UUID            `json:"accepted_booking_id,omitempty"`
+	Version            int                   `json:"version"`
+}
+
+func PublicWaitlistEntryFromDomain(value domain.WaitlistEntry) PublicWaitlistEntry {
+	return PublicWaitlistEntry{
+		ID: value.ID, BranchID: value.BranchID, ServiceID: value.ServiceID,
+		PreferredFrom: value.PreferredFrom, PreferredUntil: value.PreferredUntil,
+		Participants: value.Participants, Status: value.Status,
+		OfferExpiresAt: value.OfferExpiresAt, OfferedStartAt: value.OfferedStartAt,
+		OfferedEndAt:       value.OfferedEndAt,
+		OfferedAllocations: AllocationsFromDomain(value.OfferedAllocations),
+		AcceptedBookingID:  value.AcceptedBookingID, Version: value.Version,
 	}
 }
 

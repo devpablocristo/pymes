@@ -54,6 +54,15 @@ func (s *originRelayStore) Lease(context.Context, int, time.Duration) ([]domain.
 	return s.events, nil
 }
 
+func (s *originRelayStore) LeaseTopics(
+	context.Context,
+	[]string,
+	int,
+	time.Duration,
+) ([]domain.Event, error) {
+	return s.events, nil
+}
+
 func (s *originRelayStore) Retry(context.Context, domain.Event) error {
 	s.retried = true
 	return nil

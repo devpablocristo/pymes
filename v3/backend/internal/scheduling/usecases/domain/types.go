@@ -322,47 +322,51 @@ type AvailabilitySnapshot struct {
 }
 
 type AvailabilityQuery struct {
-	OrganizationID   string
-	BranchID         uuid.UUID
-	ServiceID        uuid.UUID
-	From             time.Time
-	Until            time.Time
-	Participants     int
+	OrganizationID string
+	BranchID       uuid.UUID
+	ServiceID      uuid.UUID
+	From           time.Time
+	Until          time.Time
+	Participants   int
+	// DurationMinutes is an internal override used when an operator resizes an
+	// existing booking. Public availability always uses the service duration.
+	DurationMinutes  int
 	Allocations      []Allocation
 	ExcludeBookingID *uuid.UUID
 }
 
 type Booking struct {
-	OrganizationID  string
-	ID              uuid.UUID
-	SeriesID        *uuid.UUID
-	SessionID       *uuid.UUID
-	SupersedesID    *uuid.UUID
-	Occurrence      int
-	BranchID        uuid.UUID
-	ServiceID       uuid.UUID
-	PartyID         string
-	Status          BookingStatus
-	Participants    int
-	StartAt         time.Time
-	EndAt           time.Time
-	OccupiesFrom    time.Time
-	OccupiesUntil   time.Time
-	HoldExpiresAt   *time.Time
-	Version         int
-	ServiceName     string
-	Price           string
-	Currency        string
-	DurationMinutes int
-	Timezone        string
-	CustomerName    string
-	CustomerEmail   string
-	CustomerPhone   string
-	Notes           string
-	Allocations     []Allocation
-	CreatedBy       string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	OrganizationID     string
+	ID                 uuid.UUID
+	SeriesID           *uuid.UUID
+	SessionID          *uuid.UUID
+	SupersedesID       *uuid.UUID
+	Occurrence         int
+	BranchID           uuid.UUID
+	ServiceID          uuid.UUID
+	PartyID            string
+	Status             BookingStatus
+	Participants       int
+	StartAt            time.Time
+	EndAt              time.Time
+	OccupiesFrom       time.Time
+	OccupiesUntil      time.Time
+	HoldExpiresAt      *time.Time
+	Version            int
+	ServiceName        string
+	Price              string
+	Currency           string
+	DurationMinutes    int
+	Timezone           string
+	CustomerName       string
+	CustomerEmail      string
+	CustomerPhone      string
+	Notes              string
+	CancellationReason string
+	Allocations        []Allocation
+	CreatedBy          string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 func (b Booking) Validate() error {
@@ -438,19 +442,26 @@ type RecurrenceSeries struct {
 }
 
 type WaitlistEntry struct {
-	OrganizationID string
-	ID             uuid.UUID
-	BranchID       uuid.UUID
-	ServiceID      uuid.UUID
-	PartyID        string
-	PreferredFrom  time.Time
-	PreferredUntil time.Time
-	Participants   int
-	Status         WaitlistStatus
-	OfferExpiresAt *time.Time
-	Version        int
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	OrganizationID     string
+	ID                 uuid.UUID
+	BranchID           uuid.UUID
+	ServiceID          uuid.UUID
+	PartyID            string
+	CustomerName       string
+	CustomerEmail      string
+	CustomerPhone      string
+	PreferredFrom      time.Time
+	PreferredUntil     time.Time
+	Participants       int
+	Status             WaitlistStatus
+	OfferExpiresAt     *time.Time
+	OfferedStartAt     *time.Time
+	OfferedEndAt       *time.Time
+	OfferedAllocations []Allocation
+	AcceptedBookingID  *uuid.UUID
+	Version            int
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type QueueTicket struct {
@@ -471,15 +482,16 @@ type QueueTicket struct {
 }
 
 type ActionToken struct {
-	OrganizationID string
-	ID             uuid.UUID
-	BookingID      *uuid.UUID
-	WaitlistID     *uuid.UUID
-	Purpose        ActionPurpose
-	TokenHash      string
-	ExpiresAt      time.Time
-	ConsumedAt     *time.Time
-	CreatedAt      time.Time
+	OrganizationID  string
+	ID              uuid.UUID
+	BookingID       *uuid.UUID
+	WaitlistID      *uuid.UUID
+	ResultBookingID *uuid.UUID
+	Purpose         ActionPurpose
+	TokenHash       string
+	ExpiresAt       time.Time
+	ConsumedAt      *time.Time
+	CreatedAt       time.Time
 }
 
 type Event struct {

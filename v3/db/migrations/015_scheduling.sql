@@ -229,6 +229,7 @@ CREATE TABLE IF NOT EXISTS app.scheduling_bookings (
   customer_email_snapshot text NOT NULL DEFAULT '',
   customer_phone_snapshot text NOT NULL DEFAULT '',
   notes text NOT NULL DEFAULT '',
+  cancellation_reason text NOT NULL DEFAULT '',
   created_by text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
@@ -252,6 +253,8 @@ CREATE TABLE IF NOT EXISTS app.scheduling_bookings (
     OR (status <> 'held')
   )
 );
+ALTER TABLE app.scheduling_bookings
+  ADD COLUMN IF NOT EXISTS cancellation_reason text NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS scheduling_bookings_range_idx
   ON app.scheduling_bookings USING gist (org_id, branch_id, tstzrange(occupies_from, occupies_until, '[)'));
 CREATE INDEX IF NOT EXISTS scheduling_bookings_party_idx
@@ -332,11 +335,18 @@ CREATE TABLE IF NOT EXISTS app.scheduling_waitlist (
   branch_id uuid NOT NULL,
   service_id uuid NOT NULL,
   party_id text NOT NULL,
+  customer_name_snapshot text NOT NULL DEFAULT '',
+  customer_email_snapshot text NOT NULL DEFAULT '',
+  customer_phone_snapshot text NOT NULL DEFAULT '',
   preferred_from timestamptz NOT NULL,
   preferred_until timestamptz NOT NULL,
   participants integer NOT NULL CHECK (participants BETWEEN 1 AND 100000),
   status text NOT NULL CHECK (status IN ('pending','offered','accepted','cancelled','expired')),
   offer_expires_at timestamptz,
+  offered_starts_at timestamptz,
+  offered_ends_at timestamptz,
+  offered_allocations jsonb NOT NULL DEFAULT '[]'::jsonb,
+  accepted_booking_id uuid,
   lease_token uuid,
   lease_expires_at timestamptz,
   version integer NOT NULL DEFAULT 1 CHECK (version > 0),
@@ -349,8 +359,32 @@ CREATE TABLE IF NOT EXISTS app.scheduling_waitlist (
     REFERENCES app.scheduling_services(org_id, id),
   FOREIGN KEY (org_id, party_id)
     REFERENCES app.parties(org_id, id),
+  CONSTRAINT scheduling_waitlist_accepted_booking_fk FOREIGN KEY (org_id, accepted_booking_id)
+    REFERENCES app.scheduling_bookings(org_id, id),
   CHECK (preferred_until > preferred_from)
 );
+ALTER TABLE app.scheduling_waitlist
+  ADD COLUMN IF NOT EXISTS customer_name_snapshot text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS customer_email_snapshot text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS customer_phone_snapshot text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS offered_starts_at timestamptz,
+  ADD COLUMN IF NOT EXISTS offered_ends_at timestamptz,
+  ADD COLUMN IF NOT EXISTS offered_allocations jsonb NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS accepted_booking_id uuid;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'scheduling_waitlist_accepted_booking_fk'
+      AND conrelid = 'app.scheduling_waitlist'::regclass
+  ) THEN
+    ALTER TABLE app.scheduling_waitlist
+      ADD CONSTRAINT scheduling_waitlist_accepted_booking_fk
+      FOREIGN KEY (org_id, accepted_booking_id)
+      REFERENCES app.scheduling_bookings(org_id, id);
+  END IF;
+END
+$$;
 CREATE INDEX IF NOT EXISTS scheduling_waitlist_pending_idx
   ON app.scheduling_waitlist (org_id, branch_id, service_id, created_at)
   WHERE status = 'pending';
@@ -374,6 +408,7 @@ CREATE TABLE IF NOT EXISTS app.scheduling_action_tokens (
   id uuid NOT NULL,
   booking_id uuid,
   waitlist_id uuid,
+  result_booking_id uuid,
   purpose text NOT NULL CHECK (purpose IN ('confirm','cancel','reschedule','accept_waitlist')),
   token_hash char(64) NOT NULL,
   expires_at timestamptz NOT NULL,
@@ -385,11 +420,29 @@ CREATE TABLE IF NOT EXISTS app.scheduling_action_tokens (
     REFERENCES app.scheduling_bookings(org_id, id) ON DELETE CASCADE,
   FOREIGN KEY (org_id, waitlist_id)
     REFERENCES app.scheduling_waitlist(org_id, id) ON DELETE CASCADE,
+  CONSTRAINT scheduling_action_tokens_result_booking_fk FOREIGN KEY (org_id, result_booking_id)
+    REFERENCES app.scheduling_bookings(org_id, id),
   CHECK (
     (booking_id IS NOT NULL AND waitlist_id IS NULL)
     OR (booking_id IS NULL AND waitlist_id IS NOT NULL)
   )
 );
+ALTER TABLE app.scheduling_action_tokens
+  ADD COLUMN IF NOT EXISTS result_booking_id uuid;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'scheduling_action_tokens_result_booking_fk'
+      AND conrelid = 'app.scheduling_action_tokens'::regclass
+  ) THEN
+    ALTER TABLE app.scheduling_action_tokens
+      ADD CONSTRAINT scheduling_action_tokens_result_booking_fk
+      FOREIGN KEY (org_id, result_booking_id)
+      REFERENCES app.scheduling_bookings(org_id, id);
+  END IF;
+END
+$$;
 CREATE INDEX IF NOT EXISTS scheduling_action_tokens_expiry_idx
   ON app.scheduling_action_tokens (expires_at) WHERE consumed_at IS NULL;
 

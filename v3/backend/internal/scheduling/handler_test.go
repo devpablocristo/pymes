@@ -2,12 +2,14 @@ package scheduling
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/usecases/domain"
+	"github.com/google/uuid"
 )
 
 type authenticatorFake struct {
@@ -21,7 +23,8 @@ func (f authenticatorFake) Principal(*http.Request) (Principal, error) {
 
 type handlerUsecasesFake struct {
 	SchedulingUsecases
-	created bool
+	created       bool
+	publicCatalog PublicCatalog
 }
 
 func (f *handlerUsecasesFake) CreateBranch(
@@ -30,6 +33,20 @@ func (f *handlerUsecasesFake) CreateBranch(
 ) (domain.Branch, error) {
 	f.created = true
 	return value, nil
+}
+
+func (f *handlerUsecasesFake) ResolvePublicOrganization(
+	context.Context,
+	string,
+) (string, error) {
+	return "secret-org-id", nil
+}
+
+func (f *handlerUsecasesFake) PublicCatalog(
+	context.Context,
+	string,
+) (PublicCatalog, error) {
+	return f.publicCatalog, nil
 }
 
 func TestSchedulingHandlerEnforcesTenantAndExplicitPermission(t *testing.T) {
@@ -97,5 +114,64 @@ func TestSchedulingHasNoPublicPhoneLookupAuthenticationRoute(t *testing.T) {
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusMethodNotAllowed && response.Code != http.StatusNotFound {
 		t.Fatalf("phone lookup unexpectedly exposed: status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestPublicCatalogRequiresNoSessionAndDoesNotExposeTenantMetadata(t *testing.T) {
+	usecases := &handlerUsecasesFake{publicCatalog: PublicCatalog{
+		Branches: []domain.Branch{{
+			OrganizationID: "secret-org-id",
+			ID:             uuid.New(),
+			Code:           "internal-code",
+			Slug:           "centro",
+			Name:           "Centro",
+			Timezone:       "America/Argentina/Buenos_Aires",
+			Address:        "Calle 1",
+			Active:         true,
+		}},
+		Services: []domain.Service{{
+			OrganizationID:  "secret-org-id",
+			ID:              uuid.New(),
+			Code:            "consulta",
+			Name:            "Consulta",
+			DurationMinutes: 30,
+			SlotMinutes:     15,
+			Price:           "100",
+			Currency:        "ARS",
+			Mode:            domain.FulfillmentInPerson,
+			MaxParticipants: 1,
+			Active:          true,
+		}},
+		Resources: []domain.Resource{{
+			OrganizationID: "secret-org-id",
+			ID:             uuid.New(),
+			BranchID:       uuid.New(),
+			Code:           "internal-professional-code",
+			Name:           "Profesional",
+			Kind:           domain.ResourceProfessional,
+			Capacity:       1,
+			Timezone:       "America/Argentina/Buenos_Aires",
+			Active:         true,
+		}},
+	}}
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/public/scheduling/acme/catalog",
+		nil,
+	)
+	NewHTTPHandler(usecases, nil).Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	body := response.Body.String()
+	if strings.Contains(body, "secret-org-id") ||
+		strings.Contains(body, "internal-professional-code") ||
+		strings.Contains(body, "internal-code") {
+		t.Fatalf("public catalog leaked internal tenant metadata: %s", body)
 	}
 }

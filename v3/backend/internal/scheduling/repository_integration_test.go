@@ -159,6 +159,21 @@ func TestPostgresSchedulingTenantIsolationConcurrencyAndRecovery(t *testing.T) {
 	if err != nil || replayed[0].ID != first[0].ID {
 		t.Fatalf("idempotent replay=%+v first=%+v err=%v", replayed, first, err)
 	}
+	cancelMetadata := testMetadata(
+		organizationID, "cancel-"+uuid.NewString(), idempotent.ID.String(),
+	)
+	cancelReason := "Cliente solicitó la cancelación"
+	cancelEvent := newEvent(
+		cancelMetadata, idempotent.ID.String(), domain.EventBookingCancelled,
+		map[string]any{"booking_id": idempotent.ID, "reason": cancelReason},
+	)
+	cancelled, err := repository.TransitionBooking(
+		ctx, cancelMetadata, idempotent.ID, 1, domain.BookingCancelled,
+		cancelReason, []domain.Event{cancelEvent},
+	)
+	if err != nil || cancelled.CancellationReason != cancelReason {
+		t.Fatalf("persist cancellation reason: booking=%+v err=%v", cancelled, err)
+	}
 
 	holdAt := now.Add(120 * time.Hour)
 	hold := testBooking(
@@ -285,6 +300,100 @@ func TestPostgresSchedulingTenantIsolationConcurrencyAndRecovery(t *testing.T) {
 		ctx, staleMetadata, original.ID, 1, replacement, []domain.Event{rescheduleEvent},
 	); domain.ErrorCodeOf(err) != domain.CodeBookingVersionConflict {
 		t.Fatalf("stale reschedule error=%v", err)
+	}
+
+	waitlistAt := now.Add(216 * time.Hour)
+	waitlist := domain.WaitlistEntry{
+		OrganizationID: organizationID,
+		ID:             uuid.New(),
+		BranchID:       sharedBranchID,
+		ServiceID:      sharedServiceID,
+		PartyID:        partyID,
+		PreferredFrom:  waitlistAt,
+		PreferredUntil: waitlistAt.Add(2 * time.Hour),
+		Participants:   1,
+		Status:         domain.WaitlistPending,
+		Version:        1,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	waitlistMetadata := testMetadata(
+		organizationID, "waitlist-"+uuid.NewString(), waitlist.ID.String(),
+	)
+	waitlistEvent := newEvent(
+		waitlistMetadata, waitlist.ID.String(), "WaitlistCreated",
+		map[string]any{"waitlist_id": waitlist.ID},
+	)
+	if _, err := repository.CreateWaitlistEntry(
+		ctx, waitlistMetadata, waitlist, waitlistEvent,
+	); err != nil {
+		t.Fatal(err)
+	}
+	codec, err := NewHMACActionTokenCodec([]byte("01234567890123456789012345678901"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawToken, tokenHash, err := codec.Issue()
+	if err != nil {
+		t.Fatal(err)
+	}
+	actionToken := domain.ActionToken{
+		OrganizationID: organizationID,
+		ID:             uuid.New(),
+		WaitlistID:     &waitlist.ID,
+		Purpose:        domain.ActionAcceptWaitlist,
+		TokenHash:      tokenHash,
+		ExpiresAt:      now.Add(time.Hour),
+		CreatedAt:      now,
+	}
+	offeredSlot := domain.Slot{
+		StartAt:       waitlistAt,
+		EndAt:         waitlistAt.Add(time.Hour),
+		OccupiesFrom:  waitlistAt,
+		OccupiesUntil: waitlistAt.Add(time.Hour),
+		Timezone:      "UTC",
+		Allocations: []domain.Allocation{{
+			ResourceID: sharedResourceID,
+			Mode:       domain.AllocationExclusive,
+			Units:      1,
+		}},
+		Remaining: 1,
+	}
+	offered, err := repository.OfferWaitlist(
+		ctx, organizationID, waitlist.ID, offeredSlot, now.Add(30*time.Minute),
+		actionToken, []domain.Event{newEvent(
+			waitlistMetadata, waitlist.ID.String(), domain.EventWaitlistOffered,
+			map[string]any{"waitlist_id": waitlist.ID},
+		)},
+	)
+	if err != nil || offered.Version != 2 || offered.OfferedStartAt == nil {
+		t.Fatalf("offer waitlist: offered=%+v err=%v", offered, err)
+	}
+	waitlistService := NewService(
+		repository,
+		algorithmsFake{slots: []domain.Slot{offeredSlot}},
+		codec,
+		WithClock(func() time.Time { return now }),
+	)
+	actionMetadata := testMetadata("", "accept-waitlist-"+uuid.NewString(), waitlist.ID.String())
+	accepted, err := waitlistService.ConsumeWaitlistAction(
+		ctx, rawToken, actionMetadata, offered.Version,
+	)
+	if err != nil || accepted.Status != domain.WaitlistAccepted ||
+		accepted.AcceptedBookingID == nil {
+		t.Fatalf("accept waitlist: accepted=%+v err=%v", accepted, err)
+	}
+	replayedAccepted, err := waitlistService.ConsumeWaitlistAction(
+		ctx, rawToken, actionMetadata, offered.Version,
+	)
+	if err != nil || replayedAccepted.AcceptedBookingID == nil ||
+		*replayedAccepted.AcceptedBookingID != *accepted.AcceptedBookingID {
+		t.Fatalf("replay waitlist action: replay=%+v accepted=%+v err=%v", replayedAccepted, accepted, err)
+	}
+	if _, err := repository.GetBooking(
+		ctx, organizationID, *accepted.AcceptedBookingID,
+	); err != nil {
+		t.Fatalf("accepted waitlist booking is missing: %v", err)
 	}
 }
 

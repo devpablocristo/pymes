@@ -1,3 +1,4 @@
+// architecture:adapter worker
 package scheduling
 
 import (
@@ -21,6 +22,11 @@ type Worker struct {
 
 func NewWorker(usecases MaintenanceUsecases, limit int) *Worker {
 	return &Worker{usecases: usecases, limit: workerhelpers.NormalizeLimit(limit)}
+}
+
+func (w *Worker) DispatchOnce(ctx context.Context) error {
+	_, err := w.RunOnce(ctx)
+	return err
 }
 
 func (w *Worker) RunOnce(ctx context.Context) (workermodels.RunResult, error) {

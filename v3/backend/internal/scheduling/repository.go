@@ -1,3 +1,4 @@
+// architecture:adapter repository
 package scheduling
 
 import (
@@ -158,19 +159,20 @@ func (r *PostgresRepository) insertBookingTx(ctx context.Context, tx pgx.Tx, boo
 			branch_id,service_id,party_id,status,participants,starts_at,ends_at,
 			occupies_from,occupies_until,hold_expires_at,version,
 			service_name_snapshot,price_snapshot,currency_snapshot,
-			duration_minutes_snapshot,timezone_snapshot,
-			customer_name_snapshot,customer_email_snapshot,customer_phone_snapshot,
-			notes,created_by,created_at,updated_at
-		) VALUES (
-			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-			$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29
-		)`,
+				duration_minutes_snapshot,timezone_snapshot,
+				customer_name_snapshot,customer_email_snapshot,customer_phone_snapshot,
+				notes,cancellation_reason,created_by,created_at,updated_at
+			) VALUES (
+				$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
+				$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30
+			)`,
 		booking.OrganizationID, booking.ID, booking.SeriesID, booking.SessionID, booking.SupersedesID,
 		booking.Occurrence, booking.BranchID, booking.ServiceID, booking.PartyID, booking.Status,
 		booking.Participants, booking.StartAt, booking.EndAt, booking.OccupiesFrom, booking.OccupiesUntil,
 		booking.HoldExpiresAt, booking.Version, booking.ServiceName, booking.Price, booking.Currency,
 		booking.DurationMinutes, booking.Timezone, booking.CustomerName, booking.CustomerEmail,
-		booking.CustomerPhone, booking.Notes, booking.CreatedBy, booking.CreatedAt, booking.UpdatedAt,
+		booking.CustomerPhone, booking.Notes, booking.CancellationReason,
+		booking.CreatedBy, booking.CreatedAt, booking.UpdatedAt,
 	)
 	if err != nil {
 		return repositoryhelpers.MapError(err)
@@ -362,6 +364,7 @@ func (r *PostgresRepository) TransitionBooking(
 	bookingID uuid.UUID,
 	expectedVersion int,
 	to domain.BookingStatus,
+	reason string,
 	events []domain.Event,
 ) (domain.Booking, error) {
 	tx, err := repositoryhelpers.BeginTenant(ctx, r.pool, metadata.OrganizationID)
@@ -400,11 +403,12 @@ func (r *PostgresRepository) TransitionBooking(
 		return domain.Booking{}, domain.NewError(domain.CodeBookingStateInvalid, "booking transition is not allowed")
 	}
 	tag, err := tx.Exec(ctx, `
-		UPDATE app.scheduling_bookings
-		SET status=$4,version=version+1,updated_at=now(),
-		    hold_expires_at=CASE WHEN $4='held' THEN hold_expires_at ELSE NULL END
-		WHERE org_id=$1 AND id=$2 AND version=$3`,
-		metadata.OrganizationID, bookingID, expectedVersion, to,
+			UPDATE app.scheduling_bookings
+			SET status=$4,version=version+1,updated_at=now(),
+			    hold_expires_at=CASE WHEN $4='held' THEN hold_expires_at ELSE NULL END,
+			    cancellation_reason=CASE WHEN $4='cancelled' THEN $5 ELSE cancellation_reason END
+			WHERE org_id=$1 AND id=$2 AND version=$3`,
+		metadata.OrganizationID, bookingID, expectedVersion, to, reason,
 	)
 	if err != nil {
 		return domain.Booking{}, repositoryhelpers.MapError(err)

@@ -13,6 +13,7 @@ import (
 	"github.com/devpablocristo/pymes/v3/backend/internal/observability"
 	"github.com/devpablocristo/pymes/v3/backend/internal/organization"
 	"github.com/devpablocristo/pymes/v3/backend/internal/postgres"
+	"github.com/devpablocristo/pymes/v3/backend/internal/scheduling"
 	"github.com/devpablocristo/pymes/v3/backend/internal/worker"
 	"log/slog"
 	"net/http"
@@ -93,10 +94,56 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 	}
 	store := commerce.New(pool)
 	identities := identity.New(pool)
-	api := commerce.NewHTTPServer(commerce.Commands{
+	organizations := organization.New(pool)
+	commands := commerce.Commands{
 		Store: store, AccountingAdjustments: store, Now: store.Clock,
-	}, identity.ClerkAuthenticator{Memberships: identities, Verifier: sessions})
-	handler := composePublicHTTP(api.Handler(), identity.NewWebhook(webhooks, identity.ReceiveWebhook{Inbox: identities}))
+	}
+	clerkAuthenticator := identity.ClerkAuthenticator{
+		Memberships: identities,
+		Verifier:    sessions,
+	}
+	api := commerce.NewHTTPServer(commands, clerkAuthenticator)
+	actionTokens, err := scheduling.NewHMACActionTokenCodec(
+		[]byte(cfg.SchedulingActionTokenSecret),
+	)
+	if err != nil {
+		database.Close()
+		_ = shutdownTracing(context.Background())
+		return nil, &APIStartupError{
+			Code: "ACTION_TOKEN_CONFIG_INVALID",
+			Err:  err,
+		}
+	}
+	schedulingRepository := scheduling.NewPostgresRepository(pool)
+	schedulingUsecases := scheduling.NewService(
+		schedulingRepository,
+		scheduling.NewPlatformScheduling(),
+		actionTokens,
+		scheduling.WithOrganizationDirectory(
+			scheduling.NewOrganizationDirectoryAdapter(
+				organization.PublicQueries{Directory: organizations},
+			),
+		),
+		scheduling.WithPartyDirectory(
+			scheduling.NewPartyDirectoryAdapter(commands),
+		),
+	)
+	schedulingHTTP := scheduling.NewHTTPHandler(
+		schedulingUsecases,
+		scheduling.NewIdentityAuthenticator(clerkAuthenticator),
+	).Handler()
+	handler := composePublicHTTP(
+		api.Handler(),
+		identity.NewWebhook(webhooks, identity.ReceiveWebhook{Inbox: identities}),
+		publicContextRoute{
+			Pattern: "/api/v1/organizations/{organizationId}/scheduling/",
+			Handler: schedulingHTTP,
+		},
+		publicContextRoute{
+			Pattern: "/api/v1/public/scheduling/",
+			Handler: schedulingHTTP,
+		},
+	)
 	return &App{
 		Handler: observability.HTTP(handler, nil), database: database,
 		shutdownTracing: shutdownTracing,
@@ -119,8 +166,19 @@ func APIStartupErrorCode(err error) string {
 	return "DEPENDENCY_UNAVAILABLE"
 }
 
-func composePublicHTTP(api, clerkWebhook http.Handler) http.Handler {
+type publicContextRoute struct {
+	Pattern string
+	Handler http.Handler
+}
+
+func composePublicHTTP(
+	api, clerkWebhook http.Handler,
+	contextRoutes ...publicContextRoute,
+) http.Handler {
 	mux := http.NewServeMux()
+	for _, route := range contextRoutes {
+		mux.Handle(route.Pattern, route.Handler)
+	}
 	mux.Handle("/", api)
 	mux.Handle("POST /api/v1/webhooks/clerk", clerkWebhook)
 	return mux
@@ -193,6 +251,29 @@ func InitializeWorker(
 		},
 		LeaseFor: cfg.LeaseDuration,
 	}
+	actionTokens, actionTokenErr := scheduling.NewHMACActionTokenCodec(
+		[]byte(cfg.SchedulingActionTokenSecret),
+	)
+	if actionTokenErr != nil {
+		if identity != nil {
+			_ = identity.Close()
+		}
+		database.Close()
+		_ = shutdownTracing(context.Background())
+		return nil, workerStartupError(
+			"ACTION_TOKEN_CONFIG_INVALID",
+			actionTokenErr,
+		)
+	}
+	schedulingRepository := scheduling.NewPostgresRepository(pool)
+	schedulingWorker := scheduling.NewWorker(
+		scheduling.NewService(
+			schedulingRepository,
+			scheduling.NewPlatformScheduling(),
+			actionTokens,
+		),
+		100,
+	)
 	operations := worker.New(pool)
 	circuits := map[string]worker.CircuitState{
 		"fiscal": fiscalHTTP, "accounting": accountingHTTP,
@@ -209,7 +290,7 @@ func InitializeWorker(
 			ReadHeaderTimeout: 2 * time.Second,
 		},
 		Runner: worker.Runner{
-			Dispatcher: dispatcher,
+			Dispatcher: worker.Dispatchers{dispatcher, schedulingWorker},
 			Metrics:    operations, Circuits: circuits, Logger: logger,
 			DispatchEvery:  cfg.DispatchInterval,
 			MetricsEvery:   cfg.MetricsInterval,

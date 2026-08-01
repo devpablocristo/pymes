@@ -735,9 +735,9 @@ func scanBooking(
 		       branch_id,service_id,party_id,status,participants,starts_at,ends_at,
 		       occupies_from,occupies_until,hold_expires_at,version,
 		       service_name_snapshot,price_snapshot::text,currency_snapshot,
-		       duration_minutes_snapshot,timezone_snapshot,
-		       customer_name_snapshot,customer_email_snapshot,customer_phone_snapshot,
-		       notes,created_by,created_at,updated_at
+			       duration_minutes_snapshot,timezone_snapshot,
+			       customer_name_snapshot,customer_email_snapshot,customer_phone_snapshot,
+			       notes,cancellation_reason,created_by,created_at,updated_at
 		FROM app.scheduling_bookings
 		WHERE org_id=$1 AND id=$2`
 	if forUpdate {
@@ -751,7 +751,7 @@ func scanBooking(
 		&value.OccupiesFrom, &value.OccupiesUntil, &value.HoldExpiresAt, &value.Version,
 		&value.ServiceName, &value.Price, &value.Currency, &value.DurationMinutes,
 		&value.Timezone, &value.CustomerName, &value.CustomerEmail, &value.CustomerPhone,
-		&value.Notes, &value.CreatedBy, &value.CreatedAt, &value.UpdatedAt,
+		&value.Notes, &value.CancellationReason, &value.CreatedBy, &value.CreatedAt, &value.UpdatedAt,
 	)
 	if err != nil {
 		return domain.Booking{}, repositoryhelpers.MapError(err)

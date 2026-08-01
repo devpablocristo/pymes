@@ -70,6 +70,37 @@ func (f algorithmsFake) NormalizeAllocations(values []domain.Allocation, _ int) 
 	return values, nil
 }
 
+type durationAlgorithmsFake struct {
+	duration int
+}
+
+func (f *durationAlgorithmsFake) NormalizeAllocations(
+	values []domain.Allocation,
+	_ int,
+) ([]domain.Allocation, error) {
+	return values, nil
+}
+
+func (f *durationAlgorithmsFake) CalculateSlots(
+	query domain.AvailabilityQuery,
+	_ domain.AvailabilitySnapshot,
+) ([]domain.Slot, error) {
+	f.duration = query.DurationMinutes
+	duration := query.DurationMinutes
+	if duration == 0 {
+		duration = 60
+	}
+	return []domain.Slot{{
+		StartAt:       query.From.UTC(),
+		EndAt:         query.From.UTC().Add(time.Duration(duration) * time.Minute),
+		OccupiesFrom:  query.From.UTC(),
+		OccupiesUntil: query.From.UTC().Add(time.Duration(duration) * time.Minute),
+		Timezone:      "UTC",
+		Allocations:   query.Allocations,
+		Remaining:     1,
+	}}, nil
+}
+
 func (f algorithmsFake) CalculateSlots(
 	query domain.AvailabilityQuery,
 	_ domain.AvailabilitySnapshot,
@@ -87,9 +118,13 @@ type partyDirectoryFake struct {
 	calls   int
 }
 
-func (f *partyDirectoryFake) EnsureCustomer(context.Context, domain.CommandMetadata, PublicCustomer) (string, error) {
+func (f *partyDirectoryFake) EnsureCustomer(
+	context.Context,
+	domain.CommandMetadata,
+	PublicCustomer,
+) (CustomerIdentity, error) {
 	f.calls++
-	return f.partyID, nil
+	return CustomerIdentity{PartyID: f.partyID, Name: "Ada"}, nil
 }
 
 func TestCreateRecurringBookingFreezesSnapshotsAndQueuesIntegrationEvents(t *testing.T) {
@@ -261,6 +296,174 @@ func TestCreateWaitlistEnsuresCustomerThroughConsumerOwnedPort(t *testing.T) {
 	}
 }
 
+type rescheduleRepositoryFake struct {
+	Repository
+	current     domain.Booking
+	service     domain.Service
+	resource    domain.Resource
+	replacement domain.Booking
+	reason      string
+}
+
+func (f *rescheduleRepositoryFake) GetBooking(
+	context.Context,
+	string,
+	uuid.UUID,
+) (domain.Booking, error) {
+	return f.current, nil
+}
+
+func (f *rescheduleRepositoryFake) GetService(
+	context.Context,
+	string,
+	uuid.UUID,
+) (domain.Service, []domain.ResourceRequirement, error) {
+	resourceID := f.resource.ID
+	return f.service, []domain.ResourceRequirement{{
+		ResourceID: &resourceID,
+		Mode:       domain.AllocationExclusive,
+		Units:      1,
+	}}, nil
+}
+
+func (f *rescheduleRepositoryFake) GetResources(
+	context.Context,
+	string,
+	[]uuid.UUID,
+) ([]domain.Resource, error) {
+	return []domain.Resource{f.resource}, nil
+}
+
+func (f *rescheduleRepositoryFake) ListResources(
+	context.Context,
+	string,
+	uuid.UUID,
+) ([]domain.Resource, error) {
+	return []domain.Resource{f.resource}, nil
+}
+
+func (f *rescheduleRepositoryFake) LoadAvailability(
+	context.Context,
+	domain.AvailabilityQuery,
+) (domain.AvailabilitySnapshot, error) {
+	return domain.AvailabilitySnapshot{Service: f.service}, nil
+}
+
+func (f *rescheduleRepositoryFake) RescheduleBooking(
+	_ context.Context,
+	_ domain.CommandMetadata,
+	_ uuid.UUID,
+	_ int,
+	replacement domain.Booking,
+	_ []domain.Event,
+) (domain.Booking, error) {
+	f.replacement = replacement
+	return replacement, nil
+}
+
+func (f *rescheduleRepositoryFake) TransitionBooking(
+	_ context.Context,
+	_ domain.CommandMetadata,
+	_ uuid.UUID,
+	_ int,
+	status domain.BookingStatus,
+	reason string,
+	_ []domain.Event,
+) (domain.Booking, error) {
+	f.reason = reason
+	result := f.current
+	result.Status = status
+	result.CancellationReason = reason
+	result.Version++
+	return result, nil
+}
+
+func TestResizeRevalidatesAndFreezesDurationAndCancellationReason(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, time.August, 1, 12, 0, 0, 0, time.UTC)
+	branchID, serviceID, resourceID, bookingID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	allocation := domain.Allocation{
+		ResourceID: resourceID,
+		Mode:       domain.AllocationExclusive,
+		Units:      1,
+	}
+	current := domain.Booking{
+		OrganizationID:  "org-resize",
+		ID:              bookingID,
+		BranchID:        branchID,
+		ServiceID:       serviceID,
+		PartyID:         "party-1",
+		Status:          domain.BookingConfirmed,
+		Participants:    1,
+		StartAt:         now.Add(time.Hour),
+		EndAt:           now.Add(2 * time.Hour),
+		OccupiesFrom:    now.Add(time.Hour),
+		OccupiesUntil:   now.Add(2 * time.Hour),
+		Version:         1,
+		ServiceName:     "Consulta",
+		Price:           "100",
+		Currency:        "ARS",
+		DurationMinutes: 60,
+		Timezone:        "UTC",
+		Allocations:     []domain.Allocation{allocation},
+		CreatedBy:       "actor",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	repository := &rescheduleRepositoryFake{
+		current: current,
+		service: domain.Service{
+			OrganizationID:  current.OrganizationID,
+			ID:              serviceID,
+			DurationMinutes: 60,
+			SlotMinutes:     15,
+			MaxParticipants: 1,
+			Active:          true,
+		},
+		resource: domain.Resource{
+			OrganizationID: current.OrganizationID,
+			ID:             resourceID,
+			BranchID:       branchID,
+			Kind:           domain.ResourceProfessional,
+			Capacity:       1,
+			Active:         true,
+		},
+	}
+	algorithms := &durationAlgorithmsFake{}
+	service := NewService(
+		repository,
+		algorithms,
+		nil,
+		WithClock(func() time.Time { return now }),
+	)
+	metadata := testMetadata(current.OrganizationID, "resize", current.ID.String())
+	newStart := now.Add(4 * time.Hour)
+	resized, err := service.RescheduleBooking(context.Background(), metadata, RescheduleInput{
+		OrganizationID:  current.OrganizationID,
+		BookingID:       current.ID,
+		ExpectedVersion: 1,
+		StartAt:         newStart,
+		DurationMinutes: 90,
+		Allocations:     []domain.Allocation{allocation},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if algorithms.duration != 90 || resized.DurationMinutes != 90 ||
+		!resized.EndAt.Equal(newStart.Add(90*time.Minute)) {
+		t.Fatalf("resize was not revalidated/frozen: booking=%+v duration=%d", resized, algorithms.duration)
+	}
+	cancelMetadata := testMetadata(current.OrganizationID, "cancel", current.ID.String())
+	cancelled, err := service.TransitionBooking(
+		context.Background(), cancelMetadata, current.OrganizationID,
+		current.ID, 1, domain.BookingCancelled, "Cliente sin disponibilidad",
+	)
+	if err != nil || cancelled.CancellationReason != "Cliente sin disponibilidad" ||
+		repository.reason != "Cliente sin disponibilidad" {
+		t.Fatalf("cancellation reason lost: booking=%+v reason=%q err=%v", cancelled, repository.reason, err)
+	}
+}
+
 type waitlistRepositoryFake struct {
 	Repository
 }
@@ -272,4 +475,180 @@ func (f *waitlistRepositoryFake) CreateWaitlistEntry(
 	_ domain.Event,
 ) (domain.WaitlistEntry, error) {
 	return value, nil
+}
+
+type maintenanceRepositoryFake struct {
+	Repository
+	candidate domain.WaitlistEntry
+	service   domain.Service
+	resource  domain.Resource
+	offers    int
+	releases  int
+	slot      domain.Slot
+}
+
+func (f *maintenanceRepositoryFake) ExpireHolds(
+	context.Context,
+	int,
+	time.Time,
+) ([]domain.Booking, error) {
+	return []domain.Booking{}, nil
+}
+
+func (f *maintenanceRepositoryFake) ClaimReminders(
+	context.Context,
+	int,
+	time.Time,
+	time.Time,
+) ([]domain.Event, error) {
+	return []domain.Event{}, nil
+}
+
+func (f *maintenanceRepositoryFake) ClaimWaitlistCandidates(
+	context.Context,
+	int,
+	time.Time,
+) ([]domain.WaitlistEntry, error) {
+	return []domain.WaitlistEntry{f.candidate}, nil
+}
+
+func (f *maintenanceRepositoryFake) GetService(
+	context.Context,
+	string,
+	uuid.UUID,
+) (domain.Service, []domain.ResourceRequirement, error) {
+	resourceID := f.resource.ID
+	return f.service, []domain.ResourceRequirement{{
+		ResourceID: &resourceID,
+		Mode:       domain.AllocationExclusive,
+		Units:      1,
+	}}, nil
+}
+
+func (f *maintenanceRepositoryFake) ListResources(
+	context.Context,
+	string,
+	uuid.UUID,
+) ([]domain.Resource, error) {
+	return []domain.Resource{f.resource}, nil
+}
+
+func (f *maintenanceRepositoryFake) LoadAvailability(
+	context.Context,
+	domain.AvailabilityQuery,
+) (domain.AvailabilitySnapshot, error) {
+	return domain.AvailabilitySnapshot{Service: f.service}, nil
+}
+
+func (f *maintenanceRepositoryFake) ReleaseWaitlistClaim(
+	context.Context,
+	string,
+	uuid.UUID,
+) error {
+	f.releases++
+	return nil
+}
+
+func (f *maintenanceRepositoryFake) OfferWaitlist(
+	_ context.Context,
+	_ string,
+	_ uuid.UUID,
+	slot domain.Slot,
+	_ time.Time,
+	_ domain.ActionToken,
+	_ []domain.Event,
+) (domain.WaitlistEntry, error) {
+	f.offers++
+	f.slot = slot
+	result := f.candidate
+	result.Status = domain.WaitlistOffered
+	result.Version++
+	return result, nil
+}
+
+func TestMaintenanceOffersWaitlistOnlyWhenAConcreteSlotExists(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, time.August, 1, 12, 0, 0, 0, time.UTC)
+	branchID, serviceID, resourceID := uuid.New(), uuid.New(), uuid.New()
+	candidate := domain.WaitlistEntry{
+		OrganizationID: "org-waitlist",
+		ID:             uuid.New(),
+		BranchID:       branchID,
+		ServiceID:      serviceID,
+		PartyID:        "party-1",
+		PreferredFrom:  now.Add(time.Hour),
+		PreferredUntil: now.Add(3 * time.Hour),
+		Participants:   1,
+		Status:         domain.WaitlistPending,
+		Version:        1,
+	}
+	serviceSnapshot := domain.Service{
+		OrganizationID:  candidate.OrganizationID,
+		ID:              serviceID,
+		DurationMinutes: 30,
+		SlotMinutes:     30,
+		MaxParticipants: 1,
+		Active:          true,
+	}
+	resource := domain.Resource{
+		OrganizationID: candidate.OrganizationID,
+		ID:             resourceID,
+		BranchID:       branchID,
+		Kind:           domain.ResourceProfessional,
+		Capacity:       1,
+		Active:         true,
+	}
+	codec, err := NewHMACActionTokenCodec([]byte("01234567890123456789012345678901"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Run("no availability releases claim", func(t *testing.T) {
+		repository := &maintenanceRepositoryFake{
+			candidate: candidate,
+			service:   serviceSnapshot,
+			resource:  resource,
+		}
+		result, err := NewService(
+			repository,
+			algorithmsFake{},
+			codec,
+			WithClock(func() time.Time { return now }),
+		).RunMaintenance(context.Background(), 10)
+		if err != nil || result.WaitlistOffers != 0 ||
+			repository.offers != 0 || repository.releases != 1 {
+			t.Fatalf(
+				"result=%+v offers=%d releases=%d err=%v",
+				result, repository.offers, repository.releases, err,
+			)
+		}
+	})
+	t.Run("availability persists exact offered slot", func(t *testing.T) {
+		slot := domain.Slot{
+			StartAt:       candidate.PreferredFrom,
+			EndAt:         candidate.PreferredFrom.Add(30 * time.Minute),
+			OccupiesFrom:  candidate.PreferredFrom,
+			OccupiesUntil: candidate.PreferredFrom.Add(30 * time.Minute),
+			Timezone:      "UTC",
+			Allocations: []domain.Allocation{{
+				ResourceID: resourceID,
+				Mode:       domain.AllocationExclusive,
+				Units:      1,
+			}},
+		}
+		repository := &maintenanceRepositoryFake{
+			candidate: candidate,
+			service:   serviceSnapshot,
+			resource:  resource,
+		}
+		result, err := NewService(
+			repository,
+			algorithmsFake{slots: []domain.Slot{slot}},
+			codec,
+			WithClock(func() time.Time { return now }),
+		).RunMaintenance(context.Background(), 10)
+		if err != nil || result.WaitlistOffers != 1 ||
+			repository.offers != 1 || !repository.slot.StartAt.Equal(slot.StartAt) {
+			t.Fatalf("result=%+v slot=%+v err=%v", result, repository.slot, err)
+		}
+	})
 }

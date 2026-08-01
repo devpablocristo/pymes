@@ -30,10 +30,12 @@ func (r *PostgresRepository) SaveActionToken(ctx context.Context, value domain.A
 func insertActionTokenTx(ctx context.Context, tx pgx.Tx, value domain.ActionToken) error {
 	_, err := tx.Exec(ctx, `
 		INSERT INTO app.scheduling_action_tokens (
-			org_id,id,booking_id,waitlist_id,purpose,token_hash,expires_at,consumed_at,created_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-		value.OrganizationID, value.ID, value.BookingID, value.WaitlistID, value.Purpose,
-		value.TokenHash, value.ExpiresAt, value.ConsumedAt, value.CreatedAt,
+			org_id,id,booking_id,waitlist_id,result_booking_id,purpose,token_hash,
+			expires_at,consumed_at,created_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+		value.OrganizationID, value.ID, value.BookingID, value.WaitlistID,
+		value.ResultBookingID, value.Purpose, value.TokenHash, value.ExpiresAt,
+		value.ConsumedAt, value.CreatedAt,
 	)
 	if err != nil {
 		return repositoryhelpers.MapError(err)
@@ -61,13 +63,15 @@ func (r *PostgresRepository) FindActionToken(ctx context.Context, hash string) (
 	defer func() { _ = tx.Rollback(ctx) }()
 	var value domain.ActionToken
 	err = tx.QueryRow(ctx, `
-		SELECT org_id,id,booking_id,waitlist_id,purpose,token_hash,expires_at,consumed_at,created_at
+		SELECT org_id,id,booking_id,waitlist_id,result_booking_id,purpose,token_hash,
+		       expires_at,consumed_at,created_at
 		FROM app.scheduling_action_tokens
 		WHERE org_id=$1 AND token_hash=$2`,
 		organizationID, hash,
 	).Scan(
 		&value.OrganizationID, &value.ID, &value.BookingID, &value.WaitlistID,
-		&value.Purpose, &value.TokenHash, &value.ExpiresAt, &value.ConsumedAt, &value.CreatedAt,
+		&value.ResultBookingID, &value.Purpose, &value.TokenHash, &value.ExpiresAt,
+		&value.ConsumedAt, &value.CreatedAt,
 	)
 	if err != nil {
 		return domain.ActionToken{}, repositoryhelpers.MapError(err)
@@ -78,7 +82,12 @@ func (r *PostgresRepository) FindActionToken(ctx context.Context, hash string) (
 	return value, nil
 }
 
-func (r *PostgresRepository) ConsumeActionToken(ctx context.Context, hash string, consumedAt time.Time) error {
+func (r *PostgresRepository) ConsumeActionToken(
+	ctx context.Context,
+	hash string,
+	consumedAt time.Time,
+	resultBookingID uuid.UUID,
+) error {
 	token, err := r.FindActionToken(ctx, hash)
 	if err != nil {
 		return err
@@ -90,9 +99,9 @@ func (r *PostgresRepository) ConsumeActionToken(ctx context.Context, hash string
 	defer func() { _ = tx.Rollback(ctx) }()
 	tag, err := tx.Exec(ctx, `
 		UPDATE app.scheduling_action_tokens
-		SET consumed_at=$3
+		SET consumed_at=$3,result_booking_id=$4
 		WHERE org_id=$1 AND token_hash=$2 AND consumed_at IS NULL AND expires_at>$3`,
-		token.OrganizationID, hash, consumedAt,
+		token.OrganizationID, hash, consumedAt, resultBookingID,
 	)
 	if err != nil {
 		return repositoryhelpers.MapError(err)
@@ -136,12 +145,18 @@ func (r *PostgresRepository) CreateWaitlistEntry(
 	}
 	_, err = tx.Exec(ctx, `
 		INSERT INTO app.scheduling_waitlist (
-			org_id,id,branch_id,service_id,party_id,preferred_from,preferred_until,
-			participants,status,offer_expires_at,version,created_at,updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+			org_id,id,branch_id,service_id,party_id,customer_name_snapshot,
+			customer_email_snapshot,customer_phone_snapshot,preferred_from,preferred_until,
+			participants,status,offer_expires_at,offered_starts_at,offered_ends_at,
+			offered_allocations,accepted_booking_id,version,created_at,updated_at
+		) VALUES (
+			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
+		)`,
 		value.OrganizationID, value.ID, value.BranchID, value.ServiceID, value.PartyID,
+		value.CustomerName, value.CustomerEmail, value.CustomerPhone,
 		value.PreferredFrom, value.PreferredUntil, value.Participants, value.Status,
-		value.OfferExpiresAt, value.Version, value.CreatedAt, value.UpdatedAt,
+		value.OfferExpiresAt, value.OfferedStartAt, value.OfferedEndAt, json.RawMessage("[]"),
+		value.AcceptedBookingID, value.Version, value.CreatedAt, value.UpdatedAt,
 	)
 	if err != nil {
 		return domain.WaitlistEntry{}, repositoryhelpers.MapError(err)
@@ -160,6 +175,26 @@ func (r *PostgresRepository) CreateWaitlistEntry(
 		return domain.WaitlistEntry{}, repositoryhelpers.MapError(err)
 	}
 	return value, nil
+}
+
+func (r *PostgresRepository) GetWaitlist(
+	ctx context.Context,
+	organizationID string,
+	id uuid.UUID,
+) (domain.WaitlistEntry, error) {
+	tx, err := repositoryhelpers.BeginTenant(ctx, r.pool, organizationID)
+	if err != nil {
+		return domain.WaitlistEntry{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	result, err := getWaitlistTx(ctx, tx, organizationID, id, false)
+	if err != nil {
+		return domain.WaitlistEntry{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return domain.WaitlistEntry{}, err
+	}
+	return result, nil
 }
 
 func (r *PostgresRepository) ListWaitlist(
@@ -213,27 +248,39 @@ func getWaitlistTx(
 	forUpdate bool,
 ) (domain.WaitlistEntry, error) {
 	query := `
-		SELECT org_id,id,branch_id,service_id,party_id,preferred_from,preferred_until,
-		       participants,status,offer_expires_at,version,created_at,updated_at
+		SELECT org_id,id,branch_id,service_id,party_id,customer_name_snapshot,
+		       customer_email_snapshot,customer_phone_snapshot,preferred_from,preferred_until,
+		       participants,status,offer_expires_at,offered_starts_at,offered_ends_at,
+		       offered_allocations,accepted_booking_id,version,created_at,updated_at
 		FROM app.scheduling_waitlist
 		WHERE org_id=$1 AND id=$2`
 	if forUpdate {
 		query += " FOR UPDATE"
 	}
 	var value domain.WaitlistEntry
+	var offeredAllocations []byte
 	err := tx.QueryRow(ctx, query, organizationID, id).Scan(
 		&value.OrganizationID, &value.ID, &value.BranchID, &value.ServiceID,
-		&value.PartyID, &value.PreferredFrom, &value.PreferredUntil,
+		&value.PartyID, &value.CustomerName, &value.CustomerEmail, &value.CustomerPhone,
+		&value.PreferredFrom, &value.PreferredUntil,
 		&value.Participants, &value.Status, &value.OfferExpiresAt,
-		&value.Version, &value.CreatedAt, &value.UpdatedAt,
+		&value.OfferedStartAt, &value.OfferedEndAt, &offeredAllocations,
+		&value.AcceptedBookingID, &value.Version, &value.CreatedAt, &value.UpdatedAt,
 	)
-	return value, repositoryhelpers.MapError(err)
+	if err != nil {
+		return domain.WaitlistEntry{}, repositoryhelpers.MapError(err)
+	}
+	if err := repositoryhelpers.Decode(offeredAllocations, &value.OfferedAllocations); err != nil {
+		return domain.WaitlistEntry{}, err
+	}
+	return value, nil
 }
 
 func (r *PostgresRepository) OfferWaitlist(
 	ctx context.Context,
 	organizationID string,
 	id uuid.UUID,
+	slot domain.Slot,
 	expiresAt time.Time,
 	token domain.ActionToken,
 	events []domain.Event,
@@ -253,12 +300,17 @@ func (r *PostgresRepository) OfferWaitlist(
 	if err := insertActionTokenTx(ctx, tx, token); err != nil {
 		return domain.WaitlistEntry{}, err
 	}
+	encodedAllocations, err := repositoryhelpers.Encode(slot.Allocations)
+	if err != nil {
+		return domain.WaitlistEntry{}, err
+	}
 	_, err = tx.Exec(ctx, `
 		UPDATE app.scheduling_waitlist
-		SET status='offered',offer_expires_at=$3,lease_token=NULL,lease_expires_at=NULL,
-		    version=version+1,updated_at=now()
+		SET status='offered',offer_expires_at=$3,offered_starts_at=$4,
+		    offered_ends_at=$5,offered_allocations=$6,
+		    lease_token=NULL,lease_expires_at=NULL,version=version+1,updated_at=now()
 		WHERE org_id=$1 AND id=$2`,
-		organizationID, id, expiresAt,
+		organizationID, id, expiresAt, slot.StartAt, slot.EndAt, encodedAllocations,
 	)
 	if err != nil {
 		return domain.WaitlistEntry{}, repositoryhelpers.MapError(err)
@@ -276,11 +328,34 @@ func (r *PostgresRepository) OfferWaitlist(
 	return result, nil
 }
 
+func (r *PostgresRepository) ReleaseWaitlistClaim(
+	ctx context.Context,
+	organizationID string,
+	id uuid.UUID,
+) error {
+	tx, err := repositoryhelpers.BeginTenant(ctx, r.pool, organizationID)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	_, err = tx.Exec(ctx, `
+		UPDATE app.scheduling_waitlist
+		SET lease_token=NULL,lease_expires_at=NULL
+		WHERE org_id=$1 AND id=$2 AND status='pending'`,
+		organizationID, id,
+	)
+	if err != nil {
+		return repositoryhelpers.MapError(err)
+	}
+	return tx.Commit(ctx)
+}
+
 func (r *PostgresRepository) AcceptWaitlist(
 	ctx context.Context,
 	organizationID string,
 	id uuid.UUID,
 	expectedVersion int,
+	bookingID uuid.UUID,
 	event domain.Event,
 ) (domain.WaitlistEntry, error) {
 	tx, err := repositoryhelpers.BeginTenant(ctx, r.pool, organizationID)
@@ -288,12 +363,23 @@ func (r *PostgresRepository) AcceptWaitlist(
 		return domain.WaitlistEntry{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	current, err := getWaitlistTx(ctx, tx, organizationID, id, true)
+	if err != nil {
+		return domain.WaitlistEntry{}, err
+	}
+	if current.Status == domain.WaitlistAccepted &&
+		current.AcceptedBookingID != nil && *current.AcceptedBookingID == bookingID {
+		if err := tx.Commit(ctx); err != nil {
+			return domain.WaitlistEntry{}, err
+		}
+		return current, nil
+	}
 	tag, err := tx.Exec(ctx, `
 		UPDATE app.scheduling_waitlist
-		SET status='accepted',version=version+1,updated_at=now()
+		SET status='accepted',accepted_booking_id=$4,version=version+1,updated_at=now()
 		WHERE org_id=$1 AND id=$2 AND status='offered' AND version=$3
 		  AND offer_expires_at>now()`,
-		organizationID, id, expectedVersion,
+		organizationID, id, expectedVersion, bookingID,
 	)
 	if err != nil {
 		return domain.WaitlistEntry{}, repositoryhelpers.MapError(err)
@@ -749,6 +835,29 @@ func (r *PostgresRepository) ClaimWaitlistCandidates(
 		tx, err := repositoryhelpers.BeginTenant(ctx, r.pool, organizationID)
 		if err != nil {
 			return nil, err
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE app.scheduling_waitlist
+			SET status='expired',lease_token=NULL,lease_expires_at=NULL,
+			    version=version+1,updated_at=$2
+			WHERE org_id=$1 AND status IN ('pending','offered')
+			  AND preferred_until<=$2`,
+			organizationID, now,
+		); err != nil {
+			_ = tx.Rollback(ctx)
+			return nil, repositoryhelpers.MapError(err)
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE app.scheduling_waitlist
+			SET status='pending',offer_expires_at=NULL,offered_starts_at=NULL,
+			    offered_ends_at=NULL,offered_allocations='[]'::jsonb,
+			    lease_token=NULL,lease_expires_at=NULL,version=version+1,updated_at=$2
+			WHERE org_id=$1 AND status='offered' AND offer_expires_at<=$2
+			  AND preferred_until>$2`,
+			organizationID, now,
+		); err != nil {
+			_ = tx.Rollback(ctx)
+			return nil, repositoryhelpers.MapError(err)
 		}
 		lease := uuid.New()
 		rows, err := tx.Query(ctx, `

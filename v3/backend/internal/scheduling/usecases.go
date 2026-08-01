@@ -36,16 +36,18 @@ type Repository interface {
 	GetBooking(context.Context, string, uuid.UUID) (domain.Booking, error)
 	ListBookings(context.Context, string, uuid.UUID, time.Time, time.Time) ([]domain.Booking, error)
 	RescheduleBooking(context.Context, domain.CommandMetadata, uuid.UUID, int, domain.Booking, []domain.Event) (domain.Booking, error)
-	TransitionBooking(context.Context, domain.CommandMetadata, uuid.UUID, int, domain.BookingStatus, []domain.Event) (domain.Booking, error)
+	TransitionBooking(context.Context, domain.CommandMetadata, uuid.UUID, int, domain.BookingStatus, string, []domain.Event) (domain.Booking, error)
 	CreateGroupSession(context.Context, domain.CommandMetadata, domain.GroupSession, []domain.Allocation, domain.Event) (domain.GroupSession, error)
 	GetGroupSession(context.Context, string, uuid.UUID) (domain.GroupSession, []domain.Allocation, error)
 	SaveActionToken(context.Context, domain.ActionToken) error
 	FindActionToken(context.Context, string) (domain.ActionToken, error)
-	ConsumeActionToken(context.Context, string, time.Time) error
+	ConsumeActionToken(context.Context, string, time.Time, uuid.UUID) error
 	CreateWaitlistEntry(context.Context, domain.CommandMetadata, domain.WaitlistEntry, domain.Event) (domain.WaitlistEntry, error)
+	GetWaitlist(context.Context, string, uuid.UUID) (domain.WaitlistEntry, error)
 	ListWaitlist(context.Context, string, uuid.UUID) ([]domain.WaitlistEntry, error)
-	OfferWaitlist(context.Context, string, uuid.UUID, time.Time, domain.ActionToken, []domain.Event) (domain.WaitlistEntry, error)
-	AcceptWaitlist(context.Context, string, uuid.UUID, int, domain.Event) (domain.WaitlistEntry, error)
+	OfferWaitlist(context.Context, string, uuid.UUID, domain.Slot, time.Time, domain.ActionToken, []domain.Event) (domain.WaitlistEntry, error)
+	ReleaseWaitlistClaim(context.Context, string, uuid.UUID) error
+	AcceptWaitlist(context.Context, string, uuid.UUID, int, uuid.UUID, domain.Event) (domain.WaitlistEntry, error)
 	CreateQueueTicket(context.Context, domain.CommandMetadata, domain.QueueTicket) (domain.QueueTicket, error)
 	AdvanceQueueTicket(context.Context, domain.CommandMetadata, uuid.UUID, int, domain.QueueStatus) (domain.QueueTicket, error)
 	ListQueue(context.Context, string, uuid.UUID) ([]domain.QueueTicket, error)
@@ -66,7 +68,7 @@ type OrganizationDirectory interface {
 }
 
 type PartyDirectory interface {
-	EnsureCustomer(context.Context, domain.CommandMetadata, PublicCustomer) (string, error)
+	EnsureCustomer(context.Context, domain.CommandMetadata, PublicCustomer) (CustomerIdentity, error)
 }
 
 type ActionTokenCodec interface {
@@ -79,6 +81,19 @@ type PublicCustomer struct {
 	Name    string
 	Email   string
 	Phone   string
+}
+
+type CustomerIdentity struct {
+	PartyID string
+	Name    string
+	Email   string
+	Phone   string
+}
+
+type PublicCatalog struct {
+	Branches  []domain.Branch
+	Services  []domain.Service
+	Resources []domain.Resource
 }
 
 type CreateWaitlistInput struct {
@@ -223,12 +238,54 @@ func (s *Service) ListAvailabilityExceptions(
 	return s.repository.ListAvailabilityExceptions(ctx, organizationID, branchID, from, until)
 }
 
+func (s *Service) PublicCatalog(
+	ctx context.Context,
+	organizationID string,
+) (PublicCatalog, error) {
+	branches, err := s.repository.ListBranches(ctx, organizationID)
+	if err != nil {
+		return PublicCatalog{}, err
+	}
+	services, err := s.repository.ListServices(ctx, organizationID)
+	if err != nil {
+		return PublicCatalog{}, err
+	}
+	resources, err := s.repository.ListResources(ctx, organizationID, uuid.Nil)
+	if err != nil {
+		return PublicCatalog{}, err
+	}
+	result := PublicCatalog{
+		Branches:  make([]domain.Branch, 0, len(branches)),
+		Services:  make([]domain.Service, 0, len(services)),
+		Resources: make([]domain.Resource, 0, len(resources)),
+	}
+	for _, branch := range branches {
+		if branch.Active {
+			result.Branches = append(result.Branches, branch)
+		}
+	}
+	for _, service := range services {
+		if service.Active {
+			result.Services = append(result.Services, service)
+		}
+	}
+	for _, resource := range resources {
+		if resource.Active {
+			result.Resources = append(result.Resources, resource)
+		}
+	}
+	return result, nil
+}
+
 func (s *Service) AvailableSlots(ctx context.Context, query domain.AvailabilityQuery) ([]domain.Slot, error) {
 	if query.OrganizationID == "" || query.BranchID == uuid.Nil || query.ServiceID == uuid.Nil {
 		return nil, domain.NewError(domain.CodeValidation, "organization, branch and service are required")
 	}
 	if query.Participants <= 0 {
 		query.Participants = 1
+	}
+	if query.DurationMinutes < 0 || query.DurationMinutes > 1440 {
+		return nil, domain.NewError(domain.CodeValidation, "duration override is invalid")
 	}
 	service, requirements, err := s.repository.GetService(ctx, query.OrganizationID, query.ServiceID)
 	if err != nil {
@@ -256,6 +313,9 @@ func (s *Service) AvailableSlots(ctx context.Context, query domain.AvailabilityQ
 		snapshot, err := s.repository.LoadAvailability(ctx, candidateQuery)
 		if err != nil {
 			return nil, err
+		}
+		if candidateQuery.DurationMinutes > 0 {
+			snapshot.Service.DurationMinutes = candidateQuery.DurationMinutes
 		}
 		slots, err := s.algorithms.CalculateSlots(candidateQuery, snapshot)
 		if err != nil {
@@ -317,10 +377,21 @@ func (s *Service) CreateBooking(
 		return nil, domain.NewError(domain.CodeCapacityExceeded, "service capacity is unavailable")
 	}
 	partyID := strings.TrimSpace(input.PartyID)
-	if partyID == "" && s.parties != nil {
-		partyID, err = s.parties.EnsureCustomer(ctx, metadata, input.Customer)
+	if partyID != "" {
+		input.Customer.PartyID = partyID
+	}
+	if s.parties != nil {
+		var customer CustomerIdentity
+		customer, err = s.parties.EnsureCustomer(ctx, metadata, input.Customer)
 		if err != nil {
 			return nil, err
+		}
+		partyID = customer.PartyID
+		input.Customer = PublicCustomer{
+			PartyID: customer.PartyID,
+			Name:    customer.Name,
+			Email:   customer.Email,
+			Phone:   customer.Phone,
 		}
 	}
 	if partyID == "" {
@@ -631,6 +702,7 @@ type RescheduleInput struct {
 	BookingID       uuid.UUID
 	ExpectedVersion int
 	StartAt         time.Time
+	DurationMinutes int
 	Allocations     []domain.Allocation
 }
 
@@ -648,6 +720,13 @@ func (s *Service) RescheduleBooking(
 	}
 	if !current.Status.Active() || input.ExpectedVersion <= 0 {
 		return domain.Booking{}, domain.NewError(domain.CodeBookingStateInvalid, "booking cannot be rescheduled")
+	}
+	durationMinutes := input.DurationMinutes
+	if durationMinutes == 0 {
+		durationMinutes = current.DurationMinutes
+	}
+	if durationMinutes <= 0 || durationMinutes > 1440 {
+		return domain.Booking{}, domain.NewError(domain.CodeValidation, "duration must be between 1 and 1440 minutes")
 	}
 	allocations := input.Allocations
 	if len(allocations) == 0 {
@@ -668,7 +747,7 @@ func (s *Service) RescheduleBooking(
 	if err := satisfyRequirements(requirements, allocations, resources); err != nil {
 		return domain.Booking{}, err
 	}
-	endAt := input.StartAt.Add(time.Duration(current.DurationMinutes) * time.Minute)
+	endAt := input.StartAt.Add(time.Duration(durationMinutes) * time.Minute)
 	query := domain.AvailabilityQuery{
 		OrganizationID:   input.OrganizationID,
 		BranchID:         current.BranchID,
@@ -676,6 +755,7 @@ func (s *Service) RescheduleBooking(
 		From:             input.StartAt,
 		Until:            endAt,
 		Participants:     current.Participants,
+		DurationMinutes:  durationMinutes,
 		Allocations:      allocations,
 		ExcludeBookingID: &current.ID,
 	}
@@ -702,6 +782,7 @@ func (s *Service) RescheduleBooking(
 	replacement.OccupiesFrom, replacement.OccupiesUntil = selected.OccupiesFrom, selected.OccupiesUntil
 	replacement.Allocations = selected.Allocations
 	replacement.Version = 1
+	replacement.DurationMinutes = durationMinutes
 	replacement.CreatedAt, replacement.UpdatedAt = now, now
 	replacement.CreatedBy = metadata.ActorID
 	replacement.HoldExpiresAt = nil
@@ -731,6 +812,7 @@ func (s *Service) TransitionBooking(
 	bookingID uuid.UUID,
 	expectedVersion int,
 	to domain.BookingStatus,
+	reason string,
 ) (domain.Booking, error) {
 	if err := metadata.Validate(); err != nil {
 		return domain.Booking{}, err
@@ -741,6 +823,13 @@ func (s *Service) TransitionBooking(
 	}
 	if !current.Status.CanTransition(to) {
 		return domain.Booking{}, domain.NewError(domain.CodeBookingStateInvalid, "booking transition is not allowed")
+	}
+	reason = strings.TrimSpace(reason)
+	if to == domain.BookingCancelled && reason == "" {
+		return domain.Booking{}, domain.NewError(domain.CodeValidation, "cancellation reason is required")
+	}
+	if len(reason) > 500 {
+		return domain.Booking{}, domain.NewError(domain.CodeValidation, "transition reason is too long")
 	}
 	eventType := map[domain.BookingStatus]string{
 		domain.BookingConfirmed: EventOrDefault(domain.EventBookingConfirmed),
@@ -759,8 +848,11 @@ func (s *Service) TransitionBooking(
 		"end_at":     current.EndAt,
 		"version":    expectedVersion + 1,
 	}
+	if reason != "" {
+		payload["reason"] = reason
+	}
 	events := lifecycleAndProjectionEvents(metadata, bookingID.String(), eventType, payload)
-	return s.repository.TransitionBooking(ctx, metadata, bookingID, expectedVersion, to, events)
+	return s.repository.TransitionBooking(ctx, metadata, bookingID, expectedVersion, to, reason, events)
 }
 
 func EventOrDefault(value string) string { return value }
@@ -820,14 +912,22 @@ func (s *Service) ConsumeBookingAction(
 	metadata domain.CommandMetadata,
 	expectedVersion int,
 	rescheduleAt *time.Time,
+	durationMinutes int,
+	reason string,
 ) (domain.Booking, error) {
 	hash, err := s.tokens.HashVerified(rawToken)
 	if err != nil {
 		return domain.Booking{}, domain.NewError(domain.CodeActionTokenInvalid, "action token is invalid")
 	}
 	token, err := s.repository.FindActionToken(ctx, hash)
-	if err != nil || token.Purpose != purpose || token.ConsumedAt != nil || token.BookingID == nil {
+	if err != nil || token.Purpose != purpose || token.BookingID == nil {
 		return domain.Booking{}, domain.NewError(domain.CodeActionTokenInvalid, "action token is invalid")
+	}
+	if token.ConsumedAt != nil {
+		if token.ResultBookingID == nil {
+			return domain.Booking{}, domain.NewError(domain.CodeActionTokenInvalid, "action token result is unavailable")
+		}
+		return s.repository.GetBooking(ctx, token.OrganizationID, *token.ResultBookingID)
 	}
 	now := s.now().UTC()
 	if !token.ExpiresAt.After(now) {
@@ -837,9 +937,9 @@ func (s *Service) ConsumeBookingAction(
 	var result domain.Booking
 	switch purpose {
 	case domain.ActionConfirm:
-		result, err = s.TransitionBooking(ctx, metadata, token.OrganizationID, *token.BookingID, expectedVersion, domain.BookingConfirmed)
+		result, err = s.TransitionBooking(ctx, metadata, token.OrganizationID, *token.BookingID, expectedVersion, domain.BookingConfirmed, "")
 	case domain.ActionCancel:
-		result, err = s.TransitionBooking(ctx, metadata, token.OrganizationID, *token.BookingID, expectedVersion, domain.BookingCancelled)
+		result, err = s.TransitionBooking(ctx, metadata, token.OrganizationID, *token.BookingID, expectedVersion, domain.BookingCancelled, reason)
 	case domain.ActionReschedule:
 		if rescheduleAt == nil {
 			return domain.Booking{}, domain.NewError(domain.CodeValidation, "reschedule time is required")
@@ -849,6 +949,7 @@ func (s *Service) ConsumeBookingAction(
 			BookingID:       *token.BookingID,
 			ExpectedVersion: expectedVersion,
 			StartAt:         *rescheduleAt,
+			DurationMinutes: durationMinutes,
 		})
 	default:
 		err = domain.NewError(domain.CodeActionTokenInvalid, "action purpose is invalid")
@@ -856,7 +957,7 @@ func (s *Service) ConsumeBookingAction(
 	if err != nil {
 		return domain.Booking{}, err
 	}
-	if err := s.repository.ConsumeActionToken(ctx, hash, now); err != nil {
+	if err := s.repository.ConsumeActionToken(ctx, hash, now, result.ID); err != nil {
 		return domain.Booking{}, err
 	}
 	return result, nil
@@ -873,9 +974,17 @@ func (s *Service) ConsumeWaitlistAction(
 		return domain.WaitlistEntry{}, domain.NewError(domain.CodeActionTokenInvalid, "action token is invalid")
 	}
 	token, err := s.repository.FindActionToken(ctx, hash)
-	if err != nil || token.Purpose != domain.ActionAcceptWaitlist ||
-		token.ConsumedAt != nil || token.WaitlistID == nil {
+	if err != nil || token.Purpose != domain.ActionAcceptWaitlist || token.WaitlistID == nil {
 		return domain.WaitlistEntry{}, domain.NewError(domain.CodeActionTokenInvalid, "action token is invalid")
+	}
+	if token.ConsumedAt != nil {
+		entry, getErr := s.repository.GetWaitlist(ctx, token.OrganizationID, *token.WaitlistID)
+		if getErr != nil || entry.Status != domain.WaitlistAccepted ||
+			entry.AcceptedBookingID == nil || token.ResultBookingID == nil ||
+			*entry.AcceptedBookingID != *token.ResultBookingID {
+			return domain.WaitlistEntry{}, domain.NewError(domain.CodeActionTokenInvalid, "action token result is unavailable")
+		}
+		return entry, nil
 	}
 	now := s.now().UTC()
 	if !token.ExpiresAt.After(now) {
@@ -885,16 +994,59 @@ func (s *Service) ConsumeWaitlistAction(
 	if err := metadata.Validate(); err != nil {
 		return domain.WaitlistEntry{}, err
 	}
+	current, err := s.repository.GetWaitlist(ctx, token.OrganizationID, *token.WaitlistID)
+	if err != nil {
+		return domain.WaitlistEntry{}, err
+	}
+	if current.Status != domain.WaitlistOffered || current.Version != expectedVersion ||
+		current.OfferedStartAt == nil || current.OfferedEndAt == nil ||
+		len(current.OfferedAllocations) == 0 {
+		return domain.WaitlistEntry{}, domain.NewError(
+			domain.CodeBookingVersionConflict,
+			"waitlist offer changed, expired or has no reservable slot",
+		)
+	}
+	bookingPayload, _ := json.Marshal(map[string]any{
+		"waitlist_id":  *token.WaitlistID,
+		"start_at":     current.OfferedStartAt,
+		"end_at":       current.OfferedEndAt,
+		"allocations":  current.OfferedAllocations,
+		"participants": current.Participants,
+	})
+	bookingDigest := sha256.Sum256(bookingPayload)
+	bookingMetadata := metadata
+	bookingMetadata.SourceID = "waitlist:" + token.WaitlistID.String()
+	bookingMetadata.SourceVersion = expectedVersion
+	bookingMetadata.PayloadHash = hex.EncodeToString(bookingDigest[:])
+	bookings, err := s.CreateBooking(ctx, bookingMetadata, CreateBookingInput{
+		OrganizationID: current.OrganizationID,
+		BranchID:       current.BranchID,
+		ServiceID:      current.ServiceID,
+		PartyID:        current.PartyID,
+		Customer:       PublicCustomer{PartyID: current.PartyID},
+		StartAt:        current.OfferedStartAt.UTC(),
+		Participants:   current.Participants,
+		Status:         domain.BookingConfirmed,
+		Allocations:    append([]domain.Allocation(nil), current.OfferedAllocations...),
+	})
+	if err != nil {
+		return domain.WaitlistEntry{}, err
+	}
+	if len(bookings) != 1 {
+		return domain.WaitlistEntry{}, domain.NewError(domain.CodeValidation, "waitlist booking result is invalid")
+	}
+	bookingID := bookings[0].ID
 	event := newEvent(metadata, token.WaitlistID.String(), "WaitlistAccepted", map[string]any{
 		"waitlist_id": *token.WaitlistID,
+		"booking_id":  bookingID,
 	})
 	result, err := s.repository.AcceptWaitlist(
-		ctx, token.OrganizationID, *token.WaitlistID, expectedVersion, event,
+		ctx, token.OrganizationID, *token.WaitlistID, expectedVersion, bookingID, event,
 	)
 	if err != nil {
 		return domain.WaitlistEntry{}, err
 	}
-	if err := s.repository.ConsumeActionToken(ctx, hash, now); err != nil {
+	if err := s.repository.ConsumeActionToken(ctx, hash, now, bookingID); err != nil {
 		return domain.WaitlistEntry{}, err
 	}
 	return result, nil
@@ -909,15 +1061,20 @@ func (s *Service) CreateWaitlistEntry(
 		return domain.WaitlistEntry{}, err
 	}
 	partyID := strings.TrimSpace(input.Customer.PartyID)
-	if partyID == "" {
-		if s.parties == nil {
-			return domain.WaitlistEntry{}, domain.NewError(domain.CodeValidation, "customer is required")
-		}
-		var err error
-		partyID, err = s.parties.EnsureCustomer(ctx, metadata, input.Customer)
+	if s.parties != nil {
+		customer, err := s.parties.EnsureCustomer(ctx, metadata, input.Customer)
 		if err != nil {
 			return domain.WaitlistEntry{}, err
 		}
+		partyID = customer.PartyID
+		input.Customer = PublicCustomer{
+			PartyID: customer.PartyID,
+			Name:    customer.Name,
+			Email:   customer.Email,
+			Phone:   customer.Phone,
+		}
+	} else if partyID == "" {
+		return domain.WaitlistEntry{}, domain.NewError(domain.CodeValidation, "customer is required")
 	}
 	value := domain.WaitlistEntry{
 		OrganizationID: input.OrganizationID,
@@ -925,6 +1082,9 @@ func (s *Service) CreateWaitlistEntry(
 		BranchID:       input.BranchID,
 		ServiceID:      input.ServiceID,
 		PartyID:        partyID,
+		CustomerName:   strings.TrimSpace(input.Customer.Name),
+		CustomerEmail:  strings.TrimSpace(input.Customer.Email),
+		CustomerPhone:  strings.TrimSpace(input.Customer.Phone),
 		PreferredFrom:  input.PreferredFrom,
 		PreferredUntil: input.PreferredUntil,
 		Participants:   input.Participants,
@@ -1007,6 +1167,39 @@ func (s *Service) RunMaintenance(ctx context.Context, limit int) (domain.Mainten
 		return domain.MaintenanceResult{}, domain.NewError(domain.CodeValidation, "action token codec is not configured")
 	}
 	for _, candidate := range candidates {
+		from := candidate.PreferredFrom
+		if from.Before(now) {
+			from = now
+		}
+		if !candidate.PreferredUntil.After(from) {
+			if err := s.repository.ReleaseWaitlistClaim(
+				ctx, candidate.OrganizationID, candidate.ID,
+			); err != nil {
+				return domain.MaintenanceResult{}, err
+			}
+			continue
+		}
+		slots, err := s.AvailableSlots(ctx, domain.AvailabilityQuery{
+			OrganizationID: candidate.OrganizationID,
+			BranchID:       candidate.BranchID,
+			ServiceID:      candidate.ServiceID,
+			From:           from,
+			Until:          candidate.PreferredUntil,
+			Participants:   candidate.Participants,
+		})
+		if err != nil {
+			_ = s.repository.ReleaseWaitlistClaim(ctx, candidate.OrganizationID, candidate.ID)
+			return domain.MaintenanceResult{}, err
+		}
+		if len(slots) == 0 {
+			if err := s.repository.ReleaseWaitlistClaim(
+				ctx, candidate.OrganizationID, candidate.ID,
+			); err != nil {
+				return domain.MaintenanceResult{}, err
+			}
+			continue
+		}
+		offeredSlot := slots[0]
 		raw, hash, err := s.tokens.Issue()
 		if err != nil {
 			return domain.MaintenanceResult{}, err
@@ -1034,11 +1227,16 @@ func (s *Service) RunMaintenance(ctx context.Context, limit int) (domain.Mainten
 		lifecyclePayload := map[string]any{
 			"waitlist_id": candidate.ID,
 			"expires_at":  expiresAt,
+			"start_at":    offeredSlot.StartAt,
+			"end_at":      offeredSlot.EndAt,
 		}
 		notificationPayload := map[string]any{
 			"waitlist_id":  candidate.ID,
 			"action_token": raw,
 			"expires_at":   expiresAt,
+			"start_at":     offeredSlot.StartAt,
+			"end_at":       offeredSlot.EndAt,
+			"allocations":  offeredSlot.Allocations,
 		}
 		events := []domain.Event{
 			newEvent(metadata, candidate.ID.String(), domain.EventWaitlistOffered, lifecyclePayload),
@@ -1048,7 +1246,7 @@ func (s *Service) RunMaintenance(ctx context.Context, limit int) (domain.Mainten
 			),
 		}
 		if _, err := s.repository.OfferWaitlist(
-			ctx, candidate.OrganizationID, candidate.ID, expiresAt, token, events,
+			ctx, candidate.OrganizationID, candidate.ID, offeredSlot, expiresAt, token, events,
 		); err != nil {
 			return domain.MaintenanceResult{}, err
 		}

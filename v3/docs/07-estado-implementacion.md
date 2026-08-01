@@ -1,6 +1,6 @@
 # Estado verificable de implementación
 
-Fecha de auditoría: 2026-07-31.
+Fecha de auditoría: 2026-08-01.
 
 El detalle que distingue implementación local de dependencias externas está en
 [la auditoría de cierre](08-auditoria-cierre.md).
@@ -18,6 +18,7 @@ El detalle que distingue implementación local de dependencias externas está en
 | Fiscal mock | Número reservado atómicamente por Pymes; PostgreSQL; autorizado/rechazado/timeout/uncertain/consult; A/B/C, NC/ND, ARS/USD/EUR e IVA soportado. | Suite Fiscal, PostgreSQL y `make fiscal-e2e`. |
 | Accounting | Headless real; cuentas, períodos, posteo, reversa, partidas, aplicaciones, trial balance, mayor y aging. | Suites focalizadas OA, integración PostgreSQL y `make accounting-e2e`. |
 | Vertical comercial | Parties, ventas, compras, NC/ND, cobros, pagos parciales, reversas, estados y reconciliación. | Tests PostgreSQL con pérdida de respuesta, nota de crédito y reversa de pago. |
+| Agenda | Contexto vertical multi-tenant con catálogo, disponibilidad, recursos múltiples, reservas, recurrencia, holds, sesiones grupales, waitlist, cola, tokens públicos, resize y cancelación con motivo. Platform Scheduling queda detrás de un adapter sin tipos compartidos ni persistencia. | `make scheduling-e2e`, tests PostgreSQL con race, DST/cruce de medianoche y gates de arquitectura/contrato. |
 | Operación | Probes contra DB, heartbeat JSON agregado sin PII, timeouts, circuit breakers, DLQ durable, replay idempotente con auditoría inmutable, métricas/alertas/dashboard Cloud Monitoring reproducibles, migraciones repetibles y backup/restore separado. | `make observability-e2e`, `make monitoring-config-check`, `make replay-smoke`, `make recovery-e2e`, `make backup-restore-smoke` y [runbook](10-runbook-operacion.md). |
 | Seguridad de dependencias | Go 1.26.5, `pgx`, `x/text`, `go-jose` y `grpc` en versiones corregidas; auditoría de los tres runtimes bloquea CI. | `make security`: cero vulnerabilidades alcanzables en Go y cero vulnerabilidades npm. |
 | Contratos | OpenAPI público y privados, código Go generado y control de drift. | `make api-check`. |

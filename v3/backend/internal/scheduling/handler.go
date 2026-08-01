@@ -1,3 +1,4 @@
+// architecture:adapter handler
 package scheduling
 
 import (
@@ -17,33 +18,10 @@ import (
 	"github.com/google/uuid"
 )
 
-type Principal struct {
-	OrganizationID     string
-	ActorID            string
-	Role               string
-	Permissions        []string
-	OrganizationStatus string
-	MembershipStatus   string
-}
-
-func (p Principal) Allows(organizationID, permission string) bool {
-	if p.OrganizationID != organizationID || p.ActorID == "" ||
-		p.OrganizationStatus != "ready" || p.MembershipStatus != "active" {
-		return false
-	}
-	if p.Role == "owner" || p.Role == "admin" {
-		return true
-	}
-	for _, current := range p.Permissions {
-		if current == permission {
-			return true
-		}
-	}
-	return false
-}
+type Principal = domain.Principal
 
 type Authenticator interface {
-	Principal(*http.Request) (Principal, error)
+	Principal(*http.Request) (domain.Principal, error)
 }
 
 // SchedulingUsecases is the HTTP adapter-owned input port.
@@ -58,20 +36,21 @@ type SchedulingUsecases interface {
 	ListResources(context.Context, string, uuid.UUID) ([]domain.Resource, error)
 	ListAvailabilityRules(context.Context, string, uuid.UUID) ([]domain.AvailabilityRule, error)
 	ListAvailabilityExceptions(context.Context, string, uuid.UUID, time.Time, time.Time) ([]domain.AvailabilityException, error)
+	PublicCatalog(context.Context, string) (PublicCatalog, error)
 	AvailableSlots(context.Context, domain.AvailabilityQuery) ([]domain.Slot, error)
 	CreateBooking(context.Context, domain.CommandMetadata, CreateBookingInput) ([]domain.Booking, error)
 	CreateGroupSession(context.Context, domain.CommandMetadata, CreateGroupSessionInput) (domain.GroupSession, error)
 	GetBooking(context.Context, string, uuid.UUID) (domain.Booking, error)
 	ListBookings(context.Context, string, uuid.UUID, time.Time, time.Time) ([]domain.Booking, error)
 	RescheduleBooking(context.Context, domain.CommandMetadata, RescheduleInput) (domain.Booking, error)
-	TransitionBooking(context.Context, domain.CommandMetadata, string, uuid.UUID, int, domain.BookingStatus) (domain.Booking, error)
+	TransitionBooking(context.Context, domain.CommandMetadata, string, uuid.UUID, int, domain.BookingStatus, string) (domain.Booking, error)
 	CreateWaitlistEntry(context.Context, domain.CommandMetadata, CreateWaitlistInput) (domain.WaitlistEntry, error)
 	ListWaitlist(context.Context, string, uuid.UUID) ([]domain.WaitlistEntry, error)
 	CreateQueueTicket(context.Context, domain.CommandMetadata, domain.QueueTicket) (domain.QueueTicket, error)
 	AdvanceQueueTicket(context.Context, domain.CommandMetadata, string, uuid.UUID, int, domain.QueueStatus) (domain.QueueTicket, error)
 	ListQueue(context.Context, string, uuid.UUID) ([]domain.QueueTicket, error)
 	ResolvePublicOrganization(context.Context, string) (string, error)
-	ConsumeBookingAction(context.Context, string, domain.ActionPurpose, domain.CommandMetadata, int, *time.Time) (domain.Booking, error)
+	ConsumeBookingAction(context.Context, string, domain.ActionPurpose, domain.CommandMetadata, int, *time.Time, int, string) (domain.Booking, error)
 	ConsumeWaitlistAction(context.Context, string, domain.CommandMetadata, int) (domain.WaitlistEntry, error)
 }
 
@@ -115,6 +94,7 @@ func (h *HTTPHandler) Handler() http.Handler {
 		router.Post("/queue/{ticketId}", h.advanceQueueTicket)
 	})
 	router.Post("/api/v1/public/scheduling/{organizationSlug}/availability", h.publicAvailability)
+	router.Get("/api/v1/public/scheduling/{organizationSlug}/catalog", h.publicCatalog)
 	router.Post("/api/v1/public/scheduling/{organizationSlug}/bookings", h.createPublicBooking)
 	router.Post("/api/v1/public/scheduling/{organizationSlug}/waitlist", h.createPublicWaitlist)
 	router.Post("/api/v1/public/scheduling/actions/{token}", h.consumePublicAction)
@@ -381,6 +361,26 @@ func (h *HTTPHandler) publicAvailability(w http.ResponseWriter, request *http.Re
 	h.availability(w, request, organizationID)
 }
 
+func (h *HTTPHandler) publicCatalog(w http.ResponseWriter, request *http.Request) {
+	organizationID, err := h.usecases.ResolvePublicOrganization(
+		request.Context(), chi.URLParam(request, "organizationSlug"),
+	)
+	if err != nil {
+		httphelpers.WriteError(w, err)
+		return
+	}
+	result, err := h.usecases.PublicCatalog(request.Context(), organizationID)
+	if err != nil {
+		httphelpers.WriteError(w, err)
+		return
+	}
+	httphelpers.WriteJSON(w, http.StatusOK, dto.PublicCatalogFromDomain(
+		result.Branches,
+		result.Services,
+		result.Resources,
+	))
+}
+
 func (h *HTTPHandler) availability(w http.ResponseWriter, request *http.Request, organizationID string) {
 	var input dto.AvailabilityQuery
 	if !httphelpers.Decode(w, request, &input) {
@@ -428,7 +428,7 @@ func (h *HTTPHandler) createAdminBooking(w http.ResponseWriter, request *http.Re
 	if !ok {
 		return
 	}
-	h.createBooking(w, request, organizationID, principal.ActorID)
+	h.createBooking(w, request, organizationID, principal.ActorID, false)
 }
 
 func (h *HTTPHandler) createPublicBooking(w http.ResponseWriter, request *http.Request) {
@@ -439,13 +439,14 @@ func (h *HTTPHandler) createPublicBooking(w http.ResponseWriter, request *http.R
 		httphelpers.WriteError(w, err)
 		return
 	}
-	h.createBooking(w, request, organizationID, "public:scheduling")
+	h.createBooking(w, request, organizationID, "public:scheduling", true)
 }
 
 func (h *HTTPHandler) createBooking(
 	w http.ResponseWriter,
 	request *http.Request,
 	organizationID, actorID string,
+	public bool,
 ) {
 	var input dto.CreateBooking
 	if !httphelpers.Decode(w, request, &input) {
@@ -472,6 +473,10 @@ func (h *HTTPHandler) createBooking(
 	})
 	if err != nil {
 		httphelpers.WriteError(w, err)
+		return
+	}
+	if public {
+		httphelpers.WriteJSON(w, http.StatusCreated, dto.PublicBookingsFromDomain(result))
 		return
 	}
 	httphelpers.WriteJSON(w, http.StatusCreated, dto.BookingsFromDomain(result))
@@ -538,7 +543,8 @@ func (h *HTTPHandler) rescheduleBooking(w http.ResponseWriter, request *http.Req
 	}
 	result, err := h.usecases.RescheduleBooking(request.Context(), metadata, RescheduleInput{
 		OrganizationID: organizationID, BookingID: id, ExpectedVersion: input.ExpectedVersion,
-		StartAt: input.StartAt.UTC(), Allocations: dto.Allocations(input.Allocations),
+		StartAt: input.StartAt.UTC(), DurationMinutes: input.DurationMinutes,
+		Allocations: dto.Allocations(input.Allocations),
 	})
 	if err != nil {
 		httphelpers.WriteError(w, err)
@@ -569,7 +575,7 @@ func (h *HTTPHandler) transition(
 			return
 		}
 		result, err := h.usecases.TransitionBooking(
-			request.Context(), metadata, organizationID, id, input.ExpectedVersion, status,
+			request.Context(), metadata, organizationID, id, input.ExpectedVersion, status, input.Reason,
 		)
 		if err != nil {
 			httphelpers.WriteError(w, err)
@@ -584,7 +590,7 @@ func (h *HTTPHandler) createAdminWaitlist(w http.ResponseWriter, request *http.R
 	if !ok {
 		return
 	}
-	h.createWaitlist(w, request, organizationID, principal.ActorID)
+	h.createWaitlist(w, request, organizationID, principal.ActorID, false)
 }
 
 func (h *HTTPHandler) createPublicWaitlist(w http.ResponseWriter, request *http.Request) {
@@ -595,13 +601,14 @@ func (h *HTTPHandler) createPublicWaitlist(w http.ResponseWriter, request *http.
 		httphelpers.WriteError(w, err)
 		return
 	}
-	h.createWaitlist(w, request, organizationID, "public:scheduling")
+	h.createWaitlist(w, request, organizationID, "public:scheduling", true)
 }
 
 func (h *HTTPHandler) createWaitlist(
 	w http.ResponseWriter,
 	request *http.Request,
 	organizationID, actorID string,
+	public bool,
 ) {
 	var input dto.CreateWaitlist
 	if !httphelpers.Decode(w, request, &input) {
@@ -628,6 +635,10 @@ func (h *HTTPHandler) createWaitlist(
 	})
 	if err != nil {
 		httphelpers.WriteError(w, err)
+		return
+	}
+	if public {
+		httphelpers.WriteJSON(w, http.StatusCreated, dto.PublicWaitlistEntryFromDomain(result))
 		return
 	}
 	httphelpers.WriteJSON(w, http.StatusCreated, dto.WaitlistEntryFromDomain(result))
@@ -739,37 +750,38 @@ func (h *HTTPHandler) consumePublicAction(w http.ResponseWriter, request *http.R
 			httphelpers.WriteError(w, err)
 			return
 		}
-		httphelpers.WriteJSON(w, http.StatusOK, dto.WaitlistEntryFromDomain(result))
+		httphelpers.WriteJSON(w, http.StatusOK, dto.PublicWaitlistEntryFromDomain(result))
 		return
 	}
 	result, err := h.usecases.ConsumeBookingAction(
-		request.Context(), token, input.Purpose, metadata, input.ExpectedVersion, input.StartAt,
+		request.Context(), token, input.Purpose, metadata, input.ExpectedVersion,
+		input.StartAt, input.DurationMinutes, input.Reason,
 	)
 	if err != nil {
 		httphelpers.WriteError(w, err)
 		return
 	}
-	httphelpers.WriteJSON(w, http.StatusOK, dto.BookingFromDomain(result))
+	httphelpers.WriteJSON(w, http.StatusOK, dto.PublicBookingFromDomain(result))
 }
 
 func (h *HTTPHandler) authorize(
 	w http.ResponseWriter,
 	request *http.Request,
 	permission string,
-) (string, Principal, bool) {
+) (string, domain.Principal, bool) {
 	organizationID := chi.URLParam(request, "organizationId")
 	if h.auth == nil {
 		httphelpers.WriteProblem(w, http.StatusUnauthorized, "UNAUTHENTICATED", "authentication is required")
-		return "", Principal{}, false
+		return "", domain.Principal{}, false
 	}
 	principal, err := h.auth.Principal(request)
 	if err != nil {
 		httphelpers.WriteProblem(w, http.StatusUnauthorized, "UNAUTHENTICATED", "authentication is required")
-		return "", Principal{}, false
+		return "", domain.Principal{}, false
 	}
 	if !principal.Allows(organizationID, permission) {
 		httphelpers.WriteProblem(w, http.StatusForbidden, domain.CodeForbidden, "permission is required")
-		return "", Principal{}, false
+		return "", domain.Principal{}, false
 	}
 	return organizationID, principal, true
 }

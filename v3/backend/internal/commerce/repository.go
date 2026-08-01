@@ -681,6 +681,28 @@ func reversalSnapshotDigest(value domain.AccountingReversal) string {
 }
 
 func (s *Store) Lease(ctx context.Context, limit int, duration time.Duration) ([]domain.Event, error) {
+	return s.lease(ctx, nil, true, limit, duration)
+}
+
+func (s *Store) LeaseTopics(
+	ctx context.Context,
+	topics []string,
+	limit int,
+	duration time.Duration,
+) ([]domain.Event, error) {
+	if len(topics) == 0 {
+		return nil, nil
+	}
+	return s.lease(ctx, topics, false, limit, duration)
+}
+
+func (s *Store) lease(
+	ctx context.Context,
+	topics []string,
+	allTopics bool,
+	limit int,
+	duration time.Duration,
+) ([]domain.Event, error) {
 	if limit < 1 || duration <= 0 {
 		return nil, nil
 	}
@@ -711,6 +733,7 @@ WITH candidate AS (
  SELECT id FROM app.outbox
  WHERE org_id=$1 AND published_at IS NULL AND available_at <= $2
    AND (lease_expires_at IS NULL OR lease_expires_at <= $2)
+   AND ($5 OR topic=ANY($6::text[]))
  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT 1
 )
 UPDATE app.outbox o SET lease_token=$3, lease_expires_at=$4, attempts=o.attempts+1
@@ -718,7 +741,7 @@ FROM candidate c WHERE o.id=c.id
 RETURNING o.id,o.org_id,o.topic,o.payload,o.payload_hash,o.idempotency_key,
           o.request_id,o.actor_ref,o.source_version,o.snapshot_digest,
           o.correlation_id,o.available_at,o.attempts,o.lease_token,o.lease_expires_at`,
-				organizationID, now, token, now.Add(duration)).
+				organizationID, now, token, now.Add(duration), allTopics, topics).
 				Scan(
 					&event.ID, &event.OrganizationID, &event.Topic, &event.Payload,
 					&event.PayloadHash, &event.IdempotencyKey, &event.RequestID,

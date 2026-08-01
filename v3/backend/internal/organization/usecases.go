@@ -25,6 +25,32 @@ type Provisioner interface {
 	ProvisionOrganization(context.Context, organizationdomain.Organization) error
 }
 
+// PublicDirectory is the read port consumed by public organization lookup.
+// It deliberately returns the Organization domain type, never a repository
+// row, so consumers cannot bypass lifecycle rules.
+type PublicDirectory interface {
+	ResolveBySlug(context.Context, string) (organizationdomain.Organization, error)
+}
+
+type PublicQueries struct {
+	Directory PublicDirectory
+}
+
+func (queries PublicQueries) ResolvePublicBySlug(
+	ctx context.Context,
+	slug string,
+) (organizationdomain.Organization, error) {
+	slug = strings.TrimSpace(slug)
+	if ctx == nil || queries.Directory == nil || slug == "" {
+		return organizationdomain.Organization{}, organizationdomain.ErrUnknown
+	}
+	organization, err := queries.Directory.ResolveBySlug(ctx, slug)
+	if err != nil || organization.Status != organizationdomain.Ready {
+		return organizationdomain.Organization{}, organizationdomain.ErrUnknown
+	}
+	return organization, nil
+}
+
 type ProvisionOrganizationCommand struct {
 	ID                  string
 	Name                string

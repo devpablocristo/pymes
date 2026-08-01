@@ -1,5 +1,7 @@
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const candidates = [process.env.PLAYWRIGHT_CHROME_PATH, "/usr/bin/google-chrome", "/usr/bin/chromium"].filter(Boolean);
 let executable = candidates.find((candidate) => existsSync(candidate));
@@ -14,18 +16,52 @@ if (!executable) {
     process.exit(install.status ?? 1);
   }
 }
-const build = spawnSync(process.execPath, [vite.pathname, "build", "--mode", "e2e"], {
-  stdio: "inherit",
-  env: process.env,
-});
+const outputDir = mkdtempSync(join(tmpdir(), "pymes-web-e2e-"));
+const build = spawnSync(
+  process.execPath,
+  [
+    vite.pathname,
+    "build",
+    "--mode",
+    "e2e",
+    "--outDir",
+    outputDir,
+    "--emptyOutDir",
+  ],
+  {
+    stdio: "inherit",
+    env: process.env,
+  },
+);
 if (build.status !== 0) {
+  rmSync(outputDir, { recursive: true, force: true });
   process.exit(build.status ?? 1);
 }
 
-const server = spawn(process.execPath, [vite.pathname, "preview", "--host", "127.0.0.1", "--port", "4173"], {
-  stdio: ["ignore", "inherit", "inherit"],
-  env: process.env,
-});
+const server = spawn(
+  process.execPath,
+  [
+    vite.pathname,
+    "preview",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "4173",
+    "--outDir",
+    outputDir,
+  ],
+  {
+    stdio: ["ignore", "inherit", "inherit"],
+    env: process.env,
+  },
+);
+
+function cleanup() {
+  if (server.exitCode === null) {
+    server.kill("SIGTERM");
+  }
+  rmSync(outputDir, { recursive: true, force: true });
+}
 
 async function waitForServer() {
   const deadline = Date.now() + 30_000;
@@ -44,7 +80,12 @@ async function waitForServer() {
   throw new Error("Vite no respondió dentro de 30 segundos.");
 }
 
-await waitForServer();
+try {
+  await waitForServer();
+} catch (error) {
+  cleanup();
+  throw error;
+}
 
 const child = spawn(process.execPath, [cli.pathname, "test", ...process.argv.slice(2)], {
   stdio: "inherit",
@@ -56,7 +97,7 @@ const child = spawn(process.execPath, [cli.pathname, "test", ...process.argv.sli
 });
 
 child.on("exit", (code, signal) => {
-  server.kill("SIGTERM");
+  cleanup();
   if (signal) {
     process.kill(process.pid, signal);
     return;
@@ -67,6 +108,6 @@ child.on("exit", (code, signal) => {
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {
     child.kill(signal);
-    server.kill(signal);
+    cleanup();
   });
 }

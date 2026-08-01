@@ -1,7 +1,7 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
   server: {
     host: "127.0.0.1",
@@ -21,7 +21,9 @@ export default defineConfig({
   },
   build: {
     target: "es2022",
-    sourcemap: true,
+    // Los mapas del bundle desplegable exponen el código fuente completo. Los
+    // E2E locales pueden conservarlos, pero producción no los publica.
+    sourcemap: mode !== "production",
   },
   test: {
     environment: "jsdom",
@@ -32,4 +34,4 @@ export default defineConfig({
       reporter: ["text", "json-summary"],
     },
   },
-});
+}));

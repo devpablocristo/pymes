@@ -10,6 +10,8 @@
     "dev": "vite",
     "generate:api": "openapi-typescript ../api/openapi.yaml -o src/api/generated.ts",
     "check:api": "node scripts/check-generated-api.mjs",
+    "check:dependencies": "node scripts/check-dependency-policy.mjs",
+    "check:bundle": "node scripts/check-production-bundle.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -17,7 +19,7 @@
     "preview": "vite preview",
     "audit": "npm audit --audit-level=high",
     "e2e": "node scripts/run-browser-e2e.mjs",
-    "ci": "npm run check:api && npm run typecheck && npm run test && npm run build && npm run audit && npm run e2e"
+    "ci": "npm run check:api && npm run check:dependencies && npm run typecheck && npm run test && npm run build && npm run check:bundle && npm run audit && npm run e2e"
   },
   "dependencies": {
     "@clerk/react": "6.12.10",

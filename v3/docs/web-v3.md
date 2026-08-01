@@ -86,11 +86,13 @@ Web.
 `make web-ci` ejecuta:
 
 1. drift del cliente TypeScript contra OpenAPI;
-2. typecheck;
-3. unitarias;
-4. build productivo;
-5. auditoría de dependencias;
-6. Playwright en Chromium desktop y mobile.
+2. política de versiones, paquetes Standard y ausencia de rutas locales;
+3. typecheck;
+4. unitarias;
+5. build productivo;
+6. ausencia de fakes y source maps públicos en el artefacto;
+7. auditoría de dependencias;
+8. Playwright en Chromium desktop y mobile.
 
 Los E2E cubren operación de Agenda, filtros accesibles, disponibilidad,
 bloqueos, cola, reserva pública y acción opaca. `cloud-run-security-check.sh`

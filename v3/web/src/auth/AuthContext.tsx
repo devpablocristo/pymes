@@ -9,33 +9,28 @@ import {
 } from "@clerk/react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  createContext,
+  lazy,
   type ReactNode,
   useCallback,
-  useContext,
   useMemo,
+  Suspense,
 } from "react";
-import type { RequestIdentity } from "../api/SchedulingGateway";
 import { getCurrentSession } from "../api/currentSession";
 import type { WebConfig } from "../config";
+import {
+  SessionContext,
+  type Session,
+  useSession,
+} from "./sessionContext";
 
-type Session = {
-  identity: RequestIdentity;
-  organizationName: string;
-  organizationSlug: string;
-  accountControls: ReactNode;
-  local: boolean;
-};
+export { useSession };
 
-const SessionContext = createContext<Session | null>(null);
-
-export function useSession(): Session {
-  const value = useContext(SessionContext);
-  if (!value) {
-    throw new Error("useSession debe utilizarse dentro de AdminAuthBoundary");
+const LocalSession = lazy(async () => {
+  if (!import.meta.env.DEV && import.meta.env.MODE !== "e2e") {
+    throw new Error("La sesión local no forma parte del runtime productivo.");
   }
-  return value;
-}
+  return import("./LocalSession");
+});
 
 function ClerkSession({
   config,
@@ -152,31 +147,6 @@ function ClerkSession({
   return <SessionContext.Provider value={session}>{children}</SessionContext.Provider>;
 }
 
-function LocalSession({ config, children }: { config: WebConfig; children: ReactNode }) {
-  if (!config.localOrganizationId) {
-    return (
-      <main className="auth-stage" id="main-content">
-        <div className="auth-card auth-card--error">
-          <p className="eyebrow">Configuración local incompleta</p>
-          <h1>Falta una organización de desarrollo</h1>
-          <p>Definí VITE_PYMES_ORGANIZATION_ID para iniciar el entorno local.</p>
-        </div>
-      </main>
-    );
-  }
-  const session: Session = {
-    identity: {
-      organizationId: config.localOrganizationId,
-      getToken: async () => "local-e2e-token",
-    },
-    organizationName: "Centro Norte",
-    organizationSlug: config.publicOrganizationSlug,
-    accountControls: <span className="local-session-badge">Sesión local</span>,
-    local: true,
-  };
-  return <SessionContext.Provider value={session}>{children}</SessionContext.Provider>;
-}
-
 export function AdminAuthBoundary({ config, children }: { config: WebConfig; children: ReactNode }) {
   if (config.clerkPublishableKey) {
     return (
@@ -196,7 +166,11 @@ export function AdminAuthBoundary({ config, children }: { config: WebConfig; chi
     );
   }
   if (config.allowInsecureLocalAuth) {
-    return <LocalSession config={config}>{children}</LocalSession>;
+    return (
+      <Suspense fallback={<main className="public-loading">Iniciando sesión local…</main>}>
+        <LocalSession config={config}>{children}</LocalSession>
+      </Suspense>
+    );
   }
   return (
     <main className="auth-stage" id="main-content">

@@ -419,7 +419,7 @@ expect_failure "job verifier accepted a Serverless VPC connector" \
   "$(jq '.spec.template.spec.template.metadata.annotations["run.googleapis.com/vpc-access-connector"] = "legacy-connector"' <<<"$job_json")" \
   pymes-v3-stg-migrate stg "$sha" "$migrate_image" "$migrate_account"
 
-if rg -q -- '--execute-now|gcloud run jobs execute|--allow-unauthenticated|--no-allow-unauthenticated' \
+if grep -Eq -- '--execute-now|gcloud run jobs execute|--allow-unauthenticated|--no-allow-unauthenticated' \
   "$script_dir/seed-cloud-run-resources.sh"; then
   echo "FAIL: seed script contains a job execution or IAM mutation path" >&2
   exit 1
@@ -435,7 +435,7 @@ for required in \
   '--clear-volumes' \
   '--clear-volume-mounts' \
   'gcloud run jobs executions list'; do
-  rg -Fq -- "$required" "$script_dir/seed-cloud-run-resources.sh" || {
+  grep -Fq -- "$required" "$script_dir/seed-cloud-run-resources.sh" || {
     echo "FAIL: seed script omits $required" >&2
     exit 1
   }

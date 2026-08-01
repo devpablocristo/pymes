@@ -2,6 +2,7 @@ import { Pool } from "pg";
 import type { Config } from "./config.js";
 import { MockFiscalAuthority } from "./fiscal/companion/mock-authority.js";
 import { createFiscalHTTPServer } from "./fiscal/handler/http.js";
+import { observePoolErrors } from "./fiscal/repository/pool-errors.js";
 import { PostgresFiscalStore } from "./fiscal/repository/postgres-store.js";
 import { FiscalService } from "./fiscal/usecases/fiscal-service.js";
 import type { InternalAuthorizer } from "./fiscal/ports/internal-authorizer.js";
@@ -10,6 +11,9 @@ import { InsecureLocalAuthorizer } from "./identity/access/authorizer.js";
 
 export async function initialize(config: Config) {
   const pool = new Pool({ connectionString: config.databaseURL });
+  observePoolErrors(pool, (event) => {
+    process.stderr.write(`${JSON.stringify(event)}\n`);
+  });
   const store = new PostgresFiscalStore(pool);
   try {
     await store.ping();

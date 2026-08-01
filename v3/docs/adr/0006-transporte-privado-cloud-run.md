@@ -52,7 +52,7 @@ siendo obligatorio y no sustituye esa capa.
 La implementación vive en
 [`cloud-run.sh`](../../scripts/deploy/cloud-run.sh). La obtención y caché del
 ID token está en
-[`cloud_run_tokens.go`](../../backend/internal/identity/access/cloud_run_tokens.go).
+[`cloud_run_tokens.go`](../../backend/internal/identity/cloud_run_tokens.go).
 
 ## Observabilidad
 

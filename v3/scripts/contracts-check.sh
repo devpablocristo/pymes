@@ -15,8 +15,8 @@ go run "$generator" --package accountingapi --generate types,client -o "$tempora
 go run "$generator" --package accountingapi --generate chi-server -o "$temporary_dir/accounting.server.gen.go" ../contracts/accounting.openapi.yaml
 go run "$generator" --package fiscalapi --generate types,client -o "$temporary_dir/fiscal.gen.go" ../contracts/fiscal.openapi.yaml
 go run "$generator" --package fiscalapi --generate chi-server -o "$temporary_dir/fiscal.server.gen.go" ../contracts/fiscal.openapi.yaml
-cmp "$temporary_dir/public.gen.go" internal/contracts/publicapi/public.gen.go
-cmp "$temporary_dir/accounting.gen.go" internal/contracts/accountingapi/accounting.gen.go
-cmp "$temporary_dir/accounting.server.gen.go" internal/contracts/accountingapi/accounting.server.gen.go
-cmp "$temporary_dir/fiscal.gen.go" internal/contracts/fiscalapi/fiscal.gen.go
-cmp "$temporary_dir/fiscal.server.gen.go" internal/contracts/fiscalapi/fiscal.server.gen.go
+cmp "$temporary_dir/public.gen.go" internal/commerce/handler/dto/public.gen.go
+cmp "$temporary_dir/accounting.gen.go" internal/commerce/accounting/models/accounting.gen.go
+cmp "$temporary_dir/accounting.server.gen.go" internal/commerce/accounting/models/accounting.server.gen.go
+cmp "$temporary_dir/fiscal.gen.go" internal/commerce/fiscal/models/fiscal.gen.go
+cmp "$temporary_dir/fiscal.server.gen.go" internal/commerce/fiscal/models/fiscal.server.gen.go

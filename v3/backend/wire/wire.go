@@ -1,66 +1,122 @@
+// Package wire is the sole composition root for Pymes v3 workloads.
 package wire
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"net/http"
-
-	clerk "github.com/devpablocristo/platform/sdks/clerk/go"
+	"github.com/devpablocristo/platform/sdks/clerk/go"
 	"github.com/devpablocristo/pymes/v3/backend/cmd/config"
-	commercehandler "github.com/devpablocristo/pymes/v3/backend/internal/commerce/handler"
-	commercerepository "github.com/devpablocristo/pymes/v3/backend/internal/commerce/repository"
-	commerceusecases "github.com/devpablocristo/pymes/v3/backend/internal/commerce/usecases"
-	identityaccess "github.com/devpablocristo/pymes/v3/backend/internal/identity/access"
-	identityhandler "github.com/devpablocristo/pymes/v3/backend/internal/identity/handler"
-	identityrepository "github.com/devpablocristo/pymes/v3/backend/internal/identity/repository"
-	identityusecases "github.com/devpablocristo/pymes/v3/backend/internal/identity/usecases"
-	postgresadapter "github.com/devpablocristo/pymes/v3/backend/internal/infrastructure/postgres"
+	"github.com/devpablocristo/pymes/v3/backend/internal/commerce"
+	"github.com/devpablocristo/pymes/v3/backend/internal/fakeservice"
+	"github.com/devpablocristo/pymes/v3/backend/internal/identity"
 	"github.com/devpablocristo/pymes/v3/backend/internal/observability"
+	"github.com/devpablocristo/pymes/v3/backend/internal/organization"
+	"github.com/devpablocristo/pymes/v3/backend/internal/postgres"
+	"github.com/devpablocristo/pymes/v3/backend/internal/worker"
+	"log/slog"
+	"net/http"
+	"os"
+	"strings"
+	"sync"
+	"time"
 )
+
+func InitializeFakeService(kind string) (http.Handler, error) {
+	return fakeservice.HandlerForKind(kind)
+}
 
 // App is the sole composition boundary. Resources own their domain, ports and
 // adapters; cmd/api never constructs infrastructure dependencies directly.
 type App struct {
-	Handler  http.Handler
-	database *postgresadapter.Database
+	Handler         http.Handler
+	database        *postgres.Database
+	shutdownTracing func(context.Context) error
+	closeOnce       sync.Once
+	closeErr        error
 }
 
-func (a *App) Close() {
-	if a != nil && a.database != nil {
-		a.database.Close()
+func (a *App) Close() error {
+	if a == nil {
+		return nil
 	}
+	a.closeOnce.Do(func() {
+		if a.shutdownTracing != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			a.closeErr = a.shutdownTracing(ctx)
+			cancel()
+		}
+		if a.database != nil {
+			a.database.Close()
+		}
+	})
+	return a.closeErr
 }
 
 func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
-	database, err := postgresadapter.Open(
+	shutdownTracing, err := observability.ConfigureTracing(
+		ctx, "pymes-v3-api", cfg.Environment, os.Getenv,
+	)
+	if err != nil {
+		return nil, &APIStartupError{Code: "TRACING_CONFIG_INVALID", Err: err}
+	}
+	database, err := postgres.Open(
 		ctx,
 		cfg.DatabaseURL,
 		"pymes-v3-api",
 	)
 	if err != nil {
-		return nil, fmt.Errorf("open database: %w", err)
+		_ = shutdownTracing(context.Background())
+		return nil, &APIStartupError{
+			Code: "DEPENDENCY_UNAVAILABLE",
+			Err:  fmt.Errorf("open database: %w", err),
+		}
 	}
 	pool := database.Pool()
 	sessions, err := clerk.NewSessionVerifier(clerk.SessionVerifierConfig{SecretKey: cfg.Clerk.SecretKey, PublicKeyPEM: cfg.Clerk.JWTKey, Issuer: cfg.Clerk.Issuer, Audience: cfg.Clerk.Audience, AuthorizedParties: cfg.Clerk.AuthorizedParties})
 	if err != nil {
 		database.Close()
-		return nil, fmt.Errorf("Clerk session verifier: %w", err)
+		_ = shutdownTracing(context.Background())
+		return nil, &APIStartupError{
+			Code: "DEPENDENCY_UNAVAILABLE",
+			Err:  fmt.Errorf("Clerk session verifier: %w", err),
+		}
 	}
 	webhooks, err := clerk.NewWebhookVerifier(cfg.Clerk.WebhookSecret)
 	if err != nil {
 		database.Close()
-		return nil, fmt.Errorf("Clerk webhook verifier: %w", err)
+		_ = shutdownTracing(context.Background())
+		return nil, &APIStartupError{
+			Code: "DEPENDENCY_UNAVAILABLE",
+			Err:  fmt.Errorf("Clerk webhook verifier: %w", err),
+		}
 	}
-	store := commercerepository.New(pool)
-	identities := identityrepository.New(pool)
-	api := commercehandler.NewHTTPServer(commerceusecases.Commands{
+	store := commerce.New(pool)
+	identities := identity.New(pool)
+	api := commerce.NewHTTPServer(commerce.Commands{
 		Store: store, AccountingAdjustments: store, Now: store.Clock,
-	}, identityaccess.ClerkAuthenticator{Memberships: identities, Verifier: sessions})
-	handler := composePublicHTTP(api.Handler(), identityhandler.NewWebhook(webhooks, identityusecases.ReceiveWebhook{Inbox: identities}))
+	}, identity.ClerkAuthenticator{Memberships: identities, Verifier: sessions})
+	handler := composePublicHTTP(api.Handler(), identity.NewWebhook(webhooks, identity.ReceiveWebhook{Inbox: identities}))
 	return &App{
-		Handler:  observability.HTTP(handler, nil),
-		database: database,
+		Handler: observability.HTTP(handler, nil), database: database,
+		shutdownTracing: shutdownTracing,
 	}, nil
+}
+
+type APIStartupError struct {
+	Code string
+	Err  error
+}
+
+func (err *APIStartupError) Error() string { return err.Err.Error() }
+func (err *APIStartupError) Unwrap() error { return err.Err }
+
+func APIStartupErrorCode(err error) string {
+	var startupErr *APIStartupError
+	if errors.As(err, &startupErr) && startupErr.Code != "" {
+		return startupErr.Code
+	}
+	return "DEPENDENCY_UNAVAILABLE"
 }
 
 func composePublicHTTP(api, clerkWebhook http.Handler) http.Handler {
@@ -68,4 +124,487 @@ func composePublicHTTP(api, clerkWebhook http.Handler) http.Handler {
 	mux.Handle("/", api)
 	mux.Handle("POST /api/v1/webhooks/clerk", clerkWebhook)
 	return mux
+}
+
+func InitializeWorker(
+	ctx context.Context,
+	cfg config.WorkerConfig,
+	logger *slog.Logger,
+) (*WorkerApp, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	database, err := postgres.Open(
+		ctx,
+		cfg.DatabaseURL,
+		"pymes-v3-worker",
+	)
+	if err != nil {
+		return nil, workerStartupError("DATABASE_UNAVAILABLE", err)
+	}
+	pool := database.Pool()
+
+	tokens, platformTokens, identity, identityErr := workerIdentity(
+		ctx,
+		cfg,
+		func(
+			ctx context.Context,
+			subject string,
+		) (workerTokenResource, error) {
+			return identity.TokenSourceFromRuntimeContext(ctx, subject)
+		},
+		func() workerPlatformTokenSource {
+			return identity.NewMetadataIDTokenSource()
+		},
+	)
+	if identityErr != nil {
+		database.Close()
+		return nil, identityErr
+	}
+	shutdownTracing, traceErr := observability.ConfigureTracing(
+		ctx,
+		"pymes-v3-worker",
+		cfg.Environment,
+		nil,
+	)
+	if traceErr != nil {
+		if identity != nil {
+			_ = identity.Close()
+		}
+		database.Close()
+		return nil, workerStartupError(
+			"TRACING_CONFIG_INVALID",
+			traceErr,
+		)
+	}
+
+	fiscalHTTP := commerce.NewServiceHTTPClient()
+	accountingHTTP := commerce.NewServiceHTTPClient()
+	commerceStore := commerce.New(pool)
+	dispatcher := commerce.DurableWorker{
+		Store: commerceStore,
+		Fiscal: commerce.HTTPFiscalClient{
+			BaseURL: cfg.FiscalURL, Client: fiscalHTTP,
+			Tokens: tokens, PlatformTokens: platformTokens,
+		},
+		Accounting: commerce.HTTPAccountingClient{
+			BaseURL: cfg.AccountingURL, Client: accountingHTTP,
+			Tokens: tokens, PlatformTokens: platformTokens,
+		},
+		LeaseFor: cfg.LeaseDuration,
+	}
+	operations := worker.New(pool)
+	circuits := map[string]worker.CircuitState{
+		"fiscal": fiscalHTTP, "accounting": accountingHTTP,
+	}
+	httpHandler := worker.HTTP{
+		Readiness: operations,
+		Metrics:   operations,
+		Circuits:  circuits,
+	}.Handler()
+	return &WorkerApp{
+		Server: &http.Server{
+			Addr:              cfg.HTTPAddr,
+			Handler:           httpHandler,
+			ReadHeaderTimeout: 2 * time.Second,
+		},
+		Runner: worker.Runner{
+			Dispatcher: dispatcher,
+			Metrics:    operations, Circuits: circuits, Logger: logger,
+			DispatchEvery:  cfg.DispatchInterval,
+			MetricsEvery:   cfg.MetricsInterval,
+			MetricsTimeout: 5 * time.Second,
+			RunOnce:        cfg.RunOnce,
+		},
+		database: database, identity: identity,
+		shutdownTracing: shutdownTracing,
+		shutdownTimeout: cfg.ShutdownTimeout,
+	}, nil
+}
+
+type workerTokenResource interface {
+	Token(context.Context, string, string) (string, error)
+	Close() error
+}
+
+type workerTokenFactory func(
+	context.Context,
+	string,
+) (workerTokenResource, error)
+
+type workerPlatformTokenSource interface {
+	PlatformToken(context.Context, string) (string, error)
+}
+
+type workerPlatformTokenFactory func() workerPlatformTokenSource
+
+func workerIdentity(
+	ctx context.Context,
+	cfg config.WorkerConfig,
+	tokenFactory workerTokenFactory,
+	platformFactory workerPlatformTokenFactory,
+) (
+	workerTokenResource,
+	workerPlatformTokenSource,
+	closeResource,
+	error,
+) {
+	if cfg.AllowInsecureLocalServices &&
+		strings.EqualFold(strings.TrimSpace(cfg.Environment), "production") {
+		return nil, nil, nil, workerStartupError(
+			"WORKLOAD_IDENTITY_INVALID",
+			fmt.Errorf("insecure local platform identity is forbidden in production"),
+		)
+	}
+	if tokenFactory == nil {
+		return nil, nil, nil, workerStartupError(
+			"WORKLOAD_IDENTITY_INVALID",
+			fmt.Errorf("internal token factory is required"),
+		)
+	}
+	tokens, err := tokenFactory(ctx, "worker:outbox")
+	if err != nil {
+		return nil, nil, nil, workerStartupError(
+			"WORKLOAD_IDENTITY_INVALID",
+			err,
+		)
+	}
+	if tokens == nil {
+		return nil, nil, nil, workerStartupError(
+			"WORKLOAD_IDENTITY_INVALID",
+			fmt.Errorf("internal token source is required"),
+		)
+	}
+	if cfg.AllowInsecureLocalServices {
+		return tokens, nil, tokens, nil
+	}
+	if platformFactory == nil {
+		_ = tokens.Close()
+		return nil, nil, nil, workerStartupError(
+			"WORKLOAD_IDENTITY_INVALID",
+			fmt.Errorf("platform token factory is required"),
+		)
+	}
+	platformTokens := platformFactory()
+	if platformTokens == nil {
+		_ = tokens.Close()
+		return nil, nil, nil, workerStartupError(
+			"WORKLOAD_IDENTITY_INVALID",
+			fmt.Errorf("platform token source is required"),
+		)
+	}
+	return tokens, platformTokens, tokens, nil
+}
+
+type closeResource interface {
+	Close() error
+}
+
+type WorkerApp struct {
+	Server          *http.Server
+	Runner          worker.Runner
+	database        *postgres.Database
+	identity        closeResource
+	shutdownTracing func(context.Context) error
+	shutdownTimeout time.Duration
+	closeOnce       sync.Once
+	closeErr        error
+}
+
+type WorkerStartupError struct {
+	Code string
+	Err  error
+}
+
+type WorkerShutdownError struct {
+	Code string
+	Err  error
+}
+
+func (e *WorkerStartupError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *WorkerStartupError) Unwrap() error {
+	return e.Err
+}
+
+func (e *WorkerShutdownError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *WorkerShutdownError) Unwrap() error {
+	return e.Err
+}
+
+func (a *WorkerApp) Close() error {
+	if a == nil {
+		return nil
+	}
+	a.closeOnce.Do(func() {
+		var shutdownErrors []error
+		if a.identity != nil {
+			if err := a.identity.Close(); err != nil {
+				shutdownErrors = append(
+					shutdownErrors,
+					workerShutdownError("KMS_CLIENT_CLOSE_FAILED", err),
+				)
+			}
+		}
+		if a.shutdownTracing != nil {
+			timeout := a.shutdownTimeout
+			if timeout <= 0 {
+				timeout = 5 * time.Second
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			if err := a.shutdownTracing(ctx); err != nil {
+				shutdownErrors = append(
+					shutdownErrors,
+					workerShutdownError("TRACE_SHUTDOWN_FAILED", err),
+				)
+			}
+			cancel()
+		}
+		if a.database != nil {
+			a.database.Close()
+		}
+		a.closeErr = errors.Join(shutdownErrors...)
+	})
+	return a.closeErr
+}
+
+func WorkerErrorCode(err error) string {
+	var startupErr *WorkerStartupError
+	if errors.As(err, &startupErr) && startupErr.Code != "" {
+		return startupErr.Code
+	}
+	return "WORKER_STARTUP_FAILED"
+}
+
+func WorkerCloseErrorCode(err error) string {
+	var shutdownErr *WorkerShutdownError
+	if errors.As(err, &shutdownErr) && shutdownErr.Code != "" {
+		return shutdownErr.Code
+	}
+	return "WORKER_SHUTDOWN_FAILED"
+}
+
+func workerStartupError(code string, err error) error {
+	return &WorkerStartupError{Code: code, Err: err}
+}
+
+func workerShutdownError(code string, err error) error {
+	return &WorkerShutdownError{Code: code, Err: err}
+}
+
+var (
+	_ organization.Directory   = (*organization.Postgres)(nil)
+	_ organization.Provisioner = organization.DeferredFiscalProvisioner{}
+	_ organization.Provisioner = commerce.HTTPAccountingProvisioningClient{}
+)
+
+type ProvisionOrganizationRequest struct {
+	ID                  string
+	Name                string
+	Slug                string
+	ClerkOrganizationID string
+}
+
+type ProvisionOrganizationApp struct {
+	workflow  organization.ProvisionOrganization
+	database  *postgres.Database
+	identity  provisionCloseResource
+	closeOnce sync.Once
+	closeErr  error
+}
+
+func InitializeOrganizationProvisioner(
+	ctx context.Context,
+	cfg config.ProvisionOrganizationConfig,
+) (*ProvisionOrganizationApp, error) {
+	if ctx == nil {
+		return nil, provisionOrganizationStartupError(
+			"PROVISION_STARTUP_FAILED",
+			fmt.Errorf("context is required"),
+		)
+	}
+	database, err := postgres.Open(
+		ctx,
+		cfg.DatabaseURL,
+		"pymes-v3-provision-org",
+	)
+	if err != nil {
+		return nil, provisionOrganizationStartupError(
+			"DATABASE_UNAVAILABLE",
+			err,
+		)
+	}
+	pool := database.Pool()
+	tokens, platformTokens, identity, err := provisionOrganizationIdentity(
+		ctx,
+		cfg,
+		func(
+			ctx context.Context,
+			subject string,
+		) (provisionTokenResource, error) {
+			return identity.TokenSourceFromRuntimeContext(ctx, subject)
+		},
+		func() provisionPlatformTokenSource {
+			return identity.NewMetadataIDTokenSource()
+		},
+	)
+	if err != nil {
+		database.Close()
+		return nil, err
+	}
+	directory := organization.New(pool)
+	return &ProvisionOrganizationApp{
+		workflow: organization.ProvisionOrganization{
+			Directory: directory,
+			Fiscal:    organization.DeferredFiscalProvisioner{},
+			Accounting: commerce.HTTPAccountingProvisioningClient{
+				BaseURL:        cfg.AccountingProvisioningURL,
+				Tokens:         tokens,
+				PlatformTokens: platformTokens,
+			},
+		},
+		database: database,
+		identity: identity,
+	}, nil
+}
+
+func (app *ProvisionOrganizationApp) Provision(
+	ctx context.Context,
+	request ProvisionOrganizationRequest,
+) error {
+	if app == nil {
+		return fmt.Errorf("organization provisioner is not initialized")
+	}
+	return app.workflow.Execute(
+		ctx,
+		organization.ProvisionOrganizationCommand{
+			ID:                  request.ID,
+			Name:                request.Name,
+			Slug:                request.Slug,
+			ClerkOrganizationID: request.ClerkOrganizationID,
+		},
+	)
+}
+
+func (app *ProvisionOrganizationApp) Close() error {
+	if app == nil {
+		return nil
+	}
+	app.closeOnce.Do(func() {
+		if app.identity != nil {
+			app.closeErr = app.identity.Close()
+		}
+		if app.database != nil {
+			app.database.Close()
+		}
+	})
+	return app.closeErr
+}
+
+type ProvisionOrganizationStartupError struct {
+	Code string
+	Err  error
+}
+
+func (err *ProvisionOrganizationStartupError) Error() string {
+	return err.Err.Error()
+}
+
+func (err *ProvisionOrganizationStartupError) Unwrap() error {
+	return err.Err
+}
+
+func ProvisionOrganizationStartupErrorCode(err error) string {
+	var startupErr *ProvisionOrganizationStartupError
+	if errors.As(err, &startupErr) && startupErr.Code != "" {
+		return startupErr.Code
+	}
+	return "PROVISION_STARTUP_FAILED"
+}
+
+type provisionTokenResource interface {
+	Token(context.Context, string, string) (string, error)
+	Close() error
+}
+
+type provisionCloseResource interface {
+	Close() error
+}
+
+type provisionTokenFactory func(
+	context.Context,
+	string,
+) (provisionTokenResource, error)
+
+type provisionPlatformTokenSource interface {
+	PlatformToken(context.Context, string) (string, error)
+}
+
+type provisionPlatformTokenFactory func() provisionPlatformTokenSource
+
+func provisionOrganizationIdentity(
+	ctx context.Context,
+	cfg config.ProvisionOrganizationConfig,
+	tokenFactory provisionTokenFactory,
+	platformFactory provisionPlatformTokenFactory,
+) (
+	provisionTokenResource,
+	provisionPlatformTokenSource,
+	provisionCloseResource,
+	error,
+) {
+	if cfg.AllowInsecureLocalServices &&
+		strings.EqualFold(strings.TrimSpace(cfg.Environment), "production") {
+		return nil, nil, nil, provisionOrganizationStartupError(
+			"WORKLOAD_IDENTITY_INVALID",
+			fmt.Errorf("insecure local platform identity is forbidden in production"),
+		)
+	}
+	if tokenFactory == nil {
+		return nil, nil, nil, provisionOrganizationStartupError(
+			"WORKLOAD_IDENTITY_INVALID",
+			fmt.Errorf("internal token factory is required"),
+		)
+	}
+	tokens, err := tokenFactory(ctx, "provision-org")
+	if err != nil {
+		return nil, nil, nil, provisionOrganizationStartupError(
+			"WORKLOAD_IDENTITY_INVALID",
+			err,
+		)
+	}
+	if tokens == nil {
+		return nil, nil, nil, provisionOrganizationStartupError(
+			"WORKLOAD_IDENTITY_INVALID",
+			fmt.Errorf("internal token source is required"),
+		)
+	}
+	if cfg.AllowInsecureLocalServices {
+		return tokens, nil, tokens, nil
+	}
+	if platformFactory == nil {
+		_ = tokens.Close()
+		return nil, nil, nil, provisionOrganizationStartupError(
+			"WORKLOAD_IDENTITY_INVALID",
+			fmt.Errorf("platform token factory is required"),
+		)
+	}
+	platformTokens := platformFactory()
+	if platformTokens == nil {
+		_ = tokens.Close()
+		return nil, nil, nil, provisionOrganizationStartupError(
+			"WORKLOAD_IDENTITY_INVALID",
+			fmt.Errorf("platform token source is required"),
+		)
+	}
+	return tokens, platformTokens, tokens, nil
+}
+
+func provisionOrganizationStartupError(code string, err error) error {
+	return &ProvisionOrganizationStartupError{Code: code, Err: err}
 }

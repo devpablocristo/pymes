@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"github.com/devpablocristo/pymes/v3/backend/cmd/config"
-	"github.com/devpablocristo/pymes/v3/backend/internal/observability"
 	"github.com/devpablocristo/pymes/v3/backend/wire"
 	"log/slog"
 	"net/http"
@@ -23,26 +22,16 @@ func main() {
 		slog.Error("api startup failed", "code", "CONFIG_INVALID")
 		return
 	}
-	shutdownTracing, err := observability.ConfigureTracing(
-		ctx, "pymes-v3-api", cfg.Environment, os.Getenv,
-	)
+	app, err := wire.Initialize(ctx, cfg)
 	if err != nil {
-		slog.Error("api startup failed", "code", "TRACING_CONFIG_INVALID")
+		slog.Error("api startup failed", "code", wire.APIStartupErrorCode(err))
 		return
 	}
 	defer func() {
-		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if traceErr := shutdownTracing(shutdown); traceErr != nil {
+		if err := app.Close(); err != nil {
 			slog.Error("trace shutdown failed", "code", "TRACE_SHUTDOWN_FAILED")
 		}
 	}()
-	app, err := wire.Initialize(ctx, cfg)
-	if err != nil {
-		slog.Error("api startup failed", "code", "DEPENDENCY_UNAVAILABLE")
-		return
-	}
-	defer app.Close()
 	server := &http.Server{Addr: cfg.HTTPAddr, Handler: app.Handler, ReadHeaderTimeout: 5 * time.Second}
 	errCh := make(chan error, 1)
 	go func() { errCh <- server.ListenAndServe() }()

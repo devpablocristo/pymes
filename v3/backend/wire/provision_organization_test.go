@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/devpablocristo/pymes/v3/backend/cmd/config"
-	identityaccess "github.com/devpablocristo/pymes/v3/backend/internal/identity/access"
 )
 
 func TestProvisionOrganizationIdentityAlwaysCreatesSignedInternalTokens(t *testing.T) {
@@ -38,7 +37,7 @@ func TestProvisionOrganizationIdentityAlwaysCreatesSignedInternalTokens(t *testi
 					}
 					return resource, nil
 				},
-				func() identityaccess.PlatformTokenSource {
+				func() provisionPlatformTokenSource {
 					platformCalls++
 					return platformTokenStub{}
 				},
@@ -84,7 +83,7 @@ func TestProvisionOrganizationIdentityRejectsProductionBypass(t *testing.T) {
 			tokenCalls++
 			return &provisionTokenStub{}, nil
 		},
-		func() identityaccess.PlatformTokenSource {
+		func() provisionPlatformTokenSource {
 			return platformTokenStub{}
 		},
 	)
@@ -110,7 +109,7 @@ func TestProvisionOrganizationIdentityClosesTokenOnCompositionFailure(t *testing
 		func(context.Context, string) (provisionTokenResource, error) {
 			return resource, nil
 		},
-		func() identityaccess.PlatformTokenSource { return nil },
+		func() provisionPlatformTokenSource { return nil },
 	)
 	if err == nil {
 		t.Fatal("expected missing platform identity to fail")
@@ -161,5 +160,5 @@ func (platformTokenStub) PlatformToken(
 	return "platform-token", nil
 }
 
-var _ identityaccess.TokenSource = (*provisionTokenStub)(nil)
-var _ identityaccess.PlatformTokenSource = platformTokenStub{}
+var _ provisionTokenResource = (*provisionTokenStub)(nil)
+var _ provisionPlatformTokenSource = platformTokenStub{}

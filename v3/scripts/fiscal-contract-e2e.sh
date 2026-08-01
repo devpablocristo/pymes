@@ -45,4 +45,4 @@ PYMES_FISCAL_TEST_URL="http://127.0.0.1:$port" \
 PYMES_INTERNAL_SIGNING_SEED_B64='AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=' \
 PYMES_INTERNAL_ISSUER=pymes-v3 \
 PYMES_INTERNAL_KEY_ID=local-dev-1 \
-go test ./internal/commerce/companion -run TestFiscalClientAgainstMockAdapter -count=1
+go test ./internal/commerce -run TestFiscalClientAgainstMockAdapter -count=1

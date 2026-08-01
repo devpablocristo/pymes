@@ -11,4 +11,4 @@ PYMES_ACCOUNTING_PROVISIONING_TEST_URL='http://127.0.0.1:18084' \
 PYMES_INTERNAL_SIGNING_SEED_B64='AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=' \
 PYMES_INTERNAL_ISSUER=pymes-v3 \
 PYMES_INTERNAL_KEY_ID=local-dev-1 \
-go test ./internal/commerce/companion -run TestAccountingClientAgainstHeadlessService -count=1
+go test ./internal/commerce -run TestAccountingClientAgainstHeadlessService -count=1

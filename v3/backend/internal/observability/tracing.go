@@ -1,3 +1,4 @@
+// architecture:adapter external
 package observability
 
 import (
@@ -5,10 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
-	"strings"
 
 	platformobservability "github.com/devpablocristo/platform/observability/go"
+	tracinghelpers "github.com/devpablocristo/pymes/v3/backend/internal/observability/tracing/helpers"
+	tracingmodels "github.com/devpablocristo/pymes/v3/backend/internal/observability/tracing/models"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -28,30 +29,18 @@ func ConfigureTracing(
 	if getenv == nil {
 		getenv = os.Getenv
 	}
-	sampleRatio := 1.0
-	if raw := strings.TrimSpace(getenv("PYMES_TRACE_SAMPLE_RATIO")); raw != "" {
-		value, err := strconv.ParseFloat(raw, 64)
-		if err != nil || value <= 0 || value > 1 {
-			return nil, fmt.Errorf("PYMES_TRACE_SAMPLE_RATIO must be greater than zero and at most one")
-		}
-		sampleRatio = value
-	}
-	exporter := strings.ToLower(strings.TrimSpace(getenv("PYMES_TRACING_EXPORTER")))
-	if exporter == "" {
-		exporter = "none"
-	}
-	insecure, err := strconv.ParseBool(defaultTracingValue(getenv("OTEL_EXPORTER_OTLP_INSECURE"), "false"))
+	settings, err := tracinghelpers.SettingsFromEnv(serviceName, environment, getenv)
 	if err != nil {
-		return nil, fmt.Errorf("OTEL_EXPORTER_OTLP_INSECURE must be a boolean")
+		return nil, err
 	}
 	return platformobservability.NewTracerProvider(ctx, platformobservability.TracingConfig{
-		ServiceName:    serviceName,
-		ServiceVersion: defaultTracingValue(getenv("PYMES_SERVICE_VERSION"), "dev"),
-		Environment:    environment,
-		Exporter:       exporter,
-		OTLPEndpoint:   strings.TrimSpace(getenv("OTEL_EXPORTER_OTLP_ENDPOINT")),
-		OTLPInsecure:   insecure,
-		SampleRatio:    sampleRatio,
+		ServiceName:    settings.ServiceName,
+		ServiceVersion: settings.ServiceVersion,
+		Environment:    settings.Environment,
+		Exporter:       settings.Exporter,
+		OTLPEndpoint:   settings.OTLPEndpoint,
+		OTLPInsecure:   settings.OTLPInsecure,
+		SampleRatio:    settings.SampleRatio,
 	})
 }
 
@@ -138,8 +127,7 @@ func (t tracingRoundTripper) RoundTrip(request *http.Request) (*http.Response, e
 }
 
 func defaultTracingValue(value, fallback string) string {
-	if strings.TrimSpace(value) == "" {
-		return fallback
-	}
-	return strings.TrimSpace(value)
+	return tracinghelpers.DefaultValue(value, fallback)
 }
+
+var _ tracingmodels.Settings

@@ -77,7 +77,7 @@ un estado más avanzado.
 
 ## Persistencia y aislamiento
 
-La migración `015_notifications_pergo.sql` crea:
+La migración `016_notifications_pergo.sql` crea:
 
 - `notification_settings`;
 - `notifications`;

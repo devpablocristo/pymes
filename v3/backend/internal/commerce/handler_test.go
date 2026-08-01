@@ -636,3 +636,13 @@ func TestGeneratedRouterRejectsUndeclaredCommercialRoutes(t *testing.T) {
 		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
 }
+
+func TestWriteCommandErrorPreservesFeatureDisabledCode(t *testing.T) {
+	t.Parallel()
+	response := httptest.NewRecorder()
+	writeCommandError(response, domain.ErrFeatureDisabled)
+	if response.Code != http.StatusForbidden ||
+		!strings.Contains(response.Body.String(), `"FEATURE_DISABLED"`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body)
+	}
+}

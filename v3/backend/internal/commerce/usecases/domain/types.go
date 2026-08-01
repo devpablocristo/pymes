@@ -357,3 +357,5 @@ var ErrOrganizationNotReady = errors.New("ORG_NOT_PROVISIONED")
 var ErrIdempotencyKeyReused = errors.New("IDEMPOTENCY_KEY_REUSED")
 
 var ErrPeriodLocked = errors.New("PERIOD_LOCKED")
+
+var ErrFeatureDisabled = errors.New("FEATURE_DISABLED")

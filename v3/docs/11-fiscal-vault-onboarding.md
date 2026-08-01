@@ -15,20 +15,24 @@ del adapter.
 
 ## Flujo de onboarding
 
-1. Un administrador tenant solicita un CSR con CUIT, razón social, nombre común
+1. Un owner/admin habilita el rollout `fiscal_real_enabled` para iniciar el
+   onboarding. El flag habilita la capacidad, pero no acredita que Fiscal esté
+   listo para emitir.
+2. Un administrador tenant solicita un CSR con CUIT, razón social, nombre común
    y ambiente.
-2. Fiscal genera RSA de 2048 bits y CSR SHA-256 con `C=AR` y
+3. Fiscal genera RSA de 2048 bits y CSR SHA-256 con `C=AR` y
    `serialNumber=CUIT <cuit>`.
-3. Fiscal cifra inmediatamente la clave privada con una DEK aleatoria
+4. Fiscal cifra inmediatamente la clave privada con una DEK aleatoria
    AES-256-GCM; Cloud KMS cifra la DEK con la misma AAD.
-4. La respuesta contiene sólo el CSR y metadatos sin material criptográfico.
-5. El cliente registra el CSR en ARCA y carga el certificado emitido.
-6. Fiscal verifica formato PEM, vigencia, issuer del ambiente, CUIT y que la
+5. La respuesta contiene sólo el CSR y metadatos sin material criptográfico.
+6. El cliente registra el CSR en ARCA y carga el certificado emitido.
+7. Fiscal verifica formato PEM, vigencia, issuer del ambiente, CUIT y que la
    clave pública coincida con la clave privada almacenada.
-7. El cliente configura puntos de venta. Homologación debe estar activa antes
+8. El cliente configura puntos de venta. Homologación debe estar activa antes
    de aceptar un certificado de producción.
-8. La organización habilita `fiscal_real_enabled` sólo después de validar
-   WSAA/WSFE en homologación. STG y PRD usan credenciales y KMS distintos.
+9. Fiscal valida WSAA/WSFE en homologación y habilita el punto de venta sólo
+   después de una respuesta correcta. STG y PRD usan credenciales y KMS
+   distintos.
 
 La solicitud de CSR es idempotente por organización. Reusar la clave con otro
 payload devuelve `IDEMPOTENCY_KEY_REUSED`; las cargas de certificado usan

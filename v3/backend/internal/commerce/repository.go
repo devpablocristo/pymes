@@ -734,6 +734,13 @@ WITH candidate AS (
  WHERE org_id=$1 AND published_at IS NULL AND available_at <= $2
    AND (lease_expires_at IS NULL OR lease_expires_at <= $2)
    AND ($5 OR topic=ANY($6::text[]))
+   AND (
+     topic <> 'FiscalAuthorizationRequested'
+     OR EXISTS (
+       SELECT 1 FROM app.organization_feature_flags features
+       WHERE features.org_id=$1 AND features.fiscal_real_enabled
+     )
+   )
  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT 1
 )
 UPDATE app.outbox o SET lease_token=$3, lease_expires_at=$4, attempts=o.attempts+1

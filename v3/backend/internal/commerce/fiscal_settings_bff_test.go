@@ -2,15 +2,31 @@ package commerce
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	publicapi "github.com/devpablocristo/pymes/v3/backend/internal/commerce/handler/dto"
+	domain "github.com/devpablocristo/pymes/v3/backend/internal/commerce/usecases/domain"
 	"github.com/devpablocristo/pymes/v3/backend/internal/fakeservice"
 )
+
+type commerceFeatureGate struct {
+	enabled bool
+	err     error
+}
+
+func (gate commerceFeatureGate) Enabled(
+	context.Context,
+	string,
+	string,
+) (bool, error) {
+	return gate.enabled, gate.err
+}
 
 func TestFiscalOnboardingTraversesBFFWithoutExposingPrivateKeyMaterial(t *testing.T) {
 	t.Parallel()
@@ -29,6 +45,7 @@ func TestFiscalOnboardingTraversesBFFWithoutExposingPrivateKeyMaterial(t *testin
 				BaseURL: fiscalServer.URL,
 				Client:  fiscalServer.Client(),
 			},
+			Features: commerceFeatureGate{enabled: true},
 		},
 		organizationAuthStub{organizationID: organizationID},
 	).Handler()
@@ -123,5 +140,41 @@ func TestFiscalOnboardingTraversesBFFWithoutExposingPrivateKeyMaterial(t *testin
 	bff.ServeHTTP(getRecorder, getRequest)
 	if getRecorder.Code != http.StatusOK {
 		t.Fatalf("get credential status=%d body=%s", getRecorder.Code, getRecorder.Body.String())
+	}
+}
+
+func TestFiscalOnboardingDoesNotReachAdapterWhenTenantFeatureIsDisabled(
+	t *testing.T,
+) {
+	t.Parallel()
+	calls := 0
+	fiscalServer := httptest.NewServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		_ *http.Request,
+	) {
+		calls++
+		writer.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(fiscalServer.Close)
+	commands := Commands{
+		FiscalCredentials: HTTPFiscalClient{
+			BaseURL: fiscalServer.URL,
+			Client:  fiscalServer.Client(),
+		},
+		Features: commerceFeatureGate{enabled: false},
+	}
+	_, err := commands.RequestFiscalCredentialCSR(
+		context.Background(),
+		"org-a",
+		"idempotency-a",
+		"correlation-a",
+		domain.FiscalCredentialCSRInput{
+			CUIT: "30712345678", LegalName: "Pyme SA",
+			CommonName:  "pyme",
+			Environment: domain.FiscalEnvironmentHomologation,
+		},
+	)
+	if !errors.Is(err, domain.ErrFeatureDisabled) || calls != 0 {
+		t.Fatalf("err=%v adapter_calls=%d", err, calls)
 	}
 }

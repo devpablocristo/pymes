@@ -881,6 +881,8 @@ func optionalString(value string) *string {
 
 func writeCommandError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, domain.ErrFeatureDisabled):
+		writeError(w, http.StatusForbidden, "FEATURE_DISABLED")
 	case errors.Is(err, domain.ErrIdempotencyKeyReused):
 		writeError(w, http.StatusConflict, "IDEMPOTENCY_KEY_REUSED")
 	case errors.Is(err, domain.ErrOrganizationNotReady):
@@ -911,6 +913,10 @@ func requestCorrelationID(r *http.Request) string {
 }
 
 func writeFiscalSettingsError(w http.ResponseWriter, err error) {
+	if errors.Is(err, domain.ErrFeatureDisabled) {
+		writeError(w, http.StatusForbidden, "FEATURE_DISABLED")
+		return
+	}
 	var upstream serviceError
 	if errors.As(err, &upstream) {
 		switch upstream.Code {

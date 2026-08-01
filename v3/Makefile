@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help build migration-image-check test fiscal-test accounting-test quality security fiscal-e2e accounting-e2e commercial-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate architecture-check db-integration backup-restore-smoke e2e ci up down backup restore
+.PHONY: help build migration-image-check test fiscal-test accounting-test quality security fiscal-e2e accounting-e2e commercial-e2e calendars-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate architecture-check db-integration backup-restore-smoke e2e ci up down backup restore
 
 ACCOUNTING_BUILD_CONTEXT ?= ../../open-accounting
 
@@ -15,6 +15,7 @@ help:
 	@echo "  make fiscal-e2e      Valida el cliente Go contra el backend fiscal mock"
 	@echo "  make accounting-e2e  Valida el cliente Go contra Open Accounting headless"
 	@echo "  make commercial-e2e  Recorre la vertical pública completa contra servicios reales/mocks"
+	@echo "  make calendars-e2e   Valida OAuth, cifrado, Google/Meet fake, RLS y recuperación"
 	@echo "  make observability-e2e  Comprueba salud, readiness y métricas del stack"
 	@echo "  make recovery-e2e   Comprueba caída y recuperación independiente de servicios y bases"
 	@echo "  make replay-smoke   Comprueba replay DLQ idempotente y auditoría inmutable"
@@ -94,6 +95,7 @@ db-integration:
 e2e:
 	$(MAKE) db-integration
 	$(MAKE) commercial-e2e
+	$(MAKE) calendars-e2e
 	$(MAKE) backup-restore-smoke
 	$(MAKE) observability-e2e
 	$(MAKE) recovery-e2e
@@ -112,6 +114,9 @@ accounting-e2e:
 
 commercial-e2e:
 	./scripts/commercial-vertical-e2e.sh
+
+calendars-e2e:
+	./scripts/calendars-e2e.sh
 
 observability-e2e:
 	./scripts/observability-e2e.sh

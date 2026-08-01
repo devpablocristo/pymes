@@ -60,9 +60,11 @@ jobs:
               echo "GitHub repository metadata does not match the immutable Open Accounting identity" >&2
               exit 1
             }
-          echo "repository=${repository}" >>"${GITHUB_OUTPUT}"
-          echo "repository_id=${repository_id}" >>"${GITHUB_OUTPUT}"
-          echo "revision=${revision}" >>"${GITHUB_OUTPUT}"
+          {
+            echo "repository=${repository}"
+            echo "repository_id=${repository_id}"
+            echo "revision=${revision}"
+          } >>"${GITHUB_OUTPUT}"
 
       - name: Checkout Open Accounting fork
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

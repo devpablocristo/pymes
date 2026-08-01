@@ -175,9 +175,11 @@ jobs:
               echo "GitHub repository metadata does not match the immutable Open Accounting identity" >&2
               exit 1
             }
-          printf 'repository=%s\n' "${repository}" >>"${GITHUB_OUTPUT}"
-          printf 'repository_id=%s\n' "${repository_id}" >>"${GITHUB_OUTPUT}"
-          printf 'revision=%s\n' "${revision}" >>"${GITHUB_OUTPUT}"
+          {
+            printf 'repository=%s\n' "${repository}"
+            printf 'repository_id=%s\n' "${repository_id}"
+            printf 'revision=%s\n' "${revision}"
+          } >>"${GITHUB_OUTPUT}"
 
       - name: Set up Go for workflow policy checks
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -309,6 +311,8 @@ jobs:
         shell: bash
         env:
           MANIFEST_FILE: ${{ runner.temp }}/pymes-v3-images.env
+          RELEASE_ENVIRONMENT: ${{ inputs.environment }}
+          RELEASE_SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
         run: |
           set -euo pipefail
           [[ -f "${MANIFEST_FILE}" && ! -L "${MANIFEST_FILE}" ]]
@@ -316,8 +320,8 @@ jobs:
           [[ "${checksum}" =~ ^[0-9a-f]{64}$ ]]
           {
             printf '### Immutable Pymes v3 release manifest\n\n'
-            printf -- '- Environment: `%s`\n' '${{ inputs.environment }}'
-            printf -- '- Source SHA: `%s`\n' '${{ needs.validate.outputs.source_sha }}'
+            printf -- '- Environment: `%s`\n' "${RELEASE_ENVIRONMENT}"
+            printf -- '- Source SHA: `%s`\n' "${RELEASE_SOURCE_SHA}"
             printf -- '- Manifest SHA-256: `%s`\n' "${checksum}"
           } >>"${GITHUB_STEP_SUMMARY}"
 

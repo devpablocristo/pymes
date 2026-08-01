@@ -19,8 +19,10 @@ entorno.
 
 Dentro de Cloud Run se adopta este control compuesto:
 
-1. El BFF/API es el único servicio público y el único punto accesible desde un
-   navegador.
+1. El BFF/API es la única API pública y el único servicio que el navegador
+   invoca para leer o mutar datos. La Web estática también es pública, pero
+   sólo entrega artefactos inmutables y el `index.html`: no tiene secretos,
+   conexión SQL, URLs privadas ni permisos sobre servicios internos.
 2. Fiscal, Accounting y Accounting Admin se despliegan con
    `ingress=internal` y `--no-allow-unauthenticated`.
 3. `roles/run.invoker` se limita a:
@@ -39,8 +41,12 @@ Dentro de Cloud Run se adopta este control compuesto:
    - JWT Ed25519 corto de Pymes en `Authorization`, con audience del servicio,
      organización, actor, roles, request/correlation ID y `jti`, para
      autorización tenant y auditoría de aplicación.
-7. Las URLs privadas sólo se inyectan en worker y provisioner; nunca en el BFF
-   ni en el navegador.
+7. Las URLs privadas sólo se inyectan en worker y provisioner; nunca en el BFF,
+   la Web ni el navegador.
+8. La Web usa una service account propia sin `roles/cloudsql.client`, se
+   despliega con escala a cero y publica `/healthz` y `/readyz`. El endpoint de
+   API y la publishable key de Clerk se fijan al construir la imagen de cada
+   entorno; ningún secreto se incorpora al bundle.
 
 HTTPS administrado por Cloud Run + ingress interno + IAM mínimo + JWT interno
 es el equivalente operativo del requisito de mTLS para este runtime. No se
@@ -68,8 +74,9 @@ tracing. Con un endpoint explícito sin credenciales embebidas, configura
 [`cloud-run-security-check.sh`](../../scripts/deploy/cloud-run-security-check.sh)
 ejecuta el despliegue localmente en modo dry-run para `stg` y `prd`, con y sin
 endpoint OTLP. El gate verifica ingress privado, ausencia de acceso anónimo,
-invoker esperado, aislamiento de URLs internas y configuración condicional de
-tracing. El dry-run no consulta GCP, no resuelve secretos y no crea recursos.
+invoker esperado, aislamiento de URLs internas, Web pública sin SQL/secretos y
+configuración condicional de tracing. El dry-run no consulta GCP, no resuelve
+secretos y no crea recursos.
 
 En un despliegue real, el script vuelve a consultar ingress y la política IAM
 de cada servicio privado, además de rechazar permisos `roles/run.invoker`

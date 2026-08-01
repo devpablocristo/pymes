@@ -11,6 +11,34 @@ RUN CGO_ENABLED=0 go build -o /out/api ./cmd/api && \
     CGO_ENABLED=0 go build -o /out/pergo-fake ./cmd/pergo-fake && \
     CGO_ENABLED=0 go build -o /out/healthcheck ./cmd/healthcheck
 
+FROM node:22-alpine AS web-deps
+WORKDIR /src/web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci --ignore-scripts
+
+FROM web-deps AS web-build
+ARG VITE_API_BASE_URL
+ARG VITE_CLERK_PUBLISHABLE_KEY
+ARG VITE_PYMES_ORGANIZATION_SLUG
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY
+ENV VITE_PYMES_ORGANIZATION_SLUG=$VITE_PYMES_ORGANIZATION_SLUG
+COPY web/ ./
+RUN npm run build
+
+FROM web-deps AS web-build-local
+COPY web/ ./
+RUN npm run build -- --mode e2e
+
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS web-runtime
+COPY web/nginx.conf /etc/nginx/conf.d/default.conf
+
+FROM web-runtime AS web
+COPY --from=web-build /src/web/dist /usr/share/nginx/html
+
+FROM web-runtime AS web-local
+COPY --from=web-build-local /src/web/dist /usr/share/nginx/html
+
 FROM gcr.io/distroless/static-debian12:nonroot AS api
 COPY --from=build /out/api /api
 COPY --from=build /out/healthcheck /healthcheck

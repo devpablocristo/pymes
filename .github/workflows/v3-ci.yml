@@ -78,7 +78,9 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: v3/fiscal-adapter/package-lock.json
+          cache-dependency-path: |
+            v3/fiscal-adapter/package-lock.json
+            v3/web/package-lock.json
 
       - name: Run V3 CI
         working-directory: v3

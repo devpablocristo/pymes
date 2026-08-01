@@ -45,8 +45,20 @@ ensure_account() {
     --quiet >/dev/null
 }
 
+ensure_stateless_account() {
+  local account_id="$1" display_name="$2" email
+  email="${account_id}@${project}.iam.gserviceaccount.com"
+  if ! gcloud iam service-accounts describe "$email" --project="$project" >/dev/null 2>&1; then
+    gcloud iam service-accounts create "$account_id" --project="$project" \
+      --display-name="$display_name"
+  fi
+}
+
 for environment in "${environments[@]}"; do
   ensure_account "pymes-v3-api-${environment}" "Pymes v3 API ${environment}"
+  # The static web serves immutable assets only. It deliberately receives no
+  # Cloud SQL role, secrets or private-service permissions.
+  ensure_stateless_account "pymes-v3-web-${environment}" "Pymes v3 Web ${environment}"
   ensure_account "pymes-v3-worker-${environment}" "Pymes v3 worker ${environment}"
   ensure_account "pymes-v3-provision-${environment}" "Pymes v3 provisioner ${environment}"
   ensure_account "pymes-v3-fiscal-${environment}" "Pymes v3 Fiscal ${environment}"

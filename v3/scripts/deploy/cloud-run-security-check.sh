@@ -50,6 +50,7 @@ run_dry() {
     "PYMES_GCP_PROJECT=$project"
     "PYMES_GCP_REGION=$region"
     "PYMES_API_IMAGE=test.invalid/pymes-api:dry-run"
+    "PYMES_WEB_IMAGE=test.invalid/pymes-web:dry-run"
     "PYMES_WORKER_IMAGE=test.invalid/pymes-worker:dry-run"
     "PYMES_FISCAL_IMAGE=test.invalid/pymes-fiscal:dry-run"
     "PYMES_ACCOUNTING_IMAGE=test.invalid/pymes-accounting:dry-run"
@@ -156,9 +157,20 @@ check_environment() {
   deploy_line=$(grep -F -- "DRY-RUN gcloud run deploy $prefix-api " "$output") ||
     fail "missing deploy command for $prefix-api"
   [[ "$deploy_line" == *"--ingress=all"* && "$deploy_line" == *"--allow-unauthenticated"* ]] ||
-    fail "the BFF is not the sole public service"
+    fail "the BFF is not publicly reachable"
   [[ "$deploy_line" != *"FISCAL_ADAPTER_URL="* && "$deploy_line" != *"ACCOUNTING_URL="* && "$deploy_line" != *"ACCOUNTING_PROVISIONING_URL="* ]] ||
     fail "the public BFF received a private downstream URL"
+
+  deploy_line=$(grep -F -- "DRY-RUN gcloud run deploy $prefix-web " "$output") ||
+    fail "missing deploy command for $prefix-web"
+  [[ "$deploy_line" == *"--ingress=all"* && "$deploy_line" == *"--allow-unauthenticated"* ]] ||
+    fail "the static web is not publicly reachable"
+  [[ "$deploy_line" == *"--min=0"* && "$deploy_line" == *"--cpu-throttling"* ]] ||
+    fail "the static web does not scale to zero"
+  [[ "$deploy_line" != *"--set-cloudsql-instances="* && "$deploy_line" != *"--set-secrets="* ]] ||
+    fail "the static web received database or secret access"
+  [[ "$deploy_line" != *"FISCAL_ADAPTER_URL="* && "$deploy_line" != *"ACCOUNTING_URL="* && "$deploy_line" != *"ACCOUNTING_PROVISIONING_URL="* ]] ||
+    fail "the static web received a private downstream URL"
 
   deploy_line=$(grep -F -- "DRY-RUN gcloud run deploy $prefix-worker " "$output") ||
     fail "missing deploy command for $prefix-worker"

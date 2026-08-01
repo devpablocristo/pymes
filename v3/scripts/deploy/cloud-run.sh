@@ -9,6 +9,7 @@ set -euo pipefail
 case "$PYMES_DEPLOY_ENV" in stg|prd) ;; *) echo "PYMES_DEPLOY_ENV must be stg or prd" >&2; exit 2 ;; esac
 
 : "${PYMES_API_IMAGE:?set PYMES_API_IMAGE}"
+: "${PYMES_WEB_IMAGE:?set PYMES_WEB_IMAGE (built with the target environment API URL and Clerk publishable key)}"
 : "${PYMES_WORKER_IMAGE:?set PYMES_WORKER_IMAGE}"
 : "${PYMES_FISCAL_IMAGE:?set PYMES_FISCAL_IMAGE}"
 : "${PYMES_ACCOUNTING_IMAGE:?set PYMES_ACCOUNTING_IMAGE}"
@@ -61,6 +62,7 @@ export CLOUDSDK_CORE_PROJECT="$project"
 export PYMES_INTERNAL_KMS_KEY_VERSION
 export PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS="${PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS:-}"
 api_sa="pymes-v3-api-${PYMES_DEPLOY_ENV}@${project}.iam.gserviceaccount.com"
+web_sa="pymes-v3-web-${PYMES_DEPLOY_ENV}@${project}.iam.gserviceaccount.com"
 worker_sa="pymes-v3-worker-${PYMES_DEPLOY_ENV}@${project}.iam.gserviceaccount.com"
 provision_sa="pymes-v3-provision-${PYMES_DEPLOY_ENV}@${project}.iam.gserviceaccount.com"
 fiscal_sa="pymes-v3-fiscal-${PYMES_DEPLOY_ENV}@${project}.iam.gserviceaccount.com"
@@ -265,6 +267,18 @@ deploy() {
   gcloud_command run deploy "$service" "${arguments[@]}"
 }
 
+deploy_web() {
+  local service="$1" image="$2" service_account="$3"
+  gcloud_command run deploy "$service" \
+    --region="$region" --image="$image" --service-account="$service_account" \
+    --ingress=all --min=0 --max=1 --cpu-throttling \
+    --allow-unauthenticated --quiet \
+    --deploy-health-check \
+    --startup-probe=httpGet.path=/readyz,httpGet.port=8080,initialDelaySeconds=0,timeoutSeconds=2,periodSeconds=5,failureThreshold=12 \
+    --readiness-probe=httpGet.path=/readyz,httpGet.port=8080,timeoutSeconds=2,periodSeconds=5,failureThreshold=3,successThreshold=1 \
+    --liveness-probe=httpGet.path=/healthz,httpGet.port=8080,initialDelaySeconds=5,timeoutSeconds=2,periodSeconds=30,failureThreshold=3
+}
+
 migrate() {
   local job="$1" image="$2" service_account="$3" secrets="$4"
   gcloud_command run jobs deploy "$job" \
@@ -347,6 +361,7 @@ fi
 deploy "$prefix-api" "$PYMES_API_IMAGE" "$api_sa" \
   "$api_secrets" \
   "$api_environment" all 0 public throttled none
+deploy_web "$prefix-web" "$PYMES_WEB_IMAGE" "$web_sa"
 deploy "$prefix-worker" "$PYMES_WORKER_IMAGE" "$worker_sa" \
   "$worker_secrets" \
   "$worker_environment" internal 1 private always direct
@@ -360,4 +375,5 @@ echo "deployed $prefix in shared project $project; configure Clerk webhook for $
 if [[ "$pergo_enabled" == "true" ]]; then
   echo "configure PerGo workspace=$pergo_workspace_id callback=$(service_url "$prefix-api")/api/v1/webhooks/pergo"
 fi
+echo "web: $(service_url "$prefix-web") (must be present in Clerk authorized parties and callbacks)"
 echo "organization provisioning job: $prefix-provision-org (execute with explicit --id, --name, --slug and --clerk-organization-id args)"

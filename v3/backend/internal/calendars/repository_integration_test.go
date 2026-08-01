@@ -134,7 +134,7 @@ func TestCalendarRelayLeasesOnlyOwnedTopic(t *testing.T) {
 		ctx,
 		organizationdomain.Organization{
 			ID: orgID, Name: "Calendar Relay",
-			Slug: "calendar-relay-" + suffix,
+			Slug:   "calendar-relay-" + suffix,
 			Status: organizationdomain.Ready,
 		},
 	); err != nil {
@@ -213,7 +213,7 @@ func integrationConnection(
 		ID: connectionID, OrganizationID: organizationID,
 		ActorID: "actor-" + connectionID, Provider: "google",
 		Status: domain.ConnectionPending, TimeZone: "UTC",
-		Scopes: []string{scopeCalendarCreated, scopeCalendarListRead},
+		Scopes:  []string{scopeCalendarCreated, scopeCalendarListRead},
 		Version: 1, CreatedAt: now, UpdatedAt: now,
 	}
 }
@@ -227,7 +227,7 @@ func integrationState(
 		Hash: hash, OrganizationID: connection.OrganizationID,
 		ActorID: connection.ActorID, ConnectionID: connection.ID,
 		SessionBinding: "session-" + connection.ID,
-		TimeZone: connection.TimeZone, ExpiresAt: now.Add(time.Minute),
+		TimeZone:       connection.TimeZone, ExpiresAt: now.Add(time.Minute),
 		CreatedAt: now,
 	}
 }

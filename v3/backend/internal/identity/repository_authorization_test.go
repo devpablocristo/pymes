@@ -177,6 +177,7 @@ func TestPostgresPrincipalDrivesBFFMutationAuthorization(t *testing.T) {
 				Memberships: memberships,
 				Verifier: fixedSessionVerifier{claims: clerk.SessionClaims{
 					OrganizationID: test.providerOrg, Subject: test.user,
+					SessionID: "session_" + test.user,
 				}},
 			}
 			request := httptest.NewRequest(http.MethodPost, endpoint.path, strings.NewReader(endpoint.body))
@@ -289,6 +290,7 @@ func TestPostgresOwnerAndAdminPersistEveryBFFMutation(t *testing.T) {
 			Memberships: identity.New(pool),
 			Verifier: fixedSessionVerifier{claims: clerk.SessionClaims{
 				OrganizationID: providerOrg, Subject: user,
+				SessionID: "session_" + user,
 			}},
 		}
 		prefix := "/api/v1/organizations/" + localOrg

@@ -2,6 +2,7 @@
 
 pymes_release_expected_folder=673291958610
 pymes_release_expected_organization=663017421195
+pymes_release_expected_project_number=884236221349
 pymes_release_pool_path=projects/884236221349/locations/global/workloadIdentityPools/pymes-v3-release-pool
 pymes_release_build_principal="principal://iam.googleapis.com/${pymes_release_pool_path}/subject/repo:devpablocristo/pymes:ref:refs/heads/main"
 pymes_release_stg_principal="principal://iam.googleapis.com/${pymes_release_pool_path}/subject/repo:devpablocristo/pymes:environment:stg"
@@ -891,7 +892,7 @@ pymes_validate_release_pool_iam_assets() {
 pymes_validate_enforced_boolean_org_policy() {
   local policy_json="$1" constraint="$2"
   jq -e \
-    --arg name "projects/pymes-dev-352318/policies/${constraint}" '
+    --arg name "projects/${pymes_release_expected_project_number}/policies/${constraint}" '
       .name == $name and
       (.spec.rules | length) == 1 and
       .spec.rules[0].enforce == true

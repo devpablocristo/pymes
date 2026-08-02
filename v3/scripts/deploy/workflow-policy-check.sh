@@ -640,6 +640,8 @@ for proof in \
   'local release helpers must equal the exact reviewed GitHub main tree' \
   'IAM mutation is restricted to the reviewed direct operator softponti@gmail.com' \
   'pymes_validate_release_pool_iam_assets' \
+  '"$release_pool_assets" "$target_environment" subset' \
+  '"$release_pool_assets" "$target_environment" exact' \
   'pymes_verify_release_account_not_attached' \
   'iam.disableCrossProjectServiceAccountUsage' \
   'iam.disableServiceAccountKeyCreation' \
@@ -672,11 +674,19 @@ for proof in \
   grep -Fq -- "$proof" "$identity_script" ||
     fail "release account preflight lacks proof: $proof"
 done
-[[ "$(grep -Fc '"$release_pool_assets" "$target_environment" exact' "$identity_script")" -eq 2 ]] ||
-  fail "release-pool trust must be exact both before and after IAM mutation"
-if grep -Fq '"$release_pool_assets" "$target_environment" subset' "$identity_script"; then
-  fail "release-pool postcondition must not accept missing or premature environment trust"
-fi
+[[ "$(grep -Fc '"$release_pool_assets" "$target_environment" subset' "$identity_script")" -eq 1 &&
+   "$(grep -Fc '"$release_pool_assets" "$target_environment" exact' "$identity_script")" -eq 1 ]] ||
+  fail "release-pool trust must use one subset preflight and one exact postcondition"
+release_pool_subset_line=$(grep -nF \
+  '"$release_pool_assets" "$target_environment" subset' "$identity_script" |
+  cut -d: -f1)
+release_pool_exact_line=$(grep -nF \
+  '"$release_pool_assets" "$target_environment" exact' "$identity_script" |
+  cut -d: -f1)
+[[ "$release_pool_subset_line" =~ ^[0-9]+$ &&
+   "$release_pool_exact_line" =~ ^[0-9]+$ &&
+   "$release_pool_subset_line" -lt "$release_pool_exact_line" ]] ||
+  fail "release-pool subset preflight must precede its exact postcondition"
 for proof in \
   'pymes_read_inverse_permission_analysis' \
   'pymes_validate_inverse_permission_analysis' \

@@ -323,7 +323,7 @@ done
 
 release_pool_assets=$(pymes_search_release_pool_iam_assets "$project")
 pymes_validate_release_pool_iam_assets \
-  "$release_pool_assets" "$target_environment" exact
+  "$release_pool_assets" "$target_environment" subset
 project_policy_json=$(gcloud projects get-iam-policy "$project" --format=json)
 pymes_assert_policy_has_no_release_pool_members \
   "$project_policy_json" "release project IAM preflight"

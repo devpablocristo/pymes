@@ -196,7 +196,10 @@ de release y exige el conjunto exacto correspondiente a la fase. Durante STG
 sólo pueden existir Build y deployer STG, y la presencia prematura del subject
 PRD falla; después del cierre STG, la preparación PRD exige exactamente esos
 dos más el deployer PRD. Todos son bindings
-`roles/iam.workloadIdentityUser` sobre su service account destino. Además relee
+`roles/iam.workloadIdentityUser` sobre su service account destino.
+En el preflight de `prepare` se permite únicamente un subconjunto válido del
+estado anterior, incluido el estado vacío; el postcondition siempre exige el
+conjunto exacto recién descrito. Además relee
 las políticas conocidas de proyecto, Artifact Registry, Secrets, KMS, runtime
 y Cloud Run.
 Builder y deployers deben aparecer sin claves y sin adjunción a workloads: se

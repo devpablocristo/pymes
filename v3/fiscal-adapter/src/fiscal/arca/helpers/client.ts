@@ -1,66 +1,53 @@
 import type {
   ExplicitSDKBaseClient,
   ExplicitSDKClient,
-  SDKLegacyPointOfSale,
-  SDKLegacyPointOfSaleClient,
+  ExplicitSDKSequenceClient,
+  SDKLastAuthorizedVoucher,
   SDKPointOfSale,
-  SDKPointOfSaleListingClient,
+  SDKVoucherSequenceReference,
 } from "../models/sdk.js";
 
 /**
- * Compatibility boundary for the published 2.4 SDK and the next explicit API.
- *
- * Version 2.4 already exposes FEParamGetPtosVenta through the root client but
- * not through its explicit-numbering subpath. Once the next SDK version is
- * published, this adapter automatically prefers `listPointsOfSale`; until
- * then it uses only the root client's read-only `getPuntosVenta` operation.
+ * Keeps all Fiscal Adapter calls behind the published explicit-numbering
+ * entrypoint while validating its normalized point-of-sale response.
  */
-export function compatibleExplicitClient(
-  explicitClient: ExplicitSDKBaseClient,
-  legacyPointOfSaleClient: SDKLegacyPointOfSaleClient,
+export function validatedExplicitClient(
+  explicitClient: ExplicitSDKBaseClient & ExplicitSDKSequenceClient,
 ): ExplicitSDKClient {
   return {
     authorize: (request) => explicitClient.authorize(request),
     consult: (reference) => explicitClient.consult(reference),
-    async listPointsOfSale(): Promise<SDKPointOfSale[]> {
-      if (supportsPointOfSaleListing(explicitClient)) {
-        return (await explicitClient.listPointsOfSale()).map(
-          normalizePointOfSale,
-        );
+    async lastAuthorizedVoucher(
+      reference: SDKVoucherSequenceReference,
+    ): Promise<SDKLastAuthorizedVoucher> {
+      const result = await explicitClient.lastAuthorizedVoucher(reference);
+      if (
+        result.pointOfSale !== reference.pointOfSale ||
+        result.voucherType !== reference.voucherType ||
+        !Number.isSafeInteger(result.voucherNumber) ||
+        result.voucherNumber < 0
+      ) {
+        throw invalidLastAuthorizedVoucherResponse();
       }
-      return (await legacyPointOfSaleClient.getPuntosVenta()).map(
-        normalizeLegacyPointOfSale,
+      return result;
+    },
+    async listPointsOfSale(): Promise<SDKPointOfSale[]> {
+      return (await explicitClient.listPointsOfSale()).map(
+        normalizePointOfSale,
       );
     },
   };
 }
 
-function supportsPointOfSaleListing(
-  client: ExplicitSDKBaseClient,
-): client is ExplicitSDKBaseClient & SDKPointOfSaleListingClient {
-  return (
-    "listPointsOfSale" in client &&
-    typeof (client as { listPointsOfSale?: unknown }).listPointsOfSale ===
-      "function"
+function invalidLastAuthorizedVoucherResponse(): Error {
+  const error = new Error(
+    "ARCA returned an invalid last-authorized voucher response",
   );
-}
-
-function normalizeLegacyPointOfSale(
-  value: SDKLegacyPointOfSale,
-): SDKPointOfSale {
-  const blocked = normalizedString(value.Bloqueado).toUpperCase();
-  if (blocked !== "S" && blocked !== "N") {
-    throw invalidPointOfSaleResponse();
-  }
-  const deactivatedOn = normalizedString(value.FchBaja);
-  return normalizePointOfSale({
-    number: value.Nro,
-    emissionType: normalizedString(value.EmisionTipo),
-    blocked: blocked === "S",
-    ...(deactivatedOn === "" || deactivatedOn.toUpperCase() === "NULL"
-      ? {}
-      : { deactivatedOn }),
+  error.name = "ExplicitPointOfSaleError";
+  Object.assign(error, {
+    code: "INVALID_LAST_AUTHORIZED_VOUCHER_RESPONSE",
   });
+  return error;
 }
 
 function normalizePointOfSale(value: SDKPointOfSale): SDKPointOfSale {

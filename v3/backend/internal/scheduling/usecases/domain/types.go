@@ -379,6 +379,7 @@ type Booking struct {
 	CustomerName       string
 	CustomerEmail      string
 	CustomerPhone      string
+	MeetRequested      bool
 	Notes              string
 	CancellationReason string
 	Allocations        []Allocation
@@ -523,6 +524,7 @@ type WaitlistEntry struct {
 	PreferredFrom      time.Time
 	PreferredUntil     time.Time
 	Participants       int
+	MeetRequested      bool
 	Status             WaitlistStatus
 	OfferExpiresAt     *time.Time
 	OfferedStartAt     *time.Time

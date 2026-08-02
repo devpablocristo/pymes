@@ -325,11 +325,40 @@ jobs:
             printf -- "- Manifest SHA-256: \`%s\`\n" "${checksum}"
           } >>"${GITHUB_STEP_SUMMARY}"
 
+      - name: Retain manifest in locked release evidence
+        shell: bash
+        env:
+          PYMES_RELEASE_EVIDENCE_ENV: ${{ inputs.environment }}
+          PYMES_RELEASE_EVIDENCE_SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+          PYMES_RELEASE_EVIDENCE_ACCOUNTING_SHA: ${{ needs.validate.outputs.accounting_sha }}
+          PYMES_RELEASE_EVIDENCE_RUN_ID: ${{ github.run_id }}
+          PYMES_RELEASE_EVIDENCE_RUN_ATTEMPT: ${{ github.run_attempt }}
+          PYMES_RELEASE_EVIDENCE_MANIFEST: ${{ runner.temp }}/pymes-v3-images.env
+          PYMES_RELEASE_EVIDENCE_RECEIPT: ${{ runner.temp }}/pymes-v3-release-evidence.json
+        run: |
+          set -euo pipefail
+          ./v3/scripts/deploy/retain-release-manifest.sh
+          jq -e '
+            .schema == "pymes-v3-release-evidence-v1" and
+            .environment == env.PYMES_RELEASE_EVIDENCE_ENV and
+            .source_sha == env.PYMES_RELEASE_EVIDENCE_SOURCE_SHA and
+            .open_accounting_sha == env.PYMES_RELEASE_EVIDENCE_ACCOUNTING_SHA
+          ' "${PYMES_RELEASE_EVIDENCE_RECEIPT}" >/dev/null
+          {
+            printf -- "- Durable evidence: \`%s#%s\`\n" \
+              "$(jq -r .object_uri "${PYMES_RELEASE_EVIDENCE_RECEIPT}")" \
+              "$(jq -r .generation "${PYMES_RELEASE_EVIDENCE_RECEIPT}")"
+            printf -- "- Retained until at least: \`%s\`\n" \
+              "$(jq -r .retained_until "${PYMES_RELEASE_EVIDENCE_RECEIPT}")"
+          } >>"${GITHUB_STEP_SUMMARY}"
+
       - name: Upload digest manifest
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: pymes-v3-images-${{ inputs.environment }}-${{ needs.validate.outputs.source_sha }}
-          path: ${{ runner.temp }}/pymes-v3-images.env
+          path: |
+            ${{ runner.temp }}/pymes-v3-images.env
+            ${{ runner.temp }}/pymes-v3-release-evidence.json
           if-no-files-found: error
           retention-days: 90
           compression-level: 0

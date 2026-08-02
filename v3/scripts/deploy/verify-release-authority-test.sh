@@ -760,7 +760,7 @@ expect_failure \
 # boundary. The inverse verifier constrains effective access to Pymes resources
 # without canonicalizing every binding owned by another product.
 pymes_validate_inverse_permission_analysis \
-  "$(jq --arg resource "//run.googleapis.com/projects/pymes-dev-352318/locations/us-central1/services/axis-runtime-stg" \
+  "$(jq --arg resource "//run.googleapis.com/projects/pymes-dev-352318/locations/us-central1/services/shared-unrelated-runtime-stg" \
     '.responses[0].mainAnalysis.analysisResults[0].accessControlLists[0].resources[0].fullResourceName = $resource' \
     <<<"$inverse_run_analysis")" \
   "inverse shared-project fixture" pymes-dev-352318 884236221349 \

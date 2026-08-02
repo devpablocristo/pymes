@@ -2,13 +2,58 @@ version = 1
 
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
+target = "v3/backend/internal/calendars/worker/helpers/events.go"
+sig = "4f51a97fc09148a9"
+
+[[bindings]]
+doc = "v3/docs/04-validacion.md"
+target = "v3/backend/internal/scheduling/calendar_projection/helpers/events.go"
+sig = "6c88eae26d96f6a5"
+
+[[bindings]]
+doc = "v3/docs/04-validacion.md"
 target = "v3/scripts/backup-restore-smoke.sh"
 sig = "099a796338ca72a9"
 
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
+target = "v3/scripts/deploy/bootstrap-release-evidence.sh"
+sig = "72bcc290dc2f5fed"
+
+[[bindings]]
+doc = "v3/docs/04-validacion.md"
+target = "v3/scripts/deploy/cloud-restore-drill-test.sh"
+sig = "06a6c6bc99d7b21d"
+
+[[bindings]]
+doc = "v3/docs/04-validacion.md"
+target = "v3/scripts/deploy/cloud-restore-drill.sh"
+sig = "1300dcdaf847eeba"
+
+[[bindings]]
+doc = "v3/docs/04-validacion.md"
 target = "v3/scripts/deploy/cloud-run-security-check.sh"
-sig = "d7ac76141980f82b"
+sig = "e5a4489ac007531d"
+
+[[bindings]]
+doc = "v3/docs/04-validacion.md"
+target = "v3/scripts/deploy/collect-pilot-evidence.sh"
+sig = "ace0e04c8673ad15"
+
+[[bindings]]
+doc = "v3/docs/04-validacion.md"
+target = "v3/scripts/deploy/protected-live-validation-test.sh"
+sig = "2536c44642661aa2"
+
+[[bindings]]
+doc = "v3/docs/04-validacion.md"
+target = "v3/scripts/deploy/release-evidence-test.sh"
+sig = "205b143837784f9c"
+
+[[bindings]]
+doc = "v3/docs/04-validacion.md"
+target = "v3/scripts/deploy/retain-release-manifest.sh"
+sig = "8ee1ff78969ea783"
 
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
@@ -23,17 +68,112 @@ sig = "b2f106a6b8914825"
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
 target = "v3/scripts/deploy/verify-cloud-run.sh"
-sig = "020c141346496ad4"
+sig = "3176443ed9cdae50"
 
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
 target = "v3/scripts/deploy/workflow-policy-check.sh"
-sig = "a76598429bdc4b5c"
+sig = "1a8a4f4ad0f25f92"
+
+[[bindings]]
+doc = "v3/docs/05-roadmap.md"
+target = "v3/backend/internal/scheduling/calendar_projection/helpers/events.go"
+sig = "6c88eae26d96f6a5"
+
+[[bindings]]
+doc = "v3/docs/05-roadmap.md"
+target = "v3/scripts/deploy/cloud-restore-drill.sh"
+sig = "1300dcdaf847eeba"
+
+[[bindings]]
+doc = "v3/docs/05-roadmap.md"
+target = "v3/scripts/deploy/collect-pilot-evidence.sh"
+sig = "ace0e04c8673ad15"
+
+[[bindings]]
+doc = "v3/docs/05-roadmap.md"
+target = "v3/scripts/deploy/retain-release-manifest.sh"
+sig = "8ee1ff78969ea783"
+
+[[bindings]]
+doc = "v3/docs/06-plan-ejecucion.md"
+target = ".github/workflows/v3-arca-homologation.yml"
+sig = "5829e6fc78ae1091"
+
+[[bindings]]
+doc = "v3/docs/06-plan-ejecucion.md"
+target = ".github/workflows/v3-google-live.yml"
+sig = "a8445efc253397b0"
+
+[[bindings]]
+doc = "v3/docs/07-estado-implementacion.md"
+target = "v3/backend/internal/scheduling/calendar_projection/helpers/events.go"
+sig = "6c88eae26d96f6a5"
+
+[[bindings]]
+doc = "v3/docs/07-estado-implementacion.md"
+target = "v3/scripts/deploy/cloud-restore-drill.sh"
+sig = "1300dcdaf847eeba"
+
+[[bindings]]
+doc = "v3/docs/07-estado-implementacion.md"
+target = "v3/scripts/deploy/collect-pilot-evidence.sh"
+sig = "ace0e04c8673ad15"
+
+[[bindings]]
+doc = "v3/docs/07-estado-implementacion.md"
+target = "v3/scripts/deploy/retain-release-manifest.sh"
+sig = "8ee1ff78969ea783"
+
+[[bindings]]
+doc = "v3/docs/08-auditoria-cierre.md"
+target = "v3/backend/internal/scheduling/calendar_projection/helpers/events.go"
+sig = "6c88eae26d96f6a5"
+
+[[bindings]]
+doc = "v3/docs/08-auditoria-cierre.md"
+target = "v3/scripts/deploy/cloud-restore-drill.sh"
+sig = "1300dcdaf847eeba"
+
+[[bindings]]
+doc = "v3/docs/08-auditoria-cierre.md"
+target = "v3/scripts/deploy/collect-pilot-evidence.sh"
+sig = "ace0e04c8673ad15"
+
+[[bindings]]
+doc = "v3/docs/08-auditoria-cierre.md"
+target = "v3/scripts/deploy/migrate-project-secret-access-test.sh"
+sig = "31057f0b473612e8"
+
+[[bindings]]
+doc = "v3/docs/08-auditoria-cierre.md"
+target = "v3/scripts/deploy/migrate-project-secret-access.sh"
+sig = "fddcf26f05f8020f"
+
+[[bindings]]
+doc = "v3/docs/08-auditoria-cierre.md"
+target = "v3/scripts/deploy/retain-release-manifest.sh"
+sig = "8ee1ff78969ea783"
+
+[[bindings]]
+doc = "v3/docs/08-auditoria-cierre.md"
+target = "v3/scripts/deploy/retire-obsolete-secrets-test.sh"
+sig = "c64c1c9d236d3c51"
+
+[[bindings]]
+doc = "v3/docs/08-auditoria-cierre.md"
+target = "v3/scripts/deploy/retire-obsolete-secrets.sh"
+sig = "57fa58e70e4de136"
 
 [[bindings]]
 doc = "v3/docs/09-gcp-stg-prd.md"
 target = "v3/scripts/deploy/retire-legacy-pymes-wif.sh"
 sig = "b5293e67a11c1e45"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = ".github/workflows/v3-release.yml"
+sig = "23f14ae8d57217b1"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
@@ -47,13 +187,23 @@ sig = "099a796338ca72a9"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/arca-homologation-validation.sh"
+sig = "cb0c4d63316c0049"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
 target = "v3/scripts/deploy/bootstrap-data-encryption.sh"
 sig = "8d637b409df06ea5"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
 target = "v3/scripts/deploy/bootstrap-network-egress.sh"
-sig = "30065a00aa4d4618"
+sig = "244317c84183fd06"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/bootstrap-release-evidence.sh"
+sig = "72bcc290dc2f5fed"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
@@ -62,13 +212,48 @@ sig = "eed2159f6ff98c90"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/cloud-restore-drill-test.sh"
+sig = "06a6c6bc99d7b21d"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/cloud-restore-drill.sh"
+sig = "1300dcdaf847eeba"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
 target = "v3/scripts/deploy/cloud-run.sh"
-sig = "60cfa3a931043fd5"
+sig = "cf0d54b7991bf914"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/collect-pilot-evidence.sh"
+sig = "ace0e04c8673ad15"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/google-live-validation.sh"
+sig = "aa76c70db088d865"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/migrate-project-secret-access.sh"
+sig = "fddcf26f05f8020f"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/retain-release-manifest.sh"
+sig = "8ee1ff78969ea783"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
 target = "v3/scripts/deploy/retire-legacy-pymes-wif.sh"
 sig = "b5293e67a11c1e45"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/retire-obsolete-secrets.sh"
+sig = "57fa58e70e4de136"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
@@ -78,7 +263,7 @@ sig = "b2f106a6b8914825"
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
 target = "v3/scripts/deploy/verify-cloud-run.sh"
-sig = "020c141346496ad4"
+sig = "3176443ed9cdae50"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
@@ -86,9 +271,114 @@ target = "v3/scripts/restore-postgres.sh"
 sig = "94c7a7ab0b51c09f"
 
 [[bindings]]
+doc = "v3/docs/11-fiscal-vault-onboarding.md"
+target = ".github/workflows/v3-arca-homologation.yml"
+sig = "5829e6fc78ae1091"
+
+[[bindings]]
+doc = "v3/docs/11-fiscal-vault-onboarding.md"
+target = "v3/backend/internal/commerce/fiscal_settings_real_contract_test.go#TestFiscalOnboardingAgainstRealAdapter"
+sig = "c6baf3e742e4421a"
+
+[[bindings]]
+doc = "v3/docs/11-fiscal-vault-onboarding.md"
+target = "v3/backend/internal/commerce/handler/helpers/fiscal.go#FiscalCredentialID"
+sig = "3fe60ce8f945d310"
+
+[[bindings]]
+doc = "v3/docs/11-fiscal-vault-onboarding.md"
+target = "v3/contracts/fiscal.openapi.yaml"
+sig = "d61c258d0732d32b"
+
+[[bindings]]
+doc = "v3/docs/11-fiscal-vault-onboarding.md"
+target = "v3/fiscal-adapter/src/credentials/usecases.ts#CredentialService"
+sig = "13d9eeee1e7aee78"
+
+[[bindings]]
+doc = "v3/docs/11-fiscal-vault-onboarding.md"
+target = "v3/fiscal-adapter/src/fiscal/arca.ts#ArcaFiscalAuthority"
+sig = "130125fc78ae74ad"
+
+[[bindings]]
+doc = "v3/docs/11-fiscal-vault-onboarding.md"
+target = "v3/fiscal-adapter/src/fiscal/arca/helpers/client.ts#validatedExplicitClient"
+sig = "34156ebf4a0db75c"
+
+[[bindings]]
+doc = "v3/docs/11-fiscal-vault-onboarding.md"
+target = "v3/fiscal-adapter/src/fiscal/arca/helpers/mapping.ts#supportedVoucherTypes"
+sig = "f7306177281e0cd6"
+
+[[bindings]]
+doc = "v3/docs/11-fiscal-vault-onboarding.md"
+target = "v3/fiscal-adapter/src/fiscal/arca/helpers/responses.ts#consultationDecision"
+sig = "02703e2c93dda600"
+
+[[bindings]]
+doc = "v3/docs/11-fiscal-vault-onboarding.md"
+target = "v3/fiscal-adapter/src/fiscal/arca/models/sdk.ts#ExplicitSDKClient"
+sig = "3809c3de3f0af059"
+
+[[bindings]]
+doc = "v3/docs/11-fiscal-vault-onboarding.md"
+target = "v3/scripts/deploy/arca-homologation-validation.sh"
+sig = "cb0c4d63316c0049"
+
+[[bindings]]
+doc = "v3/docs/11-fiscal-vault-onboarding.md"
+target = "v3/scripts/fiscal-contract-e2e.sh"
+sig = "bcff677add4d47c1"
+
+[[bindings]]
+doc = "v3/docs/11-google-calendar-meet.md"
+target = ".github/workflows/v3-google-live.yml"
+sig = "a8445efc253397b0"
+
+[[bindings]]
+doc = "v3/docs/11-google-calendar-meet.md"
+target = "v3/backend/internal/calendars/repository.go"
+sig = "a4ec8f2b6dffbfb8"
+
+[[bindings]]
+doc = "v3/docs/11-google-calendar-meet.md"
+target = "v3/backend/internal/calendars/worker.go"
+sig = "93af829226eb3709"
+
+[[bindings]]
+doc = "v3/docs/11-google-calendar-meet.md"
+target = "v3/backend/internal/calendars/worker/helpers/events.go"
+sig = "4f51a97fc09148a9"
+
+[[bindings]]
+doc = "v3/docs/11-google-calendar-meet.md"
+target = "v3/backend/internal/scheduling/calendar_projection/helpers/events.go"
+sig = "6c88eae26d96f6a5"
+
+[[bindings]]
+doc = "v3/docs/11-google-calendar-meet.md"
+target = "v3/scripts/deploy/google-live-validation.sh"
+sig = "aa76c70db088d865"
+
+[[bindings]]
 doc = "v3/docs/README.md"
 target = ".github/workflows/v3-release.yml"
-sig = "38bc54c4dfb1d5c2"
+sig = "23f14ae8d57217b1"
+
+[[bindings]]
+doc = "v3/docs/README.md"
+target = "v3/scripts/deploy/cloud-restore-drill.sh"
+sig = "1300dcdaf847eeba"
+
+[[bindings]]
+doc = "v3/docs/README.md"
+target = "v3/scripts/deploy/collect-pilot-evidence.sh"
+sig = "ace0e04c8673ad15"
+
+[[bindings]]
+doc = "v3/docs/README.md"
+target = "v3/scripts/deploy/retain-release-manifest.sh"
+sig = "8ee1ff78969ea783"
 
 [[bindings]]
 doc = "v3/docs/adr/0005-despliegue-y-operacion.md"
@@ -98,9 +388,54 @@ sig = "b5293e67a11c1e45"
 [[bindings]]
 doc = "v3/docs/adr/0006-transporte-privado-cloud-run.md"
 target = "v3/scripts/deploy/cloud-run-security-check.sh"
-sig = "d7ac76141980f82b"
+sig = "e5a4489ac007531d"
 
 [[bindings]]
 doc = "v3/docs/adr/0006-transporte-privado-cloud-run.md"
 target = "v3/scripts/deploy/cloud-run.sh"
-sig = "60cfa3a931043fd5"
+sig = "cf0d54b7991bf914"
+
+[[bindings]]
+doc = "v3/docs/adr/0011-arquitectura-go-vertical-y-adapters.md"
+target = "v3/backend/internal/architecture/architecture_test.go"
+sig = "6d44899314d2cfa5"
+
+[[bindings]]
+doc = "v3/docs/scheduling.md"
+target = "v3/api/scheduling.openapi.yaml"
+sig = "9906b628a21392be"
+
+[[bindings]]
+doc = "v3/docs/scheduling.md"
+target = "v3/backend/internal/calendars/repository.go"
+sig = "a4ec8f2b6dffbfb8"
+
+[[bindings]]
+doc = "v3/docs/scheduling.md"
+target = "v3/backend/internal/calendars/worker/helpers/events.go"
+sig = "4f51a97fc09148a9"
+
+[[bindings]]
+doc = "v3/docs/scheduling.md"
+target = "v3/backend/internal/scheduling/calendar_projection.go"
+sig = "85740972dce66efe"
+
+[[bindings]]
+doc = "v3/docs/scheduling.md"
+target = "v3/backend/internal/scheduling/calendar_projection/helpers/events.go"
+sig = "6c88eae26d96f6a5"
+
+[[bindings]]
+doc = "v3/docs/scheduling.md"
+target = "v3/backend/internal/scheduling/usecases.go"
+sig = "84f4ce84925a6c33"
+
+[[bindings]]
+doc = "v3/docs/scheduling.md"
+target = "v3/backend/internal/scheduling/usecases/domain/types.go"
+sig = "5f0d9718a1d16771"
+
+[[bindings]]
+doc = "v3/docs/scheduling.md"
+target = "v3/db/migrations/019_scheduling_calendar_projection.sql"
+sig = "b30106a05bf93309"

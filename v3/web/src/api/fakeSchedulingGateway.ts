@@ -75,6 +75,7 @@ function bookingAt(
     currency: service.currency,
     duration_minutes: service.duration_minutes,
     timezone: "America/Argentina/Buenos_Aires",
+    meet_requested: false,
     allocations: [{ resource_id: resourceId, mode: "exclusive", units: 1 }],
   };
 }
@@ -273,6 +274,7 @@ export class InMemorySchedulingGateway implements SchedulingGateway {
         preferred_from: day.toUTC().toISO()!,
         preferred_until: day.endOf("day").toUTC().toISO()!,
         participants: 1,
+        meet_requested: false,
         party_id: "party-marina",
         status: "pending",
         version: 1,
@@ -345,6 +347,7 @@ export class InMemorySchedulingGateway implements SchedulingGateway {
       input.status ?? "pending_confirmation",
     );
     booking.participants = input.participants;
+    booking.meet_requested = input.meet_requested ?? false;
     booking.allocations = deepCopy(allocations);
     booking.customer_name = input.customer.name;
     if (input.customer.email) booking.customer_email = input.customer.email;
@@ -509,6 +512,7 @@ export class InMemorySchedulingGateway implements SchedulingGateway {
       ...input,
       id: input.id ?? crypto.randomUUID(),
       party_id: input.customer.party_id ?? `party-${crypto.randomUUID()}`,
+      meet_requested: input.meet_requested ?? false,
       status: "pending",
       version: 1,
       customer_name: input.customer.name,
@@ -654,6 +658,7 @@ export class InMemorySchedulingGateway implements SchedulingGateway {
         currency,
         duration_minutes,
         timezone,
+        meet_requested,
       }) => ({
         id,
         ...(series_id ? { series_id } : {}),
@@ -671,6 +676,7 @@ export class InMemorySchedulingGateway implements SchedulingGateway {
         currency,
         duration_minutes,
         timezone,
+        meet_requested,
       }),
     );
   }
@@ -691,6 +697,7 @@ export class InMemorySchedulingGateway implements SchedulingGateway {
       preferred_from: created.preferred_from,
       preferred_until: created.preferred_until,
       participants: created.participants,
+      meet_requested: created.meet_requested,
       status: created.status,
       version: created.version,
     };

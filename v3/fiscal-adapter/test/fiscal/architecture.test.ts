@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import test from "node:test";
 import { EventEmitter } from "node:events";
 import {
@@ -78,6 +78,36 @@ test("domain and use cases stay independent from provider infrastructure", async
       false,
       `use cases import ${forbidden}`,
     );
+  }
+});
+
+test("runtime consumes only the explicit SDK surface and exposes no autonumbering", async () => {
+  const entries = await readdir("src", { recursive: true });
+  for (const entry of entries.filter((value) => value.endsWith(".ts"))) {
+    const source = await readFile(`src/${entry}`, "utf8");
+    const sdkSpecifiers = [
+      ...source.matchAll(
+        /["'](@devpablocristo\/arca-facturacion[^"']*)["']/g,
+      ),
+    ].map((match) => match[1]);
+    for (const specifier of sdkSpecifiers) {
+      assert.equal(
+        specifier,
+        "@devpablocristo/arca-facturacion/explicit",
+        `${entry} imports forbidden SDK surface ${specifier}`,
+      );
+    }
+    for (const forbidden of [
+      "crearFacturaAuto",
+      "facturarConAsociado",
+      ".facturar(",
+    ]) {
+      assert.equal(
+        source.includes(forbidden),
+        false,
+        `${entry} exposes forbidden autonumbering ${forbidden}`,
+      );
+    }
   }
 });
 

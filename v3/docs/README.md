@@ -14,18 +14,25 @@ implementada es:
 
 ## Estado de entrega
 
+<!-- drift:bind v3/scripts/deploy/retain-release-manifest.sh -->
+<!-- drift:bind v3/scripts/deploy/cloud-restore-drill.sh -->
+<!-- drift:bind v3/scripts/deploy/collect-pilot-evidence.sh -->
+
 El código y los gates locales de H8 ya cubren releases inmutables por SHA y
 digest, identidades WIF separadas por ambiente, Web same-origin con marcador
-verificable, backup/restore endurecido y readiness criptográfico del vault
-Fiscal mediante Cloud KMS. La automatización también valida imágenes, labels,
-service accounts, invokers, secretos versionados, conectividad privada y jobs
-después de cada despliegue. El alta inerte queda ligada por Audit Logs a los
-FQN exactos de proyecto, región y tipo, admitiendo sólo el `actAs` inevitable
-sobre las identidades runtime allowlisted y una única mutación inicial por
-recurso. La evidencia se valida sólo después de diez minutos y dos lecturas
-estables, con un margen superior de dos minutos para timestamps de auditoría.
-Además, cada release verifica la autoridad completa y efectiva de builder y
-deployer antes de usar el builder y nuevamente antes del deploy.
+verificable, publicación create-only del manifiesto en almacenamiento con
+Bucket Lock, restore coordinado de Pymes/Fiscal/Accounting y collectors
+fail-closed para los cuatro pilotos. Estos mecanismos están implementados y
+probados con adapters locales; los buckets, restores y pilotos reales siguen
+pendientes. La automatización también valida imágenes, labels, service
+accounts, invokers, secretos versionados, conectividad privada y jobs después
+de cada despliegue. El alta inerte queda ligada por Audit Logs a los FQN exactos
+de proyecto, región y tipo, admitiendo sólo el `actAs` inevitable sobre las
+identidades runtime allowlisted y una única mutación inicial por recurso. La
+evidencia se valida sólo después de diez minutos y dos lecturas estables, con
+un margen superior de dos minutos para timestamps de auditoría. Además, cada
+release verifica la autoridad completa y efectiva de builder y deployer antes
+de usar el builder y nuevamente antes del deploy.
 
 El bootstrap IAM sólo puede ejecutarse desde un checkout limpio cuyo HEAD y
 árbol coincidan con `main` remoto, por el operador directo revisado y sin
@@ -54,14 +61,19 @@ sea el último en recibir tráfico; recién allí se activa una instancia.
 `bootstrap` no está permitido en PRD ni cuenta como canary operativo.
 
 Open Accounting está fusionado y su CI remoto es verde en
-`1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d`. `make ci` también pasa localmente
-en Pymes contra ese pin y los controles actuales. Pymes PR #43 está fusionado
-en `fee09579cc8d846e28a704d6f60d640edfac75d0` y su workflow remoto de `main`
-está verde; PerGo también quedó fusionado y `arca-facturacion` `2.5.0` está
-publicado y fijado. Esto demuestra integración, no evidencia operativa: no se
-publicaron las imágenes de esta revisión, no se desplegó Pymes v3 en STG ni PRD
-y no se realizaron los pilotos de Agenda, PerGo, Google o ARCA. El plan sólo
-podrá declararse completo después de ejecutar y verificar esas operaciones.
+`1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d`. Para el baseline integrado, Pymes
+PR #43 está fusionado en `fee09579cc8d846e28a704d6f60d640edfac75d0`, `make
+ci` pasó localmente contra ese pin y su workflow remoto de `main` quedó verde.
+El diff actual amplía ese baseline; su `make ci` integral pasó localmente el
+2026-08-02 y todavía requiere CI del SHA exacto antes de integrarse. PerGo
+quedó fusionado hasta el arreglo concurrente `8cafff3f6e763043d912322db97dcfcf589f2c54`,
+con CI final de `master` verde; la extensión
+`arca-facturacion` `2.6.0` quedó fusionada, publicada y fijada por Pymes, con
+CI remoto y suites integradas verdes. Nada de esto constituye
+evidencia operativa: no se publicaron las imágenes de esta revisión, no se
+desplegó Pymes v3 en STG ni PRD y no se realizaron los pilotos de Agenda,
+PerGo, Google o ARCA. El plan sólo podrá declararse completo después de ejecutar
+y verificar esas operaciones.
 
 ## Lectura sugerida
 

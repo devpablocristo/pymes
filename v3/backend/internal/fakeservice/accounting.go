@@ -34,11 +34,11 @@ func newAccountingFakeServer() *accountingFakeServer {
 }
 
 func (s *accountingFakeServer) AccountingHealth(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, accountingapi.HealthStatus{Status: accountingapi.Ok})
+	accountinghelpers.WriteJSON(w, http.StatusOK, accountingapi.HealthStatus{Status: accountingapi.Ok})
 }
 
 func (s *accountingFakeServer) AccountingReadiness(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, accountingapi.ReadinessStatus{Status: accountingapi.ReadinessStatusStatusReady})
+	accountinghelpers.WriteJSON(w, http.StatusOK, accountingapi.ReadinessStatus{Status: accountingapi.ReadinessStatusStatusReady})
 }
 
 func (s *accountingFakeServer) AccountingMetrics(w http.ResponseWriter, _ *http.Request) {
@@ -54,11 +54,11 @@ func (s *accountingFakeServer) ProvisionOrganization(
 	params accountingapi.ProvisionOrganizationParams,
 ) {
 	var body accountingapi.ProvisionOrganizationJSONRequestBody
-	if !decodeJSON(w, r, &body, params.XCorrelationID) {
+	if !accountinghelpers.DecodeJSON(w, r, &body, params.XCorrelationID) {
 		return
 	}
 	if body.OrganizationId != organizationID {
-		writeProblem(w, http.StatusBadRequest, params.XCorrelationID, "VALIDATION_ERROR", "organization mismatch", "path and body organization_id must match")
+		accountinghelpers.WriteProblem(w, http.StatusBadRequest, params.XCorrelationID, "VALIDATION_ERROR", "organization mismatch", "path and body organization_id must match")
 		return
 	}
 
@@ -71,7 +71,7 @@ func (s *accountingFakeServer) ProvisionOrganization(
 	if found {
 		status = http.StatusOK
 	}
-	writeJSON(w, status, accountingapi.ProvisioningResult{
+	accountinghelpers.WriteJSON(w, status, accountingapi.ProvisioningResult{
 		OrganizationId: organizationID,
 		Status:         accountingapi.ProvisioningResultStatusReady,
 	})
@@ -83,7 +83,7 @@ func (s *accountingFakeServer) ListAccounts(
 	_ accountingapi.OrganizationId,
 	_ accountingapi.ListAccountsParams,
 ) {
-	writeJSON(w, http.StatusOK, []accountingapi.Account{})
+	accountinghelpers.WriteJSON(w, http.StatusOK, []accountingapi.Account{})
 }
 
 func (s *accountingFakeServer) SubmitPostingCommand(
@@ -93,22 +93,22 @@ func (s *accountingFakeServer) SubmitPostingCommand(
 	params accountingapi.SubmitPostingCommandParams,
 ) {
 	var body accountingapi.PostingCommand
-	if !decodeJSON(w, r, &body, params.XCorrelationID) ||
+	if !accountinghelpers.DecodeJSON(w, r, &body, params.XCorrelationID) ||
 		!validateAccountingMetadata(w, organizationID, params.IdempotencyKey, params.XCorrelationID, body.OrganizationId, body.IdempotencyKey, body.CorrelationId) {
 		return
 	}
 
-	journalEntryID := stableUUID("journal-entry", organizationID, body.CommandId.String())
+	journalEntryID := accountinghelpers.StableUUID("journal-entry", organizationID, body.CommandId.String())
 	openItemIDs := make([]uuid.UUID, 0)
 	for index, line := range body.Lines {
 		if line.OpenItem != nil && *line.OpenItem {
-			openItemIDs = append(openItemIDs, stableUUID("open-item", organizationID, body.CommandId.String(), fmt.Sprint(index)))
+			openItemIDs = append(openItemIDs, accountinghelpers.StableUUID("open-item", organizationID, body.CommandId.String(), fmt.Sprint(index)))
 		}
 	}
 	event := accountingapi.AccountingEvent{
 		CommandId:      body.CommandId,
 		CorrelationId:  body.CorrelationId,
-		EventId:        stableUUID("event", organizationID, body.CommandId.String()),
+		EventId:        accountinghelpers.StableUUID("event", organizationID, body.CommandId.String()),
 		IdempotencyKey: body.IdempotencyKey,
 		JournalEntryId: &journalEntryID,
 		OccurredAt:     time.Now().UTC(),
@@ -129,16 +129,16 @@ func (s *accountingFakeServer) ReverseJournalEntry(
 	params accountingapi.ReverseJournalEntryParams,
 ) {
 	var body accountingapi.ReversalCommand
-	if !decodeJSON(w, r, &body, params.XCorrelationID) ||
+	if !accountinghelpers.DecodeJSON(w, r, &body, params.XCorrelationID) ||
 		!validateAccountingMetadata(w, organizationID, params.IdempotencyKey, params.XCorrelationID, body.OrganizationId, body.IdempotencyKey, body.CorrelationId) {
 		return
 	}
 
-	journalEntryID := stableUUID("reversal", organizationID, body.CommandId.String())
+	journalEntryID := accountinghelpers.StableUUID("reversal", organizationID, body.CommandId.String())
 	event := accountingapi.AccountingEvent{
 		CommandId:      body.CommandId,
 		CorrelationId:  body.CorrelationId,
-		EventId:        stableUUID("event", organizationID, body.CommandId.String()),
+		EventId:        accountinghelpers.StableUUID("event", organizationID, body.CommandId.String()),
 		IdempotencyKey: body.IdempotencyKey,
 		JournalEntryId: &journalEntryID,
 		OccurredAt:     time.Now().UTC(),
@@ -158,17 +158,17 @@ func (s *accountingFakeServer) ApplyOpenItem(
 	params accountingapi.ApplyOpenItemParams,
 ) {
 	var body accountingapi.OpenItemApplicationCommand
-	if !decodeJSON(w, r, &body, params.XCorrelationID) ||
+	if !accountinghelpers.DecodeJSON(w, r, &body, params.XCorrelationID) ||
 		!validateAccountingMetadata(w, organizationID, params.IdempotencyKey, params.XCorrelationID, body.OrganizationId, body.IdempotencyKey, body.CorrelationId) {
 		return
 	}
 
-	applicationID := stableUUID("application", organizationID, body.CommandId.String())
+	applicationID := accountinghelpers.StableUUID("application", organizationID, body.CommandId.String())
 	event := accountingapi.AccountingEvent{
 		ApplicationId:  &applicationID,
 		CommandId:      body.CommandId,
 		CorrelationId:  body.CorrelationId,
-		EventId:        stableUUID("event", organizationID, body.CommandId.String()),
+		EventId:        accountinghelpers.StableUUID("event", organizationID, body.CommandId.String()),
 		IdempotencyKey: body.IdempotencyKey,
 		OccurredAt:     time.Now().UTC(),
 		OrganizationId: organizationID,
@@ -187,7 +187,7 @@ func (s *accountingFakeServer) ReverseOpenItemApplication(
 	params accountingapi.ReverseOpenItemApplicationParams,
 ) {
 	var body accountingapi.OpenItemApplicationReversalCommand
-	if !decodeJSON(w, r, &body, params.XCorrelationID) ||
+	if !accountinghelpers.DecodeJSON(w, r, &body, params.XCorrelationID) ||
 		!validateAccountingMetadata(w, organizationID, params.IdempotencyKey, params.XCorrelationID, body.OrganizationId, body.IdempotencyKey, body.CorrelationId) {
 		return
 	}
@@ -196,7 +196,7 @@ func (s *accountingFakeServer) ReverseOpenItemApplication(
 		ApplicationId:  &body.ApplicationId,
 		CommandId:      body.CommandId,
 		CorrelationId:  body.CorrelationId,
-		EventId:        stableUUID("event", organizationID, body.CommandId.String()),
+		EventId:        accountinghelpers.StableUUID("event", organizationID, body.CommandId.String()),
 		IdempotencyKey: body.IdempotencyKey,
 		OccurredAt:     time.Now().UTC(),
 		OrganizationId: organizationID,
@@ -220,7 +220,7 @@ func (s *accountingFakeServer) ListPeriods(
 		periods = append(periods, period)
 	}
 	s.mu.Unlock()
-	writeJSON(w, http.StatusOK, periods)
+	accountinghelpers.WriteJSON(w, http.StatusOK, periods)
 }
 
 func (s *accountingFakeServer) CreatePeriod(
@@ -230,7 +230,7 @@ func (s *accountingFakeServer) CreatePeriod(
 	params accountingapi.CreatePeriodParams,
 ) {
 	var body accountingapi.PeriodInput
-	if !decodeJSON(w, r, &body, params.XCorrelationID) {
+	if !accountinghelpers.DecodeJSON(w, r, &body, params.XCorrelationID) {
 		return
 	}
 	key := organizationID + "\x00period\x00" + params.IdempotencyKey
@@ -238,7 +238,7 @@ func (s *accountingFakeServer) CreatePeriod(
 	s.mu.Lock()
 	id, found := s.periodByKey[key]
 	if !found {
-		id = stableUUID("period", organizationID, params.IdempotencyKey)
+		id = accountinghelpers.StableUUID("period", organizationID, params.IdempotencyKey)
 		s.periodByKey[key] = id
 		if s.periods[organizationID] == nil {
 			s.periods[organizationID] = make(map[uuid.UUID]accountingapi.Period)
@@ -257,7 +257,7 @@ func (s *accountingFakeServer) CreatePeriod(
 	if found {
 		status = http.StatusOK
 	}
-	writeJSON(w, status, period)
+	accountinghelpers.WriteJSON(w, status, period)
 }
 
 func (s *accountingFakeServer) TransitionPeriod(
@@ -268,7 +268,7 @@ func (s *accountingFakeServer) TransitionPeriod(
 	params accountingapi.TransitionPeriodParams,
 ) {
 	var body accountingapi.TransitionPeriodJSONRequestBody
-	if !decodeJSON(w, r, &body, params.XCorrelationID) {
+	if !accountinghelpers.DecodeJSON(w, r, &body, params.XCorrelationID) {
 		return
 	}
 
@@ -280,10 +280,10 @@ func (s *accountingFakeServer) TransitionPeriod(
 	}
 	s.mu.Unlock()
 	if !found {
-		writeProblem(w, http.StatusBadRequest, params.XCorrelationID, "VALIDATION_ERROR", "period not found", periodID.String())
+		accountinghelpers.WriteProblem(w, http.StatusBadRequest, params.XCorrelationID, "VALIDATION_ERROR", "period not found", periodID.String())
 		return
 	}
-	writeJSON(w, http.StatusOK, period)
+	accountinghelpers.WriteJSON(w, http.StatusOK, period)
 }
 
 func (s *accountingFakeServer) GetReport(
@@ -293,7 +293,7 @@ func (s *accountingFakeServer) GetReport(
 	report accountingapi.GetReportParamsReport,
 	params accountingapi.GetReportParams,
 ) {
-	writeJSON(w, http.StatusOK, map[string]any{
+	accountinghelpers.WriteJSON(w, http.StatusOK, map[string]any{
 		"as_of":           params.AsOf,
 		"organization_id": organizationID,
 		"report":          report,
@@ -320,7 +320,7 @@ func (s *accountingFakeServer) writeAccountingEvent(
 	status := http.StatusCreated
 	if found {
 		if stored.SnapshotDigest != event.SnapshotDigest || stored.CommandId != event.CommandId {
-			writeProblem(
+			accountinghelpers.WriteProblem(
 				w,
 				http.StatusConflict,
 				event.CorrelationId,
@@ -333,7 +333,7 @@ func (s *accountingFakeServer) writeAccountingEvent(
 		status = http.StatusOK
 		stored.Status = accountingapi.Duplicate
 	}
-	writeJSON(w, status, stored)
+	accountinghelpers.WriteJSON(w, status, stored)
 }
 
 func validateAccountingMetadata(
@@ -355,7 +355,7 @@ func validateAccountingMetadata(
 	}) {
 		return true
 	}
-	writeProblem(
+	accountinghelpers.WriteProblem(
 		w,
 		http.StatusBadRequest,
 		headerCorrelationID,

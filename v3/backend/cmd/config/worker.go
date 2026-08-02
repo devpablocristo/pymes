@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -43,6 +44,7 @@ type PerGoWorker struct {
 	Enabled                  bool
 	BaseURL                  string
 	APIKey                   string
+	Audience                 string
 	WorkspaceID              string
 	Channel                  string
 	AllowGlobalRouteFallback bool
@@ -183,6 +185,7 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 		Enabled:                  pergoEnabled,
 		BaseURL:                  strings.TrimRight(strings.TrimSpace(getenv("PERGO_URL")), "/"),
 		APIKey:                   strings.TrimSpace(getenv("PERGO_API_KEY")),
+		Audience:                 strings.TrimSpace(getenv("PYMES_PERGO_AUDIENCE")),
 		WorkspaceID:              strings.TrimSpace(getenv("PERGO_WORKSPACE_ID")),
 		Channel:                  defaultValue(getenv("PERGO_CHANNEL"), "whatsapp"),
 		AllowGlobalRouteFallback: allowGlobalRouteFallback,
@@ -197,6 +200,19 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 		return WorkerConfig{}, workerConfigError(
 			"PERGO_CONFIG_INVALID",
 			"complete PerGo worker configuration is required",
+		)
+	}
+	if pergo.Enabled && environment == "production" &&
+		pergo.Audience == "" {
+		return WorkerConfig{}, workerConfigError(
+			"PERGO_CONFIG_INVALID",
+			"PYMES_PERGO_AUDIENCE is required in production",
+		)
+	}
+	if pergo.Audience != "" && !validPerGoAudience(pergo.Audience) {
+		return WorkerConfig{}, workerConfigError(
+			"PERGO_CONFIG_INVALID",
+			"PYMES_PERGO_AUDIENCE must be an exact HTTPS origin without path",
 		)
 	}
 	dispatchInterval := time.Second
@@ -224,6 +240,21 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 		PerGo:                       pergo,
 		Calendars:                   calendars,
 	}, nil
+}
+
+func validPerGoAudience(value string) bool {
+	audience, err := url.Parse(value)
+	return err == nil &&
+		audience.Scheme == "https" &&
+		audience.Host != "" &&
+		audience.Opaque == "" &&
+		audience.User == nil &&
+		audience.Path == "" &&
+		audience.RawPath == "" &&
+		audience.RawQuery == "" &&
+		!audience.ForceQuery &&
+		audience.Fragment == "" &&
+		!strings.ContainsAny(audience.Host, " \t\r\n,|")
 }
 
 func loadWorkerReleaseMetadata(

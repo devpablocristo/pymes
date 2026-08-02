@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${FAKE_CALL_LOG:?}"
+: "${FAKE_SOURCE_SHA:?}"
+: "${FAKE_RELEASE_MANIFEST:?}"
+: "${FAKE_PUBLIC_BASE_URL:?}"
+
+printf 'GCLOUD\n' >>"$FAKE_CALL_LOG"
+
+manifest_value() {
+  local key="$1"
+  grep -E "^${key}=" "$FAKE_RELEASE_MANIFEST" | cut -d= -f2-
+}
+
+service_json() {
+  local service="$1"
+  local env_json='[]'
+  case "$service" in
+    *-api)
+      env_json=$(jq -cn \
+        --arg redirect "$FAKE_PUBLIC_BASE_URL/api/v1/calendars/google/oauth/callback" \
+        --arg kms "projects/pymes-dev-352318/locations/us-central1/keyRings/pymes-v3-stg/cryptoKeys/calendar-tokens" '
+        [
+          {name:"PYMES_PERGO_ENABLED",value:"true"},
+          {name:"PYMES_GOOGLE_CALENDAR_ENABLED",value:"true"},
+          {name:"PYMES_GOOGLE_REDIRECT_URL",value:$redirect},
+          {name:"PYMES_CALENDAR_KMS_KEY",value:$kms}
+        ]
+      ')
+      ;;
+    *-worker)
+      env_json=$(jq -cn \
+        --arg redirect "$FAKE_PUBLIC_BASE_URL/api/v1/calendars/google/oauth/callback" \
+        --arg kms "projects/pymes-dev-352318/locations/us-central1/keyRings/pymes-v3-stg/cryptoKeys/calendar-tokens" \
+        --arg audience "${FAKE_PERGO_AUDIENCE-https://pergo-audience.pilot.example}" '
+        [
+          {name:"PYMES_PERGO_ENABLED",value:"true"},
+          {name:"PERGO_URL",value:"https://pergo.pilot.example"},
+          {name:"PYMES_PERGO_AUDIENCE",value:$audience},
+          {name:"PERGO_CHANNEL",value:"whatsapp_cloud"},
+          {name:"PERGO_ALLOW_GLOBAL_ROUTE_FALLBACK",value:"false"},
+          {name:"PYMES_GOOGLE_CALENDAR_ENABLED",value:"true"},
+          {name:"PYMES_GOOGLE_REDIRECT_URL",value:$redirect},
+          {name:"PYMES_CALENDAR_KMS_KEY",value:$kms}
+        ]
+      ')
+      ;;
+    *-fiscal)
+      env_json=$(jq -cn \
+        --arg mode "${FAKE_FISCAL_MODE:-arca}" \
+        --arg kms "projects/pymes-dev-352318/locations/us-central1/keyRings/pymes-v3-stg/cryptoKeys/fiscal-vault" '
+        [
+          {name:"FISCAL_ADAPTER_MODE",value:$mode},
+          {name:"FISCAL_KMS_KEY_NAME",value:$kms},
+          {name:"FISCAL_ARCA_HOMOLOGATION_ISSUER_PATTERN",value:"ARCA Homologacion"}
+        ]
+      ')
+      ;;
+  esac
+  jq -cn --arg service "$service" --argjson env "$env_json" '
+    {
+      metadata:{name:$service},
+      spec:{template:{spec:{containers:[{env:$env}]}}},
+      status:{
+        traffic:[{
+          percent:100,
+          revisionName:($service + "-00001-active")
+        }]
+      }
+    }
+  '
+}
+
+revision_json() {
+  local revision="$1" service role manifest_key account_prefix image sha
+  service=${revision%-00001-active}
+  role=${service#pymes-v3-stg-}
+  case "$role" in
+    fiscal)
+      manifest_key=PYMES_FISCAL_IMAGE
+      account_prefix=pymes-v3-fiscal
+      ;;
+    accounting)
+      manifest_key=PYMES_ACCOUNTING_IMAGE
+      account_prefix=pymes-v3-accounting
+      ;;
+    accounting-admin)
+      manifest_key=PYMES_ACCOUNTING_ADMIN_IMAGE
+      account_prefix=pymes-v3-accounting-admin
+      ;;
+    worker)
+      manifest_key=PYMES_WORKER_IMAGE
+      account_prefix=pymes-v3-worker
+      ;;
+    api)
+      manifest_key=PYMES_API_IMAGE
+      account_prefix=pymes-v3-api
+      ;;
+    web)
+      manifest_key=PYMES_WEB_IMAGE
+      account_prefix=pymes-v3-web
+      ;;
+    *)
+      echo "unexpected revision $revision" >&2
+      exit 97
+      ;;
+  esac
+  image=$(manifest_value "$manifest_key")
+  sha=${FAKE_REVISION_SHA:-$FAKE_SOURCE_SHA}
+  jq -cn \
+    --arg revision "$revision" \
+    --arg release "$sha" \
+    --arg image "$image" \
+    --arg account "${account_prefix}-stg@pymes-dev-352318.iam.gserviceaccount.com" '
+    {
+      metadata:{
+        name:$revision,
+        labels:{"pymes-v3-release":$release}
+      },
+      spec:{
+        serviceAccount:$account,
+        containers:[{image:$image}]
+      },
+      status:{conditions:[{type:"Ready",status:"True"}]}
+    }
+  '
+}
+
+if [[ "$1" == "run" && "$2" == "services" && "$3" == "describe" ]]; then
+  service_json "$4"
+  exit
+fi
+if [[ "$1" == "run" && "$2" == "revisions" && "$3" == "describe" ]]; then
+  revision_json "$4"
+  exit
+fi
+
+echo "unexpected gcloud invocation" >&2
+exit 97

@@ -179,6 +179,56 @@ func TestCalendarRelayLeasesOnlyOwnedTopic(t *testing.T) {
 	if len(events) != 1 || events[0].Topic != CalendarSyncRequestedTopic {
 		t.Fatalf("leased events = %+v", events)
 	}
+	if err := store.DeferCalendarEvent(ctx, events[0]); err != nil {
+		t.Fatal(err)
+	}
+	tx, err = pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(
+		ctx, "SELECT set_config('app.org_id',$1,true)", orgID,
+	); err != nil {
+		t.Fatal(err)
+	}
+	var attempts int
+	var availableAt time.Time
+	var leaseCleared, calendarPublished bool
+	if err := tx.QueryRow(ctx, `
+		SELECT attempts,available_at,lease_token IS NULL,
+		       published_at IS NOT NULL
+		FROM app.outbox
+		WHERE org_id=$1 AND topic='CalendarSyncRequested'`,
+		orgID,
+	).Scan(
+		&attempts,
+		&availableAt,
+		&leaseCleared,
+		&calendarPublished,
+	); err != nil {
+		t.Fatal(err)
+	}
+	_ = tx.Rollback(ctx)
+	if attempts != 0 ||
+		!availableAt.Equal(now.Add(5*time.Minute)) ||
+		!leaseCleared ||
+		calendarPublished {
+		t.Fatalf(
+			"deferred attempts=%d available=%s leaseCleared=%v published=%v",
+			attempts,
+			availableAt,
+			leaseCleared,
+			calendarPublished,
+		)
+	}
+	store.Now = func() time.Time { return now.Add(6 * time.Minute) }
+	events, err = store.LeaseCalendarEvents(ctx, 10, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 || events[0].Attempts != 1 {
+		t.Fatalf("re-leased events = %+v", events)
+	}
 	if err := store.MarkCalendarEventPublished(ctx, events[0]); err != nil {
 		t.Fatal(err)
 	}

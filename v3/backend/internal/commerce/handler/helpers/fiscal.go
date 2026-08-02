@@ -2,11 +2,20 @@ package helpers
 
 import (
 	"fmt"
+	"regexp"
 
 	publicapi "github.com/devpablocristo/pymes/v3/backend/internal/commerce/handler/dto"
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/commerce/usecases/domain"
-	"github.com/google/uuid"
 )
+
+var fiscalCredentialIDPattern = regexp.MustCompile(`^fcred_[A-Za-z0-9_-]{8,80}$`)
+
+func FiscalCredentialID(value string) (string, error) {
+	if !fiscalCredentialIDPattern.MatchString(value) {
+		return "", fmt.Errorf("invalid opaque fiscal credential ID")
+	}
+	return value, nil
+}
 
 func FiscalCredentialCSRInput(input publicapi.FiscalCredentialCSRInput) domain.FiscalCredentialCSRInput {
 	return domain.FiscalCredentialCSRInput{
@@ -29,9 +38,9 @@ func FiscalCertificateUpload(input publicapi.FiscalCertificateUpload) domain.Fis
 }
 
 func PublicFiscalCredential(input domain.FiscalCredential) (publicapi.FiscalCredential, error) {
-	credentialID, err := uuid.Parse(input.ID)
+	credentialID, err := FiscalCredentialID(input.ID)
 	if err != nil {
-		return publicapi.FiscalCredential{}, fmt.Errorf("invalid fiscal credential ID: %w", err)
+		return publicapi.FiscalCredential{}, err
 	}
 	return publicapi.FiscalCredential{
 		CertificateExpiresAt:    input.CertificateExpiresAt,
@@ -65,9 +74,9 @@ func PublicFiscalCredentialCSRResult(
 }
 
 func PublicFiscalPointOfSale(input domain.FiscalPointOfSale) (publicapi.FiscalPointOfSale, error) {
-	credentialID, err := uuid.Parse(input.CredentialID)
+	credentialID, err := FiscalCredentialID(input.CredentialID)
 	if err != nil {
-		return publicapi.FiscalPointOfSale{}, fmt.Errorf("invalid fiscal credential ID: %w", err)
+		return publicapi.FiscalPointOfSale{}, err
 	}
 	return publicapi.FiscalPointOfSale{
 		CredentialId:   credentialID,

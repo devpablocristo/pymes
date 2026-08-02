@@ -1,0 +1,129 @@
+name: Pymes V3 ARCA homologation validation
+run-name: Pymes V3 ARCA homologation STG @ ${{ github.sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      organization_id:
+        description: Opaque STG organization identifier
+        required: true
+        type: string
+      credential_id:
+        description: Existing ready opaque homologation credential ID (fcred_...)
+        required: true
+        type: string
+      point_of_sale:
+        description: Homologation point of sale to validate and enable
+        required: true
+        type: string
+      confirmation:
+        description: Type VALIDATE_ARCA_HOMOLOGATION_STG
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: pymes-v3-arca-homologation-stg-${{ inputs.organization_id }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate ARCA WSAA and WSFE in STG
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: stg
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Reject stale, unreviewed or ambiguous intent
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LIVE_CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          [[ "${GITHUB_RUN_ATTEMPT}" == "1" ]] || {
+            echo "Homologation validation cannot be re-run; dispatch a new workflow with a fresh API credential." >&2
+            exit 1
+          }
+          [[ "${GITHUB_REPOSITORY}" == "devpablocristo/pymes" ]]
+          [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]
+          [[ "${GITHUB_REF}" == "refs/heads/main" ]]
+          [[ "${GITHUB_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${LIVE_CONFIRMATION}" == "VALIDATE_ARCA_HOMOLOGATION_STG" ]]
+
+          runs="$(gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/v3-ci.yml/runs" \
+            -f head_sha="${GITHUB_SHA}" \
+            -f branch=main \
+            -f event=push \
+            -f status=success \
+            -f per_page=100)"
+          jq -e --arg sha "${GITHUB_SHA}" '
+            .workflow_runs
+            | any(
+                .head_sha == $sha and
+                .head_branch == "main" and
+                .event == "push" and
+                .status == "completed" and
+                .conclusion == "success"
+              )
+          ' <<<"${runs}" >/dev/null || {
+            echo "Pymes V3 CI has no successful push run for exact SHA ${GITHUB_SHA}" >&2
+            exit 1
+          }
+
+      - name: Checkout exact Pymes source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact clean source
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${GITHUB_SHA}" ]]
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+
+      - name: Verify complete protected GitHub controls
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PYMES_GITHUB_RELEASE_AUDIT_TOKEN }}
+          PYMES_PRD_REVIEWER_IDS: ${{ vars.PYMES_PRD_REVIEWER_IDS }}
+        run: |
+          set -euo pipefail
+          : "${GH_TOKEN:?configure PYMES_GITHUB_RELEASE_AUDIT_TOKEN in the protected environment}"
+          ./v3/scripts/deploy/verify-github-environments.sh all all-controls
+
+      - name: Validate WSAA and WSFE without issuing a voucher
+        shell: bash
+        env:
+          PYMES_PUBLIC_BASE_URL: ${{ vars.PYMES_PUBLIC_BASE_URL }}
+          PYMES_LIVE_PILOT_API_TOKEN: ${{ secrets.PYMES_LIVE_PILOT_API_TOKEN }}
+          PYMES_PILOT_ORGANIZATION_ID: ${{ inputs.organization_id }}
+          PYMES_PILOT_FISCAL_CREDENTIAL_ID: ${{ inputs.credential_id }}
+          PYMES_PILOT_FISCAL_POINT_OF_SALE: ${{ inputs.point_of_sale }}
+        run: ./v3/scripts/deploy/arca-homologation-validation.sh
+
+      - name: Record non-sensitive evidence
+        shell: bash
+        env:
+          PILOT_ORGANIZATION: ${{ inputs.organization_id }}
+          PILOT_CREDENTIAL: ${{ inputs.credential_id }}
+          PILOT_POINT_OF_SALE: ${{ inputs.point_of_sale }}
+        run: |
+          set -euo pipefail
+          {
+            printf '### ARCA homologation STG validation\n\n'
+            printf -- "- Source SHA: \`%s\`\n" "${GITHUB_SHA}"
+            printf -- "- Organization: \`%s\`\n" "${PILOT_ORGANIZATION}"
+            printf -- "- Credential: \`%s\`\n" "${PILOT_CREDENTIAL}"
+            printf -- "- Point of sale: \`%s\`\n" "${PILOT_POINT_OF_SALE}"
+            printf -- '- Result: WSAA and WSFE point-of-sale probe succeeded and the point was enabled.\n'
+            printf -- "- Voucher emitted: \`false\`\n"
+            printf -- "- Retained ARCA payloads, certificates or credentials: \`none\`\n"
+          } >>"${GITHUB_STEP_SUMMARY}"

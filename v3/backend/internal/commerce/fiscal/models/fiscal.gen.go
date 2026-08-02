@@ -50,6 +50,7 @@ const (
 	HOMOLOGATIONREQUIRED           ErrorCode = "HOMOLOGATION_REQUIRED"
 	IDEMPOTENCYKEYREUSED           ErrorCode = "IDEMPOTENCY_KEY_REUSED"
 	INTERNALERROR                  ErrorCode = "INTERNAL_ERROR"
+	POINTOFSALENOTEMPTY            ErrorCode = "POINT_OF_SALE_NOT_EMPTY"
 	POINTOFSALENOTENABLED          ErrorCode = "POINT_OF_SALE_NOT_ENABLED"
 	POINTOFSALENOTVALIDATED        ErrorCode = "POINT_OF_SALE_NOT_VALIDATED"
 	UNAUTHORIZEDSERVICE            ErrorCode = "UNAUTHORIZED_SERVICE"
@@ -82,6 +83,8 @@ func (e ErrorCode) Valid() bool {
 	case IDEMPOTENCYKEYREUSED:
 		return true
 	case INTERNALERROR:
+		return true
+	case POINTOFSALENOTEMPTY:
 		return true
 	case POINTOFSALENOTENABLED:
 		return true
@@ -910,13 +913,13 @@ type ClientInterface interface {
 	// ValidateFiscalPointOfSaleWithBody performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+	// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Para el MVP exige además que el último comprobante autorizado sea cero para cada tipo A/B/C, NC y ND soportado; sólo un punto de venta dedicado y vacío puede habilitarse.
 	ValidateFiscalPointOfSaleWithBody(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ValidateFiscalPointOfSale performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+	// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Para el MVP exige además que el último comprobante autorizado sea cero para cada tipo A/B/C, NC y ND soportado; sólo un punto de venta dedicado y vacío puede habilitarse.
 	ValidateFiscalPointOfSale(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, body ValidateFiscalPointOfSaleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// FiscalMetrics performs a GET /metrics (the `FiscalMetrics` operationId) request.
@@ -1108,7 +1111,7 @@ func (c *Client) ConfigureFiscalPointOfSale(ctx context.Context, organizationId 
 // ValidateFiscalPointOfSaleWithBody performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request,
 // with any type of body and a specified content type.
 //
-// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Para el MVP exige además que el último comprobante autorizado sea cero para cada tipo A/B/C, NC y ND soportado; sólo un punto de venta dedicado y vacío puede habilitarse.
 func (c *Client) ValidateFiscalPointOfSaleWithBody(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewValidateFiscalPointOfSaleRequestWithBody(c.Server, organizationId, credentialId, pointOfSale, params, contentType, body)
 	if err != nil {
@@ -1124,7 +1127,7 @@ func (c *Client) ValidateFiscalPointOfSaleWithBody(ctx context.Context, organiza
 // ValidateFiscalPointOfSale performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Para el MVP exige además que el último comprobante autorizado sea cero para cada tipo A/B/C, NC y ND soportado; sólo un punto de venta dedicado y vacío puede habilitarse.
 func (c *Client) ValidateFiscalPointOfSale(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, body ValidateFiscalPointOfSaleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewValidateFiscalPointOfSaleRequest(c.Server, organizationId, credentialId, pointOfSale, params, body)
 	if err != nil {
@@ -1879,7 +1882,7 @@ type ClientWithResponsesInterface interface {
 	// ValidateFiscalPointOfSaleWithBodyWithResponse performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+	// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Para el MVP exige además que el último comprobante autorizado sea cero para cada tipo A/B/C, NC y ND soportado; sólo un punto de venta dedicado y vacío puede habilitarse.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	ValidateFiscalPointOfSaleWithBodyWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ValidateFiscalPointOfSaleResponse, error)
@@ -1887,7 +1890,7 @@ type ClientWithResponsesInterface interface {
 	// ValidateFiscalPointOfSaleWithResponse performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+	// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Para el MVP exige además que el último comprobante autorizado sea cero para cada tipo A/B/C, NC y ND soportado; sólo un punto de venta dedicado y vacío puede habilitarse.
 	ValidateFiscalPointOfSaleWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, body ValidateFiscalPointOfSaleJSONRequestBody, reqEditors ...RequestEditorFn) (*ValidateFiscalPointOfSaleResponse, error)
 
 	// FiscalMetricsWithResponse performs a GET /metrics (the `FiscalMetrics` operationId) request.
@@ -2765,7 +2768,7 @@ func (c *ClientWithResponses) ConfigureFiscalPointOfSaleWithResponse(ctx context
 // ValidateFiscalPointOfSaleWithBodyWithResponse performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request,
 // with any type of body and a specified content type.
 //
-// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Para el MVP exige además que el último comprobante autorizado sea cero para cada tipo A/B/C, NC y ND soportado; sólo un punto de venta dedicado y vacío puede habilitarse.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) ValidateFiscalPointOfSaleWithBodyWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ValidateFiscalPointOfSaleResponse, error) {
@@ -2779,7 +2782,7 @@ func (c *ClientWithResponses) ValidateFiscalPointOfSaleWithBodyWithResponse(ctx 
 // ValidateFiscalPointOfSaleWithResponse performs a POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate (the `ValidateFiscalPointOfSale` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Sólo una validación exitosa puede habilitarlo.
+// Valida WSAA y acceso WSFE para el punto de venta sin emitir un comprobante. Para el MVP exige además que el último comprobante autorizado sea cero para cada tipo A/B/C, NC y ND soportado; sólo un punto de venta dedicado y vacío puede habilitarse.
 func (c *ClientWithResponses) ValidateFiscalPointOfSaleWithResponse(ctx context.Context, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params *ValidateFiscalPointOfSaleParams, body ValidateFiscalPointOfSaleJSONRequestBody, reqEditors ...RequestEditorFn) (*ValidateFiscalPointOfSaleResponse, error) {
 	rsp, err := c.ValidateFiscalPointOfSale(ctx, organizationId, credentialId, pointOfSale, params, body, reqEditors...)
 	if err != nil {

@@ -235,6 +235,7 @@ func TestLoadWorkerFromValidatesPerGoOnlyWhenEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !cfg.PerGo.Enabled || cfg.PerGo.BaseURL != "http://pergo" ||
+		cfg.PerGo.Audience != "" ||
 		cfg.PerGo.Timeout != 750*time.Millisecond ||
 		!cfg.PerGo.AllowGlobalRouteFallback {
 		t.Fatalf("PerGo config = %+v", cfg.PerGo)
@@ -243,5 +244,62 @@ func TestLoadWorkerFromValidatesPerGoOnlyWhenEnabled(t *testing.T) {
 	if _, err := LoadWorkerFrom(func(key string) string { return values[key] }); err == nil ||
 		WorkerErrorCode(err) != "PERGO_CONFIG_INVALID" {
 		t.Fatalf("missing key error = %v", err)
+	}
+}
+
+func TestLoadWorkerFromRequiresExplicitHTTPSPerGoAudienceInProduction(
+	t *testing.T,
+) {
+	t.Parallel()
+	base := map[string]string{
+		"PYMES_DATABASE_URL":                   "postgres://db",
+		"FISCAL_ADAPTER_URL":                   "https://fiscal",
+		"ACCOUNTING_URL":                       "https://accounting",
+		"PYMES_SCHEDULING_ACTION_TOKEN_SECRET": "01234567890123456789012345678901",
+		"PYMES_ENVIRONMENT":                    "production",
+		"PYMES_RELEASE_SHA":                    "0123456789abcdef0123456789abcdef01234567",
+		"K_REVISION":                           "pymes-v3-stg-worker-00042-abc",
+		"PYMES_PERGO_ENABLED":                  "true",
+		"PERGO_URL":                            "https://pergo.example",
+		"PERGO_API_KEY":                        "secret",
+		"PYMES_PERGO_AUDIENCE":                 "https://pergo-audience.example",
+		"PERGO_WORKSPACE_ID":                   "workspace-1",
+		"PERGO_CHANNEL":                        "whatsapp",
+	}
+	cfg, err := LoadWorkerFrom(func(key string) string { return base[key] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.PerGo.Audience != "https://pergo-audience.example" {
+		t.Fatalf("PerGo audience=%q", cfg.PerGo.Audience)
+	}
+
+	tests := []struct {
+		name     string
+		audience string
+	}{
+		{name: "missing"},
+		{name: "plain HTTP", audience: "http://pergo.example"},
+		{name: "embedded credentials", audience: "https://token@pergo.example"},
+		{name: "query", audience: "https://pergo.example?tenant=shared"},
+		{name: "path", audience: "https://pergo.example/tenant"},
+		{name: "trailing slash", audience: "https://pergo.example/"},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			values := make(map[string]string, len(base))
+			for key, value := range base {
+				values[key] = value
+			}
+			values["PYMES_PERGO_AUDIENCE"] = test.audience
+			if _, err := LoadWorkerFrom(func(key string) string {
+				return values[key]
+			}); err == nil ||
+				WorkerErrorCode(err) != "PERGO_CONFIG_INVALID" {
+				t.Fatalf("audience=%q err=%v", test.audience, err)
+			}
+		})
 	}
 }

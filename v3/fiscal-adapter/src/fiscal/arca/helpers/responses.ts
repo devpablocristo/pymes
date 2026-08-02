@@ -6,7 +6,7 @@ import type {
   SDKConsultResponse,
   SDKError,
 } from "../models/sdk.js";
-import { decimalNumber } from "./decimal.js";
+import { mapFiscalRequest } from "./mapping.js";
 
 export function authorizationDecision(
   response: SDKAuthorizationResponse,
@@ -50,23 +50,36 @@ export function consultationDecision(
 ): AuthorityDecision {
   const result = response.ResultGet;
   if (result === undefined) return { status: "not_found" };
+  const expectedRequest = mapFiscalRequest(request);
+  const expected = expectedRequest.invoices[0]!;
   if (
     (result.PtoVta !== undefined && result.PtoVta !== request.point_of_sale) ||
     (result.CbteTipo !== undefined &&
-      result.CbteTipo !== voucherTypeCode(request.document_type)) ||
-    result.CbteDesde !== request.voucher_number ||
-    result.CbteHasta !== request.voucher_number ||
-    result.DocTipo !== recipientDocumentCode(request.recipient.document_type) ||
-    result.DocNro !== Number(request.recipient.document_number) ||
-    result.ImpTotal !== decimalNumber(request.totals.total) ||
-    result.ImpNeto !== decimalNumber(request.totals.net) ||
-    result.ImpOpEx !== decimalNumber(request.totals.exempt) ||
-    result.ImpIVA !== decimalNumber(request.totals.vat) ||
-    result.MonId !== currencyCode(request.currency) ||
-    result.MonCotiz !==
-      (request.currency === "ARS"
-        ? 1
-        : decimalNumber(request.exchange_rate!, 6))
+      result.CbteTipo !== expectedRequest.CbteTipo) ||
+    result.Concepto !== expected.Concepto ||
+    result.CbteDesde !== expected.CbteDesde ||
+    result.CbteHasta !== expected.CbteHasta ||
+    result.CbteFch !== expected.CbteFch ||
+    result.DocTipo !== expected.DocTipo ||
+    result.DocNro !== expected.DocNro ||
+    result.ImpTotal !== expected.ImpTotal ||
+    result.ImpTotConc !== expected.ImpTotConc ||
+    result.ImpNeto !== expected.ImpNeto ||
+    result.ImpOpEx !== expected.ImpOpEx ||
+    result.ImpTrib !== expected.ImpTrib ||
+    result.ImpIVA !== expected.ImpIVA ||
+    result.FchServDesde !== (expected.FchServDesde ?? "") ||
+    result.FchServHasta !== (expected.FchServHasta ?? "") ||
+    result.FchVtoPago !== (expected.FchVtoPago ?? "") ||
+    result.MonId !== expected.MonId ||
+    result.MonCotiz !== expected.MonCotiz ||
+    result.EmisionTipo !== "CAE" ||
+    !sameVATBreakdown(result.Iva, expected.Iva) ||
+    !sameAssociatedVouchers(result.CbtesAsoc, expected.CbtesAsoc) ||
+    (result.CondicionIVAReceptorId !== undefined &&
+      result.CondicionIVAReceptorId !== expected.CondicionIVAReceptorId) ||
+    (result.CanMisMonExt !== undefined &&
+      result.CanMisMonExt !== expected.CanMisMonExt)
   ) {
     return {
       status: "rejected",
@@ -212,39 +225,77 @@ function isoARCADate(value: string): string {
   return iso;
 }
 
-function currencyCode(value: string): string {
-  const values: Record<string, string> = { ARS: "PES", USD: "DOL", EUR: "060" };
-  return values[value] ?? "";
+function sameVATBreakdown(
+  actual:
+    | {
+        AlicIva:
+          | { Id: number; BaseImp: number; Importe: number }
+          | Array<{ Id: number; BaseImp: number; Importe: number }>;
+      }
+    | undefined,
+  expected:
+    | Array<{ Id: number; BaseImp: number; Importe: number }>
+    | undefined,
+): boolean {
+  const actualItems = arrayOf(actual?.AlicIva)
+    .map((item) => `${item.Id}:${item.BaseImp}:${item.Importe}`)
+    .sort();
+  const expectedItems = (expected ?? [])
+    .map((item) => `${item.Id}:${item.BaseImp}:${item.Importe}`)
+    .sort();
+  return sameStrings(actualItems, expectedItems);
 }
 
-function recipientDocumentCode(value: string): number {
-  const values: Record<string, number> = {
-    CUIT: 80,
-    CUIL: 86,
-    CDI: 87,
-    LE: 89,
-    LC: 90,
-    CI_EXTRANJERA: 91,
-    EN_TRAMITE: 92,
-    ACTA_NACIMIENTO: 93,
-    PASAPORTE: 94,
-    CI_BS_AS_RNP: 95,
-    DNI: 96,
-    CONSUMIDOR_FINAL: 99,
-  };
-  return values[value.trim().toUpperCase()] ?? -1;
+function sameAssociatedVouchers(
+  actual:
+    | {
+        CbteAsoc:
+          | {
+              Tipo: number;
+              PtoVta: number;
+              Nro: number;
+              CbteFch?: string;
+            }
+          | Array<{
+              Tipo: number;
+              PtoVta: number;
+              Nro: number;
+              CbteFch?: string;
+            }>;
+      }
+    | undefined,
+  expected:
+    | Array<{
+        Tipo: number;
+        PtoVta: number;
+        Nro: number;
+        CbteFch?: string;
+      }>
+    | undefined,
+): boolean {
+  const actualItems = arrayOf(actual?.CbteAsoc)
+    .map(
+      (item) =>
+        `${item.Tipo}:${item.PtoVta}:${item.Nro}:${item.CbteFch ?? ""}`,
+    )
+    .sort();
+  const expectedItems = (expected ?? [])
+    .map(
+      (item) =>
+        `${item.Tipo}:${item.PtoVta}:${item.Nro}:${item.CbteFch ?? ""}`,
+    )
+    .sort();
+  return sameStrings(actualItems, expectedItems);
 }
 
-function voucherTypeCode(value: FiscalRequest["document_type"]): number {
-  return {
-    FA: 1,
-    NDA: 2,
-    NCA: 3,
-    FB: 6,
-    NDB: 7,
-    NCB: 8,
-    FC: 11,
-    NDC: 12,
-    NCC: 13,
-  }[value];
+function arrayOf<T>(value: T | T[] | undefined): T[] {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function sameStrings(left: string[], right: string[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
 }

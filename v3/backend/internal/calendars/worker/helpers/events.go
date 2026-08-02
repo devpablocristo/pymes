@@ -3,6 +3,7 @@ package helpers
 import (
 	"bytes"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base32"
 	"encoding/json"
 	"fmt"
@@ -26,6 +27,9 @@ func DecodeSyncRequested(
 	}
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
 		return domain.CalendarSyncCommand{}, fmt.Errorf("multiple JSON values are forbidden")
+	}
+	if input.SchemaVersion != 1 {
+		return domain.CalendarSyncCommand{}, fmt.Errorf("unsupported calendar sync schema")
 	}
 	command := domain.CalendarSyncCommand{
 		CommandID: input.CommandID, OrganizationID: organizationID,
@@ -55,7 +59,39 @@ func DecodeSyncRequested(
 	if !command.Valid() {
 		return domain.CalendarSyncCommand{}, fmt.Errorf("invalid calendar sync command")
 	}
+	expectedDigest := SnapshotDigest(command)
+	if subtle.ConstantTimeCompare(
+		[]byte(command.SnapshotDigest),
+		[]byte(expectedDigest),
+	) != 1 {
+		return domain.CalendarSyncCommand{}, fmt.Errorf("calendar snapshot digest does not match")
+	}
 	return command, nil
+}
+
+func SnapshotDigest(command domain.CalendarSyncCommand) string {
+	snapshot := workermodels.CalendarSnapshot{
+		SchemaVersion: 1,
+		BookingID:     command.BookingID,
+		Operation:     string(command.Operation),
+		SourceVersion: command.SourceVersion,
+	}
+	if command.Operation == domain.SyncUpsert {
+		snapshot.Summary = command.Summary
+		snapshot.Description = command.Description
+		snapshot.Location = command.Location
+		snapshot.Start = command.Start.UTC().Format(time.RFC3339Nano)
+		snapshot.End = command.End.UTC().Format(time.RFC3339Nano)
+		snapshot.TimeZone = command.TimeZone
+		snapshot.AttendeeEmails = append(
+			[]string(nil),
+			command.AttendeeEmails...,
+		)
+		snapshot.MeetRequested = command.MeetRequested
+	}
+	payload, _ := json.Marshal(snapshot)
+	digest := sha256.Sum256(payload)
+	return fmt.Sprintf("%x", digest[:])
 }
 
 func EventID(organizationID, connectionID, bookingID string) string {

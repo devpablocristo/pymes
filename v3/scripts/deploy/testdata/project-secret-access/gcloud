@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""Stateful gcloud fake for migrate-project-secret-access-test.sh."""
+
+import json
+import os
+import sys
+from pathlib import Path
+
+
+STATE_PATH = Path(os.environ["FAKE_GCLOUD_STATE"])
+
+
+def load():
+    return json.loads(STATE_PATH.read_text(encoding="utf-8"))
+
+
+def save(state):
+    STATE_PATH.write_text(
+        json.dumps(state, separators=(",", ":"), sort_keys=True),
+        encoding="utf-8",
+    )
+
+
+def emit(value):
+    print(json.dumps(value, separators=(",", ":"), sort_keys=True))
+
+
+def flag(args, name):
+    prefix = name + "="
+    for index, value in enumerate(args):
+        if value.startswith(prefix):
+            return value[len(prefix) :]
+        if value == name and index + 1 < len(args):
+            return args[index + 1]
+    return ""
+
+
+def fail(message):
+    print(message, file=sys.stderr)
+    raise SystemExit(1)
+
+
+args = sys.argv[1:]
+state = load()
+state.setdefault("calls", []).append(args)
+save(state)
+
+if args[:2] == ["config", "get-value"]:
+    prop = args[2]
+    if prop == "project":
+        print(state["configured_project"])
+    else:
+        print(state.get("config_properties", {}).get(prop, "(unset)"))
+    raise SystemExit(0)
+
+if args[:2] == ["auth", "list"]:
+    print(state["active_account"])
+    raise SystemExit(0)
+
+if args[:2] == ["projects", "describe"]:
+    emit(state["project"])
+    raise SystemExit(0)
+
+if len(args) >= 3 and args[0] == "run" and args[2] == "list":
+    kind = args[1]
+    region = flag(args, "--region")
+    if kind == "revisions":
+        if not region:
+            fail("Cloud Run revision list requires an explicit discovered region")
+        emit(state["run"].get(region, {}).get(kind, []))
+        raise SystemExit(0)
+    if os.environ.get("CLOUDSDK_RUN_REGION") != "" or region:
+        fail("Cloud Run global list did not clear inherited region")
+    resources = []
+    for region, region_state in state["run"].items():
+        if region == "regions" or not isinstance(region_state, dict):
+            continue
+        resources.extend(region_state.get(kind, []))
+    emit(resources)
+    raise SystemExit(0)
+
+if args[:2] == ["projects", "get-iam-policy"]:
+    emit(state["project_policy"])
+    raise SystemExit(0)
+
+if args[:3] == ["iam", "roles", "describe"]:
+    role = args[3]
+    permissions = state["roles"].get(role)
+    if permissions is None:
+        fail("unknown fake role")
+    emit({"name": role, "includedPermissions": permissions})
+    raise SystemExit(0)
+
+if args[:3] == ["asset", "search-all-iam-policies"]:
+    query = flag(args, "--query")
+    email = query.removeprefix("policy:")
+    member = "serviceAccount:" + email
+    results = []
+    for secret, secret_state in state["secrets"].items():
+        bindings = []
+        for binding in secret_state["policy"].get("bindings", []):
+            if member in binding.get("members", []):
+                bindings.append(binding)
+        if bindings:
+            results.append(
+                {
+                    "assetType": "secretmanager.googleapis.com/Secret",
+                    "resource": (
+                        "//secretmanager.googleapis.com/projects/"
+                        "884236221349/secrets/"
+                        + secret
+                    ),
+                    "policy": {"bindings": bindings},
+                }
+            )
+    emit(results)
+    raise SystemExit(0)
+
+if args[:2] == ["secrets", "describe"]:
+    secret = args[2]
+    if secret not in state["secrets"]:
+        fail("unknown fake secret")
+    emit({"name": f"projects/884236221349/secrets/{secret}"})
+    raise SystemExit(0)
+
+if args[:2] == ["secrets", "get-iam-policy"]:
+    secret = args[2]
+    emit(state["secrets"][secret]["policy"])
+    raise SystemExit(0)
+
+if args[:2] == ["secrets", "add-iam-policy-binding"]:
+    secret = args[2]
+    member = flag(args, "--member")
+    role = flag(args, "--role")
+    policy = state["secrets"][secret]["policy"]
+    binding = next(
+        (item for item in policy.get("bindings", []) if item["role"] == role),
+        None,
+    )
+    if binding is None:
+        binding = {"role": role, "members": []}
+        policy.setdefault("bindings", []).append(binding)
+    if member not in binding["members"]:
+        binding["members"].append(member)
+        binding["members"].sort()
+    loss_key = secret + "|" + member
+    lose = state.setdefault("response_loss", {}).setdefault("add", {}).pop(
+        loss_key, False
+    )
+    save(state)
+    if lose:
+        fail("simulated add response loss")
+    emit(policy)
+    raise SystemExit(0)
+
+if args[:2] == ["projects", "remove-iam-policy-binding"]:
+    member = flag(args, "--member")
+    role = flag(args, "--role")
+    removed = False
+    new_bindings = []
+    for binding in state["project_policy"].get("bindings", []):
+        if binding["role"] == role and member in binding.get("members", []):
+            updated = dict(binding)
+            updated["members"] = [
+                candidate
+                for candidate in binding["members"]
+                if candidate != member
+            ]
+            removed = True
+            if updated["members"]:
+                new_bindings.append(updated)
+        else:
+            new_bindings.append(binding)
+    if not removed:
+        fail("fake project member absent")
+    state["project_policy"]["bindings"] = new_bindings
+    loss_key = role + "|" + member
+    lose = state.setdefault("response_loss", {}).setdefault("remove", {}).pop(
+        loss_key, False
+    )
+    save(state)
+    if lose:
+        fail("simulated remove response loss")
+    emit(state["project_policy"])
+    raise SystemExit(0)
+
+if args[:3] == ["iam", "service-accounts", "describe"]:
+    email = args[3]
+    print("True" if state["accounts"][email]["disabled"] else "False")
+    raise SystemExit(0)
+
+if args[:3] == ["iam", "service-accounts", "get-iam-policy"]:
+    email = args[3]
+    emit(state["accounts"][email]["policy"])
+    raise SystemExit(0)
+
+fail("unsupported fake gcloud call: " + " ".join(args))

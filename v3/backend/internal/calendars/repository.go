@@ -90,6 +90,38 @@ func (store *Store) LeaseCalendarEvents(
 	return events, nil
 }
 
+func (store *Store) DeferCalendarEvent(
+	ctx context.Context,
+	event domain.OutboxEvent,
+) error {
+	tx, err := store.beginOrganization(ctx, event.OrganizationID)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	result, err := tx.Exec(ctx, `
+		UPDATE app.outbox
+		SET available_at=$1,
+		    lease_token=NULL,
+		    lease_expires_at=NULL,
+		    attempts=GREATEST(attempts-1,0)
+		WHERE id=$2::uuid AND org_id=$3
+		  AND topic='CalendarSyncRequested'
+		  AND lease_token=$4`,
+		store.clock().Add(5*time.Minute),
+		event.ID,
+		event.OrganizationID,
+		event.LeaseToken,
+	)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return fmt.Errorf("calendar outbox lease lost")
+	}
+	return tx.Commit(ctx)
+}
+
 func (store *Store) RetryCalendarEvent(
 	ctx context.Context,
 	event domain.OutboxEvent,

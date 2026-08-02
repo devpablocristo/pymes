@@ -78,6 +78,7 @@ export function BookingDialog({
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [participants, setParticipants] = useState(1);
+  const [meetRequested, setMeetRequested] = useState(false);
   const [notes, setNotes] = useState("");
   const [allocationIds, setAllocationIds] = useState<string[]>([]);
   const commandIdentity = useRef(new ClientCommandIdentity());
@@ -97,28 +98,44 @@ export function BookingDialog({
   useEffect(() => {
     if (!open) return;
     const effectiveStart = booking?.start_at ?? draft?.startAt ?? DateTime.now().toISO()!;
-    const effectiveServiceId = booking?.service_id ?? preferredServiceId ?? services[0]?.id ?? "";
-    const effectiveService = services.find((item) => item.id === effectiveServiceId);
+    const effectiveServiceId = booking?.service_id ?? preferredServiceId ?? "";
     setSelectedBranchId(booking?.branch_id ?? branchId);
     setServiceId(effectiveServiceId);
     setStartAt(toLocalInput(effectiveStart, timezone));
-    setDurationMinutes(booking?.duration_minutes ?? effectiveService?.duration_minutes ?? 30);
+    setDurationMinutes(booking?.duration_minutes ?? 30);
     setCustomerName(booking ? `Cliente ${booking.party_id.slice(-6)}` : "");
     setCustomerEmail("");
     setCustomerPhone("");
     setParticipants(booking?.participants ?? 1);
+    setMeetRequested(booking?.meet_requested ?? false);
     setNotes("");
     setAllocationIds(
       booking?.allocations.map((item) => item.resource_id) ??
         (preferredResourceId ? [preferredResourceId] : []),
     );
-  }, [booking, branchId, draft?.startAt, open, preferredResourceId, preferredServiceId, services, timezone]);
+  }, [
+    booking?.id,
+    booking?.version,
+    branchId,
+    draft?.startAt,
+    open,
+    preferredResourceId,
+    preferredServiceId,
+    timezone,
+  ]);
+
+  useEffect(() => {
+    if (open && !booking && !serviceId && services[0]) {
+      setServiceId(services[0].id);
+    }
+  }, [booking, open, serviceId, services]);
 
   useEffect(() => {
     if (!booking && selectedService) {
       setDurationMinutes(selectedService.duration_minutes);
+      setMeetRequested(false);
     }
-  }, [booking, selectedService]);
+  }, [booking, selectedService?.duration_minutes, selectedService?.id]);
 
   function toggleResource(resourceId: string) {
     setAllocationIds((current) =>
@@ -152,6 +169,7 @@ export function BookingDialog({
       participants,
       status: selectedService.confirmation_required ? "pending_confirmation" : "confirmed",
       allocations,
+      meet_requested: meetRequested,
     };
     if (notes) payload.notes = notes;
     const input: BookingInput = {
@@ -281,6 +299,19 @@ export function BookingDialog({
               <span>Nota interna</span>
               <input value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={500} />
             </label>
+            {selectedService?.fulfillment_mode !== "in_person" ? (
+              <label className="resource-choice">
+                <input
+                  type="checkbox"
+                  checked={meetRequested}
+                  onChange={(event) => setMeetRequested(event.target.checked)}
+                />
+                <span>
+                  <strong>Google Meet</strong>
+                  <small>Crear una videollamada cuando el turno quede confirmado.</small>
+                </span>
+              </label>
+            ) : null}
           </div>
         </>
       ) : null}

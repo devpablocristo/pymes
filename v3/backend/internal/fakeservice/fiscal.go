@@ -34,11 +34,11 @@ func newFiscalFakeServer() *fiscalFakeServer {
 }
 
 func (s *fiscalFakeServer) FiscalHealth(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, fiscalapi.HealthStatus{Status: fiscalapi.Ok})
+	fiscalhelpers.WriteJSON(w, http.StatusOK, fiscalapi.HealthStatus{Status: fiscalapi.Ok})
 }
 
 func (s *fiscalFakeServer) FiscalReadiness(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, fiscalapi.ReadinessStatus{Status: fiscalapi.ReadinessStatusStatusReady})
+	fiscalhelpers.WriteJSON(w, http.StatusOK, fiscalapi.ReadinessStatus{Status: fiscalapi.ReadinessStatusStatusReady})
 }
 
 func (s *fiscalFakeServer) FiscalMetrics(w http.ResponseWriter, _ *http.Request) {
@@ -52,7 +52,7 @@ func (s *fiscalFakeServer) ListDocumentTypes(
 	_ *http.Request,
 	_ fiscalapi.ListDocumentTypesParams,
 ) {
-	writeJSON(w, http.StatusOK, []map[string]string{
+	fiscalhelpers.WriteJSON(w, http.StatusOK, []map[string]string{
 		{"code": "FA", "letter": "A", "kind": "invoice"},
 		{"code": "NCA", "letter": "A", "kind": "credit_note"},
 		{"code": "NDA", "letter": "A", "kind": "debit_note"},
@@ -72,7 +72,7 @@ func (s *fiscalFakeServer) RequestAuthorization(
 	params fiscalapi.RequestAuthorizationParams,
 ) {
 	var body fiscalapi.FiscalRequest
-	if !decodeJSON(w, r, &body, params.XCorrelationID) ||
+	if !fiscalhelpers.DecodeJSON(w, r, &body, params.XCorrelationID) ||
 		!validateFiscalMetadata(w, organizationID, params.IdempotencyKey, params.XCorrelationID, body) {
 		return
 	}
@@ -105,7 +105,7 @@ func (s *fiscalFakeServer) RequestAuthorization(
 	}
 	s.mu.Unlock()
 	if found && (stored.SnapshotDigest != result.SnapshotDigest || stored.RequestId != result.RequestId) {
-		writeProblem(
+		fiscalhelpers.WriteProblem(
 			w,
 			http.StatusConflict,
 			body.CorrelationId,
@@ -115,7 +115,7 @@ func (s *fiscalFakeServer) RequestAuthorization(
 		)
 		return
 	}
-	writeJSON(w, http.StatusCreated, stored)
+	fiscalhelpers.WriteJSON(w, http.StatusCreated, stored)
 }
 
 func (s *fiscalFakeServer) ConsultAuthorization(
@@ -126,12 +126,12 @@ func (s *fiscalFakeServer) ConsultAuthorization(
 	params fiscalapi.ConsultAuthorizationParams,
 ) {
 	var body fiscalapi.FiscalRequest
-	if !decodeJSON(w, r, &body, params.XCorrelationID) ||
+	if !fiscalhelpers.DecodeJSON(w, r, &body, params.XCorrelationID) ||
 		!validateFiscalMetadata(w, organizationID, params.IdempotencyKey, params.XCorrelationID, body) {
 		return
 	}
 	if requestID != body.RequestId {
-		writeProblem(w, http.StatusBadRequest, params.XCorrelationID, "VALIDATION_ERROR", "request mismatch", "path and body request_id must match")
+		fiscalhelpers.WriteProblem(w, http.StatusBadRequest, params.XCorrelationID, "VALIDATION_ERROR", "request mismatch", "path and body request_id must match")
 		return
 	}
 
@@ -150,7 +150,7 @@ func (s *fiscalFakeServer) ConsultAuthorization(
 			Status:         fiscalapi.FiscalResultStatusNotFound,
 		}
 	}
-	writeJSON(w, http.StatusOK, result)
+	fiscalhelpers.WriteJSON(w, http.StatusOK, result)
 }
 
 func (s *fiscalFakeServer) RequestFiscalCredentialCSR(
@@ -160,7 +160,7 @@ func (s *fiscalFakeServer) RequestFiscalCredentialCSR(
 	params fiscalapi.RequestFiscalCredentialCSRParams,
 ) {
 	var body fiscalapi.CSRRequest
-	if !decodeJSON(w, r, &body, params.XCorrelationID) {
+	if !fiscalhelpers.DecodeJSON(w, r, &body, params.XCorrelationID) {
 		return
 	}
 	replayKey := fiscalhelpers.ScopedKey(organizationID, params.IdempotencyKey)
@@ -169,15 +169,20 @@ func (s *fiscalFakeServer) RequestFiscalCredentialCSR(
 	if replay, found := s.credentialReplays[replayKey]; found {
 		s.mu.Unlock()
 		if replay.Request != body {
-			writeProblem(w, http.StatusConflict, params.XCorrelationID, "IDEMPOTENCY_KEY_REUSED", "idempotency key reused", "the CSR request was already stored with different content")
+			fiscalhelpers.WriteProblem(w, http.StatusConflict, params.XCorrelationID, "IDEMPOTENCY_KEY_REUSED", "idempotency key reused", "the CSR request was already stored with different content")
 			return
 		}
-		writeJSON(w, http.StatusCreated, replay.Result)
+		fiscalhelpers.WriteJSON(w, http.StatusCreated, replay.Result)
 		return
 	}
 
 	now := time.Now().UTC()
-	credentialID := stableUUID(organizationID, string(body.Environment), body.Cuit, params.IdempotencyKey).String()
+	credentialID := fiscalhelpers.CredentialID(
+		organizationID,
+		string(body.Environment),
+		body.Cuit,
+		params.IdempotencyKey,
+	)
 	credential := fiscalapi.FiscalCredential{
 		CommonName:     body.CommonName,
 		CreatedAt:      now,
@@ -197,7 +202,7 @@ func (s *fiscalFakeServer) RequestFiscalCredentialCSR(
 	s.credentials[fiscalhelpers.ScopedKey(organizationID, credentialID)] = credential
 	s.credentialReplays[replayKey] = fiscalmodels.CredentialReplay{Request: body, Result: result}
 	s.mu.Unlock()
-	writeJSON(w, http.StatusCreated, result)
+	fiscalhelpers.WriteJSON(w, http.StatusCreated, result)
 }
 
 func (s *fiscalFakeServer) GetFiscalCredential(
@@ -211,10 +216,10 @@ func (s *fiscalFakeServer) GetFiscalCredential(
 	credential, found := s.credentials[fiscalhelpers.ScopedKey(organizationID, credentialID)]
 	s.mu.Unlock()
 	if !found {
-		writeProblem(w, http.StatusNotFound, params.XCorrelationID, "CREDENTIAL_NOT_FOUND", "credential not found", "the fiscal credential does not exist")
+		fiscalhelpers.WriteProblem(w, http.StatusNotFound, params.XCorrelationID, "CREDENTIAL_NOT_FOUND", "credential not found", "the fiscal credential does not exist")
 		return
 	}
-	writeJSON(w, http.StatusOK, credential)
+	fiscalhelpers.WriteJSON(w, http.StatusOK, credential)
 }
 
 func (s *fiscalFakeServer) UploadFiscalCertificate(
@@ -225,7 +230,7 @@ func (s *fiscalFakeServer) UploadFiscalCertificate(
 	params fiscalapi.UploadFiscalCertificateParams,
 ) {
 	var body fiscalapi.CertificateUpload
-	if !decodeJSON(w, r, &body, params.XCorrelationID) {
+	if !fiscalhelpers.DecodeJSON(w, r, &body, params.XCorrelationID) {
 		return
 	}
 	key := fiscalhelpers.ScopedKey(organizationID, credentialID)
@@ -233,18 +238,18 @@ func (s *fiscalFakeServer) UploadFiscalCertificate(
 	credential, found := s.credentials[key]
 	if !found {
 		s.mu.Unlock()
-		writeProblem(w, http.StatusNotFound, params.XCorrelationID, "CREDENTIAL_NOT_FOUND", "credential not found", "the fiscal credential does not exist")
+		fiscalhelpers.WriteProblem(w, http.StatusNotFound, params.XCorrelationID, "CREDENTIAL_NOT_FOUND", "credential not found", "the fiscal credential does not exist")
 		return
 	}
 	if credential.Version != body.ExpectedVersion {
 		s.mu.Unlock()
-		writeProblem(w, http.StatusConflict, params.XCorrelationID, "CREDENTIAL_VERSION_CONFLICT", "credential version conflict", "the fiscal credential was modified")
+		fiscalhelpers.WriteProblem(w, http.StatusConflict, params.XCorrelationID, "CREDENTIAL_VERSION_CONFLICT", "credential version conflict", "the fiscal credential was modified")
 		return
 	}
 	now := time.Now().UTC()
 	expiresAt := now.AddDate(1, 0, 0)
 	fingerprint := fiscalhelpers.CertificateFingerprint(body.CertificatePem)
-	serial := stableUUID(credentialID, fingerprint).String()
+	serial := fiscalhelpers.StableUUID(credentialID, fingerprint).String()
 	credential.CertificateExpiresAt = &expiresAt
 	credential.CertificateFingerprint = &fingerprint
 	credential.CertificateSerialNumber = &serial
@@ -254,7 +259,7 @@ func (s *fiscalFakeServer) UploadFiscalCertificate(
 	credential.Version++
 	s.credentials[key] = credential
 	s.mu.Unlock()
-	writeJSON(w, http.StatusOK, credential)
+	fiscalhelpers.WriteJSON(w, http.StatusOK, credential)
 }
 
 func (s *fiscalFakeServer) ConfigureFiscalPointOfSale(
@@ -266,7 +271,7 @@ func (s *fiscalFakeServer) ConfigureFiscalPointOfSale(
 	params fiscalapi.ConfigureFiscalPointOfSaleParams,
 ) {
 	var body fiscalapi.ConfigureFiscalPointOfSaleJSONBody
-	if !decodeJSON(w, r, &body, params.XCorrelationID) {
+	if !fiscalhelpers.DecodeJSON(w, r, &body, params.XCorrelationID) {
 		return
 	}
 	credentialKey := fiscalhelpers.ScopedKey(organizationID, credentialID)
@@ -274,14 +279,14 @@ func (s *fiscalFakeServer) ConfigureFiscalPointOfSale(
 	credential, found := s.credentials[credentialKey]
 	if !found {
 		s.mu.Unlock()
-		writeProblem(w, http.StatusNotFound, params.XCorrelationID, "CREDENTIAL_NOT_FOUND", "credential not found", "the fiscal credential does not exist")
+		fiscalhelpers.WriteProblem(w, http.StatusNotFound, params.XCorrelationID, "CREDENTIAL_NOT_FOUND", "credential not found", "the fiscal credential does not exist")
 		return
 	}
 	pointKey := fiscalhelpers.ScopedKey(organizationID, credentialID, fiscalPointOfSalePart(pointOfSale))
 	existing := s.fiscalPointsOfSale[pointKey]
 	if body.Enabled && existing.ValidatedAt == nil {
 		s.mu.Unlock()
-		writeProblem(w, http.StatusUnprocessableEntity, params.XCorrelationID, "POINT_OF_SALE_NOT_VALIDATED", "point of sale not validated", "validate WSAA and WSFE before enabling the point of sale")
+		fiscalhelpers.WriteProblem(w, http.StatusUnprocessableEntity, params.XCorrelationID, "POINT_OF_SALE_NOT_VALIDATED", "point of sale not validated", "validate WSAA and WSFE before enabling the point of sale")
 		return
 	}
 	point := fiscalapi.FiscalPointOfSale{
@@ -294,7 +299,7 @@ func (s *fiscalFakeServer) ConfigureFiscalPointOfSale(
 	}
 	s.fiscalPointsOfSale[pointKey] = point
 	s.mu.Unlock()
-	writeJSON(w, http.StatusOK, point)
+	fiscalhelpers.WriteJSON(w, http.StatusOK, point)
 }
 
 func (s *fiscalFakeServer) ValidateFiscalPointOfSale(
@@ -306,7 +311,7 @@ func (s *fiscalFakeServer) ValidateFiscalPointOfSale(
 	params fiscalapi.ValidateFiscalPointOfSaleParams,
 ) {
 	var body fiscalapi.ValidateFiscalPointOfSaleJSONBody
-	if !decodeJSON(w, r, &body, params.XCorrelationID) {
+	if !fiscalhelpers.DecodeJSON(w, r, &body, params.XCorrelationID) {
 		return
 	}
 	credentialKey := fiscalhelpers.ScopedKey(organizationID, credentialID)
@@ -314,12 +319,12 @@ func (s *fiscalFakeServer) ValidateFiscalPointOfSale(
 	credential, found := s.credentials[credentialKey]
 	if !found {
 		s.mu.Unlock()
-		writeProblem(w, http.StatusNotFound, params.XCorrelationID, "CREDENTIAL_NOT_FOUND", "credential not found", "the fiscal credential does not exist")
+		fiscalhelpers.WriteProblem(w, http.StatusNotFound, params.XCorrelationID, "CREDENTIAL_NOT_FOUND", "credential not found", "the fiscal credential does not exist")
 		return
 	}
 	if credential.Status != fiscalapi.FiscalCredentialStatusReady {
 		s.mu.Unlock()
-		writeProblem(w, http.StatusUnprocessableEntity, params.XCorrelationID, "CREDENTIAL_NOT_READY", "credential not ready", "upload a valid certificate before validating the point of sale")
+		fiscalhelpers.WriteProblem(w, http.StatusUnprocessableEntity, params.XCorrelationID, "CREDENTIAL_NOT_READY", "credential not ready", "upload a valid certificate before validating the point of sale")
 		return
 	}
 	now := time.Now().UTC()
@@ -333,7 +338,7 @@ func (s *fiscalFakeServer) ValidateFiscalPointOfSale(
 	}
 	s.fiscalPointsOfSale[fiscalhelpers.ScopedKey(organizationID, credentialID, fiscalPointOfSalePart(pointOfSale))] = point
 	s.mu.Unlock()
-	writeJSON(w, http.StatusOK, point)
+	fiscalhelpers.WriteJSON(w, http.StatusOK, point)
 }
 
 func validateFiscalMetadata(
@@ -353,7 +358,7 @@ func validateFiscalMetadata(
 	}) {
 		return true
 	}
-	writeProblem(
+	fiscalhelpers.WriteProblem(
 		w,
 		http.StatusBadRequest,
 		headerCorrelationID,

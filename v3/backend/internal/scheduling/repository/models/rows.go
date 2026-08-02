@@ -32,6 +32,7 @@ type BookingRow struct {
 	CustomerName    string
 	CustomerEmail   string
 	CustomerPhone   string
+	MeetRequested   bool
 	Notes           string
 	CreatedBy       string
 	CreatedAt       time.Time
@@ -113,6 +114,7 @@ type BookingResponse struct {
 	CustomerName       string               `json:"customer_name"`
 	CustomerEmail      string               `json:"customer_email,omitempty"`
 	CustomerPhone      string               `json:"customer_phone,omitempty"`
+	MeetRequested      bool                 `json:"meet_requested"`
 	Notes              string               `json:"notes,omitempty"`
 	CancellationReason string               `json:"cancellation_reason,omitempty"`
 	Allocations        []AllocationResponse `json:"allocations"`

@@ -35,7 +35,10 @@ No recibe teléfono, cuerpo ni variables y nunca llama directamente a PerGo.
    `NotificationRequested`. Commerce, Scheduling y Calendars tienen
    dispatchers y allowlists independientes, por lo que ningún contexto puede
    robar o publicar el evento de otro.
-4. El adapter llama `POST /api/v1/messages` con la API key de workspace.
+4. El adapter llama `POST /api/v1/messages` con dos credenciales distintas:
+   `Authorization` lleva la API key del workspace y
+   `X-Serverless-Authorization` lleva un ID token OIDC emitido para el origen
+   exacto configurado en `PYMES_PERGO_AUDIENCE`.
 5. `X-Trace-ID` contiene, codificados en base64url, organización e ID de
    notificación: `pymes.v1.<organization>.<notification>`.
 6. El ledger de ingreso de PerGo devuelve `202 queued`; la entrega al proveedor
@@ -163,9 +166,10 @@ Worker:
 ```text
 PYMES_PERGO_ENABLED=true
 PERGO_URL=<URL privada de PerGo>
+PYMES_PERGO_AUDIENCE=<origen HTTPS exacto del servicio privado>
 PERGO_API_KEY=<Secret Manager>
 PERGO_WORKSPACE_ID=<workspace esperado>
-PERGO_CHANNEL=whatsapp_mock
+PERGO_CHANNEL=whatsapp_cloud
 PERGO_ALLOW_GLOBAL_ROUTE_FALLBACK=false
 PERGO_TIMEOUT=5s
 ```
@@ -173,6 +177,10 @@ PERGO_TIMEOUT=5s
 `PERGO_API_KEY` y los secretos de webhook son credenciales distintas. En STG y
 PRD deben existir como versiones separadas de Secret Manager y estar accesibles
 únicamente por las service accounts de worker y API, respectivamente.
+`PYMES_PERGO_AUDIENCE` es la audiencia del ID token de plataforma y puede ser
+distinta de `PERGO_URL`; en producción debe ser un origen HTTPS sin path, query,
+fragmento, credenciales ni barra final. El servicio privado de PerGo concede
+`roles/run.invoker` únicamente al worker Pymes del mismo ambiente.
 `PERGO_CHANNEL` sólo se consulta cuando el fallback explícito está habilitado;
 la ruta normal proviene del snapshot tenant.
 

@@ -28,6 +28,7 @@ const booking: Booking = {
   currency: "ARS",
   duration_minutes: 60,
   timezone: "America/Argentina/Buenos_Aires",
+  meet_requested: false,
   customer_name: "Ada Lovelace",
   customer_email: "anterior@example.com",
   customer_phone: "+541111111111",

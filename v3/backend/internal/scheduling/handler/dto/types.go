@@ -220,18 +220,19 @@ func (r *Recurrence) Domain() *domain.RecurrenceRule {
 }
 
 type CreateBooking struct {
-	ID           uuid.UUID            `json:"id,omitempty"`
-	BranchID     uuid.UUID            `json:"branch_id"`
-	ServiceID    uuid.UUID            `json:"service_id"`
-	SessionID    *uuid.UUID           `json:"session_id,omitempty"`
-	Customer     Customer             `json:"customer"`
-	StartAt      time.Time            `json:"start_at"`
-	Participants int                  `json:"participants"`
-	Status       domain.BookingStatus `json:"status,omitempty"`
-	HoldMinutes  int                  `json:"hold_minutes,omitempty"`
-	Allocations  []Allocation         `json:"allocations,omitempty"`
-	Notes        string               `json:"notes,omitempty"`
-	Recurrence   *Recurrence          `json:"recurrence,omitempty"`
+	ID            uuid.UUID            `json:"id,omitempty"`
+	BranchID      uuid.UUID            `json:"branch_id"`
+	ServiceID     uuid.UUID            `json:"service_id"`
+	SessionID     *uuid.UUID           `json:"session_id,omitempty"`
+	Customer      Customer             `json:"customer"`
+	StartAt       time.Time            `json:"start_at"`
+	Participants  int                  `json:"participants"`
+	Status        domain.BookingStatus `json:"status,omitempty"`
+	HoldMinutes   int                  `json:"hold_minutes,omitempty"`
+	Allocations   []Allocation         `json:"allocations,omitempty"`
+	MeetRequested bool                 `json:"meet_requested,omitempty"`
+	Notes         string               `json:"notes,omitempty"`
+	Recurrence    *Recurrence          `json:"recurrence,omitempty"`
 }
 
 type CreateGroupSession struct {
@@ -347,6 +348,7 @@ type CreateWaitlist struct {
 	PreferredFrom  time.Time `json:"preferred_from"`
 	PreferredUntil time.Time `json:"preferred_until"`
 	Participants   int       `json:"participants"`
+	MeetRequested  bool      `json:"meet_requested,omitempty"`
 }
 
 type CreateQueueTicket struct {
@@ -384,6 +386,7 @@ type Booking struct {
 	CustomerName       string               `json:"customer_name"`
 	CustomerEmail      string               `json:"customer_email,omitempty"`
 	CustomerPhone      string               `json:"customer_phone,omitempty"`
+	MeetRequested      bool                 `json:"meet_requested"`
 	Notes              string               `json:"notes,omitempty"`
 	CancellationReason string               `json:"cancellation_reason,omitempty"`
 	Allocations        []domain.Allocation  `json:"allocations"`
@@ -400,7 +403,8 @@ func BookingFromDomain(value domain.Booking) Booking {
 		Currency: value.Currency, DurationMinutes: value.DurationMinutes,
 		Timezone: value.Timezone, CustomerName: value.CustomerName,
 		CustomerEmail: value.CustomerEmail, CustomerPhone: value.CustomerPhone,
-		Notes: value.Notes, CancellationReason: value.CancellationReason,
+		MeetRequested: value.MeetRequested,
+		Notes:         value.Notes, CancellationReason: value.CancellationReason,
 		Allocations: value.Allocations,
 	}
 }
@@ -422,6 +426,7 @@ type PublicBooking struct {
 	Currency        string               `json:"currency"`
 	DurationMinutes int                  `json:"duration_minutes"`
 	Timezone        string               `json:"timezone"`
+	MeetRequested   bool                 `json:"meet_requested"`
 }
 
 func PublicBookingFromDomain(value domain.Booking) PublicBooking {
@@ -432,7 +437,7 @@ func PublicBookingFromDomain(value domain.Booking) PublicBooking {
 		Participants: value.Participants, StartAt: value.StartAt, EndAt: value.EndAt,
 		Version: value.Version, ServiceName: value.ServiceName, Price: value.Price,
 		Currency: value.Currency, DurationMinutes: value.DurationMinutes,
-		Timezone: value.Timezone,
+		Timezone: value.Timezone, MeetRequested: value.MeetRequested,
 	}
 }
 
@@ -679,6 +684,7 @@ type WaitlistEntry struct {
 	PreferredFrom      time.Time             `json:"preferred_from"`
 	PreferredUntil     time.Time             `json:"preferred_until"`
 	Participants       int                   `json:"participants"`
+	MeetRequested      bool                  `json:"meet_requested"`
 	Status             domain.WaitlistStatus `json:"status"`
 	OfferExpiresAt     *time.Time            `json:"offer_expires_at,omitempty"`
 	OfferedStartAt     *time.Time            `json:"offered_start_at,omitempty"`
@@ -695,7 +701,8 @@ func WaitlistEntryFromDomain(value domain.WaitlistEntry) WaitlistEntry {
 		CustomerEmail: value.CustomerEmail, CustomerPhone: value.CustomerPhone,
 		PreferredFrom:  value.PreferredFrom,
 		PreferredUntil: value.PreferredUntil, Participants: value.Participants,
-		Status: value.Status, OfferExpiresAt: value.OfferExpiresAt,
+		MeetRequested: value.MeetRequested,
+		Status:        value.Status, OfferExpiresAt: value.OfferExpiresAt,
 		OfferedStartAt: value.OfferedStartAt, OfferedEndAt: value.OfferedEndAt,
 		OfferedAllocations: AllocationsFromDomain(value.OfferedAllocations),
 		AcceptedBookingID:  value.AcceptedBookingID, Version: value.Version,
@@ -709,6 +716,7 @@ type PublicWaitlistEntry struct {
 	PreferredFrom      time.Time             `json:"preferred_from"`
 	PreferredUntil     time.Time             `json:"preferred_until"`
 	Participants       int                   `json:"participants"`
+	MeetRequested      bool                  `json:"meet_requested"`
 	Status             domain.WaitlistStatus `json:"status"`
 	OfferExpiresAt     *time.Time            `json:"offer_expires_at,omitempty"`
 	OfferedStartAt     *time.Time            `json:"offered_start_at,omitempty"`
@@ -723,6 +731,7 @@ func PublicWaitlistEntryFromDomain(value domain.WaitlistEntry) PublicWaitlistEnt
 		ID: value.ID, BranchID: value.BranchID, ServiceID: value.ServiceID,
 		PreferredFrom: value.PreferredFrom, PreferredUntil: value.PreferredUntil,
 		Participants: value.Participants, Status: value.Status,
+		MeetRequested:  value.MeetRequested,
 		OfferExpiresAt: value.OfferExpiresAt, OfferedStartAt: value.OfferedStartAt,
 		OfferedEndAt:       value.OfferedEndAt,
 		OfferedAllocations: AllocationsFromDomain(value.OfferedAllocations),

@@ -176,6 +176,9 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 		scheduling.WithPartyDirectory(
 			scheduling.NewPartyDirectoryAdapter(commands),
 		),
+		scheduling.WithCalendarProjection(
+			scheduling.NewCalendarProjectionAdapter(),
+		),
 	)
 	schedulingHTTP := scheduling.NewHTTPHandler(
 		schedulingUsecases,
@@ -543,6 +546,9 @@ func InitializeWorker(
 			schedulingRepository,
 			scheduling.NewPlatformScheduling(),
 			actionTokens,
+			scheduling.WithCalendarProjection(
+				scheduling.NewCalendarProjectionAdapter(),
+			),
 		),
 		100,
 	)
@@ -554,8 +560,10 @@ func InitializeWorker(
 			notifications.NewPerGo(
 				cfg.PerGo.BaseURL,
 				cfg.PerGo.APIKey,
+				cfg.PerGo.Audience,
 				cfg.PerGo.Channel,
 				cfg.PerGo.AllowGlobalRouteFallback,
+				platformTokens,
 				nil,
 				cfg.PerGo.Timeout,
 			),

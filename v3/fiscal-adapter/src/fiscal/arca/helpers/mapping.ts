@@ -23,6 +23,10 @@ const voucherTypes: Record<FiscalRequest["document_type"], number> = {
   NCC: 13,
 };
 
+export const supportedVoucherTypes: readonly number[] = Object.freeze(
+  Object.values(voucherTypes),
+);
+
 const documentTypes: Record<string, number> = {
   CUIT: 80,
   CUIL: 86,

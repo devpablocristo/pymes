@@ -841,7 +841,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Valida WSAA/WSFE sin emitir un comprobante y opcionalmente habilita el punto. */
+        /** @description Valida WSAA/WSFE sin emitir un comprobante. Para el MVP comprueba además que el último autorizado sea cero en cada secuencia A/B/C, NC y ND soportada; sólo un punto de venta dedicado y vacío puede habilitarse. */
         post: operations["validateFiscalPointOfSale"];
         delete?: never;
         options?: never;
@@ -892,7 +892,7 @@ export interface components {
         };
         Error: {
             /** @enum {string} */
-            code: "AUTH_NOT_CONFIGURED" | "FORBIDDEN" | "ORG_NOT_PROVISIONED" | "NOT_FOUND" | "IDEMPOTENCY_KEY_REQUIRED" | "SOURCE_VERSION_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "DOCUMENT_NOT_REVERSIBLE" | "INVALID_APPLICATION_DOCUMENT" | "INVALID_SOURCE_DOCUMENT" | "OPEN_ITEM_AMOUNT_EXCEEDED" | "PERIOD_LOCKED" | "ACCOUNTING_ADJUSTMENT_NOT_ALLOWED" | "CREDENTIAL_NOT_FOUND" | "CREDENTIAL_NOT_READY" | "CREDENTIAL_VERSION_CONFLICT" | "CERTIFICATE_INVALID" | "CERTIFICATE_CUIT_MISMATCH" | "CERTIFICATE_ENVIRONMENT_MISMATCH" | "POINT_OF_SALE_NOT_VALIDATED" | "AUTHORITY_TIMEOUT" | "FISCAL_UNAVAILABLE" | "VALIDATION_ERROR" | "COMMAND_REJECTED" | "NOTIFICATIONS_UNAVAILABLE" | "PERGO_WEBHOOK_NOT_CONFIGURED" | "PERGO_WEBHOOK_SIGNATURE_INVALID" | "PERGO_WEBHOOK_INVALID" | "NOTIFICATION_NOT_FOUND" | "OAUTH_PROVIDER_DENIED" | "OAUTH_STATE_INVALID" | "OAUTH_STATE_EXPIRED" | "FEATURE_DISABLED" | "FEATURE_VERSION_CONFLICT" | "CALENDAR_REAUTH_REQUIRED" | "CALENDAR_PROVIDER_UNAVAILABLE" | "INTERNAL_ERROR";
+            code: "AUTH_NOT_CONFIGURED" | "FORBIDDEN" | "ORG_NOT_PROVISIONED" | "NOT_FOUND" | "IDEMPOTENCY_KEY_REQUIRED" | "SOURCE_VERSION_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "DOCUMENT_NOT_REVERSIBLE" | "INVALID_APPLICATION_DOCUMENT" | "INVALID_SOURCE_DOCUMENT" | "OPEN_ITEM_AMOUNT_EXCEEDED" | "PERIOD_LOCKED" | "ACCOUNTING_ADJUSTMENT_NOT_ALLOWED" | "CREDENTIAL_NOT_FOUND" | "CREDENTIAL_NOT_READY" | "CREDENTIAL_VERSION_CONFLICT" | "CERTIFICATE_INVALID" | "CERTIFICATE_CUIT_MISMATCH" | "CERTIFICATE_ENVIRONMENT_MISMATCH" | "POINT_OF_SALE_NOT_VALIDATED" | "POINT_OF_SALE_NOT_EMPTY" | "AUTHORITY_TIMEOUT" | "FISCAL_UNAVAILABLE" | "VALIDATION_ERROR" | "COMMAND_REJECTED" | "NOTIFICATIONS_UNAVAILABLE" | "PERGO_WEBHOOK_NOT_CONFIGURED" | "PERGO_WEBHOOK_SIGNATURE_INVALID" | "PERGO_WEBHOOK_INVALID" | "NOTIFICATION_NOT_FOUND" | "OAUTH_PROVIDER_DENIED" | "OAUTH_STATE_INVALID" | "OAUTH_STATE_EXPIRED" | "FEATURE_DISABLED" | "FEATURE_VERSION_CONFLICT" | "CALENDAR_REAUTH_REQUIRED" | "CALENDAR_PROVIDER_UNAVAILABLE" | "INTERNAL_ERROR";
         };
         OrganizationFeatureFlagsUpdate: {
             /** @default false */
@@ -990,7 +990,7 @@ export interface components {
             environment: "homologation" | "production";
         };
         FiscalCredential: {
-            /** Format: uuid */
+            /** @description Identificador fiscal opaco emitido por Fiscal Adapter; no es un UUID. */
             id: string;
             organization_id: string;
             cuit: string;
@@ -1026,7 +1026,7 @@ export interface components {
         };
         FiscalPointOfSale: {
             organization_id: string;
-            /** Format: uuid */
+            /** @description Identificador fiscal opaco emitido por Fiscal Adapter; no es un UUID. */
             credential_id: string;
             /** @enum {string} */
             environment: "homologation" | "production";
@@ -1496,6 +1496,7 @@ export interface components {
             /** Format: email */
             customer_email?: string;
             customer_phone?: string;
+            meet_requested: boolean;
             notes?: string;
             cancellation_reason?: string;
             allocations: components["schemas"]["Allocation"][];
@@ -1533,6 +1534,8 @@ export interface components {
             status?: "held" | "pending_confirmation" | "confirmed";
             hold_minutes?: number;
             allocations?: components["schemas"]["Allocation"][];
+            /** @description Si se omite, no se solicita una reunión de Google Meet. */
+            meet_requested?: boolean;
             notes?: string;
             recurrence?: components["schemas"]["Recurrence"];
         };
@@ -1579,6 +1582,7 @@ export interface components {
             /** Format: date-time */
             preferred_until: string;
             participants: number;
+            meet_requested: boolean;
             /** @enum {string} */
             status: "pending" | "offered" | "accepted" | "cancelled" | "expired";
             /** Format: date-time */
@@ -1605,6 +1609,8 @@ export interface components {
             /** Format: date-time */
             preferred_until: string;
             participants: number;
+            /** @description Si se omite, no se solicita una reunión de Google Meet. */
+            meet_requested?: boolean;
         };
         QueueTicketInput: {
             /** Format: uuid */
@@ -1687,6 +1693,8 @@ export interface components {
             participants: number;
             hold_minutes?: number;
             allocations?: components["schemas"]["Allocation"][];
+            /** @description Si se omite, no se solicita una reunión de Google Meet. */
+            meet_requested?: boolean;
             notes?: string;
             recurrence?: components["schemas"]["Recurrence"];
         };
@@ -1716,6 +1724,7 @@ export interface components {
             currency: string;
             duration_minutes: number;
             timezone: string;
+            meet_requested: boolean;
         };
         PublicWaitlistEntry: {
             /** Format: uuid */
@@ -1729,6 +1738,7 @@ export interface components {
             /** Format: date-time */
             preferred_until: string;
             participants: number;
+            meet_requested: boolean;
             /** @enum {string} */
             status: "pending" | "offered" | "accepted" | "cancelled" | "expired";
             /** Format: date-time */
@@ -1837,6 +1847,7 @@ export interface components {
     };
     parameters: {
         OrganizationId: string;
+        /** @description Identificador fiscal opaco emitido por Fiscal Adapter; no es un UUID. */
         FiscalCredentialId: string;
         FiscalPointOfSaleNumber: number;
         /** @description Clave pública estable. Queda vinculada a organización, operación, source ID y source version. */
@@ -3493,6 +3504,7 @@ export interface operations {
             header?: never;
             path: {
                 organizationId: components["parameters"]["OrganizationId"];
+                /** @description Identificador fiscal opaco emitido por Fiscal Adapter; no es un UUID. */
                 credentialId: components["parameters"]["FiscalCredentialId"];
             };
             cookie?: never;
@@ -3520,6 +3532,7 @@ export interface operations {
             header?: never;
             path: {
                 organizationId: components["parameters"]["OrganizationId"];
+                /** @description Identificador fiscal opaco emitido por Fiscal Adapter; no es un UUID. */
                 credentialId: components["parameters"]["FiscalCredentialId"];
             };
             cookie?: never;
@@ -3553,6 +3566,7 @@ export interface operations {
             header?: never;
             path: {
                 organizationId: components["parameters"]["OrganizationId"];
+                /** @description Identificador fiscal opaco emitido por Fiscal Adapter; no es un UUID. */
                 credentialId: components["parameters"]["FiscalCredentialId"];
                 pointOfSale: components["parameters"]["FiscalPointOfSaleNumber"];
             };
@@ -3586,6 +3600,7 @@ export interface operations {
             header?: never;
             path: {
                 organizationId: components["parameters"]["OrganizationId"];
+                /** @description Identificador fiscal opaco emitido por Fiscal Adapter; no es un UUID. */
                 credentialId: components["parameters"]["FiscalCredentialId"];
                 pointOfSale: components["parameters"]["FiscalPointOfSaleNumber"];
             };

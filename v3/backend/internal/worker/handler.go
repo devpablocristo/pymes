@@ -32,21 +32,21 @@ func (h HTTP) Handler() http.Handler {
 }
 
 func (h HTTP) health(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, handlerdto.Health{Status: "ok"})
+	handlerhelpers.WriteJSON(w, http.StatusOK, handlerdto.Health{Status: "ok"})
 }
 
 func (h HTTP) ready(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Second)
 	defer cancel()
 	if h.Readiness == nil || h.Readiness.Ready(ctx) != nil {
-		writeJSON(
+		handlerhelpers.WriteJSON(
 			w,
 			http.StatusServiceUnavailable,
 			handlerdto.Health{Status: "not_ready"},
 		)
 		return
 	}
-	writeJSON(w, http.StatusOK, handlerdto.Health{Status: "ready"})
+	handlerhelpers.WriteJSON(w, http.StatusOK, handlerdto.Health{Status: "ready"})
 }
 
 func (h HTTP) metrics(w http.ResponseWriter, r *http.Request) {
@@ -102,8 +102,4 @@ func (h HTTP) metrics(w http.ResponseWriter, r *http.Request) {
 			value,
 		)
 	}
-}
-
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	handlerhelpers.WriteJSON(w, status, value)
 }

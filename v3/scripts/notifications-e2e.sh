@@ -4,6 +4,8 @@ set -eu
 root_dir=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$root_dir"
 
+docker compose up -d --build --wait worker
+
 organization_id=${PYMES_NOTIFICATIONS_E2E_ORGANIZATION:-notifications-e2e-$$}
 api_port=${PYMES_API_PORT:-18080}
 pergo_port=${PERGO_FAKE_PORT:-18086}
@@ -204,6 +206,32 @@ wait_published() {
   return 1
 }
 
+wait_published_idempotency() {
+  idempotency_key=$1
+  attempts=0
+  while [ "$attempts" -lt 80 ]; do
+    publication_state=$(psql_app \
+      -qAt -v ON_ERROR_STOP=1 \
+      -v organization_id="$organization_id" \
+      -v idempotency_key="$idempotency_key" <<'SQL' |
+SELECT set_config('app.org_id', :'organization_id', false);
+SELECT count(*) || ':' || count(*) FILTER (WHERE published_at IS NOT NULL)
+FROM app.outbox
+WHERE org_id=:'organization_id'
+  AND topic='NotificationRequested'
+  AND idempotency_key=:'idempotency_key';
+SQL
+      tail -n 1)
+    if [ "$publication_state" = "1:1" ]; then
+      return 0
+    fi
+    attempts=$((attempts + 1))
+    sleep 0.25
+  done
+  echo "notification projection outbox $idempotency_key did not converge; state=$publication_state" >&2
+  return 1
+}
+
 set_scenario success
 queue_notification notification-success
 wait_status notification-success sent
@@ -221,30 +249,54 @@ SELECT (
 SQL
 )
 projection_notification_id="scheduling:$projection_event_id"
+projection_idempotency_key='scheduling:NotificationRequested:booking-projection-e2e:source:1'
 queue_scheduling_projection "$projection_event_id" booking-projection-e2e
 wait_status "$projection_notification_id" sent
-wait_published_idempotency=$(
+wait_published_idempotency "$projection_idempotency_key"
+projection_outbox_state=$(
   psql_app \
     -qAt -v ON_ERROR_STOP=1 \
-    -c "SELECT set_config('app.org_id', '$organization_id', false); SELECT count(*) || ':' || count(*) FILTER (WHERE published_at IS NOT NULL) FROM app.outbox WHERE org_id='$organization_id' AND topic='NotificationRequested' AND idempotency_key='scheduling:NotificationRequested:booking-projection-e2e:source:1';" |
+    -v organization_id="$organization_id" \
+    -v idempotency_key="$projection_idempotency_key" <<'SQL' |
+SELECT set_config('app.org_id', :'organization_id', false);
+SELECT count(*) || ':' || count(*) FILTER (WHERE published_at IS NOT NULL)
+FROM app.outbox
+WHERE org_id=:'organization_id'
+  AND topic='NotificationRequested'
+  AND idempotency_key=:'idempotency_key';
+SQL
     tail -n 1
 )
 projection_count=$(
   psql_app \
     -qAt -v ON_ERROR_STOP=1 \
-    -c "SELECT set_config('app.org_id', '$organization_id', false); SELECT count(*) FROM app.notifications WHERE org_id='$organization_id' AND idempotency_key='scheduling:NotificationRequested:booking-projection-e2e:source:1';" |
+    -v organization_id="$organization_id" \
+    -v idempotency_key="$projection_idempotency_key" <<'SQL' |
+SELECT set_config('app.org_id', :'organization_id', false);
+SELECT count(*)
+FROM app.notifications
+WHERE org_id=:'organization_id'
+  AND idempotency_key=:'idempotency_key';
+SQL
     tail -n 1
 )
 projection_route=$(
   psql_app \
     -qAt -v ON_ERROR_STOP=1 \
-    -c "SELECT set_config('app.org_id', '$organization_id', false); SELECT delivery_channel || ':' || sender_identity FROM app.notifications WHERE org_id='$organization_id' AND idempotency_key='scheduling:NotificationRequested:booking-projection-e2e:source:1';" |
+    -v organization_id="$organization_id" \
+    -v idempotency_key="$projection_idempotency_key" <<'SQL' |
+SELECT set_config('app.org_id', :'organization_id', false);
+SELECT delivery_channel || ':' || sender_identity
+FROM app.notifications
+WHERE org_id=:'organization_id'
+  AND idempotency_key=:'idempotency_key';
+SQL
     tail -n 1
 )
-if [ "$wait_published_idempotency" != "1:1" ] ||
+if [ "$projection_outbox_state" != "1:1" ] ||
   [ "$projection_count" != "1" ] ||
   [ "$projection_route" != "whatsapp_mock:mock:$organization_id" ]; then
-  echo "scheduling projection did not converge: outbox=$wait_published_idempotency notifications=$projection_count route=$projection_route" >&2
+  echo "scheduling projection did not converge: outbox=$projection_outbox_state notifications=$projection_count route=$projection_route" >&2
   exit 1
 fi
 projection_stats=$(curl -fsS \

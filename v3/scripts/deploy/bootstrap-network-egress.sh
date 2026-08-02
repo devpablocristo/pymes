@@ -60,7 +60,7 @@ fi
 
 echo "NETWORK PLAN project=$project region=$region network=$network"
 echo "NETWORK PLAN subnet=$subnet cidr=$subnet_cidr private_google_access=true"
-echo "NETWORK PLAN router=$router nat=$nat allocation=automatic scope=subnet-only"
+echo "NETWORK PLAN router=$router nat=$nat allocation=automatic scope=subnet-only ranges=all"
 echo "COST recurring Cloud NAT gateway, public IPv4 and processed traffic charges apply"
 
 if [[ "$apply" == "false" ]]; then
@@ -129,11 +129,48 @@ if ! gcloud compute routers nats describe "$nat" \
   >/dev/null 2>&1; then
   gcloud compute routers nats create "$nat" \
     --router="$router" --project="$project" --region="$region" \
-    --nat-custom-subnet-ip-ranges="$subnet" \
+    --nat-custom-subnet-ip-ranges="${subnet}:ALL" \
     --auto-allocate-nat-external-ips \
     --enable-dynamic-port-allocation \
     --min-ports-per-vm=64 \
     --max-ports-per-vm=4096 >/dev/null
+else
+  nat_json=$(gcloud compute routers nats describe "$nat" \
+    --router="$router" --project="$project" --region="$region" \
+    --format=json)
+  if ! jq -e \
+    --arg subnet "$subnet" \
+    --arg region "$region" \
+    '
+      .sourceSubnetworkIpRangesToNat == "LIST_OF_SUBNETWORKS" and
+      (.subnetworks | length) == 1 and
+      (.subnetworks[0].name |
+        endswith("/regions/" + $region + "/subnetworks/" + $subnet)) and
+      (
+        .natIpAllocateOption == "AUTO_ONLY" or
+        (
+          .natIpAllocateOption == "MANUAL_ONLY" and
+          ((.natIps // []) | length) > 0
+        )
+      ) and
+      (
+        (.endpointTypes // ["ENDPOINT_TYPE_VM"]) |
+        index("ENDPOINT_TYPE_VM") != null
+      )
+    ' <<<"$nat_json" >/dev/null; then
+    echo "existing Cloud NAT $router/$nat is not exclusively owned by $subnet; refusing to rewrite it" >&2
+    exit 1
+  fi
+  if ! jq -e \
+    '.subnetworks[0].sourceIpRangesToNat | index("ALL_IP_RANGES") != null' \
+    <<<"$nat_json" >/dev/null; then
+    gcloud compute routers nats update "$nat" \
+      --router="$router" --project="$project" --region="$region" \
+      --nat-custom-subnet-ip-ranges="${subnet}:ALL" \
+      --enable-dynamic-port-allocation \
+      --min-ports-per-vm=64 \
+      --max-ports-per-vm=4096 >/dev/null
+  fi
 fi
 
 nat_json=$(gcloud compute routers nats describe "$nat" \

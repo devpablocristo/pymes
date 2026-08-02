@@ -60,21 +60,53 @@ export interface SDKAuthorizationDetail {
 
 export interface SDKConsultResponse {
   ResultGet?: {
+    Concepto: number;
     PtoVta?: number;
     CbteTipo?: number;
     CbteDesde: number;
     CbteHasta: number;
+    CbteFch: string;
     DocTipo: number;
     DocNro: number;
     ImpTotal: number;
+    ImpTotConc: number;
     ImpNeto: number;
     ImpOpEx: number;
+    ImpTrib: number;
     ImpIVA: number;
+    FchServDesde: string;
+    FchServHasta: string;
+    FchVtoPago: string;
     MonId: string;
     MonCotiz: number;
     Resultado: "A" | "R";
     CodAutorizacion?: string;
+    EmisionTipo: string;
     FchVto?: string;
+    CondicionIVAReceptorId?: number;
+    CanMisMonExt?: string;
+    Iva?: {
+      AlicIva:
+        | { Id: number; BaseImp: number; Importe: number }
+        | Array<{ Id: number; BaseImp: number; Importe: number }>;
+    };
+    CbtesAsoc?: {
+      CbteAsoc:
+        | {
+            Tipo: number;
+            PtoVta: number;
+            Nro: number;
+            Cuit?: string | number;
+            CbteFch?: string;
+          }
+        | Array<{
+            Tipo: number;
+            PtoVta: number;
+            Nro: number;
+            Cuit?: string | number;
+            CbteFch?: string;
+          }>;
+    };
     Observaciones?: { Obs: SDKError | SDKError[] };
   };
   Errors?: { Err: SDKError | SDKError[] };
@@ -88,11 +120,14 @@ export interface SDKPointOfSale {
   deactivatedOn?: string;
 }
 
-export interface SDKLegacyPointOfSale {
-  Nro: number;
-  EmisionTipo: string;
-  Bloqueado: string;
-  FchBaja: string;
+export interface SDKVoucherSequenceReference {
+  pointOfSale: number;
+  voucherType: number;
+}
+
+export interface SDKLastAuthorizedVoucher
+  extends SDKVoucherSequenceReference {
+  voucherNumber: number;
 }
 
 export interface ExplicitSDKBaseClient {
@@ -102,22 +137,14 @@ export interface ExplicitSDKBaseClient {
     voucherType: number;
     voucherNumber: number;
   }): Promise<SDKConsultResponse>;
-}
-
-export interface SDKPointOfSaleListingClient {
   listPointsOfSale(): Promise<SDKPointOfSale[]>;
 }
 
-export interface SDKLegacyPointOfSaleClient {
-  getPuntosVenta(): Promise<SDKLegacyPointOfSale[]>;
+export interface ExplicitSDKSequenceClient {
+  lastAuthorizedVoucher(
+    reference: SDKVoucherSequenceReference,
+  ): Promise<SDKLastAuthorizedVoucher>;
 }
 
-export interface ExplicitSDKClient {
-  authorize(request: SDKInvoiceRequest): Promise<SDKAuthorizationResponse>;
-  consult(reference: {
-    pointOfSale: number;
-    voucherType: number;
-    voucherNumber: number;
-  }): Promise<SDKConsultResponse>;
-  listPointsOfSale(): Promise<SDKPointOfSale[]>;
-}
+export interface ExplicitSDKClient
+  extends ExplicitSDKBaseClient, ExplicitSDKSequenceClient {}

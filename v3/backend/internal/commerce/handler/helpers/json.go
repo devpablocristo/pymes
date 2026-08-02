@@ -6,6 +6,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+
+	publicapi "github.com/devpablocristo/pymes/v3/backend/internal/commerce/handler/dto"
 )
 
 const maxRequestBody = 1 << 20
@@ -15,6 +17,10 @@ func WriteJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
+}
+
+func WriteError(w http.ResponseWriter, status int, code string) {
+	WriteJSON(w, status, publicapi.Error{Code: publicapi.ErrorCode(code)})
 }
 
 // DecodeJSON accepts exactly one bounded JSON value.

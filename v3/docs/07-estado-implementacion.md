@@ -1,6 +1,11 @@
 # Estado verificable de implementación
 
-Fecha de auditoría: 2026-08-01.
+<!-- drift:bind v3/backend/internal/scheduling/calendar_projection/helpers/events.go -->
+<!-- drift:bind v3/scripts/deploy/retain-release-manifest.sh -->
+<!-- drift:bind v3/scripts/deploy/cloud-restore-drill.sh -->
+<!-- drift:bind v3/scripts/deploy/collect-pilot-evidence.sh -->
+
+Fecha de auditoría: 2026-08-02.
 
 Este documento separa tres estados: código implementado, evidencia automática y
 operación desplegada. Ningún componente pasa al tercero por inferencia.
@@ -16,33 +21,36 @@ operación desplegada. Ningún componente pasa al tercero por inferencia.
 | Identidad interna | JWT Ed25519 corto; producción firma con una versión KMS explícita y publica JWKS con overlap; semillas sólo locales. | tests Go y checks de despliegue |
 | Accounting | Servicio headless fusionado: cuentas, períodos, posteos, reversas, partidas, aplicaciones y reportes. | `make accounting-test` y `make accounting-e2e` |
 | Comercio | Parties, ventas, compras, A/B/C, NC/ND, cobros, pagos parciales, reversas, numeración y estados. | `make commercial-e2e` |
-| Fiscal | Mock durable y adapter ARCA real seleccionables detrás del mismo puerto; onboarding CSR/certificado por tenant, WSAA/WSFE, número explícito, consulta exacta e incertidumbre. | `make fiscal-test`, `make fiscal-real-contract`, `make fiscal-e2e` |
-| Agenda | Sucursales, servicios, disponibilidad, recursos múltiples, holds, recurrencia, grupos, waitlist, cola, edición optimista de datos operativos, acciones públicas, DST y concurrencia. | `make scheduling-e2e` |
+| Fiscal | Mock durable y adapter ARCA real detrás del mismo puerto; onboarding por tenant, WSAA/WSFE, número explícito, consulta exacta, incertidumbre y gate de POS dedicado vacío. La extensión requerida quedó publicada y fijada exactamente como `@devpablocristo/arca-facturacion@2.6.0`. | `make fiscal-test`, `make fiscal-real-contract`, `make fiscal-e2e` |
+| Agenda | Sucursales, servicios, disponibilidad, recursos múltiples, holds, recurrencia, grupos, waitlist, cola, edición optimista, acciones públicas y proyección Calendar por estado con digest validado y Meet opt-in inmutable. | `make scheduling-e2e` |
 | Web | React 19, Clerk, alta/edición/reprogramación de Agenda, booking público y Calendar Board 0.2 publicado. | `make web-ci` |
-| Notifications | Intención tenant, PerGo, fake contractual, ledger durable, idempotencia, claim/lease/fencing de entrega y webhook firmado/inbox; una respuesta incierta no se reintenta ni activa fallback. | `make notifications-e2e` y suite race del fork PerGo |
-| Calendars | OAuth tenant, tokens cifrados con KMS, Google Calendar/Meet, IDs determinísticos, ETag y reconciliación. | `make calendars-e2e` |
-| Operación | Probes, métricas, alertas, DLQ/replay, migraciones separadas, backup/restore y recuperación por servicio. | gates de operación dentro de `make ci` |
+| Notifications | Intención tenant, PerGo, fake contractual, ledger durable, idempotencia, claim/lease/fencing de entrega y webhook firmado/inbox; una respuesta incierta no se reintenta ni activa fallback. La API key y la identidad Cloud Run viajan en headers separados y producción exige una audience HTTPS explícita. | `make notifications-e2e`, dry-run Cloud Run y suite race del fork PerGo |
+| Calendars | OAuth tenant, tokens cifrados con KMS, Google Calendar/Meet, IDs determinísticos, validación del snapshot Agenda, ETag, deletes y reconciliación. | `make calendars-e2e` |
+| Operación | Probes, métricas, alertas, DLQ/replay, migraciones separadas, publicación create-only de evidencia de release, restore coordinado de tres bases y collectors redactados de pilotos. | gates de operación dentro de `make ci` |
 
-La suite Go, el gate arquitectónico y `make ci` completo pasan localmente contra
-Open Accounting `1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d` y los controles H8
-actuales. Pymes PR #43 quedó fusionado en
+Para el baseline integrado, la suite Go, el gate arquitectónico y `make ci`
+completo pasaron localmente contra Open Accounting
+`1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d`. Pymes PR #43 quedó fusionado en
 `fee09579cc8d846e28a704d6f60d640edfac75d0`, y el workflow remoto de `main`
-`30724823470` quedó verde para ese SHA exacto.
+`30724823470` quedó verde para ese SHA exacto. El `make ci` integral de las
+capacidades nuevas también pasó localmente el 2026-08-02; todavía requieren CI
+remoto de su propio SHA y no heredan la evidencia del baseline.
 
 ## Dependencias externas y evidencia pendiente
 
 | Área | Implementación | Evidencia todavía necesaria |
 |---|---|---|
-| Release | workflow y build por SHA/digest; seed inerte; capability pretraffic API/Web; baseline y pin Web → API exactos; invoker IAM/ingress fail-closed; señal durable del worker; revocación de tags/URLs; rollback automático y `rollback-cloud-run.sh` por SHA implementados y validados localmente con una matriz stateful de fallos. La verificación activa ocurre antes de desarmar la transacción, bootstrap termina sin tags y Build/Deploy rechazan reruns aislados | CI remoto del SHA exacto verde; faltan imágenes publicadas, manifiesto durable y evidencia de una transacción real |
-| GitHub | bootstrap y auditoría implementados localmente | `main` hoy sólo exige `v2-ci` a no administradores; `stg` no tiene reglas y permite bypass; `prd` no existe. Deben aplicarse y auditarse los controles V3 |
-| GCP | proyecto/región/SQL compartidos; identidades runtime, rotación simétrica de 90 días y secretos HMAC de Agenda v1 provisionados en STG/PRD | cargar valores reales de Clerk webhook/PerGo/Google, completar red y WIF dedicado por entorno |
+| Release | workflow y build por SHA/digest; seed inerte; capability pretraffic API/Web; baseline y pin Web → API exactos; señal durable del worker; rollback por SHA y publicación create-only del manifiesto con receipt verificable, condicionada a Bucket Lock. Todo está validado localmente con adapters y matrices de fallos | faltan buckets aplicados/bloqueados, imágenes publicadas, un manifiesto real retenido y evidencia de una transacción Cloud Run |
+| GitHub | `main` exige el único check `Pymes V3 validate`, no exige reviewers, mantiene historial lineal, resolución de conversaciones y enforcement administrativo; STG está limitado a `main`; PRD exige reviewers sólo para desplegar y evita self-review | falta desactivar manualmente el bypass administrativo de PRD y cargar en ambos environments el token de auditoría `Administration:read`; la auditoría completa sigue fallando cerrada hasta entonces |
+| GCP | proyecto/región/SQL compartidos; identidades runtime, rotación simétrica de 90 días, secretos HMAC de Agenda v1, APIs de auditoría, policies IAM forzadas, subred/NAT compartida y Monitoring STG/PRD provisionados y verificados | cargar valores reales de Clerk webhook/PerGo/Google, completar WIF dedicado y crear uptime checks cuando existan las URLs |
 | WIF legado | retiro reversible y doble canary especificados | primer canary STG con WIF nuevo, retiro exacto, segundo canary posterior, Cloud Asset limpio y cierre |
 | STG | no desplegado | migraciones, workloads, IAM, readiness, revisión y digest exactos |
 | PRD | no desplegado | preparar sólo después de cerrar STG; mismo SHA/materiales y controles equivalentes, con digests propios del entorno |
-| PerGo real | adapter completo | credenciales cargadas fuera de Git y piloto con número controlado |
+| PerGo real | adapter completo, incluida invocación OIDC a un Cloud Run privado sin reemplazar la API key | desplegar PerGo/NATS, cargar credenciales fuera de Git y pilotear con número controlado |
 | Google real | adapter completo | clientes OAuth separados, callback autorizado y piloto Calendar/Meet |
-| ARCA real | adapter completo; SDK `2.5.0` publicado y fijado | organización piloto, CSR/certificado, punto de venta y homologación |
-| Recuperación cloud | scripts y smoke local | backup/restore documentado contra destinos aislados del entorno |
+| ARCA real | adapter completo contra `@devpablocristo/arca-facturacion@2.6.0`, publicado y fijado por lockfile | organización piloto, CSR/certificado, POS nuevo vacío y homologación |
+| Recuperación cloud | backup/restore local y orquestador `plan/restore/verify/cleanup` para tres bases, probado con adapters | ejecutar contra tres destinos aislados, conservar witness/checksums y revisar cleanup |
+| Evidencia de pilotos | collector read-only y fail-closed para Agenda, PerGo, Google/Meet y ARCA, probado sin red | ejecutar cada flujo real controlado y conservar sus bundles sin modificarlos |
 
 No se necesita un CUIT o certificado global de Pymes: en el modelo SaaS cada
 organización registra su propia relación con ARCA y Fiscal conserva su clave

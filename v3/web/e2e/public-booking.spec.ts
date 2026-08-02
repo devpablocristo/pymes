@@ -26,6 +26,11 @@ test("reserva un turno público sin autenticarse", async ({ page }) => {
   await page.getByLabel("Nombre y apellido").fill("Lucía Público");
   await page.getByLabel("Email").fill("lucia@example.invalid");
   await page.getByLabel("WhatsApp").fill("+5491199999999");
+  const meet = page.getByRole("checkbox", {
+    name: /Videollamada por Google Meet/,
+  });
+  await expect(meet).not.toBeChecked();
+  await meet.check();
   await page.getByRole("button", { name: "Confirmar reserva" }).click();
   await expect(page.getByRole("heading", { name: "Tu horario quedó reservado" })).toBeVisible();
 });

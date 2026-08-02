@@ -119,11 +119,11 @@ jobs:
           set -euo pipefail
           {
             printf '### ARCA homologation STG validation\n\n'
-            printf -- '- Source SHA: `%s`\n' "${GITHUB_SHA}"
-            printf -- '- Organization: `%s`\n' "${PILOT_ORGANIZATION}"
-            printf -- '- Credential: `%s`\n' "${PILOT_CREDENTIAL}"
-            printf -- '- Point of sale: `%s`\n' "${PILOT_POINT_OF_SALE}"
+            printf -- "- Source SHA: \`%s\`\n" "${GITHUB_SHA}"
+            printf -- "- Organization: \`%s\`\n" "${PILOT_ORGANIZATION}"
+            printf -- "- Credential: \`%s\`\n" "${PILOT_CREDENTIAL}"
+            printf -- "- Point of sale: \`%s\`\n" "${PILOT_POINT_OF_SALE}"
             printf -- '- Result: WSAA and WSFE point-of-sale probe succeeded and the point was enabled.\n'
-            printf -- '- Voucher emitted: `false`\n'
-            printf -- '- Retained ARCA payloads, certificates or credentials: `none`\n'
+            printf -- "- Voucher emitted: \`false\`\n"
+            printf -- "- Retained ARCA payloads, certificates or credentials: \`none\`\n"
           } >>"${GITHUB_STEP_SUMMARY}"

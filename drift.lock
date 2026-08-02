@@ -98,12 +98,12 @@ sig = "8ee1ff78969ea783"
 [[bindings]]
 doc = "v3/docs/06-plan-ejecucion.md"
 target = ".github/workflows/v3-arca-homologation.yml"
-sig = "ab53300a7aa411bb"
+sig = "5829e6fc78ae1091"
 
 [[bindings]]
 doc = "v3/docs/06-plan-ejecucion.md"
 target = ".github/workflows/v3-google-live.yml"
-sig = "f07cb7a579876230"
+sig = "a8445efc253397b0"
 
 [[bindings]]
 doc = "v3/docs/07-estado-implementacion.md"
@@ -273,7 +273,7 @@ sig = "94c7a7ab0b51c09f"
 [[bindings]]
 doc = "v3/docs/11-fiscal-vault-onboarding.md"
 target = ".github/workflows/v3-arca-homologation.yml"
-sig = "ab53300a7aa411bb"
+sig = "5829e6fc78ae1091"
 
 [[bindings]]
 doc = "v3/docs/11-fiscal-vault-onboarding.md"
@@ -333,7 +333,7 @@ sig = "bcff677add4d47c1"
 [[bindings]]
 doc = "v3/docs/11-google-calendar-meet.md"
 target = ".github/workflows/v3-google-live.yml"
-sig = "f07cb7a579876230"
+sig = "a8445efc253397b0"
 
 [[bindings]]
 doc = "v3/docs/11-google-calendar-meet.md"

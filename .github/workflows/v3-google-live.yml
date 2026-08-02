@@ -131,11 +131,11 @@ jobs:
           set -euo pipefail
           {
             printf '### Google live STG validation\n\n'
-            printf -- '- Source SHA: `%s`\n' "${GITHUB_SHA}"
-            printf -- '- Organization: `%s`\n' "${PILOT_ORGANIZATION}"
-            printf -- '- Connection: `%s`\n' "${PILOT_CONNECTION}"
-            printf -- '- Booking: `%s`\n' "${PILOT_BOOKING}"
-            printf -- '- Meet required: `%s`\n' "${EXPECTED_MEET}"
+            printf -- "- Source SHA: \`%s\`\n" "${GITHUB_SHA}"
+            printf -- "- Organization: \`%s\`\n" "${PILOT_ORGANIZATION}"
+            printf -- "- Connection: \`%s\`\n" "${PILOT_CONNECTION}"
+            printf -- "- Booking: \`%s\`\n" "${PILOT_BOOKING}"
+            printf -- "- Meet required: \`%s\`\n" "${EXPECTED_MEET}"
             printf -- '- Result: Pymes connection, booking and deterministic Google projection matched.\n'
-            printf -- '- Retained provider payloads or credentials: `none`\n'
+            printf -- "- Retained provider payloads or credentials: \`none\`\n"
           } >>"${GITHUB_STEP_SUMMARY}"

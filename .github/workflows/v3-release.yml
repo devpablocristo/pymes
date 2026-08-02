@@ -320,9 +320,9 @@ jobs:
           [[ "${checksum}" =~ ^[0-9a-f]{64}$ ]]
           {
             printf '### Immutable Pymes v3 release manifest\n\n'
-            printf -- '- Environment: `%s`\n' "${RELEASE_ENVIRONMENT}"
-            printf -- '- Source SHA: `%s`\n' "${RELEASE_SOURCE_SHA}"
-            printf -- '- Manifest SHA-256: `%s`\n' "${checksum}"
+            printf -- "- Environment: \`%s\`\n" "${RELEASE_ENVIRONMENT}"
+            printf -- "- Source SHA: \`%s\`\n" "${RELEASE_SOURCE_SHA}"
+            printf -- "- Manifest SHA-256: \`%s\`\n" "${checksum}"
           } >>"${GITHUB_STEP_SUMMARY}"
 
       - name: Upload digest manifest

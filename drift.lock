@@ -88,7 +88,7 @@ sig = "94c7a7ab0b51c09f"
 [[bindings]]
 doc = "v3/docs/README.md"
 target = ".github/workflows/v3-release.yml"
-sig = "6a56b8c4e729a9a3"
+sig = "38bc54c4dfb1d5c2"
 
 [[bindings]]
 doc = "v3/docs/adr/0005-despliegue-y-operacion.md"

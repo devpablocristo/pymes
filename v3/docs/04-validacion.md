@@ -287,5 +287,6 @@ El SHA fijado de Open Accounting
 `1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d` tiene CI remoto verde en el run
 `30704446792`: pasaron backend, lint, integración PostgreSQL, E2E, frontend y el
 runtime Pymes headless. `make ci` de Pymes también pasa localmente contra ese
-checkout exacto y los controles H8 actuales. Todavía falta integrar el cambio
-de Pymes y obtener el workflow remoto verde para su nuevo SHA.
+checkout exacto y los controles H8 actuales. Pymes PR #43 quedó fusionado en
+`fee09579cc8d846e28a704d6f60d640edfac75d0`, y el workflow remoto de `main`
+`30724823470` quedó verde para ese SHA exacto.

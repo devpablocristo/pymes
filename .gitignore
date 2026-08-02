@@ -4,6 +4,8 @@
 /.firebase/
 /.deps/
 /gha-creds-*.json
+/v1/**/.auth/
+/v2/**/.auth/
 /scripts/
 /ui/
 node_modules/

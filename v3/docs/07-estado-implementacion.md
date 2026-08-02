@@ -30,11 +30,9 @@ operación desplegada. Ningún componente pasa al tercero por inferencia.
 
 Para el baseline integrado, la suite Go, el gate arquitectónico y `make ci`
 completo pasaron localmente contra Open Accounting
-`1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d`. Pymes PR #43 quedó fusionado en
-`fee09579cc8d846e28a704d6f60d640edfac75d0`, y el workflow remoto de `main`
-`30724823470` quedó verde para ese SHA exacto. El `make ci` integral de las
-capacidades nuevas también pasó localmente el 2026-08-02; todavía requieren CI
-remoto de su propio SHA y no heredan la evidencia del baseline.
+`ad1c182093986279aac7fb6582f7788202112a78`. Pymes PR #47 quedó fusionado en
+`ccff2c106da92f3bfc74b2d12b5f4409aa743050`, y el workflow remoto de `main`
+`30744384829` quedó verde para ese baseline.
 
 ## Dependencias externas y evidencia pendiente
 

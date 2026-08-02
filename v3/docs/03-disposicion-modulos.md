@@ -9,7 +9,7 @@
 | LedgerSMB | ninguno en producción | cualquier copia, por GPLv2 | casos de diario, pagos parciales, reversas y cierre |
 
 La adaptación de OA quedó concretada en el fork mantenido por el equipo. El SHA
-remoto verde `1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d` conserva el runtime
+remoto verde `ad1c182093986279aac7fb6582f7788202112a78` conserva el runtime
 headless aislado y sus tres targets privados; Pymes fija exactamente ese commit.
 El repositorio sigue siendo público, pero el servicio contable se despliega
 privado y no expone UI ni superficies comerciales de OA.

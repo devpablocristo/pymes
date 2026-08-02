@@ -61,13 +61,12 @@ sea el último en recibir tráfico; recién allí se activa una instancia.
 `bootstrap` no está permitido en PRD ni cuenta como canary operativo.
 
 Open Accounting está fusionado y su CI remoto es verde en
-`1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d`. Para el baseline integrado, Pymes
-PR #43 está fusionado en `fee09579cc8d846e28a704d6f60d640edfac75d0`, `make
-ci` pasó localmente contra ese pin y su workflow remoto de `main` quedó verde.
-El diff actual amplía ese baseline; su `make ci` integral pasó localmente el
-2026-08-02 y todavía requiere CI del SHA exacto antes de integrarse. PerGo
-quedó fusionado hasta el arreglo concurrente `8cafff3f6e763043d912322db97dcfcf589f2c54`,
-con CI final de `master` verde; la extensión
+`ad1c182093986279aac7fb6582f7788202112a78`. Para el baseline integrado, Pymes
+PR #47 está fusionado en `ccff2c106da92f3bfc74b2d12b5f4409aa743050`,
+`make ci` pasó contra ese pin y su workflow remoto de `main` `30744384829`
+quedó verde. PerGo quedó fusionado con su automatización de despliegue segura
+en `622296b8fd52ffb84b0e2dae1b81d0926af4675b`, con el run final de `master`
+`30746001931` verde; la extensión
 `arca-facturacion` `2.6.0` quedó fusionada, publicada y fijada por Pymes, con
 CI remoto y suites integradas verdes. Nada de esto constituye
 evidencia operativa: no se publicaron las imágenes de esta revisión, no se

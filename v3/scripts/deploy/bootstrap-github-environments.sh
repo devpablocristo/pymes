@@ -16,9 +16,9 @@ esac
 if [[ "$mode" == "plan" ]]; then
   printf '%s\n' \
     "PLAN repository=${repository}" \
-    "PLAN main required_check='Pymes V3 validate' strict=true reviews=1 last_push_approval=true admins=enforced" \
-    "PLAN stg branch=main required_reviewers=none" \
-    "PLAN prd branch=main required_reviewers=explicit prevent_self_review=true" \
+    "PLAN main required_check='Pymes V3 validate' strict=true pull_request_reviews=none admins=enforced linear_history=true conversations=true" \
+    "PLAN stg branch=main deployment_reviewers=none" \
+    "PLAN prd branch=main deployment_reviewers=explicit prevent_self_review=true" \
     "PLAN prd admin_bypass=disabled (manual GitHub UI control; audited by script)" \
     "No GitHub settings changed. Use audit to inspect or apply with PYMES_PRD_REVIEWER_IDS."
   exit 0

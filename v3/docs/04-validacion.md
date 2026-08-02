@@ -126,8 +126,11 @@ workflow-policy-check` comprueba que release y validaciones live sean manuales,
 partan de `main`, exijan un CI verde para el SHA exacto y una confirmación
 escrita. Los dos jobs live están fijados al environment `stg`, no solicitan WIF
 ni aceptan tokens como inputs; los secretos se materializan únicamente en el
-paso posterior a la auditoría de controles. Build y deploy usan identidades WIF
-separadas por entorno. El primer paso de todos esos jobs rechaza cualquier
+paso posterior a la auditoría de controles. También exige que la audience
+privada de PerGo se propague desde `PYMES_PERGO_AUDIENCE` del environment
+protegido, exige el bloque completo de variables PerGo con sus mappings exactos
+y rechaza el literal obsoleto `reviews=1` en la salida de control de GitHub.
+Build y deploy usan identidades WIF separadas por entorno. El primer paso de todos esos jobs rechaza cualquier
 `GITHUB_RUN_ATTEMPT` distinto de `1`: Build lo hace antes de solicitar la
 identidad del builder y Deploy antes de checkout, descargar artefactos o
 autenticar. Un job o workflow reejecutado no puede reutilizar una validación ni

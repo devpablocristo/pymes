@@ -174,15 +174,19 @@ identidades runtime y su autoridad efectiva por componente, incluidos caminos
 de impersonación.
 
 Ese pool y sus service accounts de release todavía no existen en GCP. En GitHub,
-`main` exige actualmente sólo `v2-ci` con enforcement para no administradores;
-el environment `stg` existe sin reglas y permite bypass administrativo, y
-`prd` todavía no existe. Por eso el bootstrap WIF debe permanecer bloqueado
-hasta aplicar y auditar los controles V3.
+`main` exige exactamente `Pymes V3 validate` para todos, no exige reviewers de
+PR y conserva enforcement administrativo, historial lineal y resolución de
+conversaciones. Los environments `stg` y `prd` existen y sólo aceptan `main`;
+PRD exige reviewers de despliegue e impide autoaprobación, pero todavía permite
+bypass administrativo. Falta además
+`PYMES_GITHUB_RELEASE_AUDIT_TOKEN` en ambos environments. Por eso el bootstrap
+WIF debe permanecer bloqueado hasta desactivar ese bypass, cargar la credencial
+de auditoría y volver a verificar los controles V3.
 
 Antes de autenticar contra WIF, cada release comprueba que `main` esté
 protegida para todos por el único check `Pymes V3 validate` y que ambos
-environments sólo acepten `main`; PRD exige reviewers, prohíbe autoaprobación y
-bypass administrativo. Como el token nativo de Actions no dispone de
+environments sólo acepten `main`; PRD exige deployment reviewers, prohíbe
+autoaprobación y bypass administrativo. Como el token nativo de Actions no dispone de
 `Administration:read`, cada environment guarda una credencial de auditoría
 separada del token nativo. El workflow ejecuta la auditoría completa al validar
 la release y otra vez inmediatamente antes de autenticar el deployer. La
@@ -376,8 +380,9 @@ Las service accounts runtime y las claves de identidad interna están
 provisionadas. STG y PRD tienen rotación simétrica completa y cada uno posee su
 secreto HMAC de Agenda en versión 1 con acceso mínimo. Faltan valores reales de
 Clerk webhook, PerGo y Google; la versión temporal STG no cuenta como valor
-real. También faltan el pool y las tres identidades WIF de release, la
-reconciliación de GitHub y el retiro recuperable de los contenedores obsoletos
+real. También faltan el pool y las tres identidades WIF de release, el cierre
+de la reconciliación de GitHub mediante la desactivación del bypass
+administrativo de PRD y el retiro recuperable de los contenedores obsoletos
 `fiscal-credential` e `internal-jwt-seed`. No se afirma ningún despliegue ni
 piloto hasta que el stage operacional compare digest, revisión, IAM, red,
 secretos, pin Web → API, señal durable del worker y release marker, y termine

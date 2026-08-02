@@ -136,13 +136,15 @@ PYMES_PRD_REVIEWER_IDS=123456,789012 \
 ```
 
 El workflow publica el check estable `Pymes V3 validate` en cada PR y push a
-`main`; el bootstrap configura la protección para exigirlo junto con review,
-aprobación del último push, enforcement para administradores y políticas de
-deployment limitadas a `main`. Hoy `main` sólo exige `v2-ci` para no
-administradores, `stg` no tiene reglas y permite bypass, y `prd` no existe.
-GitHub no expone en su REST documentado el switch de bypass administrativo: un
-administrador debe desmarcarlo para PRD en Settings → Environments y luego
-ejecutar:
+`main`; el bootstrap configura la protección para exigirlo sin reviewers de PR,
+con enforcement para administradores, historial lineal, resolución de
+conversaciones y políticas de deployment limitadas a `main`. Actualmente esa
+protección de `main` ya está aplicada; `stg` y `prd` existen y sólo aceptan
+`main`, y PRD exige reviewers de despliegue e impide autoaprobación. Sigue
+pendiente desactivar el bypass administrativo de PRD y cargar
+`PYMES_GITHUB_RELEASE_AUDIT_TOKEN` en ambos environments. GitHub no expone en su
+REST documentado el switch de bypass administrativo: un administrador debe
+desmarcarlo para PRD en Settings → Environments y luego ejecutar:
 
 ```bash
 PYMES_GITHUB_ENVIRONMENT_MODE=audit \

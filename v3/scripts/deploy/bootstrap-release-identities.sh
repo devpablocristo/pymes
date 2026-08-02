@@ -280,27 +280,45 @@ required_services=(
   run.googleapis.com
   sts.googleapis.com
 )
-if [[ "$phase" == "prepare" ]]; then
-  gcloud services enable "${required_services[@]}" \
-    --project="$project" >/dev/null
-else
-  enabled_services=$(gcloud services list --enabled \
-    --project="$project" --format='value(config.name)')
-  for required_service in "${required_services[@]}"; do
-    grep -Fxq "$required_service" <<<"$enabled_services" || {
-      echo "finalize refuses to enable missing API: $required_service" >&2
-      exit 1
-    }
-  done
+enabled_services=$(gcloud services list --enabled \
+  --project="$project" --format='value(config.name)')
+missing_services=()
+for required_service in "${required_services[@]}"; do
+  grep -Fxq "$required_service" <<<"$enabled_services" ||
+    missing_services+=("$required_service")
+done
+if ((${#missing_services[@]} > 0)); then
+  if [[ "$phase" == "prepare" ]]; then
+    gcloud services enable "${missing_services[@]}" \
+      --project="$project" >/dev/null
+  else
+    printf 'finalize refuses to enable missing API: %s\n' \
+      "${missing_services[@]}" >&2
+    exit 1
+  fi
 fi
 
 for constraint in \
   iam.disableCrossProjectServiceAccountUsage \
   iam.disableServiceAccountKeyCreation; do
-  org_policy_json=$(gcloud org-policies describe "constraints/${constraint}" \
-    --project="$project" --effective --format=json)
-  pymes_validate_enforced_boolean_org_policy \
-    "$org_policy_json" "$constraint"
+  org_policy_json=
+  org_policy_valid=false
+  for attempt in 1 2 3 4 5 6; do
+    if org_policy_json=$(gcloud org-policies describe \
+        "constraints/${constraint}" --project="$project" \
+        --effective --format=json 2>/dev/null) &&
+      pymes_validate_enforced_boolean_org_policy \
+        "$org_policy_json" "$constraint" 2>/dev/null; then
+      org_policy_valid=true
+      break
+    fi
+    [[ "$attempt" -eq 6 ]] || sleep 5
+  done
+  [[ "$org_policy_valid" == "true" ]] || {
+    pymes_validate_enforced_boolean_org_policy \
+      "$org_policy_json" "$constraint"
+    exit 1
+  }
 done
 
 release_pool_assets=$(pymes_search_release_pool_iam_assets "$project")

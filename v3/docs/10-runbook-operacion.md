@@ -329,7 +329,9 @@ organización, su alta o corrección debe efectuarla el operador humano de
 bootstrap con permisos administrativos explícitos y luego retirarlos según la
 política de acceso privilegiado.
 
-El gate requiere `orgpolicy.googleapis.com` y relee las policies efectivas
+El gate requiere `orgpolicy.googleapis.com`; `prepare` habilita únicamente las
+APIs ausentes y nunca vuelve a habilitar las ya activas. Después de una
+habilitación relee, con retry acotado, las policies efectivas
 `iam.disableCrossProjectServiceAccountUsage` e
 `iam.disableServiceAccountKeyCreation`; ambas deben contener una única regla
 `enforce: true`. Además ejecuta IAM Policy Analyzer en el proyecto con

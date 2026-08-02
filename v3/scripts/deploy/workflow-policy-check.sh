@@ -643,6 +643,10 @@ for proof in \
   'pymes_verify_release_account_not_attached' \
   'iam.disableCrossProjectServiceAccountUsage' \
   'iam.disableServiceAccountKeyCreation' \
+  'missing_services=()' \
+  'gcloud services enable "${missing_services[@]}"' \
+  'for attempt in 1 2 3 4 5 6' \
+  '[[ "$attempt" -eq 6 ]] || sleep 5' \
   'pymesV3ReleaseOrganizationIamRead' \
   'pymesV3ReleaseFolderIamRead' \
   'assert_release_account_preflight' \

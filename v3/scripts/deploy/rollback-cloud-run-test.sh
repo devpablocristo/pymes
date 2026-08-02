@@ -6,7 +6,7 @@ subject="$script_dir/rollback-cloud-run.sh"
 fixture_dir="$script_dir/testdata/rollback-cloud-run"
 
 release_sha=1111111111111111111111111111111111111111
-accounting_sha=1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d
+accounting_sha=ad1c182093986279aac7fb6582f7788202112a78
 token=2222222222222222222222222222222222222222222222222222222222222222
 project=pymes-dev-352318
 region=us-central1
@@ -25,7 +25,8 @@ api_image="${region}-docker.pkg.dev/${project}/pymes/pymes-v3-api@sha256:${api_d
 web_image="${region}-docker.pkg.dev/${project}/pymes/pymes-v3-web-stg@sha256:${web_digest}"
 web_marker="stg:${release_sha}:sha256:${web_digest}"
 registry="${region}-docker.pkg.dev/${project}/pymes"
-accounting_context=${ACCOUNTING_BUILD_CONTEXT:-/tmp/open-accounting-release}
+accounting_context=${ACCOUNTING_BUILD_CONTEXT:-"$script_dir/../../../../open-accounting"}
+accounting_context=$(cd -- "$accounting_context" && pwd)
 
 fail() {
   echo "rollback-cloud-run test failed: $*" >&2

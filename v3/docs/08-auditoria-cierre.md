@@ -19,12 +19,12 @@ fuente autoritativa para medir el plan.
 
 | Requisito | Estado | Evidencia / condición |
 |---|---|---|
-| H0 Baseline y Open Accounting | cerrado | Runtime headless fusionado y SHA OA remoto verde `1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d`. Pymes PR #43 quedó fusionado en `fee09579cc8d846e28a704d6f60d640edfac75d0`; `make ci` local y el workflow remoto de `main` `30724823470` pasan contra ese pin. |
+| H0 Baseline y Open Accounting | cerrado | Runtime headless fusionado y SHA OA remoto verde `ad1c182093986279aac7fb6582f7788202112a78`, con `CI gate` y cobertura verdes. Pymes PR #47 quedó fusionado en `ccff2c106da92f3bfc74b2d12b5f4409aa743050`; `make ci` y el workflow remoto de `main` `30744384829` pasan contra ese baseline. |
 | H1 Arquitectura Go | cerrado | árbol vertical y `make architecture-check`; todos los adapters y fragmentos conservan `models`/`helpers`, la composición concreta queda en `wire` y Axis no aparece como dependencia, ruta, checkout, mount, runtime ni en `go list -deps`. |
 | H2 Platform | cerrado | paquetes Go/React 0.2 publicados y consumidos sin `replace`, `file:`, `link:` o rutas locales. |
 | H3 Agenda | cerrado en código | contrato, persistencia, waitlist exactamente una vez y proyección Calendar por estado con digest validado; piloto pendiente en H8. |
 | H4 Web | cerrado en código | cliente generado, alta/edición/reprogramación y transiciones en UI interna, booking público y browser E2E; artefacto cloud pendiente en H8. |
-| H5 PerGo | cerrado en código y fork fusionado | adapter/fake/webhook, ledger durable y claim/lease/fencing de entrega; el worker mantiene la API key en `Authorization` y agrega el ID token Cloud Run en `X-Serverless-Authorization`, con audience HTTPS obligatoria en producción. La integración base quedó en PR #4 y el arreglo de convergencia concurrente en PR #5, fusionado como `8cafff3f6e763043d912322db97dcfcf589f2c54`. El CI del PR y el run de `master` `30738575789` pasaron para el código final. Piloto real pendiente en H8. |
+| H5 PerGo | cerrado en código y fork fusionado | adapter/fake/webhook, ledger durable y claim/lease/fencing de entrega; el worker mantiene la API key en `Authorization` y agrega el ID token Cloud Run en `X-Serverless-Authorization`, con audience HTTPS obligatoria en producción. El fork quedó fusionado en `622296b8fd52ffb84b0e2dae1b81d0926af4675b`, incluido el despliegue fail-closed; el run de `master` `30746001931` pasó para el código final. Piloto real pendiente en H8. |
 | H6 Google | cerrado en código | OAuth/cifrado, deletes y reprogramación idempotentes, Meet opt-in inmutable y reconciliación; piloto real pendiente en H8. |
 | H7 ARCA | cerrado en código integrado | onboarding tenant, KMS, WSAA/WSFE, autorización/consulta exacta, POS dedicado vacío y contratos con fakes; `arca-facturacion` `2.6.0` quedó fusionado en `69a0d4cf5110aa280fa50420dc0d13f8010115d0`, etiquetado, publicado, fijado por lockfile y validado por CI remoto antes de homologación en H8. |
 
@@ -32,8 +32,8 @@ fuente autoritativa para medir el plan.
 
 | Puerta | Estado actual | Evidencia objetiva de cierre |
 |---|---|---|
-| CI local | cerrado para el diff actual | `make ci` pasó integralmente el 2026-08-02 contra OA `1af6…`, incluyendo arquitectura, seguridad, contratos, Web, PostgreSQL, Agenda→Calendars, PerGo fake, fiscal, restore local, replay y recuperación |
-| CI remoto/integración | cerrado para el baseline; pendiente para el diff actual | Pymes PR #43 fusionado en `fee09579cc8d846e28a704d6f60d640edfac75d0`; el SHA que incorpore este diff debe obtener su propio `Pymes V3 validate` verde en PR y `main` |
+| CI local | cerrado para el baseline | `make ci` pasó integralmente el 2026-08-02 contra OA `ad1c…`, incluyendo arquitectura, seguridad, contratos, Web, PostgreSQL, Agenda→Calendars, PerGo fake, fiscal, restore local, replay y recuperación |
+| CI remoto/integración | cerrado para el baseline; obligatorio por cada cambio | Pymes PR #47 fusionado en `ccff2c106da92f3bfc74b2d12b5f4409aa743050`, con `Pymes V3 validate` verde; cada SHA posterior debe obtener el mismo gate verde en PR y `main` |
 | Release | cerrado y validado localmente; no operado | build por digest, manifiesto de 13 entradas, publicación create-only con receipt y Bucket Lock requerido, candidato con tráfico cero, capability pretraffic API/Web, señal durable `worker_release_ready`, verificación dentro de la transacción y rollback por SHA. Los adapters prueban fail-closed; faltan buckets bloqueados, imágenes/manifiesto reales y una ejecución Cloud Run |
 | Identidad de release | cerrada en código, no aplicada | WIF separado y STG-first, condición cerrada al repo/workflow/branch/environment, seed inerte auditado sin Run Admin de proyecto, permisos finales sólo por recurso y análisis inverso fail-closed por recurso/permiso/identidad, incluso ante roles custom e impersonación |
 | Retiro WIF legado | pendiente | primer canary STG con WIF nuevo; retiro del principal Pymes, cuenta exclusiva deshabilitada, segundo canary posterior, Cloud Asset limpio y fase de cierre |

@@ -348,9 +348,10 @@ ARCA. `verify-cloud-run.sh` sólo constituirá evidencia de runtime después de
 una release real exitosa.
 
 El SHA fijado de Open Accounting
-`1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d` tiene CI remoto verde en el run
-`30704446792`: pasaron backend, lint, integración PostgreSQL, E2E, frontend y el
-runtime Pymes headless. `make ci` de Pymes también pasa localmente contra ese
-checkout exacto y los controles H8 actuales. Pymes PR #43 quedó fusionado en
-`fee09579cc8d846e28a704d6f60d640edfac75d0`, y el workflow remoto de `main`
-`30724823470` quedó verde para ese SHA exacto.
+`ad1c182093986279aac7fb6582f7788202112a78` tiene CI remoto verde en el run
+`30745457821`: pasaron backend, lint, integración PostgreSQL, E2E, frontend, el
+runtime Pymes headless y el gate agregado. `make ci` de Pymes también pasa
+contra el runtime incluido por ese checkout exacto y los controles H8 actuales.
+Pymes PR #47 quedó fusionado en
+`ccff2c106da92f3bfc74b2d12b5f4409aa743050`, y el workflow remoto de `main`
+`30744384829` quedó verde para ese baseline.

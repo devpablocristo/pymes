@@ -292,11 +292,16 @@ expect_failure \
   "policy fixture"
 
 enforced_org_policy='{
-  "name":"projects/pymes-dev-352318/policies/iam.disableCrossProjectServiceAccountUsage",
+  "name":"projects/884236221349/policies/iam.disableCrossProjectServiceAccountUsage",
   "spec":{"rules":[{"enforce":true}]}
 }'
 pymes_validate_enforced_boolean_org_policy \
   "$enforced_org_policy" iam.disableCrossProjectServiceAccountUsage
+expect_failure \
+  "release accepted a non-canonical project ID in organization-policy name" \
+  pymes_validate_enforced_boolean_org_policy \
+  "$(sed 's#projects/884236221349/#projects/pymes-dev-352318/#' <<<"$enforced_org_policy")" \
+  iam.disableCrossProjectServiceAccountUsage
 expect_failure \
   "release accepted disabled cross-project service-account protection" \
   pymes_validate_enforced_boolean_org_policy \

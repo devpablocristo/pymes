@@ -5,8 +5,10 @@ go 1.26.5
 require (
 	cloud.google.com/go/kms v1.31.0
 	github.com/devpablocristo/platform/databases/postgres/go v0.5.0
+	github.com/devpablocristo/platform/features/scheduling/go v0.2.0
 	github.com/devpablocristo/platform/observability/go v0.2.1
 	github.com/devpablocristo/platform/sdks/clerk/go v0.5.1
+	github.com/devpablocristo/platform/sdks/google-calendar/go v0.2.1
 	github.com/go-chi/chi/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.21.0
@@ -30,6 +32,8 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/clerk/clerk-sdk-go/v2 v2.7.0 // indirect
+	github.com/devpablocristo/platform/errors/go v0.2.0 // indirect
+	github.com/devpablocristo/platform/jobs/go v0.1.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.5 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect

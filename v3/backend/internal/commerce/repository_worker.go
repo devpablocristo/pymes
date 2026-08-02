@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	repositoryhelpers "github.com/devpablocristo/pymes/v3/backend/internal/commerce/repository/helpers"
+	repositorymodels "github.com/devpablocristo/pymes/v3/backend/internal/commerce/repository/models"
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/commerce/usecases/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -44,9 +46,14 @@ func (s *Store) ListUncertainSales(ctx context.Context, limit int) ([]domain.Pen
 				       request_id,actor_ref,source_version,correlation_id,created_at,updated_at
 				FROM app.sales
 				WHERE status='fiscal_uncertain'
+				  AND EXISTS (
+				    SELECT 1 FROM app.organization_feature_flags features
+				    WHERE features.org_id=$2 AND features.fiscal_real_enabled
+				  )
 				ORDER BY updated_at
 				LIMIT $1`,
 			limit-len(result),
+			organizationID,
 		)
 		if err != nil {
 			_ = tx.Rollback(ctx)
@@ -153,7 +160,7 @@ func (s *Store) GetPurchase(ctx context.Context, organizationID, purchaseID stri
 }
 func (s *Store) MarkPurchasePosted(ctx context.Context, purchase domain.Purchase, result domain.AccountingEvent) error {
 	if result.OrganizationID != purchase.OrganizationID ||
-		result.SourceVersion != originSourceVersion(purchase.Origin) ||
+		result.SourceVersion != repositoryhelpers.OriginSourceVersion(purchase.Origin) ||
 		result.SnapshotDigest != purchase.SnapshotDigest ||
 		result.CorrelationID != purchase.CorrelationID ||
 		(result.Status != "posted" && result.Status != "duplicate") ||
@@ -247,7 +254,7 @@ func (s *Store) MarkPaymentPosted(ctx context.Context, payment domain.Payment, r
 		snapshotDigest = paymentSnapshotDigest(payment)
 	}
 	if result.OrganizationID != payment.OrganizationID ||
-		result.SourceVersion != originSourceVersion(payment.Origin) ||
+		result.SourceVersion != repositoryhelpers.OriginSourceVersion(payment.Origin) ||
 		result.SnapshotDigest != snapshotDigest ||
 		result.CorrelationID != payment.CorrelationID ||
 		(result.Status != "posted" && result.Status != "duplicate") ||
@@ -290,11 +297,16 @@ func (s *Store) MarkPaymentPosted(ctx context.Context, payment domain.Payment, r
 		if err != nil {
 			return err
 		}
-		type application struct{ id, kind, documentID, amount, currency string }
-		var values []application
+		var values []repositorymodels.PendingApplication
 		for rows.Next() {
-			var value application
-			if err := rows.Scan(&value.id, &value.kind, &value.documentID, &value.amount, &value.currency); err != nil {
+			var value repositorymodels.PendingApplication
+			if err := rows.Scan(
+				&value.ID,
+				&value.Kind,
+				&value.DocumentID,
+				&value.Amount,
+				&value.Currency,
+			); err != nil {
 				rows.Close()
 				return err
 			}
@@ -307,11 +319,11 @@ func (s *Store) MarkPaymentPosted(ctx context.Context, payment domain.Payment, r
 		rows.Close()
 		for _, value := range values {
 			var documentOpenItemID string
-			switch value.kind {
+			switch value.Kind {
 			case "sale":
-				err = tx.QueryRow(ctx, `SELECT COALESCE(open_item_id,'') FROM app.sales WHERE org_id=$1 AND id=$2`, org, value.documentID).Scan(&documentOpenItemID)
+				err = tx.QueryRow(ctx, `SELECT COALESCE(open_item_id,'') FROM app.sales WHERE org_id=$1 AND id=$2`, org, value.DocumentID).Scan(&documentOpenItemID)
 			case "purchase":
-				err = tx.QueryRow(ctx, `SELECT COALESCE(open_item_id,'') FROM app.purchases WHERE org_id=$1 AND id=$2`, org, value.documentID).Scan(&documentOpenItemID)
+				err = tx.QueryRow(ctx, `SELECT COALESCE(open_item_id,'') FROM app.purchases WHERE org_id=$1 AND id=$2`, org, value.DocumentID).Scan(&documentOpenItemID)
 			default:
 				err = fmt.Errorf("unsupported application document kind")
 			}
@@ -322,14 +334,14 @@ func (s *Store) MarkPaymentPosted(ctx context.Context, payment domain.Payment, r
 				return fmt.Errorf("OPEN_ITEM_NOT_READY")
 			}
 			debitID, creditID := documentOpenItemID, openItemID
-			if value.kind == "purchase" {
+			if value.Kind == "purchase" {
 				debitID, creditID = openItemID, documentOpenItemID
 			}
-			commandID := commandUUID("payment-application", value.id)
+			commandID := commandUUID("payment-application", value.ID)
 			if err := insertApplicationCommand(ctx, tx, domain.PendingAccountingApplication{
-				ID: commandID, OrganizationID: org, SourceKind: "payment_application", SourceID: value.id,
+				ID: commandID, OrganizationID: org, SourceKind: "payment_application", SourceID: value.ID,
 				DebitOpenItemID: debitID, CreditOpenItemID: creditID,
-				Amount: domain.Money{Amount: value.amount, Currency: value.currency}, Status: "pending",
+				Amount: domain.Money{Amount: value.Amount, Currency: value.Currency}, Status: "pending",
 				Origin: payment.Origin, CorrelationID: payment.CorrelationID,
 			}, now); err != nil {
 				return err
@@ -399,7 +411,7 @@ func (s *Store) GetSale(ctx context.Context, organizationID, saleID string) (dom
 
 func (s *Store) ApplyFiscalResult(ctx context.Context, sale domain.Sale, result domain.FiscalResult) error {
 	if result.OrganizationID != sale.OrganizationID ||
-		result.SourceVersion != originSourceVersion(sale.Origin) ||
+		result.SourceVersion != repositoryhelpers.OriginSourceVersion(sale.Origin) ||
 		result.SnapshotDigest != sale.SnapshotDigest ||
 		result.CorrelationID != sale.CorrelationID {
 		return fmt.Errorf("INVALID_SERVICE_RESPONSE: fiscal metadata")
@@ -437,11 +449,11 @@ func (s *Store) ApplyFiscalResult(ctx context.Context, sale domain.Sale, result 
 		if updated.RowsAffected() == 1 {
 			payload, _ := json.Marshal(map[string]string{"sale_id": sale.ID})
 			payloadDigest := sha256.Sum256(payload)
-			sourceVersion := originSourceVersion(sale.Origin)
-			idempotencyKey := repositoryIdempotencyKey(
+			sourceVersion := repositoryhelpers.OriginSourceVersion(sale.Origin)
+			idempotencyKey := repositoryhelpers.IdempotencyKey(
 				sale.OrganizationID, "accounting.post", sale.ID, sourceVersion,
 			)
-			origin := normalizeOrigin(
+			origin := repositoryhelpers.NormalizeOrigin(
 				sale.Origin, sale.CorrelationID, "accounting.post", sale.ID,
 			)
 			if _, err = tx.Exec(ctx, `
@@ -510,7 +522,7 @@ func (s *Store) ApplyFiscalResult(ctx context.Context, sale domain.Sale, result 
 
 func (s *Store) MarkSalePosted(ctx context.Context, sale domain.Sale, result domain.AccountingEvent) error {
 	if result.OrganizationID != sale.OrganizationID ||
-		result.SourceVersion != originSourceVersion(sale.Origin) ||
+		result.SourceVersion != repositoryhelpers.OriginSourceVersion(sale.Origin) ||
 		result.SnapshotDigest != sale.SnapshotDigest ||
 		result.CorrelationID != sale.CorrelationID ||
 		(result.Status != "posted" && result.Status != "duplicate") ||
@@ -592,12 +604,12 @@ func (s *Store) MarkSalePosted(ctx context.Context, sale domain.Sale, result dom
 }
 
 func insertApplicationCommand(ctx context.Context, tx pgx.Tx, value domain.PendingAccountingApplication, now time.Time) error {
-	value.Origin = normalizeOrigin(
+	value.Origin = repositoryhelpers.NormalizeOrigin(
 		value.Origin, value.CorrelationID, "accounting.apply", value.ID,
 	)
 	value.CorrelationID = value.Origin.CorrelationID
 	if value.SnapshotDigest == "" {
-		value.SnapshotDigest = applicationSnapshotDigest(value)
+		value.SnapshotDigest = repositoryhelpers.AccountingApplicationSnapshotDigest(value)
 	}
 	_, err := tx.Exec(ctx, `
 		INSERT INTO app.accounting_application_commands
@@ -615,7 +627,7 @@ func insertApplicationCommand(ctx context.Context, tx pgx.Tx, value domain.Pendi
 	}
 	payload, _ := json.Marshal(map[string]string{"application_id": value.ID})
 	digest := sha256.Sum256(payload)
-	idempotencyKey := repositoryIdempotencyKey(
+	idempotencyKey := repositoryhelpers.IdempotencyKey(
 		value.OrganizationID, "accounting.apply", value.ID, value.Origin.SourceVersion,
 	)
 	_, err = tx.Exec(ctx, `
@@ -633,14 +645,6 @@ func insertApplicationCommand(ctx context.Context, tx pgx.Tx, value domain.Pendi
 
 func commandUUID(operation, sourceID string) string {
 	return uuid.NewSHA1(uuid.NameSpaceURL, []byte("pymes-v3:"+operation+":"+sourceID)).String()
-}
-
-func applicationSnapshotDigest(value domain.PendingAccountingApplication) string {
-	body, _ := json.Marshal(struct {
-		ID, DebitOpenItemID, CreditOpenItemID, Amount, Currency string
-	}{value.ID, value.DebitOpenItemID, value.CreditOpenItemID, value.Amount.Amount, value.Amount.Currency})
-	digest := sha256.Sum256(body)
-	return hex.EncodeToString(digest[:])
 }
 
 func paymentSnapshotDigest(payment domain.Payment) string {
@@ -681,7 +685,7 @@ func (s *Store) GetAccountingApplication(ctx context.Context, organizationID, id
 
 func (s *Store) MarkAccountingApplicationApplied(ctx context.Context, value domain.PendingAccountingApplication, result domain.AccountingEvent) error {
 	if result.OrganizationID != value.OrganizationID ||
-		result.SourceVersion != originSourceVersion(value.Origin) ||
+		result.SourceVersion != repositoryhelpers.OriginSourceVersion(value.Origin) ||
 		result.SnapshotDigest != value.SnapshotDigest ||
 		result.CorrelationID != value.CorrelationID ||
 		(result.Status != "applied" && result.Status != "duplicate") ||
@@ -845,7 +849,7 @@ func (s *Store) ListAppliedAccountingApplications(ctx context.Context, organizat
 
 func (s *Store) MarkAccountingApplicationReversed(ctx context.Context, value domain.PendingAccountingApplication, result domain.AccountingEvent) error {
 	if result.OrganizationID != value.OrganizationID ||
-		result.SourceVersion != originSourceVersion(value.Origin) ||
+		result.SourceVersion != repositoryhelpers.OriginSourceVersion(value.Origin) ||
 		result.IdempotencyKey == "" ||
 		result.SnapshotDigest == "" ||
 		result.CorrelationID == "" ||
@@ -923,7 +927,7 @@ func (s *Store) GetAccountingReversal(ctx context.Context, organizationID, id st
 
 func (s *Store) MarkAccountingReversalCompleted(ctx context.Context, value domain.AccountingReversal, result domain.AccountingEvent) error {
 	if result.OrganizationID != value.OrganizationID ||
-		result.SourceVersion != originSourceVersion(value.Origin) ||
+		result.SourceVersion != repositoryhelpers.OriginSourceVersion(value.Origin) ||
 		result.SnapshotDigest != value.SnapshotDigest ||
 		result.CorrelationID != value.CorrelationID ||
 		(result.Status != "reversed" && result.Status != "duplicate") ||
@@ -1014,8 +1018,4 @@ func (s *Store) MarkAccountingReversalCompleted(ctx context.Context, value domai
 		return err
 	}
 	return tx.Commit(ctx)
-}
-
-func normalizeDocumentKind(value string) string {
-	return strings.ToLower(strings.TrimSpace(value))
 }

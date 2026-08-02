@@ -31,11 +31,9 @@ wait_http_down() {
 }
 
 worker_ready() {
-  docker compose exec -T fiscal-fake node -e '
-fetch("http://worker:8080/readyz")
-  .then((response) => process.exit(response.ok ? 0 : 1))
-  .catch(() => process.exit(1));
-' >/dev/null 2>&1
+  worker_port=${PYMES_WORKER_PORT:-18083}
+  curl -fsS --max-time 2 \
+    "http://127.0.0.1:$worker_port/readyz" >/dev/null 2>&1
 }
 
 wait_worker_up() {

@@ -107,15 +107,21 @@ Wire no llama `ListenAndServe`, `Serve`, `Shutdown` ni `signal.NotifyContext`.
 
 ## Contratos generados
 
-OpenAPI continúa siendo la fuente de verdad. El código generado pertenece al
-adapter que lo consume:
+OpenAPI continúa siendo la fuente de verdad. Los contratos de contextos
+manuales, como Agenda, se referencian desde `api/openapi.yaml`, pero no fuerzan
+una interfaz Go transversal. El código generado pertenece al adapter que lo
+consume:
 
 - API pública: `internal/commerce/handler/dto/public.gen.go`;
 - contabilidad privada: `internal/commerce/accounting/models/*.gen.go`;
 - fiscal privado: `internal/commerce/fiscal/models/*.gen.go`.
 
-`make api-generate` escribe en esas rutas y `make api-check` regenera en un
-directorio temporal para comparar byte a byte. `internal/contracts` no existe.
+La API Go de Commerce se genera con una allowlist positiva de sus operation IDs,
+por lo que las operaciones manuales de Scheduling, Notifications o Calendars
+no entran en su `ServerInterface`. `make api-generate` escribe en esas rutas y
+`make api-check` regenera en un directorio temporal para comparar byte a byte;
+además resuelve el contrato público completo como cliente efímero.
+`internal/contracts` no existe.
 
 ## Dependencias permitidas
 
@@ -147,12 +153,21 @@ make test
 `make architecture-check` usa `go/parser` y `go/ast` para verificar:
 
 - descubrimiento y forma completa de adapters;
+- aplicación de esa forma a todos los fragmentos del adapter, no sólo al
+  archivo raíz que lleva el marcador;
 - helpers con funciones reales y dto/models con tipos reales;
+- ausencia de payloads serializados, data-only structs y transformaciones en
+  los archivos raíz de adapters;
 - dominio libre de adapters;
 - interfaces fuera de repositories y packages de datos;
 - ausencia de capas históricas y `internal/contracts`;
-- composición exclusiva en wire;
+- ausencia física de directorios horizontales globales, aun cuando contengan
+  archivos no Go;
+- composición concreta entre contextos exclusivamente en `wire`;
 - ciclo de vida fuera de wire y dentro de cmd.
+- ausencia de imports, rutas, mounts, workflows o dependencias compiladas hacia
+  el proyecto usado históricamente para observar el patrón; el gate ejecuta
+  también `go list -deps -buildvcs=false`.
 
 El target forma parte de `make ci`. Toda nueva vertical o integración debe
 pasarlo antes de ejecutar los checks de integración y E2E.

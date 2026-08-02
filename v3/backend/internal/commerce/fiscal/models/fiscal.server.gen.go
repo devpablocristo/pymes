@@ -26,6 +26,21 @@ type ServerInterface interface {
 	// (POST /internal/v1/organizations/{organizationId}/authorizations/{requestId}/consult)
 	ConsultAuthorization(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, requestId string, params ConsultAuthorizationParams)
 
+	// (POST /internal/v1/organizations/{organizationId}/credentials/csr)
+	RequestFiscalCredentialCSR(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, params RequestFiscalCredentialCSRParams)
+
+	// (GET /internal/v1/organizations/{organizationId}/credentials/{credentialId})
+	GetFiscalCredential(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId CredentialId, params GetFiscalCredentialParams)
+
+	// (PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId})
+	UploadFiscalCertificate(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId CredentialId, params UploadFiscalCertificateParams)
+
+	// (PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale})
+	ConfigureFiscalPointOfSale(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params ConfigureFiscalPointOfSaleParams)
+
+	// (POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate)
+	ValidateFiscalPointOfSale(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params ValidateFiscalPointOfSaleParams)
+
 	// (GET /metrics)
 	FiscalMetrics(w http.ResponseWriter, r *http.Request)
 
@@ -54,6 +69,31 @@ func (_ Unimplemented) RequestAuthorization(w http.ResponseWriter, r *http.Reque
 
 // (POST /internal/v1/organizations/{organizationId}/authorizations/{requestId}/consult)
 func (_ Unimplemented) ConsultAuthorization(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, requestId string, params ConsultAuthorizationParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /internal/v1/organizations/{organizationId}/credentials/csr)
+func (_ Unimplemented) RequestFiscalCredentialCSR(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, params RequestFiscalCredentialCSRParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /internal/v1/organizations/{organizationId}/credentials/{credentialId})
+func (_ Unimplemented) GetFiscalCredential(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId CredentialId, params GetFiscalCredentialParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId})
+func (_ Unimplemented) UploadFiscalCertificate(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId CredentialId, params UploadFiscalCertificateParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale})
+func (_ Unimplemented) ConfigureFiscalPointOfSale(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params ConfigureFiscalPointOfSaleParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate)
+func (_ Unimplemented) ValidateFiscalPointOfSale(w http.ResponseWriter, r *http.Request, organizationId OrganizationId, credentialId CredentialId, pointOfSale int, params ValidateFiscalPointOfSaleParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -298,6 +338,353 @@ func (siw *ServerInterfaceWrapper) ConsultAuthorization(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// RequestFiscalCredentialCSR operation middleware
+func (siw *ServerInterfaceWrapper) RequestFiscalCredentialCSR(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "organizationId" -------------
+	var organizationId OrganizationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "organizationId", chi.URLParam(r, "organizationId"), &organizationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "organizationId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RequestFiscalCredentialCSRParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "X-Correlation-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Correlation-ID")]; found {
+		var XCorrelationID CorrelationId
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Correlation-ID", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Correlation-ID", valueList[0], &XCorrelationID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Correlation-ID", Err: err})
+			return
+		}
+
+		params.XCorrelationID = XCorrelationID
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Correlation-ID is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Correlation-ID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestFiscalCredentialCSR(w, r, organizationId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFiscalCredential operation middleware
+func (siw *ServerInterfaceWrapper) GetFiscalCredential(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "organizationId" -------------
+	var organizationId OrganizationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "organizationId", chi.URLParam(r, "organizationId"), &organizationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "organizationId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "credentialId" -------------
+	var credentialId CredentialId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "credentialId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetFiscalCredentialParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-Correlation-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Correlation-ID")]; found {
+		var XCorrelationID CorrelationId
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Correlation-ID", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Correlation-ID", valueList[0], &XCorrelationID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Correlation-ID", Err: err})
+			return
+		}
+
+		params.XCorrelationID = XCorrelationID
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Correlation-ID is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Correlation-ID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFiscalCredential(w, r, organizationId, credentialId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UploadFiscalCertificate operation middleware
+func (siw *ServerInterfaceWrapper) UploadFiscalCertificate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "organizationId" -------------
+	var organizationId OrganizationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "organizationId", chi.URLParam(r, "organizationId"), &organizationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "organizationId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "credentialId" -------------
+	var credentialId CredentialId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "credentialId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UploadFiscalCertificateParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-Correlation-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Correlation-ID")]; found {
+		var XCorrelationID CorrelationId
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Correlation-ID", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Correlation-ID", valueList[0], &XCorrelationID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Correlation-ID", Err: err})
+			return
+		}
+
+		params.XCorrelationID = XCorrelationID
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Correlation-ID is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Correlation-ID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadFiscalCertificate(w, r, organizationId, credentialId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConfigureFiscalPointOfSale operation middleware
+func (siw *ServerInterfaceWrapper) ConfigureFiscalPointOfSale(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "organizationId" -------------
+	var organizationId OrganizationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "organizationId", chi.URLParam(r, "organizationId"), &organizationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "organizationId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "credentialId" -------------
+	var credentialId CredentialId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "credentialId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "pointOfSale" -------------
+	var pointOfSale int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pointOfSale", chi.URLParam(r, "pointOfSale"), &pointOfSale, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pointOfSale", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ConfigureFiscalPointOfSaleParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-Correlation-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Correlation-ID")]; found {
+		var XCorrelationID CorrelationId
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Correlation-ID", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Correlation-ID", valueList[0], &XCorrelationID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Correlation-ID", Err: err})
+			return
+		}
+
+		params.XCorrelationID = XCorrelationID
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Correlation-ID is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Correlation-ID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfigureFiscalPointOfSale(w, r, organizationId, credentialId, pointOfSale, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ValidateFiscalPointOfSale operation middleware
+func (siw *ServerInterfaceWrapper) ValidateFiscalPointOfSale(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "organizationId" -------------
+	var organizationId OrganizationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "organizationId", chi.URLParam(r, "organizationId"), &organizationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "organizationId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "credentialId" -------------
+	var credentialId CredentialId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "credentialId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "pointOfSale" -------------
+	var pointOfSale int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pointOfSale", chi.URLParam(r, "pointOfSale"), &pointOfSale, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pointOfSale", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ValidateFiscalPointOfSaleParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-Correlation-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Correlation-ID")]; found {
+		var XCorrelationID CorrelationId
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Correlation-ID", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Correlation-ID", valueList[0], &XCorrelationID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Correlation-ID", Err: err})
+			return
+		}
+
+		params.XCorrelationID = XCorrelationID
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Correlation-ID is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Correlation-ID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ValidateFiscalPointOfSale(w, r, organizationId, credentialId, pointOfSale, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // FiscalMetrics operation middleware
 func (siw *ServerInterfaceWrapper) FiscalMetrics(w http.ResponseWriter, r *http.Request) {
 
@@ -453,6 +840,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/internal/v1/organizations/{organizationId}/authorizations/{requestId}/consult", wrapper.ConsultAuthorization)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/internal/v1/organizations/{organizationId}/credentials/csr", wrapper.RequestFiscalCredentialCSR)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/internal/v1/organizations/{organizationId}/credentials/{credentialId}", wrapper.GetFiscalCredential)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/internal/v1/organizations/{organizationId}/credentials/{credentialId}", wrapper.UploadFiscalCertificate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}", wrapper.ConfigureFiscalPointOfSale)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/internal/v1/organizations/{organizationId}/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate", wrapper.ValidateFiscalPointOfSale)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/internal/v1/catalogs/document-types", wrapper.ListDocumentTypes)

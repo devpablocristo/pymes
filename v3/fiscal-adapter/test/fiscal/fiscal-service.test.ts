@@ -1,9 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { InMemoryFiscalLedger } from "../../src/fiscal/companion/in-memory-ledger.js";
-import { MockFiscalAuthority } from "../../src/fiscal/companion/mock-authority.js";
-import { FiscalError, type FiscalRequest } from "../../src/fiscal/domain/fiscal.js";
-import { FiscalService } from "../../src/fiscal/usecases/fiscal-service.js";
+import { InMemoryFiscalLedger } from "../../src/fiscal/in_memory_ledger.js";
+import { MockFiscalAuthority } from "../../src/fiscal/mock_authority.js";
+import {
+  FiscalError,
+  type FiscalRequest,
+} from "../../src/fiscal/usecases/domain/fiscal.js";
+import {
+  FiscalService,
+  type AuthorityDecision,
+  type FiscalClaim,
+  type FiscalCompletion,
+  type FiscalLease,
+  type FiscalLedger,
+  type FiscalRecord,
+} from "../../src/fiscal/usecases.js";
 
 const request: FiscalRequest = {
   request_id: "fiscal:sale-1:1",
@@ -17,6 +28,7 @@ const request: FiscalRequest = {
   document_type: "FA",
   voucher_number: 42,
   issue_date: "2026-07-30",
+  concept: "products",
   currency: "ARS",
   totals: { net: "100", vat: "21", exempt: "0", total: "121.00" },
   recipient: { document_type: "CUIT", document_number: "20123456789", vat_condition: "registered" },
@@ -76,11 +88,228 @@ test("exact retries return the original result and changed payloads are rejected
   await assert.rejects(() => service.authorize(changed, context), (error) => error instanceof FiscalError && error.code === "IDEMPOTENCY_KEY_REUSED");
 });
 
+test("concurrent exact retries share one durable claim and dispatch once", async () => {
+  let authorizeCalls = 0;
+  const authority = {
+    async authorize(): Promise<AuthorityDecision> {
+      authorizeCalls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return authorizedDecision("12345678901234");
+    },
+    async consult(): Promise<AuthorityDecision> {
+      return { status: "not_found" };
+    },
+  };
+  const service = new FiscalService(
+    authority,
+    new InMemoryFiscalLedger(),
+    now,
+  );
+
+  const results = await Promise.all(
+    Array.from({ length: 12 }, () =>
+      service.authorize(structuredClone(request), contextFor(request))
+    ),
+  );
+
+  assert.equal(authorizeCalls, 1);
+  assert.equal(new Set(results.map((result) => result.cae)).size, 1);
+  assert.ok(results.every((result) => result.status === "authorized"));
+});
+
+test("a conflicting payload is rejected while the original claim is active", async () => {
+  const started = deferred<void>();
+  const release = deferred<AuthorityDecision>();
+  let authorizeCalls = 0;
+  const service = new FiscalService(
+    {
+      async authorize(): Promise<AuthorityDecision> {
+        authorizeCalls += 1;
+        started.resolve();
+        return release.promise;
+      },
+      async consult(): Promise<AuthorityDecision> {
+        return { status: "not_found" };
+      },
+    },
+    new InMemoryFiscalLedger(),
+    now,
+  );
+  const original = service.authorize(request, context);
+  await started.promise;
+  const changed = structuredClone(request);
+  changed.recipient.document_number = "20999999999";
+
+  await assert.rejects(
+    service.authorize(changed, contextFor(changed)),
+    (error: unknown) =>
+      error instanceof FiscalError &&
+      error.code === "IDEMPOTENCY_KEY_REUSED",
+  );
+  release.resolve(authorizedDecision("12345678901234"));
+  assert.equal((await original).status, "authorized");
+  assert.equal(authorizeCalls, 1);
+});
+
+test("an expired pre-dispatch lease is reclaimed without an unnecessary consultation", async () => {
+  let clock = 0;
+  let authorizeCalls = 0;
+  let consultCalls = 0;
+  const ledger = new MarkFaultLedger(
+    new InMemoryFiscalLedger(() => clock),
+    "before",
+    () => {
+      clock = 11;
+    },
+  );
+  const service = serviceWithShortLease(
+    {
+      async authorize(): Promise<AuthorityDecision> {
+        authorizeCalls += 1;
+        return authorizedDecision("12345678901234");
+      },
+      async consult(): Promise<AuthorityDecision> {
+        consultCalls += 1;
+        return { status: "not_found" };
+      },
+    },
+    ledger,
+  );
+
+  const result = await service.authorize(request, context);
+
+  assert.equal(result.status, "authorized");
+  assert.equal(authorizeCalls, 1);
+  assert.equal(consultCalls, 0);
+});
+
+test("an expired post-dispatch lease consults the exact voucher before authorizing", async () => {
+  let clock = 0;
+  const operations: string[] = [];
+  const ledger = new MarkFaultLedger(
+    new InMemoryFiscalLedger(() => clock),
+    "after",
+    () => {
+      clock = 11;
+    },
+  );
+  const service = serviceWithShortLease(
+    {
+      async authorize(input): Promise<AuthorityDecision> {
+        operations.push(`authorize:${input.voucher_number}`);
+        return authorizedDecision("12345678901234");
+      },
+      async consult(input): Promise<AuthorityDecision> {
+        operations.push(`consult:${input.voucher_number}`);
+        return { status: "not_found" };
+      },
+    },
+    ledger,
+  );
+
+  const result = await service.authorize(request, context);
+
+  assert.equal(result.status, "authorized");
+  assert.deepEqual(operations, ["consult:42", "authorize:42"]);
+});
+
+test("a late fenced response cannot overwrite a newer terminal CAE", async () => {
+  let clock = 0;
+  const firstStarted = deferred<void>();
+  const releaseFirst = deferred<AuthorityDecision>();
+  let authorizeCalls = 0;
+  let consultCalls = 0;
+  const ledger = new InMemoryFiscalLedger(() => clock);
+  const service = serviceWithShortLease(
+    {
+      async authorize(): Promise<AuthorityDecision> {
+        authorizeCalls += 1;
+        firstStarted.resolve();
+        return releaseFirst.promise;
+      },
+      async consult(): Promise<AuthorityDecision> {
+        consultCalls += 1;
+        return authorizedDecision("99999999999999");
+      },
+    },
+    ledger,
+  );
+
+  const first = service.authorize(request, context);
+  await firstStarted.promise;
+  clock = 11;
+  const recovered = await service.authorize(
+    structuredClone(request),
+    contextFor(request),
+  );
+  releaseFirst.resolve({
+    status: "rejected",
+    result_code: "LATE_REJECTION",
+    messages: ["late"],
+  });
+  const late = await first;
+
+  assert.equal(authorizeCalls, 1);
+  assert.equal(consultCalls, 1);
+  assert.equal(recovered.status, "authorized");
+  assert.equal(recovered.cae, "99999999999999");
+  assert.equal(late.status, "authorized");
+  assert.equal(late.cae, recovered.cae);
+  assert.equal(
+    (await ledger.findByRequest(request.organization_id, request.request_id))
+      ?.result.cae,
+    recovered.cae,
+  );
+});
+
+test("a late fenced CAE cannot overwrite a newer terminal rejection", async () => {
+  let clock = 0;
+  const firstStarted = deferred<void>();
+  const releaseFirst = deferred<AuthorityDecision>();
+  const ledger = new InMemoryFiscalLedger(() => clock);
+  const service = serviceWithShortLease(
+    {
+      async authorize(): Promise<AuthorityDecision> {
+        firstStarted.resolve();
+        return releaseFirst.promise;
+      },
+      async consult(): Promise<AuthorityDecision> {
+        return {
+          status: "rejected",
+          result_code: "RECOVERED_REJECTION",
+          messages: ["rejected"],
+        };
+      },
+    },
+    ledger,
+  );
+
+  const first = service.authorize(request, context);
+  await firstStarted.promise;
+  clock = 11;
+  const recovered = await service.authorize(
+    structuredClone(request),
+    contextFor(request),
+  );
+  releaseFirst.resolve(authorizedDecision("11111111111111"));
+  const late = await first;
+
+  assert.equal(recovered.status, "rejected");
+  assert.equal(late.status, "rejected");
+  assert.equal(
+    (await ledger.findByRequest(request.organization_id, request.request_id))
+      ?.result.status,
+    "rejected",
+  );
+});
+
 test("organizations are isolated even when request and idempotency IDs coincide", async () => {
   const service = new FiscalService(new MockFiscalAuthority(), new InMemoryFiscalLedger(), now);
-  const left = await service.authorize(request, context);
   const rightRequest = { ...structuredClone(request), organization_id: "org_b", credential_ref: "mock://credential/b" };
-  const right = await service.authorize(rightRequest, contextFor(rightRequest));
+  const [left, right] = await Promise.all([
+    service.authorize(request, context),
+    service.authorize(rightRequest, contextFor(rightRequest)),
+  ]);
   assert.equal(left.status, "authorized");
   assert.equal(right.status, "authorized");
   assert.notEqual(left.cae, right.cae);
@@ -194,4 +423,112 @@ function contextFor(value: Pick<FiscalRequest, "organization_id" | "idempotency_
       tokenId: "token-1",
     },
   };
+}
+
+class MarkFaultLedger implements FiscalLedger {
+  private failed = false;
+
+  constructor(
+    private readonly delegate: FiscalLedger,
+    private readonly fault: "before" | "after",
+    private readonly onFault: () => void,
+  ) {}
+
+  findByIdempotency(
+    organizationId: string,
+    idempotencyKey: string,
+  ): Promise<FiscalRecord | undefined> {
+    return this.delegate.findByIdempotency(organizationId, idempotencyKey);
+  }
+
+  findByRequest(
+    organizationId: string,
+    requestId: string,
+  ): Promise<FiscalRecord | undefined> {
+    return this.delegate.findByRequest(organizationId, requestId);
+  }
+
+  claimAuthorization(
+    record: FiscalRecord,
+    lease: FiscalLease,
+  ): Promise<FiscalClaim> {
+    return this.delegate.claimAuthorization(record, lease);
+  }
+
+  async markDispatched(
+    organizationId: string,
+    requestId: string,
+    payloadHash: string,
+    lease: FiscalLease,
+    attempt: number,
+  ): Promise<boolean> {
+    if (this.failed) {
+      return this.delegate.markDispatched(
+        organizationId,
+        requestId,
+        payloadHash,
+        lease,
+        attempt,
+      );
+    }
+    this.failed = true;
+    if (this.fault === "before") {
+      this.onFault();
+      return false;
+    }
+    const marked = await this.delegate.markDispatched(
+      organizationId,
+      requestId,
+      payloadHash,
+      lease,
+      attempt,
+    );
+    this.onFault();
+    return marked ? false : marked;
+  }
+
+  completeAuthorization(
+    record: FiscalRecord,
+    leaseToken: string,
+    attempt: number,
+  ): Promise<FiscalCompletion> {
+    return this.delegate.completeAuthorization(record, leaseToken, attempt);
+  }
+}
+
+function serviceWithShortLease(
+  authority: {
+    authorize(request: FiscalRequest): Promise<AuthorityDecision>;
+    consult(request: FiscalRequest): Promise<AuthorityDecision>;
+  },
+  ledger: FiscalLedger,
+): FiscalService {
+  return new FiscalService(authority, ledger, now, {
+    leaseDurationMs: 10,
+    contentionTimeoutMs: 1_000,
+    contentionPollMs: 1,
+    // Reusing the token deliberately proves that the durable attempt is the
+    // fencing generation; correctness does not rely only on token entropy.
+    leaseToken: () => "lease-fixed",
+    sleep: async () => undefined,
+  });
+}
+
+function authorizedDecision(cae: string): AuthorityDecision {
+  return {
+    status: "authorized",
+    cae,
+    cae_expires_on: "2026-08-09",
+    result_code: "AUTHORIZED",
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }

@@ -3,6 +3,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -14,8 +15,34 @@ type Dispatcher interface {
 	DispatchOnce(context.Context) error
 }
 
+// Dispatchers composes independently owned context workers without giving any
+// of them access to another context's repository. One failure does not starve
+// the remaining dispatchers in the same tick.
+type Dispatchers []Dispatcher
+
+func (dispatchers Dispatchers) DispatchOnce(ctx context.Context) error {
+	var result error
+	for index, dispatcher := range dispatchers {
+		if ctx.Err() != nil {
+			return errors.Join(result, ctx.Err())
+		}
+		if dispatcher == nil {
+			result = errors.Join(result, fmt.Errorf("dispatcher %d is not configured", index))
+			continue
+		}
+		if err := dispatcher.DispatchOnce(ctx); err != nil {
+			result = errors.Join(result, fmt.Errorf("dispatcher %d: %w", index, err))
+		}
+	}
+	return result
+}
+
 type MetricsReader interface {
 	Collect(context.Context) (workerdomain.Metrics, error)
+}
+
+type ReleaseReadySignal interface {
+	SignalReady(context.Context)
 }
 
 type CircuitState interface {
@@ -39,6 +66,7 @@ type EventTracer interface {
 type Runner struct {
 	Dispatcher     Dispatcher
 	Metrics        MetricsReader
+	ReleaseReady   ReleaseReadySignal
 	Circuits       map[string]CircuitState
 	Logger         *slog.Logger
 	DispatchEvery  time.Duration
@@ -48,7 +76,7 @@ type Runner struct {
 }
 
 func (r Runner) Run(ctx context.Context) error {
-	if r.Dispatcher == nil || r.Metrics == nil {
+	if r.Dispatcher == nil || r.Metrics == nil || r.ReleaseReady == nil {
 		return fmt.Errorf("worker runtime dependencies are not configured")
 	}
 	if r.DispatchEvery <= 0 || r.MetricsEvery <= 0 {
@@ -63,7 +91,13 @@ func (r Runner) Run(ctx context.Context) error {
 		metricsTimeout = 5 * time.Second
 	}
 
-	emitMetrics(ctx, logger, r.Metrics, r.Circuits, metricsTimeout)
+	if !emitMetrics(ctx, logger, r.Metrics, r.Circuits, metricsTimeout) {
+		return fmt.Errorf("initial durable worker metrics collection failed")
+	}
+	if ctx.Err() != nil {
+		return nil
+	}
+	r.ReleaseReady.SignalReady(ctx)
 	if r.RunOnce {
 		if ctx.Err() != nil {
 			return nil
@@ -116,7 +150,7 @@ func emitMetrics(
 	reader MetricsReader,
 	circuits map[string]CircuitState,
 	timeout time.Duration,
-) {
+) bool {
 	metricsCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	metrics, err := reader.Collect(metricsCtx)
@@ -131,9 +165,10 @@ func emitMetrics(
 			"code",
 			"METRICS_UNAVAILABLE",
 		)
-		return
+		return false
 	}
 	logMetrics(ctx, logger, metrics, circuits)
+	return true
 }
 
 func logMetrics(
@@ -170,6 +205,10 @@ func logMetrics(
 		metrics.OutboxOldestAgeSeconds,
 		"fiscal_uncertain",
 		metrics.FiscalUncertain,
+		"notifications_stalled",
+		metrics.NotificationsStalled,
+		"notifications_failed",
+		metrics.NotificationsFailed,
 		"accounting_applications_pending",
 		metrics.ApplicationPending,
 		"accounting_reversals_pending",

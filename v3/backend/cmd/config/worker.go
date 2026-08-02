@@ -4,23 +4,49 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
+const (
+	localWorkerReleaseSHA = "0000000000000000000000000000000000000000"
+	localWorkerRevision   = "local"
+)
+
+var (
+	workerReleaseSHA = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	workerRevision   = regexp.MustCompile(`^[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
+)
+
 type WorkerConfig struct {
-	HTTPAddr                   string
-	DatabaseURL                string
-	FiscalURL                  string
-	AccountingURL              string
-	Environment                string
-	AllowInsecureLocalServices bool
-	RunOnce                    bool
-	DispatchInterval           time.Duration
-	MetricsInterval            time.Duration
-	LeaseDuration              time.Duration
-	ShutdownTimeout            time.Duration
+	HTTPAddr                    string
+	DatabaseURL                 string
+	FiscalURL                   string
+	AccountingURL               string
+	Environment                 string
+	ReleaseSHA                  string
+	Revision                    string
+	SchedulingActionTokenSecret string
+	AllowInsecureLocalServices  bool
+	RunOnce                     bool
+	DispatchInterval            time.Duration
+	MetricsInterval             time.Duration
+	LeaseDuration               time.Duration
+	ShutdownTimeout             time.Duration
+	PerGo                       PerGoWorker
+	Calendars                   Calendars
+}
+
+type PerGoWorker struct {
+	Enabled                  bool
+	BaseURL                  string
+	APIKey                   string
+	WorkspaceID              string
+	Channel                  string
+	AllowGlobalRouteFallback bool
+	Timeout                  time.Duration
 }
 
 type WorkerConfigError struct {
@@ -58,6 +84,10 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 			"PYMES_ENVIRONMENT must be development, test, or production",
 		)
 	}
+	releaseSHA, revision, err := loadWorkerReleaseMetadata(getenv, environment)
+	if err != nil {
+		return WorkerConfig{}, err
+	}
 	allowInsecure := strings.EqualFold(
 		strings.TrimSpace(getenv("PYMES_ALLOW_INSECURE_LOCAL_SERVICES")),
 		"true",
@@ -83,6 +113,22 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 			"FISCAL_ADAPTER_URL and ACCOUNTING_URL are required",
 		)
 	}
+	actionTokenSecret := strings.TrimSpace(
+		getenv("PYMES_SCHEDULING_ACTION_TOKEN_SECRET"),
+	)
+	if len(actionTokenSecret) < 32 {
+		return WorkerConfig{}, workerConfigError(
+			"ACTION_TOKEN_SECRET_INVALID",
+			"PYMES_SCHEDULING_ACTION_TOKEN_SECRET must contain at least 32 bytes",
+		)
+	}
+	calendars, err := loadCalendars(getenv, environment)
+	if err != nil {
+		return WorkerConfig{}, &WorkerConfigError{
+			Code: "CALENDAR_CONFIG_INVALID",
+			Err:  err,
+		}
+	}
 	metricsInterval, err := parseWorkerMetricsInterval(
 		strings.TrimSpace(getenv("PYMES_WORKER_METRICS_INTERVAL")),
 	)
@@ -102,6 +148,57 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 			Err:  err,
 		}
 	}
+	pergoEnabled, err := parseWorkerBoolean(
+		"PYMES_PERGO_ENABLED",
+		strings.TrimSpace(getenv("PYMES_PERGO_ENABLED")),
+	)
+	if err != nil {
+		return WorkerConfig{}, &WorkerConfigError{
+			Code: "PERGO_CONFIG_INVALID",
+			Err:  err,
+		}
+	}
+	allowGlobalRouteFallback, err := parseWorkerBoolean(
+		"PERGO_ALLOW_GLOBAL_ROUTE_FALLBACK",
+		strings.TrimSpace(getenv("PERGO_ALLOW_GLOBAL_ROUTE_FALLBACK")),
+	)
+	if err != nil {
+		return WorkerConfig{}, &WorkerConfigError{
+			Code: "PERGO_CONFIG_INVALID",
+			Err:  err,
+		}
+	}
+	pergoTimeout := 5 * time.Second
+	if value := strings.TrimSpace(getenv("PERGO_TIMEOUT")); value != "" {
+		pergoTimeout, err = time.ParseDuration(value)
+		if err != nil || pergoTimeout < 100*time.Millisecond ||
+			pergoTimeout > 30*time.Second {
+			return WorkerConfig{}, workerConfigError(
+				"PERGO_CONFIG_INVALID",
+				"PERGO_TIMEOUT must be between 100ms and 30s",
+			)
+		}
+	}
+	pergo := PerGoWorker{
+		Enabled:                  pergoEnabled,
+		BaseURL:                  strings.TrimRight(strings.TrimSpace(getenv("PERGO_URL")), "/"),
+		APIKey:                   strings.TrimSpace(getenv("PERGO_API_KEY")),
+		WorkspaceID:              strings.TrimSpace(getenv("PERGO_WORKSPACE_ID")),
+		Channel:                  defaultValue(getenv("PERGO_CHANNEL"), "whatsapp"),
+		AllowGlobalRouteFallback: allowGlobalRouteFallback,
+		Timeout:                  pergoTimeout,
+	}
+	if pergo.Enabled &&
+		(pergo.BaseURL == "" || pergo.APIKey == "" ||
+			pergo.WorkspaceID == "" ||
+			(pergo.Channel != "whatsapp" &&
+				pergo.Channel != "whatsapp_cloud" &&
+				pergo.Channel != "whatsapp_mock")) {
+		return WorkerConfig{}, workerConfigError(
+			"PERGO_CONFIG_INVALID",
+			"complete PerGo worker configuration is required",
+		)
+	}
 	dispatchInterval := time.Second
 	if strings.TrimSpace(getenv("PYMES_WORKER_INTERVAL_MS")) != "" {
 		dispatchInterval = 250 * time.Millisecond
@@ -111,17 +208,51 @@ func LoadWorkerFrom(getenv func(string) string) (WorkerConfig, error) {
 			getenv("PYMES_WORKER_HTTP_ADDR"),
 			":8080",
 		),
-		DatabaseURL:                databaseURL,
-		FiscalURL:                  fiscalURL,
-		AccountingURL:              accountingURL,
-		Environment:                environment,
-		AllowInsecureLocalServices: allowInsecure,
-		RunOnce:                    runOnce,
-		DispatchInterval:           dispatchInterval,
-		MetricsInterval:            metricsInterval,
-		LeaseDuration:              30 * time.Second,
-		ShutdownTimeout:            5 * time.Second,
+		DatabaseURL:                 databaseURL,
+		FiscalURL:                   fiscalURL,
+		AccountingURL:               accountingURL,
+		Environment:                 environment,
+		ReleaseSHA:                  releaseSHA,
+		Revision:                    revision,
+		SchedulingActionTokenSecret: actionTokenSecret,
+		AllowInsecureLocalServices:  allowInsecure,
+		RunOnce:                     runOnce,
+		DispatchInterval:            dispatchInterval,
+		MetricsInterval:             metricsInterval,
+		LeaseDuration:               30 * time.Second,
+		ShutdownTimeout:             5 * time.Second,
+		PerGo:                       pergo,
+		Calendars:                   calendars,
 	}, nil
+}
+
+func loadWorkerReleaseMetadata(
+	getenv func(string) string,
+	environment string,
+) (string, string, error) {
+	releaseSHA := strings.TrimSpace(getenv("PYMES_RELEASE_SHA"))
+	revision := strings.TrimSpace(getenv("K_REVISION"))
+	if environment != "production" {
+		if releaseSHA == "" {
+			releaseSHA = localWorkerReleaseSHA
+		}
+		if revision == "" {
+			revision = localWorkerRevision
+		}
+	}
+	if !workerReleaseSHA.MatchString(releaseSHA) {
+		return "", "", workerConfigError(
+			"WORKER_RELEASE_METADATA_INVALID",
+			"PYMES_RELEASE_SHA must contain exactly 40 lowercase hexadecimal characters",
+		)
+	}
+	if !workerRevision.MatchString(revision) {
+		return "", "", workerConfigError(
+			"WORKER_RELEASE_METADATA_INVALID",
+			"K_REVISION must contain a valid Cloud Run revision name",
+		)
+	}
+	return releaseSHA, revision, nil
 }
 
 func WorkerErrorCode(err error) string {

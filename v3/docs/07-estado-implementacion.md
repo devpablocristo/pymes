@@ -1,46 +1,56 @@
 # Estado verificable de implementación
 
-Fecha de auditoría: 2026-07-31.
+Fecha de auditoría: 2026-08-01.
 
-El detalle que distingue implementación local de dependencias externas está en
-[la auditoría de cierre](08-auditoria-cierre.md).
+Este documento separa tres estados: código implementado, evidencia automática y
+operación desplegada. Ningún componente pasa al tercero por inferencia.
 
-## Implementado
+## Implementado y probado en la rama de integración
 
-| Área | Resultado | Evidencia automática |
+| Área | Resultado | Gate principal |
 |---|---|---|
-| Estructura | Backend Go y Fiscal TypeScript hexagonales; composición sólo en `wire`/`cmd`; SQL contable aislado en `internal/database/pymesaccounting`. | Go tests y boundary test de Open Accounting. |
-| Clerk y RBAC | Sesión validada con issuer, audience y authorized party; principal local con organización, actor, rol, permisos y estados; membresía inactiva denegada; `owner`/`admin` mutan y `member`/`viewer` sólo leen; toda mutación exige organización `ready`; webhook Svix durable e idempotente. | Matriz unitaria de todos los endpoints mutantes y PostgreSQL de identity/commerce con `pending`, `failed` y `suspended`. |
-| Tenancy | `org_id` transaccional y RLS en Pymes; mapping explícito a UUID/schema interno en Accounting; sin fallback de schema. | Prueba negativa de dos organizaciones e integración OA. |
-| Provisionamiento | Estados globales y por servicio; Accounting idempotente; mock Fiscal marcado explícitamente; fallo cerrado. | Prueba PostgreSQL de reintento y conservación de estados. |
-| Consistencia | Outbox transaccional, leases vencibles, backoff exponencial con jitter por evento, circuit breaker, payload hash e idempotencia durable. | Suites repository, respuesta perdida y E2E de contratos. |
-| Identidad interna | JWT Ed25519 de hasta cinco minutos; firma Cloud KMS obligatoria en producción con versión explícita, CRC32C y validación al arrancar; semilla sólo local; JWKS con overlap; request/correlation/actor/delegación tenant-safe. | Tests Go con KMS falso e integridad negativa más tests Go/TypeScript de claims. |
-| Fiscal mock | Número reservado atómicamente por Pymes; PostgreSQL; autorizado/rechazado/timeout/uncertain/consult; A/B/C, NC/ND, ARS/USD/EUR e IVA soportado. | Suite Fiscal, PostgreSQL y `make fiscal-e2e`. |
-| Accounting | Headless real; cuentas, períodos, posteo, reversa, partidas, aplicaciones, trial balance, mayor y aging. | Suites focalizadas OA, integración PostgreSQL y `make accounting-e2e`. |
-| Vertical comercial | Parties, ventas, compras, NC/ND, cobros, pagos parciales, reversas, estados y reconciliación. | Tests PostgreSQL con pérdida de respuesta, nota de crédito y reversa de pago. |
-| Operación | Probes contra DB, heartbeat JSON agregado sin PII, timeouts, circuit breakers, DLQ durable, replay idempotente con auditoría inmutable, métricas/alertas/dashboard Cloud Monitoring reproducibles, migraciones repetibles y backup/restore separado. | `make observability-e2e`, `make monitoring-config-check`, `make replay-smoke`, `make recovery-e2e`, `make backup-restore-smoke` y [runbook](10-runbook-operacion.md). |
-| Seguridad de dependencias | Go 1.26.5, `pgx`, `x/text`, `go-jose` y `grpc` en versiones corregidas; auditoría de los tres runtimes bloquea CI. | `make security`: cero vulnerabilidades alcanzables en Go y cero vulnerabilidades npm. |
-| Contratos | OpenAPI público y privados, código Go generado y control de drift. | `make api-check`. |
+| Arquitectura Go | Contextos verticales; `handler`, `repository`, `worker` e integraciones como adapters con `models`/`helpers`; el gate cubre también fragmentos; puertos consumer-owned; dominio aislado; composición sólo en `wire`; cero contacto técnico con Axis, incluido `go list -deps`. | `make architecture-check` |
+| Clerk y RBAC | Sesión validada con issuer, audience, authorized party y expiración; organización/membresía local; permisos y estados tenant; webhook Svix durable. | suite `identity`, PostgreSQL y E2E |
+| Tenancy | `org_id` transaccional, RLS forzado y referencias compuestas tenant-aware; Accounting usa mapping explícito sin fallback de schema. | `make db-integration` |
+| Consistencia | Outbox/inbox, leases, backoff, circuit breaker, hash de payload, idempotencia y reconciliación de respuestas perdidas. | `make e2e` |
+| Identidad interna | JWT Ed25519 corto; producción firma con una versión KMS explícita y publica JWKS con overlap; semillas sólo locales. | tests Go y checks de despliegue |
+| Accounting | Servicio headless fusionado: cuentas, períodos, posteos, reversas, partidas, aplicaciones y reportes. | `make accounting-test` y `make accounting-e2e` |
+| Comercio | Parties, ventas, compras, A/B/C, NC/ND, cobros, pagos parciales, reversas, numeración y estados. | `make commercial-e2e` |
+| Fiscal | Mock durable y adapter ARCA real seleccionables detrás del mismo puerto; onboarding CSR/certificado por tenant, WSAA/WSFE, número explícito, consulta exacta e incertidumbre. | `make fiscal-test`, `make fiscal-real-contract`, `make fiscal-e2e` |
+| Agenda | Sucursales, servicios, disponibilidad, recursos múltiples, holds, recurrencia, grupos, waitlist, cola, edición optimista de datos operativos, acciones públicas, DST y concurrencia. | `make scheduling-e2e` |
+| Web | React 19, Clerk, alta/edición/reprogramación de Agenda, booking público y Calendar Board 0.2 publicado. | `make web-ci` |
+| Notifications | Intención tenant, PerGo, fake contractual, ledger durable, idempotencia, claim/lease/fencing de entrega y webhook firmado/inbox; una respuesta incierta no se reintenta ni activa fallback. | `make notifications-e2e` y suite race del fork PerGo |
+| Calendars | OAuth tenant, tokens cifrados con KMS, Google Calendar/Meet, IDs determinísticos, ETag y reconciliación. | `make calendars-e2e` |
+| Operación | Probes, métricas, alertas, DLQ/replay, migraciones separadas, backup/restore y recuperación por servicio. | gates de operación dentro de `make ci` |
 
-## Diferido por decisión del producto
+La suite Go, el gate arquitectónico y `make ci` completo pasan localmente contra
+Open Accounting `1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d` y los controles H8
+actuales. El cierre expuso y corrigió una colisión de puerto entre Web y el fake
+de PerGo, además de la ausencia y el tipado incorrecto de la capability local
+pretraffic de Web. La rama remota aún no se considera verde hasta integrar el
+nuevo SHA y observar su workflow exitoso.
 
-La integración ARCA real no forma parte del runtime actual. Quedan juntos para
-la fase fiscal dedicada:
+## Dependencias externas y evidencia pendiente
 
-- publicación y consumo versionado de `arca-facturacion`;
-- WSAA, WSFEv1 y consulta real; certificados y tickets;
-- KMS/secret manager **fiscal**, alertas de expiración y homologación;
-- padrón, FCE, WSFEX y CAEA;
-- piloto y posterior emisión productiva.
+| Área | Implementación | Evidencia todavía necesaria |
+|---|---|---|
+| Release | workflow y build por SHA/digest; seed inerte; capability pretraffic API/Web; baseline y pin Web → API exactos; invoker IAM/ingress fail-closed; señal durable del worker; revocación de tags/URLs; rollback automático y `rollback-cloud-run.sh` por SHA implementados y validados localmente con una matriz stateful de fallos. La verificación activa ocurre antes de desarmar la transacción, bootstrap termina sin tags y Build/Deploy rechazan reruns aislados | CI remoto verde del SHA exacto; imágenes publicadas, manifiesto durable y evidencia de una transacción real |
+| GitHub | bootstrap y auditoría implementados localmente | `main` hoy sólo exige `v2-ci` a no administradores; `stg` no tiene reglas y permite bypass; `prd` no existe. Deben aplicarse y auditarse los controles V3 |
+| GCP | proyecto/región/SQL compartidos; identidades runtime, rotación simétrica de 90 días y secretos HMAC de Agenda v1 provisionados en STG/PRD | cargar valores reales de Clerk webhook/PerGo/Google, completar red y WIF dedicado por entorno |
+| WIF legado | retiro reversible y doble canary especificados | primer canary STG con WIF nuevo, retiro exacto, segundo canary posterior, Cloud Asset limpio y cierre |
+| STG | no desplegado | migraciones, workloads, IAM, readiness, revisión y digest exactos |
+| PRD | no desplegado | preparar sólo después de cerrar STG; mismo SHA/materiales y controles equivalentes, con digests propios del entorno |
+| PerGo real | adapter completo | credenciales cargadas fuera de Git y piloto con número controlado |
+| Google real | adapter completo | clientes OAuth separados, callback autorizado y piloto Calendar/Meet |
+| ARCA real | adapter completo; fork 2.5 local compatible | publicar/fijar el SDK, organización piloto, CSR/certificado, punto de venta y homologación |
+| Recuperación cloud | scripts y smoke local | backup/restore documentado contra destinos aislados del entorno |
 
-El puerto `FiscalAuthority`, la numeración, los estados y los escenarios de
-recuperación ya están fijados. El companion real debe sustituir al mock sin
-cambiar dominio, handlers ni orquestación.
+No se necesita un CUIT o certificado global de Pymes: en el modelo SaaS cada
+organización registra su propia relación con ARCA y Fiscal conserva su clave
+privada cifrada.
 
-## Condiciones de producción, no decisiones de dominio
+## Criterio de cierre
 
-El entorno productivo debe ejecutar el bootstrap de la clave KMS interna, fijar
-su versión numérica y desplegar primero el JWKS activo+solapado en consumidores.
-También deberá proporcionar credenciales de base independientes, colector de
-logs/métricas/trazas y backups cifrados. Compose usa una semilla de desarrollo
-conocida y nunca debe reutilizarse como configuración productiva.
+El estado global sigue **en progreso** hasta completar H8. Los fakes son
+autoritativos para CI determinístico, pero no sustituyen los pilotos de PerGo,
+Google o ARCA ni la verificación de STG/PRD.

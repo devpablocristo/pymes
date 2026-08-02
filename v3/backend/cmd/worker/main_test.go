@@ -50,6 +50,7 @@ func TestWorkerEntrypointOwnsLifecycleWithoutConstructingAdapters(t *testing.T) 
 		"SELECT ", "INSERT ", "UPDATE ", "DELETE ",
 		"pgxpool", "DispatchOnce", "NewTicker",
 		"/healthz", "/readyz", "/metrics",
+		"ReleaseReady", "worker_release_ready",
 	} {
 		if strings.Contains(string(source), forbidden) {
 			t.Errorf("cmd/worker contains runtime concern %q", forbidden)
@@ -86,11 +87,20 @@ func (metrics *workerMetricsStub) Collect(context.Context) (workerdomain.Metrics
 	return workerdomain.Metrics{}, nil
 }
 
+type workerReleaseReadyStub struct {
+	calls atomic.Int64
+}
+
+func (signal *workerReleaseReadyStub) SignalReady(context.Context) {
+	signal.calls.Add(1)
+}
+
 func TestRunWorkerOwnsServerAndRunnerLifecycle(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	metrics := &workerMetricsStub{}
+	releaseReady := &workerReleaseReadyStub{}
 	var dispatches atomic.Int64
 	app := &wire.WorkerApp{
 		Server: &http.Server{
@@ -102,15 +112,23 @@ func TestRunWorkerOwnsServerAndRunnerLifecycle(t *testing.T) {
 				cancel()
 				return nil
 			}),
-			Metrics: metrics, Logger: slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+			Metrics: metrics, ReleaseReady: releaseReady,
+			Logger:        slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
 			DispatchEvery: time.Millisecond, MetricsEvery: time.Hour,
 		},
 	}
 	if err := runWorker(ctx, app); err != nil {
 		t.Fatal(err)
 	}
-	if dispatches.Load() != 1 || metrics.calls.Load() != 1 {
-		t.Fatalf("dispatches=%d metrics=%d", dispatches.Load(), metrics.calls.Load())
+	if dispatches.Load() != 1 ||
+		metrics.calls.Load() != 1 ||
+		releaseReady.calls.Load() != 1 {
+		t.Fatalf(
+			"dispatches=%d metrics=%d release_ready=%d",
+			dispatches.Load(),
+			metrics.calls.Load(),
+			releaseReady.calls.Load(),
+		)
 	}
 }
 

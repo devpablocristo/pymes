@@ -40,15 +40,22 @@ func (r *Postgres) ResolveClerkMembership(ctx context.Context, clerkOrganization
 	principal := identitydomain.Principal{OrganizationID: organizationID, ActorID: clerkUserID}
 	var membership repositorymodels.Membership
 	if err = tx.QueryRow(ctx, `
-		SELECT m.role,m.permissions::text,m.status,o.status
+		SELECT m.role,m.permissions::text,m.status,o.name,o.slug,o.status
 		FROM app.memberships m
 		JOIN app.organizations o ON o.id=m.org_id
 		WHERE m.org_id=$1 AND m.provider='clerk' AND m.provider_user_id=$2`,
 		organizationID, clerkUserID).Scan(
-		&membership.Role, &membership.PermissionsJSON, &membership.Status, &membership.OrganizationStatus,
+		&membership.Role,
+		&membership.PermissionsJSON,
+		&membership.Status,
+		&membership.OrganizationName,
+		&membership.OrganizationSlug,
+		&membership.OrganizationStatus,
 	); err != nil {
 		return identitydomain.Principal{}, fmt.Errorf("resolve clerk membership: %w", err)
 	}
+	principal.OrganizationName = membership.OrganizationName
+	principal.OrganizationSlug = membership.OrganizationSlug
 	principal.MembershipStatus = membership.Status
 	principal.OrganizationStatus = membership.OrganizationStatus
 	if principal.MembershipStatus != "active" {
@@ -126,6 +133,39 @@ func (r *Postgres) organization(ctx context.Context, tx pgx.Tx, value clerk.Orga
 		return err
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO app.organization_identities(provider,provider_organization_id,org_id) VALUES('clerk',$1,$2) ON CONFLICT(provider,provider_organization_id) DO UPDATE SET org_id=EXCLUDED.org_id`, value.ID, localID)
+	if err != nil {
+		return err
+	}
+	if _, err = tx.Exec(
+		ctx,
+		"SELECT set_config('app.org_id',$1,true)",
+		localID,
+	); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `
+		INSERT INTO app.organization_feature_flags (
+		  org_id,scheduling_enabled,whatsapp_enabled,
+		  google_calendar_enabled,fiscal_real_enabled,
+		  version,updated_at,updated_by
+		)
+		VALUES ($1,false,false,false,false,1,now(),'system:clerk')
+		ON CONFLICT (org_id) DO NOTHING`,
+		localID); err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `
+		INSERT INTO app.organization_feature_flag_audit (
+		  org_id,version,scheduling_enabled,whatsapp_enabled,
+		  google_calendar_enabled,fiscal_real_enabled,changed_by,changed_at
+		)
+		SELECT
+		  org_id,version,scheduling_enabled,whatsapp_enabled,
+		  google_calendar_enabled,fiscal_real_enabled,updated_by,updated_at
+		FROM app.organization_feature_flags
+		WHERE org_id=$1
+		ON CONFLICT (org_id,version) DO NOTHING`,
+		localID)
 	return err
 }
 func (r *Postgres) membership(ctx context.Context, tx pgx.Tx, value clerk.OrganizationMembership, deleted bool) error {

@@ -36,6 +36,20 @@ groups:
           severity: warning
         annotations:
           summary: "Pymes v3 needs fiscal reconciliation"
+      - alert: PymesNotificationsStalled
+        expr: pymes_notifications_stalled > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pymes v3 has WhatsApp deliveries stalled for over five minutes"
+      - alert: PymesNotificationsFailed
+        expr: pymes_notifications_failed > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pymes v3 has terminal WhatsApp delivery failures"
       - alert: PymesDependencyCircuitOpen
         expr: pymes_dependency_circuit_open > 0
         for: 2m

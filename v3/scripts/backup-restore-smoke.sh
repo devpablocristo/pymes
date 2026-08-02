@@ -1,9 +1,11 @@
 #!/usr/bin/env sh
 set -eu
+umask 077
 
 # This smoke test never writes to the active Pymes databases. It creates three
-# isolated source databases, restores them into three new databases and removes
-# only those six explicitly named databases when it finishes.
+# isolated source databases, restores them into three new databases, creates
+# one disposable destructive-guard witness and removes only those seven
+# explicitly named databases when it finishes.
 root_dir=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 temporary_dir=$(mktemp -d)
 run_suffix="$(date -u +%Y%m%d%H%M%S)_$$"
@@ -11,6 +13,7 @@ container_suffix="$(date -u +%Y%m%d%H%M%S)-$$"
 
 pymes_source_database="pymes_backup_source_$run_suffix"
 pymes_restore_database="pymes_backup_restore_$run_suffix"
+pymes_guard_database="pymes_backup_restore_guard_$run_suffix"
 fiscal_source_database="fiscal_backup_source_$run_suffix"
 fiscal_restore_database="fiscal_backup_restore_$run_suffix"
 accounting_source_database="accounting_backup_source_$run_suffix"
@@ -30,7 +33,7 @@ fiscal_user=
 fiscal_password=
 accounting_admin_user=
 
-for command in cut docker jq pg_dump pg_restore psql sha256sum; do
+for command in basename cp cut docker grep jq pg_dump pg_restore psql sed sha256sum stat; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "$command is required" >&2
     exit 1
@@ -313,6 +316,17 @@ assert_equal() {
   fi
 }
 
+assert_private_backup() {
+  archive=$1
+  test -s "$archive"
+  test -s "$archive.sha256"
+  archive_mode=$(stat -c '%a' "$archive")
+  manifest_mode=$(stat -c '%a' "$archive.sha256")
+  assert_equal "archive mode for $(basename "$archive")" 600 "$archive_mode"
+  assert_equal "manifest mode for $(basename "$archive")" 600 \
+    "$manifest_mode"
+}
+
 stage() {
   printf 'backup/restore: %s\n' "$1"
 }
@@ -329,6 +343,8 @@ cleanup() {
     drop_database postgres "$pymes_user" "$pymes_source_database" \
       >/dev/null 2>&1 || true
     drop_database postgres "$pymes_user" "$pymes_restore_database" \
+      >/dev/null 2>&1 || true
+    drop_database postgres "$pymes_user" "$pymes_guard_database" \
       >/dev/null 2>&1 || true
   fi
   if test -n "${fiscal_user:-}" &&
@@ -551,12 +567,12 @@ ACCOUNTING_DATABASE_URL="$accounting_source_host_url" \
 
 for dump in "$temporary_dir/pymes.dump" "$temporary_dir/fiscal.dump" \
   "$temporary_dir/accounting.dump"; do
-  test -s "$dump"
-  sha256sum "$dump" >>"$temporary_dir/checksums.sha256"
+  assert_private_backup "$dump"
 done
 
 stage 'creating and restoring three isolated destinations'
 create_database postgres "$pymes_user" "$pymes_restore_database" "$pymes_user"
+create_database postgres "$pymes_user" "$pymes_guard_database" "$pymes_user"
 create_database fiscal-postgres "$fiscal_user" "$fiscal_restore_database" "$fiscal_user"
 create_database accounting-postgres "$accounting_admin_user" \
   "$accounting_restore_database" accounting_owner
@@ -571,12 +587,73 @@ accounting_restore_host_url=$(accounting_database_url \
   '&options=-c%20role%3Daccounting_owner')
 accounting_restore_read_url=$(accounting_database_url \
   "$accounting_admin_user" 127.0.0.1 55436 "$accounting_restore_database")
+pymes_guard_host_url=$(password_database_url \
+  "$pymes_user" "$pymes_password" 127.0.0.1 55434 "$pymes_guard_database")
+
+docker compose exec -T postgres \
+  psql -X -U "$pymes_user" -d "$pymes_guard_database" \
+    -v ON_ERROR_STOP=1 \
+    -c 'CREATE SCHEMA app' \
+    -c 'CREATE TABLE app.organizations (id text PRIMARY KEY)' \
+    >/dev/null
+
+# Recovery must fail before touching a database when the checksum is absent,
+# the archive was altered, its service does not match, the operator did not
+# provide the exact confirmation, or the target already contains an object.
+stage 'proving destructive restore guards fail closed'
+cp "$temporary_dir/pymes.dump" "$temporary_dir/missing-manifest.dump"
+if PYMES_RESTORE_DATABASE_URL="$pymes_restore_host_url" \
+  SERVICE=pymes ./scripts/restore-postgres.sh \
+    "$temporary_dir/missing-manifest.dump" \
+    >"$temporary_dir/missing-manifest.log" 2>&1; then
+  echo "restore accepted an archive without a checksum manifest" >&2
+  exit 1
+fi
+
+cp "$temporary_dir/pymes.dump" "$temporary_dir/tampered.dump"
+cp "$temporary_dir/pymes.dump.sha256" \
+  "$temporary_dir/tampered.dump.sha256"
+sed -i 's/^archive=.*/archive=tampered.dump/' \
+  "$temporary_dir/tampered.dump.sha256"
+printf 'tampered' >>"$temporary_dir/tampered.dump"
+if PYMES_RESTORE_DATABASE_URL="$pymes_restore_host_url" \
+  SERVICE=pymes ./scripts/restore-postgres.sh "$temporary_dir/tampered.dump" \
+    >"$temporary_dir/tampered.log" 2>&1; then
+  echo "restore accepted an archive with the wrong checksum" >&2
+  exit 1
+fi
+
+if FISCAL_RESTORE_DATABASE_URL="$fiscal_restore_host_url" \
+  SERVICE=fiscal ./scripts/restore-postgres.sh "$temporary_dir/pymes.dump" \
+    >"$temporary_dir/cross-service.log" 2>&1; then
+  echo "Fiscal restore accepted a Pymes backup" >&2
+  exit 1
+fi
+
+if PYMES_RESTORE_DATABASE_URL="$pymes_restore_host_url" \
+  SERVICE=pymes ./scripts/restore-postgres.sh "$temporary_dir/pymes.dump" \
+    >"$temporary_dir/unconfirmed.log" 2>&1; then
+  echo "restore accepted an empty prefixed target without confirmation" >&2
+  exit 1
+fi
+
+if PYMES_RESTORE_DATABASE_URL="$pymes_guard_host_url" \
+  RESTORE_CONFIRMATION="RESTORE:pymes:$pymes_guard_database" \
+  SERVICE=pymes ./scripts/restore-postgres.sh "$temporary_dir/pymes.dump" \
+    >"$temporary_dir/nonempty.log" 2>&1; then
+  echo "restore accepted a prefixed target that already contains a marker" >&2
+  exit 1
+fi
+grep -q -- '--single-transaction' "$root_dir/scripts/restore-postgres.sh"
 
 PYMES_RESTORE_DATABASE_URL="$pymes_restore_host_url" \
+  RESTORE_CONFIRMATION="RESTORE:pymes:$pymes_restore_database" \
   SERVICE=pymes ./scripts/restore-postgres.sh "$temporary_dir/pymes.dump"
 FISCAL_RESTORE_DATABASE_URL="$fiscal_restore_host_url" \
+  RESTORE_CONFIRMATION="RESTORE:fiscal:$fiscal_restore_database" \
   SERVICE=fiscal ./scripts/restore-postgres.sh "$temporary_dir/fiscal.dump"
 ACCOUNTING_RESTORE_DATABASE_URL="$accounting_restore_host_url" \
+  RESTORE_CONFIRMATION="RESTORE:accounting:$accounting_restore_database" \
   SERVICE=accounting ./scripts/restore-postgres.sh "$temporary_dir/accounting.dump"
 
 stage 'reapplying every restored migration twice'

@@ -8,8 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
+	repositorymodels "github.com/devpablocristo/pymes/v3/backend/internal/commerce/repository/models"
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/commerce/usecases/domain"
 	"github.com/jackc/pgx/v5"
 )
@@ -133,18 +133,12 @@ func reserveIdempotency(
 	}
 	defer rows.Close()
 
-	type record struct {
-		operation, sourceID, payloadHash, key string
-		sourceVersion                         int
-		response                              json.RawMessage
-		completedAt                           *time.Time
-	}
-	var records []record
+	var records []repositorymodels.IdempotencyRecord
 	for rows.Next() {
-		var value record
+		var value repositorymodels.IdempotencyRecord
 		if err := rows.Scan(
-			&value.operation, &value.sourceID, &value.sourceVersion, &value.payloadHash,
-			&value.key, &value.response, &value.completedAt,
+			&value.Operation, &value.SourceID, &value.SourceVersion, &value.PayloadHash,
+			&value.Key, &value.Response, &value.CompletedAt,
 		); err != nil {
 			return false, nil, err
 		}
@@ -157,15 +151,15 @@ func reserveIdempotency(
 		return false, nil, domain.ErrIdempotencyKeyReused
 	}
 	existing := records[0]
-	if existing.operation != command.Operation ||
-		existing.sourceID != command.SourceID ||
-		existing.sourceVersion != command.SourceVersion ||
-		existing.key != command.Key ||
-		existing.payloadHash != command.PayloadHash {
+	if existing.Operation != command.Operation ||
+		existing.SourceID != command.SourceID ||
+		existing.SourceVersion != command.SourceVersion ||
+		existing.Key != command.Key ||
+		existing.PayloadHash != command.PayloadHash {
 		return false, nil, domain.ErrIdempotencyKeyReused
 	}
-	if existing.completedAt == nil || len(existing.response) == 0 {
+	if existing.CompletedAt == nil || len(existing.Response) == 0 {
 		return false, nil, errors.New("IDEMPOTENCY_IN_PROGRESS")
 	}
-	return true, existing.response, nil
+	return true, existing.Response, nil
 }

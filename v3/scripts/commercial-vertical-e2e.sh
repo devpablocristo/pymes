@@ -11,7 +11,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-for command in curl docker go jq node openssl; do
+for command in curl docker go jq node openssl psql; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "$command is required" >&2
     exit 1
@@ -29,12 +29,16 @@ export PYMES_CLERK_JWT_KEY
 export PYMES_CLERK_ISSUER=https://clerk.local
 export PYMES_CLERK_AUDIENCE=pymes-v3
 export PYMES_CLERK_AUTHORIZED_PARTIES=http://localhost:18080
-export PYMES_CLERK_WEBHOOK_SECRET=whsec_dGVzdHRlc3R0ZXN0dGVzdHRlc3R0ZXN0dGVzdA==
+PYMES_CLERK_WEBHOOK_SECRET="whsec_$(openssl rand -base64 32 | tr -d '\n')"
+export PYMES_CLERK_WEBHOOK_SECRET
 
 cd "$root_dir"
 docker compose up -d --build --wait
 
 api_url=http://127.0.0.1:18080
+fiscal_database_url=${FISCAL_DATABASE_TEST_URL:-postgresql://fiscal@127.0.0.1:55435/pymes_fiscal?sslmode=disable}
+fiscal_database_password=${FISCAL_DATABASE_TEST_PASSWORD:-fiscal}
+accounting_database_url=${ACCOUNTING_DATABASE_TEST_URL:-postgresql://accounting@127.0.0.1:55436/pymes_accounting?sslmode=disable}
 run_suffix="$(date -u +%Y%m%d%H%M%S)-$$"
 issue_date=$(date -u +%F)
 external_org_a="org_e2e_a_$run_suffix"
@@ -156,6 +160,33 @@ get_json() {
     exit 1
   fi
 }
+
+enable_fiscal_mock_for_tenant() {
+  feature_token=$1
+  feature_organization=$2
+  feature_output=$3
+  feature_status=$(curl -sS -o "$feature_output" -w '%{http_code}' \
+    -X PUT \
+    "$api_url/api/v1/organizations/$feature_organization/features" \
+    -H "Authorization: Bearer $feature_token" \
+    -H 'Content-Type: application/json' \
+    --data-binary '{
+      "scheduling_enabled":false,
+      "whatsapp_enabled":false,
+      "google_calendar_enabled":false,
+      "fiscal_real_enabled":true,
+      "expected_version":1
+    }')
+  if test "$feature_status" != 200; then
+    echo "enable fiscal feature failed: status=$feature_status body=$(sed -n '1,20p' "$feature_output")" >&2
+    exit 1
+  fi
+}
+
+enable_fiscal_mock_for_tenant \
+  "$token_a" "$organization_a" "$tmp_dir/features-a"
+enable_fiscal_mock_for_tenant \
+  "$token_b" "$organization_b" "$tmp_dir/features-b"
 
 wait_status() {
   wait_token=$1
@@ -369,25 +400,30 @@ post_json "$token_a" "/api/v1/organizations/$organization_a/reversals" "reversal
   "$reversal_payload" "$tmp_dir/reversal-created"
 wait_status "$token_a" "/api/v1/organizations/$organization_a/purchases/$purchase_usd" reversed "$tmp_dir/purchase-usd-reversed"
 
-fiscal_count=$(docker compose exec -T fiscal-postgres \
-  psql -U fiscal -d pymes_fiscal -Atc \
-    "SELECT count(*) FROM fiscal.requests WHERE organization_id='$organization_a'")
+fiscal_count=$(printf '%s\n' \
+  "SELECT count(*) FROM fiscal.requests WHERE organization_id = :'organization_id';" |
+  PGPASSWORD="$fiscal_database_password" \
+  psql "$fiscal_database_url" -X -v ON_ERROR_STOP=1 \
+    -v organization_id="$organization_a" -At)
 if test "$fiscal_count" != 7; then
   echo "expected seven unique fiscal requests, got $fiscal_count" >&2
   exit 1
 fi
 
-duplicate_journals=$(docker compose exec -T accounting-postgres \
-  psql -U accounting -d pymes_accounting -Atc \
-    "SELECT count(*)-count(DISTINCT result->>'journal_entry_id') FROM public.pymes_accounting_commands WHERE organization_id='$organization_a' AND result ? 'journal_entry_id'")
+duplicate_journals=$(printf '%s\n' \
+  "SELECT count(*)-count(DISTINCT result->>'journal_entry_id') FROM public.pymes_accounting_commands WHERE organization_id = :'organization_id' AND result ? 'journal_entry_id';" |
+  psql "$accounting_database_url" -X -v ON_ERROR_STOP=1 \
+    -v organization_id="$organization_a" -At)
 if test "$duplicate_journals" != 0; then
   echo "accounting commands converged to duplicate journal entries" >&2
   exit 1
 fi
 
-schema_pair=$(docker compose exec -T accounting-postgres \
-  psql -U accounting -d pymes_accounting -Atc \
-    "SELECT count(DISTINCT schema_name) FROM public.pymes_accounting_organizations WHERE organization_id IN ('$organization_a','$organization_b')")
+schema_pair=$(printf '%s\n' \
+  "SELECT count(DISTINCT schema_name) FROM public.pymes_accounting_organizations WHERE organization_id IN (:'organization_id', :'second_organization_id');" |
+  psql "$accounting_database_url" -X -v ON_ERROR_STOP=1 \
+    -v organization_id="$organization_a" \
+    -v second_organization_id="$organization_b" -At)
 if test "$schema_pair" != 2; then
   echo "accounting organizations do not have distinct schemas" >&2
   exit 1

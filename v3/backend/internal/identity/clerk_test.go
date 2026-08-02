@@ -52,14 +52,18 @@ func TestClerkAuthenticatorVerifiesTokenAndResolvesLocalMembership(t *testing.T)
 			if token != "session-token" {
 				t.Fatalf("unexpected token %q", token)
 			}
-			return clerk.SessionClaims{OrganizationID: "org_clerk", Subject: "user_clerk"}, nil
+			return clerk.SessionClaims{
+				OrganizationID: "org_clerk", Subject: "user_clerk",
+				SessionID: "session_clerk",
+			}, nil
 		}),
 		Memberships: membershipStub(func(_ context.Context, organizationID, userID string) (identitydomain.Principal, error) {
 			if organizationID != "org_clerk" || userID != "user_clerk" {
 				t.Fatalf("unexpected Clerk identity %q/%q", organizationID, userID)
 			}
 			return identitydomain.Principal{
-				OrganizationID: "local-organization", ActorID: "user_clerk", Role: identitydomain.RoleAdmin,
+				OrganizationID: "local-organization", OrganizationName: "Local Organization",
+				OrganizationSlug: "local-organization", ActorID: "user_clerk", Role: identitydomain.RoleAdmin,
 				Permissions: []string{"org:members:read"}, OrganizationStatus: "ready", MembershipStatus: "active",
 			}, nil
 		}),
@@ -69,7 +73,10 @@ func TestClerkAuthenticatorVerifiesTokenAndResolvesLocalMembership(t *testing.T)
 		t.Fatal(err)
 	}
 	if principal.OrganizationID != "local-organization" || principal.ActorID != "user_clerk" ||
+		principal.OrganizationName != "Local Organization" ||
+		principal.OrganizationSlug != "local-organization" ||
 		principal.Role != identitydomain.RoleAdmin || len(principal.Permissions) != 1 ||
+		principal.SessionID != "session_clerk" ||
 		principal.OrganizationStatus != "ready" || principal.MembershipStatus != "active" {
 		t.Fatalf("unexpected local principal %+v", principal)
 	}

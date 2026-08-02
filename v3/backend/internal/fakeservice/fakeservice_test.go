@@ -154,7 +154,7 @@ func TestFiscalGeneratedClientServerConformance(t *testing.T) {
 	if authorized.StatusCode() != http.StatusCreated || authorized.JSON201 == nil {
 		t.Fatalf("authorization response = %d %s", authorized.StatusCode(), authorized.Body)
 	}
-	if authorized.JSON201.Status != fiscalapi.Authorized ||
+	if authorized.JSON201.Status != fiscalapi.FiscalResultStatusAuthorized ||
 		authorized.JSON201.Cae == nil ||
 		authorized.JSON201.RequestId != request.RequestId {
 		t.Fatalf("invalid fiscal result: %#v", authorized.JSON201)
@@ -176,7 +176,7 @@ func TestFiscalGeneratedClientServerConformance(t *testing.T) {
 	if consulted.StatusCode() != http.StatusOK || consulted.JSON200 == nil {
 		t.Fatalf("consult response = %d %s", consulted.StatusCode(), consulted.Body)
 	}
-	if consulted.JSON200.Status != fiscalapi.Authorized ||
+	if consulted.JSON200.Status != fiscalapi.FiscalResultStatusAuthorized ||
 		consulted.JSON200.Cae == nil ||
 		*consulted.JSON200.Cae != *authorized.JSON201.Cae {
 		t.Fatalf("consult did not return stored result: %#v", consulted.JSON200)
@@ -190,6 +190,110 @@ func TestFiscalGeneratedClientServerConformance(t *testing.T) {
 		"X-Correlation-ID",
 		request.CorrelationId,
 	)
+}
+
+func TestFiscalGeneratedClientCredentialOnboardingConformance(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(fiscalapi.Handler(newFiscalFakeServer()))
+	t.Cleanup(server.Close)
+	client, err := fiscalapi.NewClientWithResponses(server.URL)
+	if err != nil {
+		t.Fatalf("new fiscal client: %v", err)
+	}
+
+	ctx := context.Background()
+	organizationID := "org_fiscal_onboarding"
+	correlationID := "corr-fiscal-onboarding"
+	csr, err := client.RequestFiscalCredentialCSRWithResponse(
+		ctx,
+		organizationID,
+		&fiscalapi.RequestFiscalCredentialCSRParams{
+			IdempotencyKey: "csr-key",
+			XCorrelationID: correlationID,
+		},
+		fiscalapi.CSRRequest{
+			CommonName:  "org-fiscal-onboarding",
+			Cuit:        "30712345678",
+			Environment: fiscalapi.CSRRequestEnvironmentHomologation,
+			LegalName:   "Pyme de prueba SA",
+		},
+	)
+	if err != nil {
+		t.Fatalf("request CSR: %v", err)
+	}
+	if csr.StatusCode() != http.StatusCreated || csr.JSON201 == nil {
+		t.Fatalf("CSR response = %d %s", csr.StatusCode(), csr.Body)
+	}
+	if !strings.Contains(csr.JSON201.CsrPem, "BEGIN CERTIFICATE REQUEST") ||
+		csr.JSON201.Credential.Status != fiscalapi.FiscalCredentialStatusPendingCertificate {
+		t.Fatalf("invalid CSR result: %#v", csr.JSON201)
+	}
+
+	credentialID := csr.JSON201.Credential.Id
+	uploaded, err := client.UploadFiscalCertificateWithResponse(
+		ctx,
+		organizationID,
+		credentialID,
+		&fiscalapi.UploadFiscalCertificateParams{XCorrelationID: correlationID},
+		fiscalapi.CertificateUpload{
+			CertificatePem:  "-----BEGIN CERTIFICATE-----\nFAKE\n-----END CERTIFICATE-----\n",
+			ExpectedVersion: csr.JSON201.Credential.Version,
+		},
+	)
+	if err != nil {
+		t.Fatalf("upload certificate: %v", err)
+	}
+	if uploaded.StatusCode() != http.StatusOK || uploaded.JSON200 == nil ||
+		uploaded.JSON200.Status != fiscalapi.FiscalCredentialStatusReady ||
+		uploaded.JSON200.CertificateFingerprint == nil {
+		t.Fatalf("invalid uploaded credential: %#v", uploaded)
+	}
+
+	configured, err := client.ConfigureFiscalPointOfSaleWithResponse(
+		ctx,
+		organizationID,
+		credentialID,
+		1,
+		&fiscalapi.ConfigureFiscalPointOfSaleParams{XCorrelationID: correlationID},
+		fiscalapi.ConfigureFiscalPointOfSaleJSONRequestBody{Enabled: false},
+	)
+	if err != nil {
+		t.Fatalf("configure point of sale: %v", err)
+	}
+	if configured.StatusCode() != http.StatusOK || configured.JSON200 == nil ||
+		configured.JSON200.ValidatedAt != nil {
+		t.Fatalf("invalid configured point of sale: %#v", configured)
+	}
+
+	validated, err := client.ValidateFiscalPointOfSaleWithResponse(
+		ctx,
+		organizationID,
+		credentialID,
+		1,
+		&fiscalapi.ValidateFiscalPointOfSaleParams{XCorrelationID: correlationID},
+		fiscalapi.ValidateFiscalPointOfSaleJSONRequestBody{Enabled: true},
+	)
+	if err != nil {
+		t.Fatalf("validate point of sale: %v", err)
+	}
+	if validated.StatusCode() != http.StatusOK || validated.JSON200 == nil ||
+		!validated.JSON200.Enabled || validated.JSON200.ValidatedAt == nil {
+		t.Fatalf("invalid validated point of sale: %#v", validated)
+	}
+
+	crossTenant, err := client.GetFiscalCredentialWithResponse(
+		ctx,
+		"org_other",
+		credentialID,
+		&fiscalapi.GetFiscalCredentialParams{XCorrelationID: correlationID},
+	)
+	if err != nil {
+		t.Fatalf("cross-tenant credential lookup: %v", err)
+	}
+	if crossTenant.StatusCode() != http.StatusNotFound {
+		t.Fatalf("cross-tenant lookup status = %d, want %d", crossTenant.StatusCode(), http.StatusNotFound)
+	}
 }
 
 func TestAccountingGeneratedServerConcurrentReplay(t *testing.T) {

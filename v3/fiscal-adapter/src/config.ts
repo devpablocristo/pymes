@@ -1,21 +1,29 @@
-import type { MockScenario } from "./fiscal/companion/mock-authority.js";
-import { legacyPublicKeyJWKS } from "./identity/access/ed25519-jwt-authorizer.js";
+import type { MockScenario } from "./fiscal/mock_authority.js";
+import { legacyPublicKeyJWKS } from "./identity/internal_jwt.js";
 
 export interface Config {
   port: number;
-  mode: "mock";
+  mode: "mock" | "arca";
   mockScenario: MockScenario;
   databaseURL: string;
+  runtimeEnvironment: string;
   allowInsecureLocal: boolean;
   internalIssuer?: string;
   internalJWKSJSON: string;
+  fiscalKMSKeyName: string;
+  localKMSKeyB64?: string;
+  homologationIssuerPattern?: string;
+  productionIssuerPattern?: string;
+  requestTimeoutMs: number;
 }
 
 const scenarios: MockScenario[] = ["authorized", "rejected", "timeout_before_processing", "response_lost_after_processing"];
 
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Config {
   const mode = environment.FISCAL_ADAPTER_MODE;
-  if (mode !== "mock") throw new Error("FISCAL_ADAPTER_MODE=mock is required while real ARCA is deferred");
+  if (mode !== "mock" && mode !== "arca") {
+    throw new Error("FISCAL_ADAPTER_MODE must be mock or arca");
+  }
   const databaseURL = environment.FISCAL_DATABASE_URL;
   if (databaseURL === undefined || databaseURL.length < 1) throw new Error("FISCAL_DATABASE_URL is required");
   const allowInsecureLocal = environment.FISCAL_ALLOW_INSECURE_LOCAL === "true";
@@ -40,5 +48,78 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Config
   if (!scenarios.includes(scenario as MockScenario)) throw new Error("invalid FISCAL_MOCK_SCENARIO");
   const port = Number(environment.PORT ?? "8080");
   if (!Number.isSafeInteger(port) || port < 1 || port > 65535) throw new Error("invalid PORT");
-  return { port, mode, mockScenario: scenario as MockScenario, databaseURL, allowInsecureLocal, internalIssuer, internalJWKSJSON };
+  const requestTimeoutMs = Number(environment.FISCAL_ARCA_TIMEOUT_MS ?? "30000");
+  if (!Number.isSafeInteger(requestTimeoutMs) || requestTimeoutMs < 1000 || requestTimeoutMs > 120000) {
+    throw new Error("invalid FISCAL_ARCA_TIMEOUT_MS");
+  }
+  const cloudKMSKeyName =
+    environment.FISCAL_KMS_KEY_NAME?.trim() || undefined;
+  const testKMSKey = Buffer.alloc(32, 7).toString("base64");
+  let localKMSKeyB64 =
+    environment.FISCAL_LOCAL_KMS_KEY_B64?.trim() || undefined;
+  if (
+    cloudKMSKeyName !== undefined &&
+    localKMSKeyB64 !== undefined
+  ) {
+    throw new Error(
+      "FISCAL_KMS_KEY_NAME and FISCAL_LOCAL_KMS_KEY_B64 are mutually exclusive",
+    );
+  }
+  if (localKMSKeyB64 !== undefined && runtimeEnvironment !== "development" && runtimeEnvironment !== "test") {
+    throw new Error("local fiscal KMS is forbidden outside development or test");
+  }
+  if (
+    cloudKMSKeyName === undefined &&
+    localKMSKeyB64 === undefined &&
+    runtimeEnvironment === "test"
+  ) {
+    localKMSKeyB64 = testKMSKey;
+  }
+  if (
+    runtimeEnvironment !== "development" &&
+    runtimeEnvironment !== "test" &&
+    cloudKMSKeyName === undefined
+  ) {
+    throw new Error(
+      "FISCAL_KMS_KEY_NAME is required outside development or test",
+    );
+  }
+  if (cloudKMSKeyName === undefined && localKMSKeyB64 === undefined) {
+    throw new Error(
+      "FISCAL_KMS_KEY_NAME or FISCAL_LOCAL_KMS_KEY_B64 is required",
+    );
+  }
+  const fiscalKMSKeyName =
+    cloudKMSKeyName ??
+    "projects/local/locations/global/keyRings/local/cryptoKeys/fiscal";
+  const homologationIssuerPattern = environment.FISCAL_ARCA_HOMOLOGATION_ISSUER_PATTERN;
+  const productionIssuerPattern = environment.FISCAL_ARCA_PRODUCTION_ISSUER_PATTERN;
+  if (mode === "arca" && (homologationIssuerPattern === undefined || productionIssuerPattern === undefined)) {
+    throw new Error("ARCA certificate issuer patterns are required in arca mode");
+  }
+  for (const pattern of [homologationIssuerPattern, productionIssuerPattern]) {
+    if (pattern !== undefined) {
+      if (pattern.length < 1 || pattern.length > 256) throw new Error("invalid ARCA issuer pattern");
+      try {
+        new RegExp(pattern, "i");
+      } catch {
+        throw new Error("invalid ARCA issuer pattern");
+      }
+    }
+  }
+  return {
+    port,
+    mode,
+    mockScenario: scenario as MockScenario,
+    databaseURL,
+    runtimeEnvironment,
+    allowInsecureLocal,
+    internalIssuer,
+    internalJWKSJSON,
+    fiscalKMSKeyName,
+    ...(localKMSKeyB64 === undefined ? {} : { localKMSKeyB64 }),
+    ...(homologationIssuerPattern === undefined ? {} : { homologationIssuerPattern }),
+    ...(productionIssuerPattern === undefined ? {} : { productionIssuerPattern }),
+    requestTimeoutMs,
+  };
 }

@@ -2,6 +2,8 @@
 .env.*
 !.env.example
 /.firebase/
+/.deps/
+/gha-creds-*.json
 /scripts/
 /ui/
 node_modules/

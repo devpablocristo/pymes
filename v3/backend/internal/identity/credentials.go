@@ -5,8 +5,6 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -97,15 +95,15 @@ func newServiceIssuer(issuer string, signer credentialSigner, overlap []Verifica
 		now = time.Now
 	}
 	keys := []VerificationKey{{KeyID: signer.KeyID(), PublicKey: public}}
-	seen := map[string]struct{}{signer.KeyID(): {}}
+	seen := map[string]bool{signer.KeyID(): true}
 	for _, key := range overlap {
 		if strings.TrimSpace(key.KeyID) == "" || len(key.PublicKey) != ed25519.PublicKeySize {
 			return nil, fmt.Errorf("%w: invalid verification key", ErrInvalidCredential)
 		}
-		if _, exists := seen[key.KeyID]; exists {
+		if seen[key.KeyID] {
 			continue
 		}
-		seen[key.KeyID] = struct{}{}
+		seen[key.KeyID] = true
 		keys = append(keys, VerificationKey{KeyID: key.KeyID, PublicKey: append(ed25519.PublicKey(nil), key.PublicKey...)})
 	}
 	return &ServiceIssuer{issuer: issuer, signer: signer, verificationKeys: keys, now: now}, nil
@@ -171,12 +169,10 @@ func (i *ServiceIssuer) MintCredential(ctx context.Context, request CredentialRe
 		ExpiresAt:        now.Add(5 * time.Minute).Unix(),
 		KeyID:            i.signer.KeyID(),
 	}
-	header, _ := json.Marshal(map[string]string{"alg": "EdDSA", "typ": "JWT", "kid": i.signer.KeyID()})
-	payload, err := json.Marshal(claims)
+	signingInput, err := credentialhelpers.SigningInput(i.signer.KeyID(), claims)
 	if err != nil {
 		return "", err
 	}
-	signingInput := base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(payload)
 	signature, err := i.signer.Sign(ctx, []byte(signingInput))
 	if err != nil {
 		return "", fmt.Errorf("sign internal credential: %w", err)
@@ -184,37 +180,12 @@ func (i *ServiceIssuer) MintCredential(ctx context.Context, request CredentialRe
 	if len(signature) != ed25519.SignatureSize || !ed25519.Verify(i.signer.PublicKey(), []byte(signingInput), signature) {
 		return "", fmt.Errorf("%w: signer returned an unverifiable signature", ErrInvalidCredential)
 	}
-	return signingInput + "." + base64.RawURLEncoding.EncodeToString(signature), nil
+	return credentialhelpers.SignedToken(signingInput, signature), nil
 }
 
 func VerifyInternalCredential(token string, public ed25519.PublicKey, now time.Time, expectedIssuer, expectedAudience, expectedOrgID string) (InternalCredential, error) {
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 {
-		return InternalCredential{}, ErrInvalidCredential
-	}
-	headerJSON, err := base64.RawURLEncoding.DecodeString(parts[0])
+	header, claims, err := credentialhelpers.DecodeAndVerify(token, public)
 	if err != nil {
-		return InternalCredential{}, ErrInvalidCredential
-	}
-	var header struct {
-		Algorithm string `json:"alg"`
-		Type      string `json:"typ"`
-		KeyID     string `json:"kid"`
-	}
-	if err = json.Unmarshal(headerJSON, &header); err != nil ||
-		header.Algorithm != "EdDSA" || header.Type != "JWT" || header.KeyID == "" {
-		return InternalCredential{}, ErrInvalidCredential
-	}
-	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
-	if err != nil || !ed25519.Verify(public, []byte(parts[0]+"."+parts[1]), signature) {
-		return InternalCredential{}, ErrInvalidCredential
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return InternalCredential{}, ErrInvalidCredential
-	}
-	var claims InternalCredential
-	if err = json.Unmarshal(payload, &claims); err != nil {
 		return InternalCredential{}, ErrInvalidCredential
 	}
 	if claims.Issuer != expectedIssuer || claims.Audience != expectedAudience ||
@@ -241,38 +212,9 @@ func (i *ServiceIssuer) JWKSJSON() (string, error) {
 }
 
 func JWKSJSON(keys []VerificationKey) (string, error) {
-	if len(keys) == 0 {
-		return "", fmt.Errorf("%w: at least one verification key is required", ErrInvalidCredential)
-	}
-	result := credentialmodels.JSONWebKeySet{
-		Keys: make([]credentialmodels.JSONWebKey, 0, len(keys)),
-	}
-	seen := make(map[string]struct{}, len(keys))
-	for _, key := range keys {
-		if key.KeyID == "" || len(key.PublicKey) != ed25519.PublicKeySize {
-			return "", fmt.Errorf("%w: invalid verification key", ErrInvalidCredential)
-		}
-		if _, exists := seen[key.KeyID]; exists {
-			return "", fmt.Errorf("%w: duplicate verification key ID", ErrInvalidCredential)
-		}
-		seen[key.KeyID] = struct{}{}
-		result.Keys = append(result.Keys, credentialmodels.JSONWebKey{
-			KeyType:   "OKP",
-			Curve:     "Ed25519",
-			Algorithm: "EdDSA",
-			Use:       "sig",
-			KeyOps:    []string{"verify"},
-			KeyID:     key.KeyID,
-			X:         base64.RawURLEncoding.EncodeToString(key.PublicKey),
-		})
-	}
-	encoded, err := json.Marshal(result)
+	encoded, err := credentialhelpers.JWKSJSON(keys)
 	if err != nil {
-		return "", fmt.Errorf("encode internal JWKS: %w", err)
+		return "", fmt.Errorf("%w: %v", ErrInvalidCredential, err)
 	}
-	return string(encoded), nil
-}
-
-func stableKMSKeyID(public ed25519.PublicKey) string {
-	return credentialhelpers.StableKeyID(public)
+	return encoded, nil
 }

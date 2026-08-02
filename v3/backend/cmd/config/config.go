@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -10,9 +11,23 @@ type Clerk struct {
 	SecretKey, JWTKey, Issuer, Audience, WebhookSecret string
 	AuthorizedParties                                  []string
 }
+type PerGoAPI struct {
+	Enabled        bool
+	WorkspaceID    string
+	WebhookSecrets []string
+}
+type Preflight struct {
+	Tag   string
+	Token string
+}
 type Config struct {
-	HTTPAddr, DatabaseURL, Environment string
-	Clerk                              Clerk
+	HTTPAddr, DatabaseURL, FiscalURL, Environment string
+	AllowInsecureLocalServices                    bool
+	SchedulingActionTokenSecret                   string
+	Clerk                                         Clerk
+	PerGo                                         PerGoAPI
+	Calendars                                     Calendars
+	Preflight                                     Preflight
 }
 
 func Load() (Config, error) { return LoadFrom(os.Getenv) }
@@ -21,18 +36,125 @@ func LoadFrom(getenv func(string) string) (Config, error) {
 		return Config{}, fmt.Errorf("environment reader is required")
 	}
 	env := strings.ToLower(defaultValue(getenv("PYMES_ENVIRONMENT"), "development"))
-	cfg := Config{HTTPAddr: defaultValue(getenv("PYMES_HTTP_ADDR"), ":8080"), DatabaseURL: strings.TrimSpace(getenv("PYMES_DATABASE_URL")), Environment: env, Clerk: Clerk{SecretKey: strings.TrimSpace(getenv("PYMES_CLERK_SECRET_KEY")), JWTKey: strings.TrimSpace(getenv("PYMES_CLERK_JWT_KEY")), Issuer: strings.TrimRight(strings.TrimSpace(getenv("PYMES_CLERK_ISSUER")), "/"), Audience: defaultValue(getenv("PYMES_CLERK_AUDIENCE"), "pymes-v3"), AuthorizedParties: csv(getenv("PYMES_CLERK_AUTHORIZED_PARTIES")), WebhookSecret: strings.TrimSpace(getenv("PYMES_CLERK_WEBHOOK_SECRET"))}}
+	if env != "development" && env != "test" && env != "production" {
+		return Config{}, fmt.Errorf("PYMES_ENVIRONMENT must be development, test, or production")
+	}
+	allowInsecure := strings.EqualFold(
+		strings.TrimSpace(getenv("PYMES_ALLOW_INSECURE_LOCAL_SERVICES")),
+		"true",
+	)
+	if allowInsecure && env == "production" {
+		return Config{}, fmt.Errorf("insecure local services are forbidden in production")
+	}
+	calendars, err := loadCalendars(getenv, env)
+	if err != nil {
+		return Config{}, err
+	}
+	pergoEnabled, err := strconv.ParseBool(
+		defaultValue(getenv("PYMES_PERGO_ENABLED"), "false"),
+	)
+	if err != nil {
+		return Config{}, fmt.Errorf("PYMES_PERGO_ENABLED must be a boolean")
+	}
+	cfg := Config{
+		HTTPAddr:                    defaultValue(getenv("PYMES_HTTP_ADDR"), ":8080"),
+		DatabaseURL:                 strings.TrimSpace(getenv("PYMES_DATABASE_URL")),
+		FiscalURL:                   strings.TrimSpace(getenv("FISCAL_ADAPTER_URL")),
+		Environment:                 env,
+		AllowInsecureLocalServices:  allowInsecure,
+		SchedulingActionTokenSecret: strings.TrimSpace(getenv("PYMES_SCHEDULING_ACTION_TOKEN_SECRET")),
+		Clerk: Clerk{
+			SecretKey:         strings.TrimSpace(getenv("PYMES_CLERK_SECRET_KEY")),
+			JWTKey:            strings.TrimSpace(getenv("PYMES_CLERK_JWT_KEY")),
+			Issuer:            strings.TrimRight(strings.TrimSpace(getenv("PYMES_CLERK_ISSUER")), "/"),
+			Audience:          defaultValue(getenv("PYMES_CLERK_AUDIENCE"), "pymes-v3"),
+			AuthorizedParties: csv(getenv("PYMES_CLERK_AUTHORIZED_PARTIES")),
+			WebhookSecret:     strings.TrimSpace(getenv("PYMES_CLERK_WEBHOOK_SECRET")),
+		},
+		PerGo: PerGoAPI{
+			Enabled:        pergoEnabled,
+			WorkspaceID:    strings.TrimSpace(getenv("PERGO_WORKSPACE_ID")),
+			WebhookSecrets: csv(getenv("PERGO_WEBHOOK_SECRETS")),
+		},
+		Preflight: Preflight{
+			Tag:   strings.TrimSpace(getenv("PYMES_PREFLIGHT_TAG")),
+			Token: strings.TrimSpace(getenv("PYMES_PREFLIGHT_TOKEN")),
+		},
+		Calendars: calendars,
+	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("PYMES_DATABASE_URL is required")
 	}
-	if env != "development" && env != "test" && env != "production" {
-		return Config{}, fmt.Errorf("PYMES_ENVIRONMENT must be development, test, or production")
+	if cfg.FiscalURL == "" {
+		return Config{}, fmt.Errorf("FISCAL_ADAPTER_URL is required")
 	}
 	if cfg.Clerk.Issuer == "" || len(cfg.Clerk.AuthorizedParties) == 0 || cfg.Clerk.WebhookSecret == "" || (cfg.Clerk.SecretKey == "" && cfg.Clerk.JWTKey == "") {
 		return Config{}, fmt.Errorf("complete Clerk configuration is required")
 	}
+	if len(cfg.SchedulingActionTokenSecret) < 32 {
+		return Config{}, fmt.Errorf("PYMES_SCHEDULING_ACTION_TOKEN_SECRET must contain at least 32 bytes")
+	}
+	if cfg.PerGo.Enabled &&
+		(cfg.PerGo.WorkspaceID == "" ||
+			!validPerGoWebhookSecrets(cfg.PerGo.WebhookSecrets)) {
+		return Config{}, fmt.Errorf(
+			"PERGO_WORKSPACE_ID and strong PERGO_WEBHOOK_SECRETS are required when PerGo is enabled",
+		)
+	}
+	if (cfg.Preflight.Tag == "") != (cfg.Preflight.Token == "") {
+		return Config{}, fmt.Errorf(
+			"PYMES_PREFLIGHT_TAG and PYMES_PREFLIGHT_TOKEN must be configured together",
+		)
+	}
+	if cfg.Environment == "production" &&
+		(!validPreflightTag(cfg.Preflight.Tag) ||
+			!validPreflightToken(cfg.Preflight.Token)) {
+		return Config{}, fmt.Errorf(
+			"strong PYMES_PREFLIGHT_TAG and PYMES_PREFLIGHT_TOKEN are required in production",
+		)
+	}
 	return cfg, nil
 }
+
+func validPerGoWebhookSecrets(secrets []string) bool {
+	if len(secrets) == 0 {
+		return false
+	}
+	for _, secret := range secrets {
+		if len(secret) < 32 {
+			return false
+		}
+	}
+	return true
+}
+
+func validPreflightTag(value string) bool {
+	if len(value) != len("candidate-")+40 ||
+		!strings.HasPrefix(value, "candidate-") {
+		return false
+	}
+	for _, character := range strings.TrimPrefix(value, "candidate-") {
+		if (character < 'a' || character > 'f') &&
+			(character < '0' || character > '9') {
+			return false
+		}
+	}
+	return true
+}
+
+func validPreflightToken(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, character := range value {
+		if (character < 'a' || character > 'f') &&
+			(character < '0' || character > '9') {
+			return false
+		}
+	}
+	return true
+}
+
 func defaultValue(value, fallback string) string {
 	if trimmed := strings.TrimSpace(value); trimmed != "" {
 		return trimmed

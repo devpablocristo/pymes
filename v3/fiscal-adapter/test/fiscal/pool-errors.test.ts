@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   observePoolErrors,
   type DatabasePoolEvent,
-} from "../../src/fiscal/repository/pool-errors.js";
+} from "../../src/fiscal/repository/helpers/pool-errors.js";
 
 test("idle PostgreSQL errors are observed without becoming unhandled process errors", () => {
   const source = new EventEmitter();

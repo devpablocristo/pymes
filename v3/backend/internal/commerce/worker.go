@@ -31,7 +31,7 @@ type AccountingClient interface {
 // RelayStore is the persistence port for the commerce outbox relay. PostgreSQL
 // is an adapter of this port; the workflow itself has no pgx dependency.
 type RelayStore interface {
-	Lease(context.Context, int, time.Duration) ([]domain.Event, error)
+	LeaseTopics(context.Context, []string, int, time.Duration) ([]domain.Event, error)
 	Retry(context.Context, domain.Event) error
 	DeadLetter(context.Context, domain.Event, string) error
 	MarkPublished(context.Context, domain.Event) error
@@ -52,6 +52,16 @@ type RelayStore interface {
 	ReserveFiscalConsultAttempt(context.Context, string, string) (int, error)
 }
 
+var commerceOutboxTopics = []string{
+	"AccountingAdjustmentRequested",
+	"PurchasePostingRequested",
+	"PaymentPostingRequested",
+	"OpenItemApplicationRequested",
+	"AccountingReversalRequested",
+	"FiscalAuthorizationRequested",
+	"AccountingPostingRequested",
+}
+
 // DurableWorker relays commerce commands at-least-once. Private services must
 // treat a repeated command identifier as a duplicate.
 type DurableWorker struct {
@@ -70,7 +80,12 @@ func (w DurableWorker) DispatchOnce(ctx context.Context) error {
 	if leaseFor <= 0 {
 		leaseFor = 30 * time.Second
 	}
-	events, err := w.Store.Lease(ctx, 20, leaseFor)
+	events, err := w.Store.LeaseTopics(
+		ctx,
+		commerceOutboxTopics,
+		20,
+		leaseFor,
+	)
 	if err != nil {
 		return err
 	}
@@ -320,9 +335,13 @@ func (w DurableWorker) applyOpenItem(ctx context.Context, event domain.Event) er
 	sourceVersion := persistedSourceVersion(value.Origin)
 	snapshotDigest := value.SnapshotDigest
 	if snapshotDigest == "" {
-		snapshotDigest = commandSnapshotDigest(struct {
-			ID, DebitOpenItemID, CreditOpenItemID, Amount, Currency string
-		}{value.ID, value.DebitOpenItemID, value.CreditOpenItemID, value.Amount.Amount, value.Amount.Currency})
+		snapshotDigest = commandSnapshotDigest(workermodels.AccountingApplicationSnapshot{
+			ID:               value.ID,
+			DebitOpenItemID:  value.DebitOpenItemID,
+			CreditOpenItemID: value.CreditOpenItemID,
+			Amount:           value.Amount.Amount,
+			Currency:         value.Amount.Currency,
+		})
 	}
 	command := domain.AccountingApplicationCommand{
 		CommandID: value.ID, OrganizationID: value.OrganizationID, DebitOpenItemID: value.DebitOpenItemID,
@@ -354,9 +373,7 @@ func (w DurableWorker) applyOpenItem(ctx context.Context, event domain.Event) er
 }
 
 func (w DurableWorker) reverseAccounting(ctx context.Context, event domain.Event) error {
-	var payload struct {
-		ReversalID string `json:"reversal_id"`
-	}
+	var payload workermodels.AccountingReversalEvent
 	if err := json.Unmarshal(event.Payload, &payload); err != nil {
 		return err
 	}
@@ -385,10 +402,11 @@ func (w DurableWorker) reverseAccounting(ctx context.Context, event domain.Event
 			)
 		}
 		commandID := accountingCommandID("application-reversal", application.ID, sourceVersion)
-		snapshotDigest := commandSnapshotDigest(struct {
-			ApplicationID, Reason string
-			ReversedAt            time.Time
-		}{application.ApplicationID, value.Reason, value.EffectiveAt})
+		snapshotDigest := commandSnapshotDigest(workermodels.AccountingApplicationReversalSnapshot{
+			ApplicationID: application.ApplicationID,
+			Reason:        value.Reason,
+			ReversedAt:    value.EffectiveAt,
+		})
 		command := domain.AccountingApplicationReversalCommand{
 			CommandID: commandID, OrganizationID: value.OrganizationID,
 			IdempotencyKey: internalIdempotencyKey(value.OrganizationID, "accounting.reverse-application", application.ID, sourceVersion),
@@ -422,10 +440,12 @@ func (w DurableWorker) reverseAccounting(ctx context.Context, event domain.Event
 	}
 	snapshotDigest := value.SnapshotDigest
 	if snapshotDigest == "" {
-		snapshotDigest = commandSnapshotDigest(struct {
-			ID, JournalEntryID, Reason string
-			EffectiveAt                time.Time
-		}{value.ID, value.OriginalJournalEntryID, value.Reason, value.EffectiveAt})
+		snapshotDigest = commandSnapshotDigest(workermodels.JournalReversalSnapshot{
+			ID:             value.ID,
+			JournalEntryID: value.OriginalJournalEntryID,
+			Reason:         value.Reason,
+			EffectiveAt:    value.EffectiveAt,
+		})
 	}
 	command := domain.ReversalCommand{
 		CommandID: accountingCommandID("journal-reversal", value.ID, sourceVersion), OrganizationID: value.OrganizationID,

@@ -42,6 +42,11 @@ type Commerce interface {
 	GetAccountingFailure(context.Context, string, string) (domain.AccountingFailure, error)
 	RequestAccountingAdjustmentIdempotent(context.Context, domain.IdempotencyCommand, string, domain.AccountingAdjustment) (domain.AccountingAdjustment, error)
 	GetSale(context.Context, string, string) (domain.Sale, error)
+	RequestFiscalCredentialCSR(context.Context, string, string, string, domain.FiscalCredentialCSRInput) (domain.FiscalCredentialCSRResult, error)
+	GetFiscalCredential(context.Context, string, string, string) (domain.FiscalCredential, error)
+	UploadFiscalCertificate(context.Context, string, string, string, domain.FiscalCertificateUpload) (domain.FiscalCredential, error)
+	ConfigureFiscalPointOfSale(context.Context, string, string, string, int, bool) (domain.FiscalPointOfSale, error)
+	ValidateFiscalPointOfSale(context.Context, string, string, string, int, bool) (domain.FiscalPointOfSale, error)
 	Ready(context.Context) error
 	Clock() time.Time
 }
@@ -78,6 +83,176 @@ func (s *HTTPServer) GetReadyz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
+}
+
+func (s *HTTPServer) RequestFiscalCredentialCSR(
+	w http.ResponseWriter,
+	r *http.Request,
+	organizationID publicapi.OrganizationId,
+	params publicapi.RequestFiscalCredentialCSRParams,
+) {
+	principal, ok := s.authorizedOrganization(w, r, organizationID, true)
+	if !ok {
+		return
+	}
+	var input publicapi.FiscalCredentialCSRInput
+	if handlerhelpers.DecodeJSON(r, &input) != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
+		return
+	}
+	result, err := s.commerce.RequestFiscalCredentialCSR(
+		identityusecases.WithPrincipal(r.Context(), principal),
+		organizationID,
+		params.IdempotencyKey,
+		requestCorrelationID(r),
+		handlerhelpers.FiscalCredentialCSRInput(input),
+	)
+	if err != nil {
+		writeFiscalSettingsError(w, err)
+		return
+	}
+	response, err := handlerhelpers.PublicFiscalCredentialCSRResult(result)
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "FISCAL_UNAVAILABLE")
+		return
+	}
+	writeJSON(w, http.StatusCreated, response)
+}
+
+func (s *HTTPServer) GetFiscalCredential(
+	w http.ResponseWriter,
+	r *http.Request,
+	organizationID publicapi.OrganizationId,
+	credentialID publicapi.FiscalCredentialId,
+) {
+	principal, ok := s.authorizedOrganization(w, r, organizationID, false)
+	if !ok {
+		return
+	}
+	result, err := s.commerce.GetFiscalCredential(
+		identityusecases.WithPrincipal(r.Context(), principal),
+		organizationID,
+		credentialID.String(),
+		requestCorrelationID(r),
+	)
+	if err != nil {
+		writeFiscalSettingsError(w, err)
+		return
+	}
+	response, err := handlerhelpers.PublicFiscalCredential(result)
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "FISCAL_UNAVAILABLE")
+		return
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (s *HTTPServer) UploadFiscalCertificate(
+	w http.ResponseWriter,
+	r *http.Request,
+	organizationID publicapi.OrganizationId,
+	credentialID publicapi.FiscalCredentialId,
+) {
+	principal, ok := s.authorizedOrganization(w, r, organizationID, true)
+	if !ok {
+		return
+	}
+	var input publicapi.FiscalCertificateUpload
+	if handlerhelpers.DecodeJSON(r, &input) != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
+		return
+	}
+	result, err := s.commerce.UploadFiscalCertificate(
+		identityusecases.WithPrincipal(r.Context(), principal),
+		organizationID,
+		credentialID.String(),
+		requestCorrelationID(r),
+		handlerhelpers.FiscalCertificateUpload(input),
+	)
+	if err != nil {
+		writeFiscalSettingsError(w, err)
+		return
+	}
+	response, err := handlerhelpers.PublicFiscalCredential(result)
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "FISCAL_UNAVAILABLE")
+		return
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (s *HTTPServer) ConfigureFiscalPointOfSale(
+	w http.ResponseWriter,
+	r *http.Request,
+	organizationID publicapi.OrganizationId,
+	credentialID publicapi.FiscalCredentialId,
+	pointOfSale publicapi.FiscalPointOfSaleNumber,
+) {
+	s.configureFiscalPointOfSale(w, r, organizationID, credentialID, pointOfSale, false)
+}
+
+func (s *HTTPServer) ValidateFiscalPointOfSale(
+	w http.ResponseWriter,
+	r *http.Request,
+	organizationID publicapi.OrganizationId,
+	credentialID publicapi.FiscalCredentialId,
+	pointOfSale publicapi.FiscalPointOfSaleNumber,
+) {
+	s.configureFiscalPointOfSale(w, r, organizationID, credentialID, pointOfSale, true)
+}
+
+func (s *HTTPServer) configureFiscalPointOfSale(
+	w http.ResponseWriter,
+	r *http.Request,
+	organizationID string,
+	credentialID publicapi.FiscalCredentialId,
+	pointOfSale int,
+	validate bool,
+) {
+	principal, ok := s.authorizedOrganization(w, r, organizationID, true)
+	if !ok {
+		return
+	}
+	var input publicapi.FiscalPointOfSaleConfiguration
+	if handlerhelpers.DecodeJSON(r, &input) != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
+		return
+	}
+	ctx := identityusecases.WithPrincipal(r.Context(), principal)
+	correlationID := requestCorrelationID(r)
+	var (
+		result domain.FiscalPointOfSale
+		err    error
+	)
+	if validate {
+		result, err = s.commerce.ValidateFiscalPointOfSale(
+			ctx,
+			organizationID,
+			credentialID.String(),
+			correlationID,
+			pointOfSale,
+			input.Enabled,
+		)
+	} else {
+		result, err = s.commerce.ConfigureFiscalPointOfSale(
+			ctx,
+			organizationID,
+			credentialID.String(),
+			correlationID,
+			pointOfSale,
+			input.Enabled,
+		)
+	}
+	if err != nil {
+		writeFiscalSettingsError(w, err)
+		return
+	}
+	response, err := handlerhelpers.PublicFiscalPointOfSale(result)
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "FISCAL_UNAVAILABLE")
+		return
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (s *HTTPServer) GetPurchase(w http.ResponseWriter, r *http.Request, organizationID publicapi.OrganizationId, purchaseID string) {
@@ -117,7 +292,7 @@ func (s *HTTPServer) CreateAccountingReversal(
 		return
 	}
 	var input publicapi.CreateAccountingReversalJSONRequestBody
-	if decodeJSON(r, &input) != nil || input.Id == "" || !input.DocumentKind.Valid() ||
+	if handlerhelpers.DecodeJSON(r, &input) != nil || input.Id == "" || !input.DocumentKind.Valid() ||
 		input.DocumentId == "" || input.EffectiveAt.IsZero() || strings.TrimSpace(input.Reason) == "" {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
@@ -174,7 +349,7 @@ func (s *HTTPServer) CreateAccountingAdjustment(
 		return
 	}
 	var input publicapi.CreateAccountingAdjustmentJSONRequestBody
-	if decodeJSON(r, &input) != nil ||
+	if handlerhelpers.DecodeJSON(r, &input) != nil ||
 		strings.TrimSpace(input.Id) == "" ||
 		len(input.Id) > 255 ||
 		input.EffectiveAt.IsZero() ||
@@ -225,7 +400,7 @@ func (s *HTTPServer) CreateParty(
 		return
 	}
 	var input publicapi.CreatePartyJSONRequestBody
-	if decodeJSON(r, &input) != nil || input.Id == "" || !input.Kind.Valid() || strings.TrimSpace(input.DisplayName) == "" {
+	if handlerhelpers.DecodeJSON(r, &input) != nil || input.Id == "" || !input.Kind.Valid() || strings.TrimSpace(input.DisplayName) == "" {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
@@ -269,7 +444,7 @@ func (s *HTTPServer) CreatePurchase(
 		return
 	}
 	var input publicapi.CreatePurchaseJSONRequestBody
-	if decodeJSON(r, &input) != nil {
+	if handlerhelpers.DecodeJSON(r, &input) != nil {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
@@ -331,7 +506,7 @@ func (s *HTTPServer) CreatePayment(
 		return
 	}
 	var input publicapi.CreatePaymentJSONRequestBody
-	if decodeJSON(r, &input) != nil {
+	if handlerhelpers.DecodeJSON(r, &input) != nil {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
@@ -416,7 +591,7 @@ func (s *HTTPServer) CreateSale(
 		return
 	}
 	var input publicapi.CreateSaleJSONRequestBody
-	if decodeJSON(r, &input) != nil {
+	if handlerhelpers.DecodeJSON(r, &input) != nil {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
@@ -440,7 +615,7 @@ func (s *HTTPServer) CreateSale(
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
-	fiscalSnapshot, err := freezeFiscalSnapshot(input.Fiscal, input.Currency, exchangeRate)
+	fiscalSnapshot, err := handlerhelpers.FreezeFiscalSnapshot(input.Fiscal, input.Currency, exchangeRate)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
@@ -472,22 +647,6 @@ func isNote(value string) bool {
 	return strings.HasPrefix(value, "NC") || strings.HasPrefix(value, "ND")
 }
 
-func freezeFiscalSnapshot(fiscal any, currency, exchangeRate string) ([]byte, error) {
-	raw, err := json.Marshal(fiscal)
-	if err != nil {
-		return nil, err
-	}
-	var snapshot map[string]any
-	if err = json.Unmarshal(raw, &snapshot); err != nil {
-		return nil, err
-	}
-	snapshot["currency"] = currency
-	if exchangeRate != "" {
-		snapshot["exchange_rate"] = exchangeRate
-	}
-	return json.Marshal(snapshot)
-}
-
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	handlerhelpers.WriteJSON(w, status, value)
 }
@@ -515,10 +674,6 @@ func writeGeneratedParameterError(w http.ResponseWriter, _ *http.Request, err er
 		return
 	}
 	writeError(w, http.StatusBadRequest, "VALIDATION_ERROR")
-}
-
-func decodeJSON(r *http.Request, destination any) error {
-	return handlerhelpers.DecodeJSON(r, destination)
 }
 
 func commandIdentity(
@@ -722,6 +877,8 @@ func optionalString(value string) *string {
 
 func writeCommandError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, domain.ErrFeatureDisabled):
+		writeError(w, http.StatusForbidden, "FEATURE_DISABLED")
 	case errors.Is(err, domain.ErrIdempotencyKeyReused):
 		writeError(w, http.StatusConflict, "IDEMPOTENCY_KEY_REUSED")
 	case errors.Is(err, domain.ErrOrganizationNotReady):
@@ -736,4 +893,47 @@ func writeCommandError(w http.ResponseWriter, err error) {
 			writeError(w, http.StatusUnprocessableEntity, "COMMAND_REJECTED")
 		}
 	}
+}
+
+func requestCorrelationID(r *http.Request) string {
+	if r != nil {
+		if metadata, ok := identityusecases.RequestMetadataFromContext(r.Context()); ok &&
+			metadata.CorrelationID != "" {
+			return metadata.CorrelationID
+		}
+		if value := strings.TrimSpace(r.Header.Get("X-Correlation-ID")); value != "" && len(value) <= 255 {
+			return value
+		}
+	}
+	return uuid.NewString()
+}
+
+func writeFiscalSettingsError(w http.ResponseWriter, err error) {
+	if errors.Is(err, domain.ErrFeatureDisabled) {
+		writeError(w, http.StatusForbidden, "FEATURE_DISABLED")
+		return
+	}
+	var upstream serviceError
+	if errors.As(err, &upstream) {
+		switch upstream.Code {
+		case "CREDENTIAL_NOT_FOUND":
+			writeError(w, http.StatusNotFound, upstream.Code)
+		case "IDEMPOTENCY_KEY_REUSED", "CREDENTIAL_VERSION_CONFLICT":
+			writeError(w, http.StatusConflict, upstream.Code)
+		case "AUTHORITY_TIMEOUT":
+			writeError(w, http.StatusServiceUnavailable, upstream.Code)
+		case "CREDENTIAL_NOT_READY", "CERTIFICATE_INVALID", "CERTIFICATE_CUIT_MISMATCH",
+			"CERTIFICATE_ENVIRONMENT_MISMATCH", "POINT_OF_SALE_NOT_VALIDATED",
+			"VALIDATION_ERROR":
+			writeError(w, http.StatusUnprocessableEntity, upstream.Code)
+		default:
+			writeError(w, http.StatusServiceUnavailable, "FISCAL_UNAVAILABLE")
+		}
+		return
+	}
+	if err != nil && err.Error() == "VALIDATION_ERROR" {
+		writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR")
+		return
+	}
+	writeError(w, http.StatusServiceUnavailable, "FISCAL_UNAVAILABLE")
 }

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Fault-matrix time is logical; production keeps the real bounded wait.
+exit 0

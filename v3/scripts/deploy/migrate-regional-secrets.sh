@@ -74,6 +74,87 @@ grant_accessor() {
     --role=roles/secretmanager.secretAccessor >/dev/null
 }
 
+revoke_accessor() {
+  local secret="$1" service_account="$2" member policy_json
+  member="serviceAccount:${service_account}@${project}.iam.gserviceaccount.com"
+  policy_json=$(gcloud secrets get-iam-policy "$secret" \
+    --project="$project" --format=json) || {
+    echo "could not audit obsolete accessor on $secret" >&2
+    exit 1
+  }
+  if ! jq -e --arg member "$member" '
+      any(
+        .bindings[]?;
+        .role == "roles/secretmanager.secretAccessor" and
+        ((.members // []) | index($member) != null)
+      )
+    ' <<<"$policy_json" >/dev/null; then
+    return
+  fi
+  gcloud secrets remove-iam-policy-binding "$secret" --project="$project" \
+    --member="$member" --role=roles/secretmanager.secretAccessor --quiet >/dev/null
+  policy_json=$(gcloud secrets get-iam-policy "$secret" \
+    --project="$project" --format=json) || {
+    echo "could not verify obsolete accessor removal on $secret" >&2
+    exit 1
+  }
+  if jq -e --arg member "$member" '
+    any(
+      .bindings[]?;
+      .role == "roles/secretmanager.secretAccessor" and
+      ((.members // []) | index($member) != null)
+    )
+  ' <<<"$policy_json" >/dev/null; then
+    echo "obsolete accessor remains on $secret: $member" >&2
+    exit 1
+  fi
+}
+
+assert_exact_accessors() {
+  local secret="$1"
+  shift
+  local policy_json actual expected account
+  policy_json=$(gcloud secrets get-iam-policy "$secret" \
+    --project="$project" --format=json) || {
+    echo "could not verify accessors on $secret" >&2
+    exit 1
+  }
+  jq -e '
+    all(
+      .bindings[]?;
+      .role != "roles/secretmanager.secretAccessor" or
+      ((.condition // null) == null)
+    )
+  ' <<<"$policy_json" >/dev/null || {
+    echo "conditional secret accessor is forbidden on $secret" >&2
+    exit 1
+  }
+  actual=$(jq -r '
+    [
+      .bindings[]?
+      | select(.role == "roles/secretmanager.secretAccessor")
+      | (.members // [])[]
+    ]
+    | unique
+    | sort
+    | .[]
+  ' <<<"$policy_json")
+  expected=$(
+    for account in "$@"; do
+      printf 'serviceAccount:%s@%s.iam.gserviceaccount.com\n' \
+        "$account" "$project"
+    done | LC_ALL=C sort -u
+  )
+  if [[ "$actual" != "$expected" ]]; then
+    echo "direct secret accessors differ from the exact allowlist on $secret" >&2
+    echo "expected:" >&2
+    printf '%s\n' "$expected" >&2
+    echo "actual:" >&2
+    printf '%s\n' "$actual" >&2
+    exit 1
+  fi
+}
+
 copy_latest_if_missing() {
   local secret="$1" data metadata
   metadata=$(gcloud secrets versions list "$secret" --project="$project" --format='value(state)')
@@ -84,6 +165,25 @@ copy_latest_if_missing() {
   if [[ -n "$data" ]]; then
     printf '%s' "$data" | base64 --decode | gcloud secrets versions add "$secret" --project="$project" --data-file=- >/dev/null
   fi
+}
+
+ensure_action_token_value() {
+  local secret="$1" metadata
+  metadata=$(gcloud secrets versions list "$secret" --project="$project" \
+    --format='value(state)')
+  if grep -iqx enabled <<<"$metadata"; then
+    return
+  fi
+  command -v openssl >/dev/null || {
+    echo "openssl is required to generate the scheduling action-token secret" >&2
+    exit 1
+  }
+  # Generate directly into Secret Manager. The material is never stored in a
+  # shell variable, temporary file, command line, or log.
+  openssl rand 48 |
+    base64 --wrap=0 |
+    gcloud secrets versions add "$secret" --project="$project" \
+      --data-file=- >/dev/null
 }
 
 disable_regional_versions() {
@@ -113,7 +213,10 @@ for environment in "${environments[@]}"; do
   secrets=(
     "$prefix-clerk-secret-key"
     "$prefix-clerk-webhook-secret"
-    "$prefix-fiscal-credential"
+    "$prefix-scheduling-action-token-secret"
+    "$prefix-pergo-api-key"
+    "$prefix-pergo-webhook-secrets"
+    "$prefix-google-client-secret"
     "$prefix-database-url"
     "$prefix-worker-database-url"
     "$prefix-migrate-database-url"
@@ -129,19 +232,55 @@ for environment in "${environments[@]}"; do
     disable_regional_versions "$secret"
     printf 'configured global secret: %s\n' "$secret"
   done
+  ensure_action_token_value "$prefix-scheduling-action-token-secret"
 
   grant_accessor "$prefix-clerk-secret-key" "pymes-v3-api-${environment}"
   grant_accessor "$prefix-clerk-webhook-secret" "pymes-v3-api-${environment}"
+  grant_accessor "$prefix-scheduling-action-token-secret" "pymes-v3-api-${environment}"
+  grant_accessor "$prefix-scheduling-action-token-secret" "pymes-v3-worker-${environment}"
+  grant_accessor "$prefix-pergo-webhook-secrets" "pymes-v3-api-${environment}"
+  grant_accessor "$prefix-google-client-secret" "pymes-v3-api-${environment}"
+  grant_accessor "$prefix-google-client-secret" "pymes-v3-worker-${environment}"
   grant_accessor "$prefix-database-url" "pymes-v3-api-${environment}"
   grant_accessor "$prefix-database-url" "pymes-v3-provision-${environment}"
+  revoke_accessor "$prefix-database-url" "pymes-v3-worker-${environment}"
   grant_accessor "$prefix-worker-database-url" "pymes-v3-worker-${environment}"
-  grant_accessor "$prefix-fiscal-credential" "pymes-v3-fiscal-${environment}"
+  grant_accessor "$prefix-pergo-api-key" "pymes-v3-worker-${environment}"
   grant_accessor "$prefix-fiscal-database-url" "pymes-v3-fiscal-${environment}"
   grant_accessor "$prefix-accounting-database-url" "pymes-v3-accounting-${environment}"
   grant_accessor "$prefix-accounting-admin-database-url" "pymes-v3-accounting-admin-${environment}"
   grant_accessor "$prefix-migrate-database-url" "pymes-v3-migrate-${environment}"
   grant_accessor "$prefix-fiscal-migrate-database-url" "pymes-v3-fiscal-migrate-${environment}"
   grant_accessor "$prefix-accounting-migrate-database-url" "pymes-v3-acct-migrate-${environment}"
+
+  assert_exact_accessors "$prefix-clerk-secret-key" \
+    "pymes-v3-api-${environment}"
+  assert_exact_accessors "$prefix-clerk-webhook-secret" \
+    "pymes-v3-api-${environment}"
+  assert_exact_accessors "$prefix-scheduling-action-token-secret" \
+    "pymes-v3-api-${environment}" "pymes-v3-worker-${environment}"
+  assert_exact_accessors "$prefix-pergo-api-key" \
+    "pymes-v3-worker-${environment}"
+  assert_exact_accessors "$prefix-pergo-webhook-secrets" \
+    "pymes-v3-api-${environment}"
+  assert_exact_accessors "$prefix-google-client-secret" \
+    "pymes-v3-api-${environment}" "pymes-v3-worker-${environment}"
+  assert_exact_accessors "$prefix-database-url" \
+    "pymes-v3-api-${environment}" "pymes-v3-provision-${environment}"
+  assert_exact_accessors "$prefix-worker-database-url" \
+    "pymes-v3-worker-${environment}"
+  assert_exact_accessors "$prefix-migrate-database-url" \
+    "pymes-v3-migrate-${environment}"
+  assert_exact_accessors "$prefix-fiscal-database-url" \
+    "pymes-v3-fiscal-${environment}"
+  assert_exact_accessors "$prefix-fiscal-migrate-database-url" \
+    "pymes-v3-fiscal-migrate-${environment}"
+  assert_exact_accessors "$prefix-accounting-database-url" \
+    "pymes-v3-accounting-${environment}"
+  assert_exact_accessors "$prefix-accounting-admin-database-url" \
+    "pymes-v3-accounting-admin-${environment}"
+  assert_exact_accessors "$prefix-accounting-migrate-database-url" \
+    "pymes-v3-acct-migrate-${environment}"
 done
 
 echo "migrated global Secret Manager containers for pymes-v3 ${migration_env}"

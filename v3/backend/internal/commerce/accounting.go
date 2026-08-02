@@ -5,9 +5,6 @@ package commerce
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -37,11 +34,6 @@ type HTTPAccountingProvisioningClient struct {
 	PlatformTokens PlatformTokenSource
 }
 
-type accountingProvisioningPayload struct {
-	OrganizationID string `json:"organization_id"`
-	DisplayName    string `json:"display_name"`
-}
-
 func (c HTTPAccountingProvisioningClient) ProvisionOrganization(ctx context.Context, organization organizationdomain.Organization) error {
 	if strings.TrimSpace(organization.ID) == "" || strings.TrimSpace(organization.Name) == "" {
 		return fmt.Errorf("accounting provision: organization ID and display name are required")
@@ -51,16 +43,18 @@ func (c HTTPAccountingProvisioningClient) ProvisionOrganization(ctx context.Cont
 		return fmt.Errorf("accounting provision: base URL is required")
 	}
 
-	body, err := json.Marshal(accountingProvisioningPayload{
-		OrganizationID: organization.ID,
-		DisplayName:    organization.Name,
-	})
+	body, payloadDigest, err := accountinghelpers.EncodePayload(
+		accountingapi.ProvisioningPayload{
+			OrganizationID: organization.ID,
+			DisplayName:    organization.Name,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("encode accounting provisioning command: %w", err)
 	}
-	digest := sha256.Sum256(body)
-	payloadDigest := hex.EncodeToString(digest[:])
-	idempotencyKey := accountingProvisioningIdempotencyKey(organization.ID)
+	idempotencyKey := accountinghelpers.ProvisioningIdempotencyKey(
+		organization.ID,
+	)
 	ctx, requestID, correlationID := accountingProvisioningMetadata(ctx)
 
 	client, err := accountingapi.NewClientWithResponses(
@@ -98,13 +92,13 @@ func (c HTTPAccountingProvisioningClient) ProvisionOrganization(ctx context.Cont
 		return err
 	}
 	if response.StatusCode() != http.StatusCreated && response.StatusCode() != http.StatusOK {
-		return generatedServiceError("accounting provision", response.Status(), response.Body)
+		return accountinghelpers.DecodeServiceError(
+			"accounting provision",
+			response.Status(),
+			response.Body,
+		)
 	}
 	return nil
-}
-
-func accountingProvisioningIdempotencyKey(organizationID string) string {
-	return accountinghelpers.ProvisioningIdempotencyKey(organizationID)
 }
 
 func accountingProvisioningMetadata(ctx context.Context) (context.Context, string, string) {
@@ -146,9 +140,9 @@ func (c HTTPAccountingClient) Post(ctx context.Context, command domain.PostingCo
 		}
 		lines = append(lines, payloadLine)
 	}
-	key := fallback(command.IdempotencyKey, command.CommandID)
-	correlationID := fallback(command.CorrelationID, key)
-	sourceVersion := positiveVersion(command.SourceVersion)
+	key := accountinghelpers.Fallback(command.IdempotencyKey, command.CommandID)
+	correlationID := accountinghelpers.Fallback(command.CorrelationID, key)
+	sourceVersion := accountinghelpers.PositiveVersion(command.SourceVersion)
 	payload := map[string]any{
 		"command_id":      command.CommandID,
 		"organization_id": command.OrganizationID,
@@ -171,7 +165,7 @@ func (c HTTPAccountingClient) Post(ctx context.Context, command domain.PostingCo
 		payload["original_journal_entry_id"] = command.OriginalJournalEntryID
 	}
 	var body accountingapi.SubmitPostingCommandJSONRequestBody
-	if err := transcodeJSON(payload, &body); err != nil {
+	if err := accountinghelpers.TranscodeJSON(payload, &body); err != nil {
 		return domain.AccountingEvent{}, fmt.Errorf("encode accounting posting command: %w", err)
 	}
 	client, err := c.generatedClient(command.OrganizationID, key, correlationID)
@@ -187,7 +181,7 @@ func (c HTTPAccountingClient) Post(ctx context.Context, command domain.PostingCo
 	if err != nil {
 		return domain.AccountingEvent{}, err
 	}
-	return decodeAccountingEvent(
+	return accountinghelpers.DecodeAccountingEvent(
 		"accounting post",
 		response.Status(),
 		response.StatusCode(),
@@ -202,12 +196,12 @@ func (c HTTPAccountingClient) Reverse(ctx context.Context, command domain.Revers
 		"command_id": command.CommandID, "original_journal_entry_id": command.OriginalJournalEntryID,
 		"effective_at": command.EffectiveAt.UTC(), "reason": command.Reason,
 	}
-	key := fallback(command.IdempotencyKey, command.CommandID)
-	correlationID := fallback(command.CorrelationID, key)
+	key := accountinghelpers.Fallback(command.IdempotencyKey, command.CommandID)
+	correlationID := accountinghelpers.Fallback(command.CorrelationID, key)
 	digest := command.SnapshotDigest
 	if digest == "" {
 		var err error
-		digest, err = snapshotDigest(payload)
+		digest, err = accountinghelpers.SnapshotDigest(payload)
 		if err != nil {
 			return domain.AccountingEvent{}, fmt.Errorf("hash accounting reversal: %w", err)
 		}
@@ -215,10 +209,10 @@ func (c HTTPAccountingClient) Reverse(ctx context.Context, command domain.Revers
 	payload["organization_id"] = command.OrganizationID
 	payload["idempotency_key"] = key
 	payload["correlation_id"] = correlationID
-	payload["source_version"] = positiveVersion(command.SourceVersion)
+	payload["source_version"] = accountinghelpers.PositiveVersion(command.SourceVersion)
 	payload["snapshot_digest"] = digest
 	var body accountingapi.ReverseJournalEntryJSONRequestBody
-	if err := transcodeJSON(payload, &body); err != nil {
+	if err := accountinghelpers.TranscodeJSON(payload, &body); err != nil {
 		return domain.AccountingEvent{}, fmt.Errorf("encode accounting reversal: %w", err)
 	}
 	client, err := c.generatedClient(command.OrganizationID, key, correlationID)
@@ -234,7 +228,7 @@ func (c HTTPAccountingClient) Reverse(ctx context.Context, command domain.Revers
 	if err != nil {
 		return domain.AccountingEvent{}, err
 	}
-	return decodeAccountingEvent(
+	return accountinghelpers.DecodeAccountingEvent(
 		"accounting reversal",
 		response.Status(),
 		response.StatusCode(),
@@ -250,12 +244,12 @@ func (c HTTPAccountingClient) ApplyOpenItem(ctx context.Context, command domain.
 		"credit_open_item_id": command.CreditOpenItemID, "amount": command.Amount,
 		"applied_at": command.AppliedAt.UTC(),
 	}
-	key := fallback(command.IdempotencyKey, command.CommandID)
-	correlationID := fallback(command.CorrelationID, key)
+	key := accountinghelpers.Fallback(command.IdempotencyKey, command.CommandID)
+	correlationID := accountinghelpers.Fallback(command.CorrelationID, key)
 	digest := command.SnapshotDigest
 	if digest == "" {
 		var err error
-		digest, err = snapshotDigest(payload)
+		digest, err = accountinghelpers.SnapshotDigest(payload)
 		if err != nil {
 			return domain.AccountingEvent{}, fmt.Errorf("hash accounting application: %w", err)
 		}
@@ -263,10 +257,10 @@ func (c HTTPAccountingClient) ApplyOpenItem(ctx context.Context, command domain.
 	payload["organization_id"] = command.OrganizationID
 	payload["idempotency_key"] = key
 	payload["correlation_id"] = correlationID
-	payload["source_version"] = positiveVersion(command.SourceVersion)
+	payload["source_version"] = accountinghelpers.PositiveVersion(command.SourceVersion)
 	payload["snapshot_digest"] = digest
 	var body accountingapi.ApplyOpenItemJSONRequestBody
-	if err := transcodeJSON(payload, &body); err != nil {
+	if err := accountinghelpers.TranscodeJSON(payload, &body); err != nil {
 		return domain.AccountingEvent{}, fmt.Errorf("encode accounting application: %w", err)
 	}
 	client, err := c.generatedClient(command.OrganizationID, key, correlationID)
@@ -282,7 +276,7 @@ func (c HTTPAccountingClient) ApplyOpenItem(ctx context.Context, command domain.
 	if err != nil {
 		return domain.AccountingEvent{}, err
 	}
-	return decodeAccountingEvent(
+	return accountinghelpers.DecodeAccountingEvent(
 		"accounting application",
 		response.Status(),
 		response.StatusCode(),
@@ -297,12 +291,12 @@ func (c HTTPAccountingClient) ReverseOpenItemApplication(ctx context.Context, co
 		"command_id": command.CommandID, "application_id": command.ApplicationID,
 		"reversed_at": command.ReversedAt.UTC(), "reason": command.Reason,
 	}
-	key := fallback(command.IdempotencyKey, command.CommandID)
-	correlationID := fallback(command.CorrelationID, key)
+	key := accountinghelpers.Fallback(command.IdempotencyKey, command.CommandID)
+	correlationID := accountinghelpers.Fallback(command.CorrelationID, key)
 	digest := command.SnapshotDigest
 	if digest == "" {
 		var err error
-		digest, err = snapshotDigest(payload)
+		digest, err = accountinghelpers.SnapshotDigest(payload)
 		if err != nil {
 			return domain.AccountingEvent{}, fmt.Errorf("hash accounting application reversal: %w", err)
 		}
@@ -310,10 +304,10 @@ func (c HTTPAccountingClient) ReverseOpenItemApplication(ctx context.Context, co
 	payload["organization_id"] = command.OrganizationID
 	payload["idempotency_key"] = key
 	payload["correlation_id"] = correlationID
-	payload["source_version"] = positiveVersion(command.SourceVersion)
+	payload["source_version"] = accountinghelpers.PositiveVersion(command.SourceVersion)
 	payload["snapshot_digest"] = digest
 	var body accountingapi.ReverseOpenItemApplicationJSONRequestBody
-	if err := transcodeJSON(payload, &body); err != nil {
+	if err := accountinghelpers.TranscodeJSON(payload, &body); err != nil {
 		return domain.AccountingEvent{}, fmt.Errorf("encode accounting application reversal: %w", err)
 	}
 	client, err := c.generatedClient(command.OrganizationID, key, correlationID)
@@ -329,7 +323,7 @@ func (c HTTPAccountingClient) ReverseOpenItemApplication(ctx context.Context, co
 	if err != nil {
 		return domain.AccountingEvent{}, err
 	}
-	return decodeAccountingEvent(
+	return accountinghelpers.DecodeAccountingEvent(
 		"accounting application reversal",
 		response.Status(),
 		response.StatusCode(),
@@ -391,83 +385,4 @@ func internalRequestEditor(
 	}
 }
 
-func decodeAccountingEvent(
-	service string,
-	status string,
-	statusCode int,
-	body []byte,
-	candidates ...*accountingapi.AccountingEvent,
-) (domain.AccountingEvent, error) {
-	if statusCode != http.StatusOK && statusCode != http.StatusCreated {
-		return domain.AccountingEvent{}, generatedServiceError(service, status, body)
-	}
-	for _, candidate := range candidates {
-		if candidate == nil {
-			continue
-		}
-		var result domain.AccountingEvent
-		if err := transcodeJSON(candidate, &result); err != nil {
-			return domain.AccountingEvent{}, fmt.Errorf("decode %s response: %w", service, err)
-		}
-		return result, nil
-	}
-	return domain.AccountingEvent{}, generatedServiceError(service, status, body)
-}
-
-func transcodeJSON(source any, target any) error {
-	encoded, err := json.Marshal(source)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(encoded, target)
-}
-
-func snapshotDigest(value any) (string, error) {
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		return "", err
-	}
-	sum := sha256.Sum256(encoded)
-	return hex.EncodeToString(sum[:]), nil
-}
-
-func fallback(value, defaultValue string) string {
-	if value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-func positiveVersion(value int) int {
-	if value > 0 {
-		return value
-	}
-	return 1
-}
-
-type serviceError struct {
-	Service string `json:"-"`
-	Code    string `json:"code"`
-	Title   string `json:"title"`
-	Status  string `json:"-"`
-}
-
-func (e serviceError) Error() string {
-	if e.Code != "" {
-		return e.Service + " returned " + e.Code
-	}
-	return e.Service + " returned " + e.Status
-}
-
-func (e serviceError) Unwrap() error {
-	if e.Code == domain.ErrPeriodLocked.Error() {
-		return domain.ErrPeriodLocked
-	}
-	return nil
-}
-
-func generatedServiceError(service string, status string, body []byte) error {
-	result := serviceError{Service: service, Status: status}
-	_ = json.Unmarshal(body, &result)
-	return result
-}
+type serviceError = accountinghelpers.ServiceError

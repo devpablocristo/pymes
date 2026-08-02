@@ -31,7 +31,7 @@ func (a ClerkAuthenticator) Principal(request *http.Request) (identitydomain.Pri
 	if a.Memberships == nil || a.Verifier == nil {
 		return identitydomain.Principal{}, errors.New("clerk verifier unavailable")
 	}
-	token, err := clerkhelpers.BearerToken(request.Header)
+	token, err := clerkhelpers.SessionToken(request)
 	if err != nil {
 		return identitydomain.Principal{}, err
 	}
@@ -43,8 +43,16 @@ func (a ClerkAuthenticator) Principal(request *http.Request) (identitydomain.Pri
 		OrganizationID: claims.OrganizationID,
 		Subject:        claims.Subject,
 	}
-	if identity.OrganizationID == "" || identity.Subject == "" {
+	if identity.OrganizationID == "" || identity.Subject == "" ||
+		claims.SessionID == "" {
 		return identitydomain.Principal{}, errors.New("Clerk session has no active organization or subject")
 	}
-	return a.Memberships.ResolveClerkMembership(request.Context(), identity.OrganizationID, identity.Subject)
+	principal, err := a.Memberships.ResolveClerkMembership(
+		request.Context(), identity.OrganizationID, identity.Subject,
+	)
+	if err != nil {
+		return identitydomain.Principal{}, err
+	}
+	principal.SessionID = claims.SessionID
+	return principal, nil
 }

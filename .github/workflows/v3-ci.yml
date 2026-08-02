@@ -2,18 +2,8 @@ name: Pymes V3 CI
 
 on:
   pull_request:
-    paths:
-      - "v3/**"
-      - "AGENTS.md"
-      - ".github/dependencies/open-accounting.env"
-      - ".github/workflows/v3-ci.yml"
   push:
     branches: [main]
-    paths:
-      - "v3/**"
-      - "AGENTS.md"
-      - ".github/dependencies/open-accounting.env"
-      - ".github/workflows/v3-ci.yml"
 
 permissions:
   contents: read
@@ -24,35 +14,60 @@ concurrency:
 
 jobs:
   validate:
+    name: Pymes V3 validate
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - name: Checkout Pymes
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Reject changes to immutable v1 and v2
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: .github/scripts/check-legacy-frozen.sh "${BASE_SHA}" "${HEAD_SHA}"
 
       - name: Read and validate Open Accounting pin
         id: accounting-pin
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           pin_file=".github/dependencies/open-accounting.env"
           repository="$(sed -n 's/^OPEN_ACCOUNTING_REPOSITORY=//p' "${pin_file}")"
+          repository_id="$(sed -n 's/^OPEN_ACCOUNTING_REPOSITORY_ID=//p' "${pin_file}")"
           revision="$(sed -n 's/^OPEN_ACCOUNTING_REF=//p' "${pin_file}")"
-          if [[ ! "${repository}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
-            echo "invalid Open Accounting repository pin" >&2
-            exit 1
-          fi
+          [[ "$(grep -c '^OPEN_ACCOUNTING_REPOSITORY=' "${pin_file}")" -eq 1 ]]
+          [[ "$(grep -c '^OPEN_ACCOUNTING_REPOSITORY_ID=' "${pin_file}")" -eq 1 ]]
+          [[ "$(grep -c '^OPEN_ACCOUNTING_REF=' "${pin_file}")" -eq 1 ]]
+          [[ "${repository}" == "devpablocristo/open-accounting" ]]
+          [[ "${repository_id}" == "1317775856" ]]
           if [[ ! "${revision}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "Open Accounting must be pinned to one full commit SHA" >&2
             exit 1
           fi
-          echo "repository=${repository}" >>"${GITHUB_OUTPUT}"
-          echo "revision=${revision}" >>"${GITHUB_OUTPUT}"
+          metadata="$(gh api --method GET "repos/${repository}")"
+          jq -e \
+            --arg repository "${repository}" \
+            --argjson repository_id "${repository_id}" \
+            '.full_name == $repository and .id == $repository_id' \
+            <<<"${metadata}" >/dev/null || {
+              echo "GitHub repository metadata does not match the immutable Open Accounting identity" >&2
+              exit 1
+            }
+          {
+            echo "repository=${repository}"
+            echo "repository_id=${repository_id}"
+            echo "revision=${revision}"
+          } >>"${GITHUB_OUTPUT}"
 
       - name: Checkout Open Accounting fork
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ steps.accounting-pin.outputs.repository }}
           ref: ${{ steps.accounting-pin.outputs.revision }}
@@ -62,11 +77,33 @@ jobs:
       - name: Verify exact Open Accounting revision
         working-directory: .deps/open-accounting
         env:
+          EXPECTED_REPOSITORY: ${{ steps.accounting-pin.outputs.repository }}
           EXPECTED_REVISION: ${{ steps.accounting-pin.outputs.revision }}
-        run: test "$(git rev-parse HEAD)" = "${EXPECTED_REVISION}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${EXPECTED_REVISION}" ]]
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+          origin="$(git remote get-url origin)"
+          case "${origin}" in
+            "https://github.com/${EXPECTED_REPOSITORY}"|"https://github.com/${EXPECTED_REPOSITORY}.git"|"git@github.com:${EXPECTED_REPOSITORY}.git")
+              ;;
+            *)
+              echo "Open Accounting checkout origin differs from the immutable pin" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Verify immutable release source inputs
+        shell: bash
+        env:
+          PYMES_RELEASE_ENV: stg
+          PYMES_SOURCE_SHA: ${{ github.sha }}
+          OPEN_ACCOUNTING_CONTEXT: ${{ github.workspace }}/.deps/open-accounting
+        run: ./v3/scripts/deploy/build-push-images.sh verify-source-pins
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.26.5"
           cache-dependency-path: |
@@ -74,11 +111,13 @@ jobs:
             .deps/open-accounting/go.sum
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: v3/fiscal-adapter/package-lock.json
+          cache-dependency-path: |
+            v3/fiscal-adapter/package-lock.json
+            v3/web/package-lock.json
 
       - name: Run V3 CI
         working-directory: v3

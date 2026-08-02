@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	repositoryhelpers "github.com/devpablocristo/pymes/v3/backend/internal/commerce/repository/helpers"
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/commerce/usecases/domain"
 	organizationrepository "github.com/devpablocristo/pymes/v3/backend/internal/organization"
 	organizationdomain "github.com/devpablocristo/pymes/v3/backend/internal/organization/usecases/domain"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"os"
 	"strings"
@@ -102,7 +104,7 @@ func TestOriginMetadataNormalizationAndInternalIdempotencyAreDeterministic(t *te
 		ActorRef:      " actor-7 ",
 		SourceVersion: 7,
 	}
-	normalized := normalizeOrigin(explicit, "fallback", "accounting.post", "purchase-7")
+	normalized := repositoryhelpers.NormalizeOrigin(explicit, "fallback", "accounting.post", "purchase-7")
 	if normalized.RequestID != "request-7" ||
 		normalized.CorrelationID != "correlation-7" ||
 		normalized.ActorRef != "actor-7" ||
@@ -110,8 +112,8 @@ func TestOriginMetadataNormalizationAndInternalIdempotencyAreDeterministic(t *te
 		t.Fatalf("explicit origin was not normalized exactly: %+v", normalized)
 	}
 
-	first := normalizeOrigin(domain.OriginMetadata{}, "", "accounting.post", "purchase-legacy")
-	second := normalizeOrigin(domain.OriginMetadata{}, "", "accounting.post", "purchase-legacy")
+	first := repositoryhelpers.NormalizeOrigin(domain.OriginMetadata{}, "", "accounting.post", "purchase-legacy")
+	second := repositoryhelpers.NormalizeOrigin(domain.OriginMetadata{}, "", "accounting.post", "purchase-legacy")
 	if first != second || first.RequestID == "" || first.CorrelationID == "" ||
 		first.ActorRef != "system:internal" || first.SourceVersion != 1 {
 		t.Fatalf("legacy origin is not complete and deterministic: first=%+v second=%+v", first, second)
@@ -413,7 +415,37 @@ func TestStorePersistsSaleAndLeasesOutbox(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	events, err := store.Lease(context.Background(), 1, time.Minute)
+	events, err := store.LeaseTopics(
+		context.Background(),
+		[]string{"NotificationRequested"},
+		1,
+		time.Minute,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 0 {
+		t.Fatalf("foreign context leased commerce event: %+v", events)
+	}
+	events, err = store.LeaseTopics(
+		context.Background(),
+		[]string{"FiscalAuthorizationRequested"},
+		1,
+		time.Minute,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 0 {
+		t.Fatalf("disabled fiscal feature leased event: %+v", events)
+	}
+	enableFiscalRealForTest(t, pool, organization.ID)
+	events, err = store.LeaseTopics(
+		context.Background(),
+		[]string{"FiscalAuthorizationRequested"},
+		1,
+		time.Minute,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -452,6 +484,7 @@ func TestStoreMovesExhaustedEventToDeadLetter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	enableFiscalRealForTest(t, pool, organization.ID)
 	store := New(pool)
 	store.Now = func() time.Time { return time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC) }
 	if _, err := store.CreateSaleAndQueueFiscal(ctx, domain.Sale{
@@ -499,6 +532,41 @@ func TestStoreMovesExhaustedEventToDeadLetter(t *testing.T) {
 	}
 }
 
+func enableFiscalRealForTest(
+	t *testing.T,
+	pool *pgxpool.Pool,
+	organizationID string,
+) {
+	t.Helper()
+	ctx := context.Background()
+	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err = tx.Exec(
+		ctx,
+		"SELECT set_config('app.org_id',$1,true)",
+		organizationID,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `
+		INSERT INTO app.organization_feature_flags(
+		  org_id,fiscal_real_enabled,updated_by
+		)
+		VALUES($1,true,'test')
+		ON CONFLICT(org_id) DO UPDATE
+		  SET fiscal_real_enabled=true,updated_by='test'`,
+		organizationID,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err = tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDurableWorkerRecoversLostFiscalAndAccountingResponses(t *testing.T) {
 	url := os.Getenv("PYMES_DATABASE_TEST_URL")
 	if url == "" {
@@ -526,6 +594,7 @@ func TestDurableWorkerRecoversLostFiscalAndAccountingResponses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	enableFiscalRealForTest(t, pool, organization.ID)
 	sale := domain.Sale{ID: "sale_worker_" + runID, OrganizationID: organization.ID, RecipientRef: "party", Voucher: domain.VoucherReference{PointOfSale: 1, DocumentType: "FA", VoucherNumber: 2}, Total: domain.Money{Amount: "121.00", Currency: "ARS"}, Status: domain.SaleFiscalPending, SnapshotDigest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", CorrelationID: "worker-test-" + runID, FiscalSnapshot: []byte(`{"issue_date":"2026-07-31","currency":"ARS","totals":{"net":"100","vat":"21","exempt":"0","total":"121"}}`)}
 	if _, err := store.CreateSaleAndQueueFiscal(context.Background(), sale, "kms://credential/worker"); err != nil {
 		t.Fatal(err)
@@ -576,6 +645,7 @@ func TestDurableWorkerAppliesPartialPaymentAndReversesIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	enableFiscalRealForTest(t, pool, organization.ID)
 	sale := domain.Sale{
 		ID: "sale_partial", OrganizationID: organization.ID, RecipientRef: "party_customer",
 		Voucher: domain.VoucherReference{PointOfSale: 1, DocumentType: "FA", VoucherNumber: 10},
@@ -670,6 +740,7 @@ func TestDurableWorkerPostsAndAppliesCreditNote(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	enableFiscalRealForTest(t, pool, organization.ID)
 	worker := DurableWorker{Store: store, Fiscal: NewFakeFiscal(), Accounting: NewFakeAccounting(), LeaseFor: time.Minute}
 	original := domain.Sale{
 		ID: "sale_original", OrganizationID: organization.ID, RecipientRef: "party_customer",

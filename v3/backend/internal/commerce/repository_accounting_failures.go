@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	repositoryhelpers "github.com/devpablocristo/pymes/v3/backend/internal/commerce/repository/helpers"
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/commerce/usecases/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -112,7 +113,7 @@ func (s *Store) RequestAccountingAdjustmentIdempotent(
 			return domain.AccountingAdjustment{}, fmt.Errorf("ACCOUNTING_ADJUSTMENT_NOT_ALLOWED")
 		}
 		now := s.Now().UTC()
-		adjustment.Origin = originFromIdempotencyCommand(adjustment.Origin, command)
+		adjustment.Origin = repositoryhelpers.OriginFromIdempotencyCommand(adjustment.Origin, command)
 		adjustment.CorrelationID = adjustment.Origin.CorrelationID
 		adjustment.SnapshotDigest = command.PayloadHash
 		adjustment.Status = "pending"
@@ -163,7 +164,7 @@ func (s *Store) RequestAccountingAdjustmentIdempotent(
 			)`,
 			uuid.New(), failure.OrganizationID, payload,
 			hex.EncodeToString(payloadDigest[:]),
-			repositoryIdempotencyKey(
+			repositoryhelpers.IdempotencyKey(
 				failure.OrganizationID, "accounting.adjust",
 				adjustment.ID, adjustment.Origin.SourceVersion,
 			),
@@ -424,7 +425,7 @@ func (s *Store) ResumeAccountingReversalAfterAdjustment(
 		ON CONFLICT (org_id,topic,idempotency_key) DO NOTHING`,
 		uuid.New(), failure.OrganizationID, payload,
 		hex.EncodeToString(digest[:]),
-		repositoryIdempotencyKey(
+		repositoryhelpers.IdempotencyKey(
 			failure.OrganizationID, "accounting.reversal.resume",
 			adjustment.ID, adjustment.Origin.SourceVersion,
 		),

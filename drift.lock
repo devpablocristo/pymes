@@ -3,19 +3,104 @@ version = 1
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
 target = "v3/scripts/backup-restore-smoke.sh"
-sig = "d87ab1ac3d11156d"
+sig = "099a796338ca72a9"
+
+[[bindings]]
+doc = "v3/docs/04-validacion.md"
+target = "v3/scripts/deploy/cloud-run-security-check.sh"
+sig = "d7ac76141980f82b"
+
+[[bindings]]
+doc = "v3/docs/04-validacion.md"
+target = "v3/scripts/deploy/retire-legacy-pymes-wif-test.sh"
+sig = "564e58adc5435336"
+
+[[bindings]]
+doc = "v3/docs/04-validacion.md"
+target = "v3/scripts/deploy/rollback-cloud-run.sh"
+sig = "b2f106a6b8914825"
+
+[[bindings]]
+doc = "v3/docs/04-validacion.md"
+target = "v3/scripts/deploy/verify-cloud-run.sh"
+sig = "020c141346496ad4"
+
+[[bindings]]
+doc = "v3/docs/04-validacion.md"
+target = "v3/scripts/deploy/workflow-policy-check.sh"
+sig = "a76598429bdc4b5c"
+
+[[bindings]]
+doc = "v3/docs/09-gcp-stg-prd.md"
+target = "v3/scripts/deploy/retire-legacy-pymes-wif.sh"
+sig = "b5293e67a11c1e45"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/backup-postgres.sh"
+sig = "2e6dae54219e645f"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
 target = "v3/scripts/backup-restore-smoke.sh"
-sig = "d87ab1ac3d11156d"
+sig = "099a796338ca72a9"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/bootstrap-data-encryption.sh"
+sig = "8d637b409df06ea5"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/bootstrap-network-egress.sh"
+sig = "30065a00aa4d4618"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/bootstrap-release-identities.sh"
+sig = "eed2159f6ff98c90"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/cloud-run.sh"
+sig = "60cfa3a931043fd5"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/retire-legacy-pymes-wif.sh"
+sig = "b5293e67a11c1e45"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/rollback-cloud-run.sh"
+sig = "b2f106a6b8914825"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/deploy/verify-cloud-run.sh"
+sig = "020c141346496ad4"
+
+[[bindings]]
+doc = "v3/docs/10-runbook-operacion.md"
+target = "v3/scripts/restore-postgres.sh"
+sig = "94c7a7ab0b51c09f"
+
+[[bindings]]
+doc = "v3/docs/README.md"
+target = ".github/workflows/v3-release.yml"
+sig = "6a56b8c4e729a9a3"
+
+[[bindings]]
+doc = "v3/docs/adr/0005-despliegue-y-operacion.md"
+target = "v3/scripts/deploy/retire-legacy-pymes-wif.sh"
+sig = "b5293e67a11c1e45"
 
 [[bindings]]
 doc = "v3/docs/adr/0006-transporte-privado-cloud-run.md"
 target = "v3/scripts/deploy/cloud-run-security-check.sh"
-sig = "cb445ffc14e83832"
+sig = "d7ac76141980f82b"
 
 [[bindings]]
 doc = "v3/docs/adr/0006-transporte-privado-cloud-run.md"
 target = "v3/scripts/deploy/cloud-run.sh"
-sig = "33e64b4305dc1023"
+sig = "60cfa3a931043fd5"

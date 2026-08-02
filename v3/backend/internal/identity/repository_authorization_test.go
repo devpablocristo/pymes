@@ -13,6 +13,7 @@ import (
 	commerce "github.com/devpablocristo/pymes/v3/backend/internal/commerce"
 	commercedomain "github.com/devpablocristo/pymes/v3/backend/internal/commerce/usecases/domain"
 	identity "github.com/devpablocristo/pymes/v3/backend/internal/identity"
+	organization "github.com/devpablocristo/pymes/v3/backend/internal/organization"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -177,6 +178,7 @@ func TestPostgresPrincipalDrivesBFFMutationAuthorization(t *testing.T) {
 				Memberships: memberships,
 				Verifier: fixedSessionVerifier{claims: clerk.SessionClaims{
 					OrganizationID: test.providerOrg, Subject: test.user,
+					SessionID: "session_" + test.user,
 				}},
 			}
 			request := httptest.NewRequest(http.MethodPost, endpoint.path, strings.NewReader(endpoint.body))
@@ -244,6 +246,17 @@ func TestPostgresOwnerAndAdminPersistEveryBFFMutation(t *testing.T) {
 				localOrg, user, role)
 		}
 		if txErr == nil {
+			_, txErr = tx.Exec(ctx, `
+				INSERT INTO app.organization_feature_flags(
+					org_id,fiscal_real_enabled,updated_by
+				)
+				VALUES($1,true,'test')
+				ON CONFLICT (org_id) DO UPDATE
+				SET fiscal_real_enabled=true,updated_by='test'`,
+				localOrg,
+			)
+		}
+		if txErr == nil {
 			txErr = tx.Commit(ctx)
 		} else {
 			_ = tx.Rollback(ctx)
@@ -284,11 +297,18 @@ func TestPostgresOwnerAndAdminPersistEveryBFFMutation(t *testing.T) {
 			t.Fatal(txErr)
 		}
 
-		commands := commerce.Commands{Store: store, Now: store.Clock}
+		commands := commerce.Commands{
+			Store: store,
+			Features: organization.Features{
+				Store: organization.New(pool),
+			},
+			Now: store.Clock,
+		}
 		auth := identity.ClerkAuthenticator{
 			Memberships: identity.New(pool),
 			Verifier: fixedSessionVerifier{claims: clerk.SessionClaims{
 				OrganizationID: providerOrg, Subject: user,
+				SessionID: "session_" + user,
 			}},
 		}
 		prefix := "/api/v1/organizations/" + localOrg

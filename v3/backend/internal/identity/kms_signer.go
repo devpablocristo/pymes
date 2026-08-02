@@ -15,6 +15,7 @@ import (
 
 	kms "cloud.google.com/go/kms/apiv1"
 	kmspb "cloud.google.com/go/kms/apiv1/kmspb"
+	credentialhelpers "github.com/devpablocristo/pymes/v3/backend/internal/identity/credentials/helpers"
 	kmshelpers "github.com/devpablocristo/pymes/v3/backend/internal/identity/kms_signer/helpers"
 	kmsmodels "github.com/devpablocristo/pymes/v3/backend/internal/identity/kms_signer/models"
 	"github.com/googleapis/gax-go/v2"
@@ -149,7 +150,7 @@ func LoadKMSVerificationKeys(ctx context.Context, client KMSClient, keyVersions 
 		return nil, fmt.Errorf("%w: KMS client is required", ErrInvalidCredential)
 	}
 	keys := make([]VerificationKey, 0, len(keyVersions))
-	seen := make(map[string]struct{}, len(keyVersions))
+	seen := make(map[string]bool, len(keyVersions))
 	for _, keyVersion := range keyVersions {
 		keyVersion = strings.TrimSpace(keyVersion)
 		if keyVersion == "" {
@@ -159,10 +160,10 @@ func LoadKMSVerificationKeys(ctx context.Context, client KMSClient, keyVersions 
 		if err != nil {
 			return nil, err
 		}
-		if _, exists := seen[key.KeyID]; exists {
+		if seen[key.KeyID] {
 			continue
 		}
-		seen[key.KeyID] = struct{}{}
+		seen[key.KeyID] = true
 		keys = append(keys, key)
 	}
 	return keys, nil
@@ -204,7 +205,7 @@ func loadKMSVerificationKey(ctx context.Context, client KMSClient, keyVersion st
 		return VerificationKey{}, fmt.Errorf("KMS public key is not Ed25519")
 	}
 	material := kmsmodels.PublicKeyMaterial{
-		KeyID:     stableKMSKeyID(public),
+		KeyID:     credentialhelpers.StableKeyID(public),
 		PublicKey: append(ed25519.PublicKey(nil), public...),
 	}
 	return VerificationKey{KeyID: material.KeyID, PublicKey: material.PublicKey}, nil

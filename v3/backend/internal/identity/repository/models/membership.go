@@ -7,5 +7,7 @@ type Membership struct {
 	Role               string
 	PermissionsJSON    string
 	Status             string
+	OrganizationName   string
+	OrganizationSlug   string
 	OrganizationStatus string
 }

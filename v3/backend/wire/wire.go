@@ -2,24 +2,33 @@
 package wire
 
 import (
+	cloudkms "cloud.google.com/go/kms/apiv1"
 	"context"
 	"errors"
 	"fmt"
-	"github.com/devpablocristo/platform/sdks/clerk/go"
-	"github.com/devpablocristo/pymes/v3/backend/cmd/config"
-	"github.com/devpablocristo/pymes/v3/backend/internal/commerce"
-	"github.com/devpablocristo/pymes/v3/backend/internal/fakeservice"
-	"github.com/devpablocristo/pymes/v3/backend/internal/identity"
-	"github.com/devpablocristo/pymes/v3/backend/internal/observability"
-	"github.com/devpablocristo/pymes/v3/backend/internal/organization"
-	"github.com/devpablocristo/pymes/v3/backend/internal/postgres"
-	"github.com/devpablocristo/pymes/v3/backend/internal/worker"
 	"log/slog"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	clerk "github.com/devpablocristo/platform/sdks/clerk/go"
+	"github.com/devpablocristo/pymes/v3/backend/cmd/config"
+	"github.com/devpablocristo/pymes/v3/backend/internal/calendars"
+	googlemodels "github.com/devpablocristo/pymes/v3/backend/internal/calendars/google_calendar/models"
+	"github.com/devpablocristo/pymes/v3/backend/internal/commerce"
+	"github.com/devpablocristo/pymes/v3/backend/internal/fakeservice"
+	"github.com/devpablocristo/pymes/v3/backend/internal/identity"
+	identitydomain "github.com/devpablocristo/pymes/v3/backend/internal/identity/usecases/domain"
+	"github.com/devpablocristo/pymes/v3/backend/internal/notifications"
+	"github.com/devpablocristo/pymes/v3/backend/internal/observability"
+	preflightmodels "github.com/devpablocristo/pymes/v3/backend/internal/observability/preflight/models"
+	"github.com/devpablocristo/pymes/v3/backend/internal/organization"
+	"github.com/devpablocristo/pymes/v3/backend/internal/postgres"
+	"github.com/devpablocristo/pymes/v3/backend/internal/scheduling"
+	"github.com/devpablocristo/pymes/v3/backend/internal/worker"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func InitializeFakeService(kind string) (http.Handler, error) {
@@ -32,6 +41,7 @@ type App struct {
 	Handler         http.Handler
 	database        *postgres.Database
 	shutdownTracing func(context.Context) error
+	resources       []closeResource
 	closeOnce       sync.Once
 	closeErr        error
 }
@@ -41,14 +51,26 @@ func (a *App) Close() error {
 		return nil
 	}
 	a.closeOnce.Do(func() {
+		var closeErrors []error
+		for index := len(a.resources) - 1; index >= 0; index-- {
+			if a.resources[index] == nil {
+				continue
+			}
+			if err := a.resources[index].Close(); err != nil {
+				closeErrors = append(closeErrors, err)
+			}
+		}
 		if a.shutdownTracing != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			a.closeErr = a.shutdownTracing(ctx)
+			if err := a.shutdownTracing(ctx); err != nil {
+				closeErrors = append(closeErrors, err)
+			}
 			cancel()
 		}
 		if a.database != nil {
 			a.database.Close()
 		}
+		a.closeErr = errors.Join(closeErrors...)
 	})
 	return a.closeErr
 }
@@ -91,15 +113,183 @@ func Initialize(ctx context.Context, cfg config.Config) (*App, error) {
 			Err:  fmt.Errorf("Clerk webhook verifier: %w", err),
 		}
 	}
+	internalTokens, err := identity.TokenSourceFromRuntimeContext(
+		ctx,
+		"api:fiscal-settings",
+	)
+	if err != nil {
+		database.Close()
+		_ = shutdownTracing(context.Background())
+		return nil, &APIStartupError{
+			Code: "WORKLOAD_IDENTITY_INVALID",
+			Err:  fmt.Errorf("internal fiscal identity: %w", err),
+		}
+	}
+	var platformTokens commerce.PlatformTokenSource
+	if !cfg.AllowInsecureLocalServices {
+		platformTokens = identity.NewMetadataIDTokenSource()
+	}
 	store := commerce.New(pool)
 	identities := identity.New(pool)
-	api := commerce.NewHTTPServer(commerce.Commands{
-		Store: store, AccountingAdjustments: store, Now: store.Clock,
-	}, identity.ClerkAuthenticator{Memberships: identities, Verifier: sessions})
-	handler := composePublicHTTP(api.Handler(), identity.NewWebhook(webhooks, identity.ReceiveWebhook{Inbox: identities}))
+	organizations := organization.New(pool)
+	features := organization.Features{Store: organizations}
+	fiscalCredentials := commerce.HTTPFiscalClient{
+		BaseURL:        cfg.FiscalURL,
+		Client:         commerce.NewServiceHTTPClient(),
+		Tokens:         internalTokens,
+		PlatformTokens: platformTokens,
+	}
+	commands := commerce.Commands{
+		Store:                 store,
+		AccountingAdjustments: store,
+		FiscalCredentials:     fiscalCredentials,
+		Features:              features,
+		Now:                   store.Clock,
+	}
+	clerkAuthenticator := identity.ClerkAuthenticator{
+		Memberships: identities,
+		Verifier:    sessions,
+	}
+	api := commerce.NewHTTPServer(commands, clerkAuthenticator)
+	actionTokens, err := scheduling.NewHMACActionTokenCodec(
+		[]byte(cfg.SchedulingActionTokenSecret),
+	)
+	if err != nil {
+		_ = internalTokens.Close()
+		database.Close()
+		_ = shutdownTracing(context.Background())
+		return nil, &APIStartupError{
+			Code: "ACTION_TOKEN_CONFIG_INVALID",
+			Err:  err,
+		}
+	}
+	schedulingRepository := scheduling.NewPostgresRepository(pool)
+	schedulingUsecases := scheduling.NewService(
+		schedulingRepository,
+		scheduling.NewPlatformScheduling(),
+		actionTokens,
+		scheduling.WithOrganizationDirectory(
+			scheduling.NewOrganizationDirectoryAdapter(
+				organization.PublicQueries{Directory: organizations},
+			),
+		),
+		scheduling.WithPartyDirectory(
+			scheduling.NewPartyDirectoryAdapter(commands),
+		),
+	)
+	schedulingHTTP := scheduling.NewHTTPHandler(
+		schedulingUsecases,
+		scheduling.NewIdentityAuthenticator(clerkAuthenticator),
+		features,
+	).Handler()
+	featureHTTP := organization.NewFeatureHTTP(
+		features,
+		clerkAuthenticator,
+	).Handler()
+	notificationStore := notifications.NewPostgres(pool)
+	var notificationHTTP http.Handler
+	if cfg.PerGo.Enabled {
+		secrets := make([][]byte, 0, len(cfg.PerGo.WebhookSecrets))
+		for _, value := range cfg.PerGo.WebhookSecrets {
+			secrets = append(secrets, []byte(value))
+		}
+		notificationHTTP = notifications.NewHandler(
+			notifications.ReadNotification{Repository: notificationStore},
+			notificationAuthenticator{source: clerkAuthenticator},
+			notifications.ProcessDeliveryWebhook{
+				Repository:        notificationStore,
+				ExpectedWorkspace: cfg.PerGo.WorkspaceID,
+			},
+			notifications.PerGoSignatureVerifier{
+				Secrets: secrets, Tolerance: 5 * time.Minute,
+			},
+			features,
+		).Routes()
+	}
+	calendarHTTP, calendarResource, err := initializeCalendarAPI(
+		ctx, cfg.Calendars, pool, clerkAuthenticator, features,
+	)
+	if err != nil {
+		_ = internalTokens.Close()
+		database.Close()
+		_ = shutdownTracing(context.Background())
+		return nil, &APIStartupError{
+			Code: "CALENDAR_DEPENDENCY_UNAVAILABLE",
+			Err:  err,
+		}
+	}
+	contextRoutes := []publicContextRoute{
+		{
+			Pattern: "GET /api/v1/organizations/{organizationId}/features",
+			Handler: featureHTTP,
+		},
+		{
+			Pattern: "PUT /api/v1/organizations/{organizationId}/features",
+			Handler: featureHTTP,
+		},
+		{
+			Pattern: "GET /api/v1/session",
+			Handler: identity.NewSessionHandler(clerkAuthenticator),
+		},
+		{
+			Pattern: "/api/v1/organizations/{organizationId}/scheduling/",
+			Handler: schedulingHTTP,
+		},
+		{
+			Pattern: "/api/v1/public/scheduling/",
+			Handler: schedulingHTTP,
+		},
+	}
+	if notificationHTTP != nil {
+		contextRoutes = append(
+			contextRoutes,
+			publicContextRoute{
+				Pattern: "GET /api/v1/organizations/{organizationId}/notifications/{notificationId}",
+				Handler: notificationHTTP,
+			},
+			publicContextRoute{
+				Pattern: "POST /api/v1/webhooks/pergo",
+				Handler: notificationHTTP,
+			},
+		)
+	}
+	if calendarHTTP != nil {
+		contextRoutes = append(
+			contextRoutes,
+			publicContextRoute{
+				Pattern: "POST /api/v1/organizations/{organizationId}/calendars/google/oauth/start",
+				Handler: calendarHTTP,
+			},
+			publicContextRoute{
+				Pattern: "GET /api/v1/calendars/google/oauth/callback",
+				Handler: calendarHTTP,
+			},
+			publicContextRoute{
+				Pattern: "GET /api/v1/organizations/{organizationId}/calendars/connections",
+				Handler: calendarHTTP,
+			},
+			publicContextRoute{
+				Pattern: "DELETE /api/v1/organizations/{organizationId}/calendars/connections/{connectionId}",
+				Handler: calendarHTTP,
+			},
+		)
+	}
+	handler := composePublicHTTP(
+		api.Handler(),
+		identity.NewWebhook(webhooks, identity.ReceiveWebhook{Inbox: identities}),
+		contextRoutes...,
+	)
+	handler = observability.PreflightGate(
+		handler,
+		preflightmodels.Config{
+			Tag:   cfg.Preflight.Tag,
+			Token: cfg.Preflight.Token,
+		},
+	)
 	return &App{
 		Handler: observability.HTTP(handler, nil), database: database,
 		shutdownTracing: shutdownTracing,
+		resources:       compactCloseResources(internalTokens, calendarResource),
 	}, nil
 }
 
@@ -119,11 +309,138 @@ func APIStartupErrorCode(err error) string {
 	return "DEPENDENCY_UNAVAILABLE"
 }
 
-func composePublicHTTP(api, clerkWebhook http.Handler) http.Handler {
+type principalSource interface {
+	Principal(*http.Request) (identitydomain.Principal, error)
+}
+
+type notificationAuthenticator struct {
+	source principalSource
+}
+
+func (auth notificationAuthenticator) Authenticate(
+	request *http.Request,
+) (notifications.Actor, error) {
+	principal, err := auth.source.Principal(request)
+	if err != nil {
+		return notifications.Actor{}, err
+	}
+	return notifications.Actor{
+		OrganizationID:   principal.OrganizationID,
+		ActorID:          principal.ActorID,
+		Role:             string(principal.Role),
+		MembershipStatus: principal.MembershipStatus,
+	}, nil
+}
+
+type publicContextRoute struct {
+	Pattern string
+	Handler http.Handler
+}
+
+func composePublicHTTP(
+	api, clerkWebhook http.Handler,
+	contextRoutes ...publicContextRoute,
+) http.Handler {
 	mux := http.NewServeMux()
+	for _, route := range contextRoutes {
+		mux.Handle(route.Pattern, route.Handler)
+	}
 	mux.Handle("/", api)
 	mux.Handle("POST /api/v1/webhooks/clerk", clerkWebhook)
 	return mux
+}
+
+func initializeCalendarAPI(
+	ctx context.Context,
+	cfg config.Calendars,
+	pool *pgxpool.Pool,
+	auth calendars.CalendarAuthenticator,
+	features calendars.HandlerFeatureGate,
+) (http.Handler, closeResource, error) {
+	if !cfg.Enabled {
+		return nil, nil, nil
+	}
+	cipher, resource, err := initializeCalendarCipher(ctx, cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	provider, err := calendars.NewGoogleCalendar(
+		googlemodels.Configuration{
+			ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret,
+			RedirectURL: cfg.RedirectURL, AuthURL: cfg.AuthURL,
+			TokenURL: cfg.TokenURL, RevokeURL: cfg.RevokeURL,
+			CalendarURL: cfg.CalendarURL,
+		},
+	)
+	if err != nil {
+		if resource != nil {
+			_ = resource.Close()
+		}
+		return nil, nil, fmt.Errorf("configure Google Calendar: %w", err)
+	}
+	store := calendars.NewStore(pool, cipher)
+	handler := calendars.NewCalendarHTTP(
+		calendars.Commands{Repository: store, Google: provider},
+		auth,
+		features,
+	)
+	return handler.Handler(), resource, nil
+}
+
+func initializeCalendarCipher(
+	ctx context.Context,
+	cfg config.Calendars,
+) (calendars.SecretCipher, closeResource, error) {
+	if len(cfg.LocalKey) != 0 {
+		cipher, err := calendars.NewLocalEnvelopeCipher(cfg.LocalKey)
+		return cipher, nil, err
+	}
+	client, err := cloudkms.NewKeyManagementClient(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("open calendar KMS client: %w", err)
+	}
+	return calendars.NewKMSEnvelopeCipher(
+		client, cfg.KMSKeyName,
+	), client, nil
+}
+
+func initializeCalendarWorker(
+	ctx context.Context,
+	cfg config.Calendars,
+	pool *pgxpool.Pool,
+	leaseFor time.Duration,
+	features calendars.WorkerFeatureGate,
+) (worker.Dispatcher, closeResource, error) {
+	if !cfg.Enabled {
+		return nil, nil, nil
+	}
+	cipher, resource, err := initializeCalendarCipher(ctx, cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	provider, err := calendars.NewGoogleCalendar(
+		googlemodels.Configuration{
+			ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret,
+			RedirectURL: cfg.RedirectURL, AuthURL: cfg.AuthURL,
+			TokenURL: cfg.TokenURL, RevokeURL: cfg.RevokeURL,
+			CalendarURL: cfg.CalendarURL,
+		},
+	)
+	if err != nil {
+		if resource != nil {
+			_ = resource.Close()
+		}
+		return nil, nil, fmt.Errorf("configure Google Calendar worker: %w", err)
+	}
+	if leaseFor <= 0 {
+		leaseFor = 30 * time.Second
+	}
+	return calendars.CalendarWorker{
+		Store:    calendars.NewStore(pool, cipher),
+		Provider: provider,
+		Features: features,
+		LeaseFor: leaseFor,
+	}, resource, nil
 }
 
 func InitializeWorker(
@@ -133,6 +450,17 @@ func InitializeWorker(
 ) (*WorkerApp, error) {
 	if logger == nil {
 		logger = slog.Default()
+	}
+	releaseSignal, err := worker.NewReleaseSignal(
+		logger,
+		cfg.ReleaseSHA,
+		cfg.Revision,
+	)
+	if err != nil {
+		return nil, workerStartupError(
+			"WORKER_RELEASE_METADATA_INVALID",
+			err,
+		)
 	}
 	database, err := postgres.Open(
 		ctx,
@@ -181,7 +509,9 @@ func InitializeWorker(
 	fiscalHTTP := commerce.NewServiceHTTPClient()
 	accountingHTTP := commerce.NewServiceHTTPClient()
 	commerceStore := commerce.New(pool)
-	dispatcher := commerce.DurableWorker{
+	organizationStore := organization.New(pool)
+	features := organization.Features{Store: organizationStore}
+	commerceDispatcher := commerce.DurableWorker{
 		Store: commerceStore,
 		Fiscal: commerce.HTTPFiscalClient{
 			BaseURL: cfg.FiscalURL, Client: fiscalHTTP,
@@ -192,6 +522,72 @@ func InitializeWorker(
 			Tokens: tokens, PlatformTokens: platformTokens,
 		},
 		LeaseFor: cfg.LeaseDuration,
+	}
+	actionTokens, actionTokenErr := scheduling.NewHMACActionTokenCodec(
+		[]byte(cfg.SchedulingActionTokenSecret),
+	)
+	if actionTokenErr != nil {
+		if identity != nil {
+			_ = identity.Close()
+		}
+		database.Close()
+		_ = shutdownTracing(context.Background())
+		return nil, workerStartupError(
+			"ACTION_TOKEN_CONFIG_INVALID",
+			actionTokenErr,
+		)
+	}
+	schedulingRepository := scheduling.NewPostgresRepository(pool)
+	schedulingWorker := scheduling.NewWorker(
+		scheduling.NewService(
+			schedulingRepository,
+			scheduling.NewPlatformScheduling(),
+			actionTokens,
+		),
+		100,
+	)
+	dispatchers := worker.Dispatchers{commerceDispatcher, schedulingWorker}
+	if cfg.PerGo.Enabled {
+		notificationStore := notifications.NewPostgres(pool)
+		notificationDispatcher := notifications.NewWorker(
+			notificationStore,
+			notifications.NewPerGo(
+				cfg.PerGo.BaseURL,
+				cfg.PerGo.APIKey,
+				cfg.PerGo.Channel,
+				cfg.PerGo.AllowGlobalRouteFallback,
+				nil,
+				cfg.PerGo.Timeout,
+			),
+			notifications.ProjectSchedulingNotification{
+				Repository: notificationStore,
+				Routes:     notificationStore,
+			},
+			features,
+		)
+		notificationDispatcher.LeaseFor = cfg.LeaseDuration
+		dispatchers = append(dispatchers, notificationDispatcher)
+	}
+	calendarDispatcher, calendarResource, calendarErr := initializeCalendarWorker(
+		ctx,
+		cfg.Calendars,
+		pool,
+		cfg.LeaseDuration,
+		features,
+	)
+	if calendarErr != nil {
+		if identity != nil {
+			_ = identity.Close()
+		}
+		database.Close()
+		_ = shutdownTracing(context.Background())
+		return nil, workerStartupError(
+			"CALENDAR_DEPENDENCY_UNAVAILABLE",
+			calendarErr,
+		)
+	}
+	if calendarDispatcher != nil {
+		dispatchers = append(dispatchers, calendarDispatcher)
 	}
 	operations := worker.New(pool)
 	circuits := map[string]worker.CircuitState{
@@ -209,14 +605,19 @@ func InitializeWorker(
 			ReadHeaderTimeout: 2 * time.Second,
 		},
 		Runner: worker.Runner{
-			Dispatcher: dispatcher,
-			Metrics:    operations, Circuits: circuits, Logger: logger,
+			Dispatcher:     dispatchers,
+			Metrics:        operations,
+			ReleaseReady:   releaseSignal,
+			Circuits:       circuits,
+			Logger:         logger,
 			DispatchEvery:  cfg.DispatchInterval,
 			MetricsEvery:   cfg.MetricsInterval,
 			MetricsTimeout: 5 * time.Second,
 			RunOnce:        cfg.RunOnce,
 		},
-		database: database, identity: identity,
+		database:        database,
+		identity:        identity,
+		resources:       compactCloseResources(calendarResource),
 		shutdownTracing: shutdownTracing,
 		shutdownTimeout: cfg.ShutdownTimeout,
 	}, nil
@@ -300,11 +701,22 @@ type closeResource interface {
 	Close() error
 }
 
+func compactCloseResources(resources ...closeResource) []closeResource {
+	compacted := make([]closeResource, 0, len(resources))
+	for _, resource := range resources {
+		if resource != nil {
+			compacted = append(compacted, resource)
+		}
+	}
+	return compacted
+}
+
 type WorkerApp struct {
 	Server          *http.Server
 	Runner          worker.Runner
 	database        *postgres.Database
 	identity        closeResource
+	resources       []closeResource
 	shutdownTracing func(context.Context) error
 	shutdownTimeout time.Duration
 	closeOnce       sync.Once
@@ -343,6 +755,14 @@ func (a *WorkerApp) Close() error {
 	}
 	a.closeOnce.Do(func() {
 		var shutdownErrors []error
+		for index := len(a.resources) - 1; index >= 0; index-- {
+			if err := a.resources[index].Close(); err != nil {
+				shutdownErrors = append(
+					shutdownErrors,
+					workerShutdownError("KMS_CLIENT_CLOSE_FAILED", err),
+				)
+			}
+		}
 		if a.identity != nil {
 			if err := a.identity.Close(); err != nil {
 				shutdownErrors = append(

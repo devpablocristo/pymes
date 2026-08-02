@@ -1,7 +1,8 @@
 .DEFAULT_GOAL := help
-.PHONY: help build migration-image-check test fiscal-test accounting-test quality security fiscal-e2e accounting-e2e commercial-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate architecture-check db-integration backup-restore-smoke e2e ci up down backup restore
+.PHONY: help build migration-image-check test fiscal-test fiscal-real-contract accounting-test web-ci quality workflow-policy-check legacy-wif-test compose-security-check libpq-exec-test security fiscal-e2e accounting-e2e commercial-e2e scheduling-e2e notifications-e2e calendars-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate architecture-check db-integration backup-restore-smoke e2e ci up down backup restore
 
 ACCOUNTING_BUILD_CONTEXT ?= ../../open-accounting
+PUBLIC_GO_OPERATION_IDS := getHealthz,getReadyz,createSale,createParty,getParty,createPurchase,getPurchase,createPayment,getPayment,createAccountingReversal,getAccountingFailure,createAccountingAdjustment,getSale,requestFiscalCredentialCSR,getFiscalCredential,uploadFiscalCertificate,configureFiscalPointOfSale,validateFiscalPointOfSale
 
 help:
 	@echo "Pymes v3"
@@ -9,12 +10,21 @@ help:
 	@echo "  make migration-image-check  Construye las imágenes de migración Cloud Run"
 	@echo "  make test            Ejecuta pruebas Go y del fiscal adapter mock"
 	@echo "  make fiscal-test     Ejecuta typecheck y pruebas TypeScript fiscales"
+	@echo "  make fiscal-real-contract  Prueba onboarding, KMS, WSAA y WSFE real con fakes"
 	@echo "  make accounting-test Ejecuta las suites del runtime contable headless"
+	@echo "  make web-ci          Valida cliente generado, tipos, tests, build, auditoría y E2E browser"
 	@echo "  make quality         Ejecuta vet y valida Compose"
+	@echo "  make workflow-policy-check  Valida Actions, release inmutable e IAM declarativo"
+	@echo "  make legacy-wif-test Prueba el corte WIF legado con adapters falsos"
+	@echo "  make compose-security-check Verifica que Compose publique sólo en loopback"
+	@echo "  make libpq-exec-test Verifica que URLs y passwords no lleguen a argv"
 	@echo "  make security        Verifica vulnerabilidades alcanzables en los tres runtimes"
 	@echo "  make fiscal-e2e      Valida el cliente Go contra el backend fiscal mock"
 	@echo "  make accounting-e2e  Valida el cliente Go contra Open Accounting headless"
 	@echo "  make commercial-e2e  Recorre la vertical pública completa contra servicios reales/mocks"
+	@echo "  make scheduling-e2e  Valida Agenda HTTP/PostgreSQL, aislamiento y concurrencia"
+	@echo "  make notifications-e2e  Valida PerGo, reintentos y webhooks firmados"
+	@echo "  make calendars-e2e   Valida OAuth, cifrado, Google/Meet fake, RLS y recuperación"
 	@echo "  make observability-e2e  Comprueba salud, readiness y métricas del stack"
 	@echo "  make recovery-e2e   Comprueba caída y recuperación independiente de servicios y bases"
 	@echo "  make replay-smoke   Comprueba replay DLQ idempotente y auditoría inmutable"
@@ -46,22 +56,47 @@ test:
 fiscal-test:
 	cd fiscal-adapter && npm ci --ignore-scripts && npm run ci
 
+fiscal-real-contract:
+	cd fiscal-adapter && npm ci --ignore-scripts && npm run test:real
+
 accounting-test:
 	cd "$(ACCOUNTING_BUILD_CONTEXT)" && go test ./internal/accounting ./internal/tenant ./internal/pymesaccounting ./internal/database/pymesaccounting ./internal/database/pymesaccountingadmin ./internal/pymesaccountingadminhttp ./cmd/pymes-accounting ./cmd/pymes-accounting-admin
 	cd "$(ACCOUNTING_BUILD_CONTEXT)" && go test ./docs -run 'TestRuntimePersistenceStaysBehindRepositories|TestRepositoryRawSQLExceptionsAreExplicit'
 
+web-ci:
+	cd web && npm ci --ignore-scripts && npm run ci
+
 quality:
 	cd backend && go vet ./...
 	cd "$(ACCOUNTING_BUILD_CONTEXT)" && go vet ./internal/accounting ./internal/tenant ./internal/pymesaccounting ./internal/database/pymesaccounting ./internal/database/pymesaccountingadmin ./internal/pymesaccountingadminhttp ./cmd/pymes-accounting ./cmd/pymes-accounting-admin
-	for script in scripts/*.sh; do sh -n "$$script"; done
-	bash -n scripts/deploy/cloud-run.sh
-	bash -n scripts/deploy/bootstrap-internal-identity.sh
-	bash -n scripts/deploy/bootstrap-workload-identities.sh
-	bash -n scripts/deploy/bootstrap-cloudsql.sh
-	bash -n scripts/deploy/migrate-regional-secrets.sh
-	bash -n scripts/deploy/provision-monitoring.sh
+	for script in scripts/*.sh; do \
+		case "$$(head -n 1 "$$script")" in \
+			*"bash") bash -n "$$script" ;; \
+			*) sh -n "$$script" ;; \
+		esac || exit 1; \
+	done
+	for script in scripts/deploy/*.sh; do bash -n "$$script" || exit 1; done
+	$(MAKE) legacy-wif-test
+	$(MAKE) compose-security-check
+	$(MAKE) libpq-exec-test
+	./scripts/deploy/cloud-run-security-check.sh
+	./scripts/deploy/cloud-run-transaction-test.sh
+	ACCOUNTING_BUILD_CONTEXT="$(ACCOUNTING_BUILD_CONTEXT)" ./scripts/deploy/rollback-cloud-run-test.sh
+	$(MAKE) workflow-policy-check
 	$(MAKE) monitoring-config-check
 	docker compose config --quiet
+
+workflow-policy-check:
+	./scripts/deploy/workflow-policy-check.sh
+
+legacy-wif-test:
+	bash scripts/deploy/retire-legacy-pymes-wif-test.sh
+
+compose-security-check:
+	./scripts/compose-security-check.sh
+
+libpq-exec-test:
+	./scripts/libpq-exec-test.sh
 
 security:
 	cd backend && go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
@@ -69,11 +104,11 @@ security:
 	cd fiscal-adapter && npm audit --omit=dev
 
 api-check:
-	python3 -c 'import yaml; [yaml.safe_load(open(p)) for p in ["api/openapi.yaml", "contracts/accounting.openapi.yaml", "contracts/fiscal.openapi.yaml", "monitoring/alerts.yml"]]'
+	python3 -c 'import yaml; [yaml.safe_load(open(p)) for p in ["api/openapi.yaml", "api/scheduling.openapi.yaml", "contracts/accounting.openapi.yaml", "contracts/fiscal.openapi.yaml", "contracts/pergo.openapi.yaml", "monitoring/alerts.yml"]]'
 	./scripts/contracts-check.sh
 
 api-generate:
-	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --exclude-operation-ids clerkWebhook --package publicapi --generate types,chi-server -o internal/commerce/handler/dto/public.gen.go ../api/openapi.yaml
+	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --include-operation-ids "$(PUBLIC_GO_OPERATION_IDS)" --package publicapi --generate types,chi-server -o internal/commerce/handler/dto/public.gen.go ../api/openapi.yaml
 	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --package accountingapi --generate types,client -o internal/commerce/accounting/models/accounting.gen.go ../contracts/accounting.openapi.yaml
 	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --package accountingapi --generate chi-server -o internal/commerce/accounting/models/accounting.server.gen.go ../contracts/accounting.openapi.yaml
 	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --package fiscalapi --generate types,client -o internal/commerce/fiscal/models/fiscal.gen.go ../contracts/fiscal.openapi.yaml
@@ -93,7 +128,10 @@ db-integration:
 
 e2e:
 	$(MAKE) db-integration
+	$(MAKE) scheduling-e2e
 	$(MAKE) commercial-e2e
+	$(MAKE) notifications-e2e
+	$(MAKE) calendars-e2e
 	$(MAKE) backup-restore-smoke
 	$(MAKE) observability-e2e
 	$(MAKE) recovery-e2e
@@ -112,6 +150,15 @@ accounting-e2e:
 
 commercial-e2e:
 	./scripts/commercial-vertical-e2e.sh
+
+scheduling-e2e:
+	./scripts/scheduling-e2e.sh
+
+notifications-e2e:
+	./scripts/notifications-e2e.sh
+
+calendars-e2e:
+	./scripts/calendars-e2e.sh
 
 observability-e2e:
 	./scripts/observability-e2e.sh
@@ -135,6 +182,8 @@ ci:
 	$(MAKE) quality
 	$(MAKE) security
 	$(MAKE) test
+	$(MAKE) fiscal-real-contract
+	$(MAKE) web-ci
 	$(MAKE) build
 	$(MAKE) migration-image-check
 	$(MAKE) e2e

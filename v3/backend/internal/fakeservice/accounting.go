@@ -18,7 +18,7 @@ var _ accountingapi.ServerInterface = (*accountingFakeServer)(nil)
 
 type accountingFakeServer struct {
 	mu          sync.Mutex
-	provisioned map[string]struct{}
+	provisioned map[string]bool
 	events      map[string]accountingapi.AccountingEvent
 	periods     map[string]map[uuid.UUID]accountingapi.Period
 	periodByKey map[string]uuid.UUID
@@ -26,7 +26,7 @@ type accountingFakeServer struct {
 
 func newAccountingFakeServer() *accountingFakeServer {
 	return &accountingFakeServer{
-		provisioned: make(map[string]struct{}),
+		provisioned: make(map[string]bool),
 		events:      make(map[string]accountingapi.AccountingEvent),
 		periods:     make(map[string]map[uuid.UUID]accountingapi.Period),
 		periodByKey: make(map[string]uuid.UUID),
@@ -64,7 +64,7 @@ func (s *accountingFakeServer) ProvisionOrganization(
 
 	s.mu.Lock()
 	_, found := s.provisioned[organizationID]
-	s.provisioned[organizationID] = struct{}{}
+	s.provisioned[organizationID] = true
 	s.mu.Unlock()
 
 	status := http.StatusCreated

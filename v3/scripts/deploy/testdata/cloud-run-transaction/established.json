@@ -1,0 +1,205 @@
+{
+  "fault": {
+    "enabled": false
+  },
+  "region": "us-central1",
+  "services": {
+    "pymes-v3-stg-accounting": {
+      "exists": true,
+      "ingress": "internal",
+      "invoker_iam_check": true,
+      "invokers": [
+        "serviceAccount:pymes-v3-worker-stg@pymes-dev-352318.iam.gserviceaccount.com"
+      ],
+      "latest_created": "pymes-v3-stg-accounting-old",
+      "latest_ready": "pymes-v3-stg-accounting-old",
+      "next_revision": 1,
+      "revisions": {
+        "pymes-v3-stg-accounting-old": {
+          "environment": {},
+          "image": "test.invalid/accounting-old",
+          "labels": {
+            "pymes-v3-release": "1111111111111111111111111111111111111111"
+          },
+          "service_account": "pymes-v3-accounting-stg@pymes-dev-352318.iam.gserviceaccount.com"
+        }
+      },
+      "scaling": {
+        "count": 0,
+        "mode": "automatic"
+      },
+      "traffic": [
+        {
+          "percent": 100,
+          "revisionName": "pymes-v3-stg-accounting-old"
+        }
+      ]
+    },
+    "pymes-v3-stg-accounting-admin": {
+      "exists": true,
+      "ingress": "internal",
+      "invoker_iam_check": true,
+      "invokers": [
+        "serviceAccount:pymes-v3-provision-stg@pymes-dev-352318.iam.gserviceaccount.com"
+      ],
+      "latest_created": "pymes-v3-stg-accounting-admin-old",
+      "latest_ready": "pymes-v3-stg-accounting-admin-old",
+      "next_revision": 1,
+      "revisions": {
+        "pymes-v3-stg-accounting-admin-old": {
+          "environment": {},
+          "image": "test.invalid/accounting-admin-old",
+          "labels": {
+            "pymes-v3-release": "1111111111111111111111111111111111111111"
+          },
+          "service_account": "pymes-v3-accounting-admin-stg@pymes-dev-352318.iam.gserviceaccount.com"
+        }
+      },
+      "scaling": {
+        "count": 0,
+        "mode": "automatic"
+      },
+      "traffic": [
+        {
+          "percent": 100,
+          "revisionName": "pymes-v3-stg-accounting-admin-old"
+        }
+      ]
+    },
+    "pymes-v3-stg-api": {
+      "exists": true,
+      "ingress": "all",
+      "invoker_iam_check": true,
+      "invokers": [
+        "allUsers"
+      ],
+      "latest_created": "pymes-v3-stg-api-old",
+      "latest_ready": "pymes-v3-stg-api-old",
+      "next_revision": 1,
+      "revisions": {
+        "pymes-v3-stg-api-old": {
+          "environment": {
+            "PYMES_PREFLIGHT_TOKEN": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "image": "test.invalid/api-old",
+          "labels": {
+            "pymes-v3-release": "1111111111111111111111111111111111111111"
+          },
+          "service_account": "pymes-v3-api-stg@pymes-dev-352318.iam.gserviceaccount.com"
+        }
+      },
+      "scaling": {
+        "count": 0,
+        "mode": "automatic"
+      },
+      "traffic": [
+        {
+          "percent": 100,
+          "revisionName": "pymes-v3-stg-api-old"
+        },
+        {
+          "percent": 0,
+          "revisionName": "pymes-v3-stg-api-old",
+          "tag": "c-1111111111111111",
+          "url": "https://c-1111111111111111---pymes-v3-stg-api.us-central1.run.fake"
+        }
+      ]
+    },
+    "pymes-v3-stg-fiscal": {
+      "exists": true,
+      "ingress": "internal",
+      "invoker_iam_check": true,
+      "invokers": [
+        "serviceAccount:pymes-v3-api-stg@pymes-dev-352318.iam.gserviceaccount.com",
+        "serviceAccount:pymes-v3-worker-stg@pymes-dev-352318.iam.gserviceaccount.com"
+      ],
+      "latest_created": "pymes-v3-stg-fiscal-old",
+      "latest_ready": "pymes-v3-stg-fiscal-old",
+      "next_revision": 1,
+      "revisions": {
+        "pymes-v3-stg-fiscal-old": {
+          "environment": {},
+          "image": "test.invalid/fiscal-old",
+          "labels": {
+            "pymes-v3-release": "1111111111111111111111111111111111111111"
+          },
+          "service_account": "pymes-v3-fiscal-stg@pymes-dev-352318.iam.gserviceaccount.com"
+        }
+      },
+      "scaling": {
+        "count": 0,
+        "mode": "automatic"
+      },
+      "traffic": [
+        {
+          "percent": 100,
+          "revisionName": "pymes-v3-stg-fiscal-old"
+        }
+      ]
+    },
+    "pymes-v3-stg-web": {
+      "exists": true,
+      "ingress": "all",
+      "invoker_iam_check": true,
+      "invokers": [
+        "allUsers"
+      ],
+      "latest_created": "pymes-v3-stg-web-old",
+      "latest_ready": "pymes-v3-stg-web-old",
+      "next_revision": 1,
+      "revisions": {
+        "pymes-v3-stg-web-old": {
+          "environment": {
+            "PYMES_API_UPSTREAM": "https://c-1111111111111111---pymes-v3-stg-api.us-central1.run.fake",
+            "PYMES_PREFLIGHT_TOKEN": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "image": "test.invalid/web-old",
+          "labels": {
+            "pymes-v3-release": "1111111111111111111111111111111111111111"
+          },
+          "service_account": "pymes-v3-web-stg@pymes-dev-352318.iam.gserviceaccount.com"
+        }
+      },
+      "scaling": {
+        "count": 0,
+        "mode": "automatic"
+      },
+      "traffic": [
+        {
+          "percent": 100,
+          "revisionName": "pymes-v3-stg-web-old"
+        }
+      ]
+    },
+    "pymes-v3-stg-worker": {
+      "exists": true,
+      "ingress": "internal",
+      "invoker_iam_check": true,
+      "invokers": [],
+      "latest_created": "pymes-v3-stg-worker-old",
+      "latest_ready": "pymes-v3-stg-worker-old",
+      "next_revision": 1,
+      "revisions": {
+        "pymes-v3-stg-worker-old": {
+          "environment": {},
+          "image": "test.invalid/worker-old",
+          "labels": {
+            "pymes-v3-release": "1111111111111111111111111111111111111111"
+          },
+          "service_account": "pymes-v3-worker-stg@pymes-dev-352318.iam.gserviceaccount.com"
+        }
+      },
+      "scaling": {
+        "count": 1,
+        "mode": "manual"
+      },
+      "traffic": [
+        {
+          "percent": 100,
+          "revisionName": "pymes-v3-stg-worker-old"
+        }
+      ],
+      "worker_signal_revision": "pymes-v3-stg-worker-old"
+    }
+  }
+}

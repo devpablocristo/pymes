@@ -849,6 +849,7 @@ for json in "$api_json" "$worker_json"; do
 done
 if [[ "$pergo_enabled" == "true" ]]; then
   : "${PYMES_PERGO_URL:?set PYMES_PERGO_URL}"
+  : "${PYMES_PERGO_AUDIENCE:?set PYMES_PERGO_AUDIENCE}"
   : "${PYMES_PERGO_WORKSPACE_ID:?set PYMES_PERGO_WORKSPACE_ID}"
   if [[ ! "$PYMES_PERGO_WORKSPACE_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]; then
     fail "PYMES_PERGO_WORKSPACE_ID must be one canonical lowercase UUIDv4"
@@ -864,8 +865,22 @@ if [[ "$pergo_enabled" == "true" ]]; then
         "$PYMES_PERGO_URL" == *"#"* ]]; then
     fail "PYMES_PERGO_URL is not an explicit safe HTTPS URL"
   fi
+  pergo_audience_pattern='^https://[^/@|?#]+$'
+  if [[ ! "$PYMES_PERGO_AUDIENCE" =~ $pergo_audience_pattern ||
+        "$PYMES_PERGO_AUDIENCE" == *$'\r'* ||
+        "$PYMES_PERGO_AUDIENCE" == *$'\n'* ||
+        "$PYMES_PERGO_AUDIENCE" == *[[:space:]]* ||
+        "$PYMES_PERGO_AUDIENCE" == *"|"* ||
+        "$PYMES_PERGO_AUDIENCE" == *","* ||
+        "$PYMES_PERGO_AUDIENCE" == *"@"* ||
+        "$PYMES_PERGO_AUDIENCE" == *"?"* ||
+        "$PYMES_PERGO_AUDIENCE" == *"#"* ]]; then
+    fail "PYMES_PERGO_AUDIENCE is not an exact safe HTTPS origin without path"
+  fi
   [[ "$(service_env_value PERGO_URL <<<"$worker_json")" == "$PYMES_PERGO_URL" ]] ||
     fail "$prefix-worker PerGo URL differs"
+  [[ "$(service_env_value PYMES_PERGO_AUDIENCE <<<"$worker_json")" == "$PYMES_PERGO_AUDIENCE" ]] ||
+    fail "$prefix-worker PerGo audience differs"
   [[ "$(service_env_value PERGO_WORKSPACE_ID <<<"$worker_json")" == "$PYMES_PERGO_WORKSPACE_ID" ]] ||
     fail "$prefix-worker PerGo workspace differs"
   [[ "$(service_env_value PERGO_CHANNEL <<<"$worker_json")" == "${PYMES_PERGO_CHANNEL:-whatsapp}" ]] ||
@@ -1021,6 +1036,7 @@ if [[ "$pergo_enabled" == "true" ]]; then
     PERGO_TIMEOUT
     PERGO_URL
     PERGO_WORKSPACE_ID
+    PYMES_PERGO_AUDIENCE
   )
   verify_service_env_value "$prefix-api" "$api_json" PERGO_WORKSPACE_ID "$PYMES_PERGO_WORKSPACE_ID"
   verify_service_env_value "$prefix-worker" "$worker_json" PERGO_TIMEOUT 5s

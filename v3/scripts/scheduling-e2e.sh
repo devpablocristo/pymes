@@ -22,5 +22,5 @@ cd backend
 PYMES_DATABASE_TEST_URL=${PYMES_DATABASE_TEST_URL:-postgres://pymes:pymes@127.0.0.1:55434/pymes_v3?sslmode=disable}
 export PYMES_DATABASE_TEST_URL
 go test -race ./internal/scheduling \
-  -run 'Test(PostgresSchedulingTenantIsolationConcurrencyAndRecovery|PostgresBookingUpdateIsVersionedIdempotentAndPreservesImmutableFields|SchedulingHTTPEndToEnd|BookingStatusCustomizationPreservesTenantAndLifecycleInvariants)$' \
+  -run 'Test(PostgresSchedulingTenantIsolationConcurrencyAndRecovery|PostgresBookingUpdateIsVersionedIdempotentAndPreservesImmutableFields|PostgresPublicBookingActionIsConcurrentAndExactlyOnce|PostgresPublicBookingActionRollsBackBeforeTokenConsumption|PostgresPublicWaitlistAcceptanceIsConcurrentAndExactlyOnce|SchedulingHTTPEndToEnd|BookingStatusCustomizationPreservesTenantAndLifecycleInvariants)$' \
   -count=1

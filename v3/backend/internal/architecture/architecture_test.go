@@ -24,7 +24,7 @@ var serializedFieldTag = regexp.MustCompile(
 )
 
 var misplacedAdapterHelper = regexp.MustCompile(
-	`(?i)^(?:attach|decode|digest|encode|fallback|generated.*error|hash|map|normalize|nullable|parse|positive|stable|transcode|translate)`,
+	`(?i)^(?:attach|decode|digest|encode|fallback|generated.*error|hash|map|normalize|nullable|parse|positive|stable|transcode|translate|write(?:error|json|problem)$)`,
 )
 
 type parsedGoFile struct {
@@ -106,6 +106,57 @@ func TestAdaptersHaveRootDataAndHelpers(t *testing.T) {
 		if _, ok := byRelative[rootFile]; !ok {
 			t.Errorf("%s belongs to adapter without root %s", file.relative, rootFile)
 		}
+	}
+}
+
+func TestAdapterBoundaryImportsCannotBypassRootMarkers(t *testing.T) {
+	root := backendRoot(t)
+	files := productionGoFiles(t, root)
+	definitions := adapterDefinitions(files)
+	for _, file := range files {
+		if !strings.HasPrefix(filepath.ToSlash(file.relative), "internal/") ||
+			strings.Count(filepath.ToSlash(file.relative), "/") != 2 {
+			continue
+		}
+		imports := adapterBoundaryImports(file)
+		if len(imports) == 0 {
+			continue
+		}
+		if _, ok := adapterDefinitionFor(file, definitions); ok {
+			continue
+		}
+		t.Errorf(
+			"%s imports adapter boundary %q but has no architecture:adapter marker "+
+				"and is not a fragment of a marked adapter",
+			file.relative,
+			imports,
+		)
+	}
+}
+
+func TestEveryContextRootFileIsUseCaseOrMarkedAdapter(t *testing.T) {
+	root := backendRoot(t)
+	files := productionGoFiles(t, root)
+	definitions := adapterDefinitions(files)
+	for _, file := range files {
+		path := filepath.ToSlash(file.relative)
+		if !strings.HasPrefix(path, "internal/") ||
+			strings.Count(path, "/") != 2 {
+			continue
+		}
+		base := strings.TrimSuffix(filepath.Base(path), ".go")
+		if base == "usecases" || strings.HasPrefix(base, "usecases_") {
+			continue
+		}
+		if _, ok := adapterDefinitionFor(file, definitions); ok {
+			continue
+		}
+		t.Errorf(
+			"%s is an unclassified context-root file; external adapters require "+
+				"an architecture:adapter marker and adapter fragments must share "+
+				"the marked root prefix",
+			file.relative,
+		)
 	}
 }
 
@@ -227,6 +278,8 @@ type hiddenPayload struct {
 }
 
 func decodeHiddenPayload() {}
+
+func writeJSON() {}
 `)
 	rootFile := mustParseSyntheticGoFile(
 		t,
@@ -246,8 +299,25 @@ func decodeHiddenPayload() {}
 		fragmentFile,
 		map[string]struct{}{},
 	)
-	if len(violations) < 2 {
+	if len(violations) < 3 {
 		t.Fatalf("fragment violations = %v, want serialized data and helper violations", violations)
+	}
+}
+
+func TestAdapterBoundaryImportDetection(t *testing.T) {
+	file := mustParseSyntheticGoFile(
+		t,
+		"internal/sample/http_client.go",
+		[]byte(`package sample
+
+import "net/http"
+
+var _ = http.MethodGet
+`),
+	)
+	got := adapterBoundaryImports(file)
+	if len(got) != 1 || got[0] != "net/http" {
+		t.Fatalf("adapter boundary imports = %v, want [net/http]", got)
 	}
 }
 
@@ -395,8 +465,6 @@ func TestAxisHasNoDependencyPathOrRuntimeContact(t *testing.T) {
 			extension := filepath.Ext(entry.Name())
 			switch {
 			case entry.Name() == "Dockerfile", entry.Name() == "Makefile":
-			case extension == ".sh" && strings.HasSuffix(entry.Name(), "-test.sh"):
-				return nil
 			case extension == ".go" && strings.HasSuffix(entry.Name(), "_test.go"):
 				return nil
 			case extension == ".go", extension == ".mod", extension == ".sum",
@@ -713,12 +781,20 @@ func mustParseSyntheticGoFile(
 	if err != nil {
 		t.Fatal(err)
 	}
-	return parsedGoFile{
+	file := parsedGoFile{
 		relative: relative,
 		source:   source,
 		syntax:   syntax,
 		adapter:  adapterMarker(syntax),
 	}
+	for _, imported := range syntax.Imports {
+		value, err := strconv.Unquote(imported.Path.Value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		file.imports = append(file.imports, value)
+	}
+	return file
 }
 
 func adapterMarker(file *ast.File) string {
@@ -819,6 +895,23 @@ func importAliases(file *ast.File) map[string]string {
 			continue
 		}
 		result[name] = imported
+	}
+	return result
+}
+
+func adapterBoundaryImports(file parsedGoFile) []string {
+	var result []string
+	for _, imported := range file.imports {
+		switch {
+		case imported == "database/sql", imported == "net/http":
+			result = append(result, imported)
+		case strings.Contains(imported, "pgx"):
+			result = append(result, imported)
+		case strings.HasPrefix(imported, "cloud.google.com/"):
+			result = append(result, imported)
+		case strings.HasPrefix(imported, "github.com/devpablocristo/platform/"):
+			result = append(result, imported)
+		}
 	}
 	return result
 }

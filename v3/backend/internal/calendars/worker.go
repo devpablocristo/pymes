@@ -16,6 +16,7 @@ const CalendarSyncRequestedTopic = "CalendarSyncRequested"
 
 type SyncStateStore interface {
 	LeaseCalendarEvents(context.Context, int, time.Duration) ([]domain.OutboxEvent, error)
+	DeferCalendarEvent(context.Context, domain.OutboxEvent) error
 	RetryCalendarEvent(context.Context, domain.OutboxEvent) error
 	DeadLetterCalendarEvent(context.Context, domain.OutboxEvent, string) error
 	MarkCalendarEventPublished(context.Context, domain.OutboxEvent) error
@@ -76,6 +77,12 @@ func (worker CalendarWorker) DispatchOnce(ctx context.Context) error {
 			deliveryErr = fmt.Errorf("calendar worker leased unowned topic %q", event.Topic)
 		}
 		if deliveryErr != nil {
+			if errors.Is(deliveryErr, domain.ErrProjectionDeferred) {
+				if err := worker.Store.DeferCalendarEvent(ctx, event); err != nil {
+					return err
+				}
+				continue
+			}
 			maxAttempts := worker.MaxAttempts
 			if maxAttempts <= 0 {
 				maxAttempts = 10
@@ -120,7 +127,7 @@ func (worker CalendarWorker) Consume(
 		return true, err
 	}
 	if !enabled {
-		return true, nil
+		return true, domain.ErrProjectionDeferred
 	}
 	command, err := workerhelpers.DecodeSyncRequested(
 		organizationID, payload,
@@ -133,6 +140,9 @@ func (worker CalendarWorker) Consume(
 	)
 	if err != nil {
 		return true, err
+	}
+	if len(connections) == 0 {
+		return true, domain.ErrProjectionDeferred
 	}
 	for _, connection := range connections {
 		if err := worker.syncConnection(ctx, connection, command); err != nil {
@@ -147,40 +157,64 @@ func (worker CalendarWorker) syncConnection(
 	connection domain.Connection,
 	command domain.CalendarSyncCommand,
 ) error {
+	eventID := workerhelpers.EventID(
+		command.OrganizationID, connection.ID, command.BookingID,
+	)
+	existing, existingErr := worker.Store.GetExternalEvent(
+		ctx, command.OrganizationID, connection.ID, command.BookingID,
+	)
+	if existingErr != nil && !errors.Is(existingErr, domain.ErrNotFound) {
+		return existingErr
+	}
+	if existingErr == nil && existing.SourceVersion > command.SourceVersion {
+		return nil
+	}
+	if existingErr == nil &&
+		existing.SourceVersion == command.SourceVersion &&
+		existing.SnapshotDigest != command.SnapshotDigest {
+		return domain.ErrConflict
+	}
+	if command.Operation == domain.SyncDelete &&
+		existingErr == nil &&
+		existing.SourceVersion == command.SourceVersion &&
+		existing.SnapshotDigest == command.SnapshotDigest &&
+		existing.Status == domain.ExternalEventDeleted {
+		return nil
+	}
+	if existingErr == nil &&
+		command.Operation == domain.SyncUpsert &&
+		existing.SourceVersion == command.SourceVersion &&
+		existing.SnapshotDigest == command.SnapshotDigest &&
+		existing.Status == domain.ExternalEventSynced {
+		return nil
+	}
+	if command.Operation == domain.SyncDelete &&
+		errors.Is(existingErr, domain.ErrNotFound) {
+		return worker.deleteEvent(
+			ctx,
+			connection,
+			domain.OAuthGrant{},
+			command,
+			existing,
+			eventID,
+		)
+	}
 	connection, grant, err := worker.connectionGrant(ctx, connection)
 	if err != nil {
 		return err
 	}
-	eventID := workerhelpers.EventID(
-		command.OrganizationID, connection.ID, command.BookingID,
-	)
 	meetRequestID := ""
 	if command.MeetRequested && connection.MeetEnabled {
 		meetRequestID = workerhelpers.MeetRequestID(
 			command.OrganizationID, connection.ID, command.BookingID,
 		)
 	}
-	existing, err := worker.Store.GetExternalEvent(
-		ctx, command.OrganizationID, connection.ID, command.BookingID,
-	)
-	if err != nil && !errors.Is(err, domain.ErrNotFound) {
-		return err
-	}
 	if command.Operation == domain.SyncDelete {
 		return worker.deleteEvent(
 			ctx, connection, grant, command, existing, eventID,
 		)
 	}
-	if err == nil && existing.SourceVersion > command.SourceVersion {
-		return nil
-	}
-	if err == nil &&
-		existing.SourceVersion == command.SourceVersion &&
-		existing.SnapshotDigest == command.SnapshotDigest &&
-		existing.Status == domain.ExternalEventSynced {
-		return nil
-	}
-	if errors.Is(err, domain.ErrNotFound) {
+	if errors.Is(existingErr, domain.ErrNotFound) {
 		return worker.createEvent(
 			ctx, connection, grant, command, eventID, meetRequestID,
 		)

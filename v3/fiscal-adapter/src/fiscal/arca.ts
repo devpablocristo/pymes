@@ -2,7 +2,6 @@ import {
   createExplicitArcaClient,
   createWSAAAccessTicketProvider,
 } from "@devpablocristo/arca-facturacion/explicit";
-import { Arca } from "@devpablocristo/arca-facturacion";
 import type {
   ArtifactRepository,
   CredentialProbe,
@@ -16,7 +15,11 @@ import type { AuthorityDecision, FiscalAuthority } from "./usecases.js";
 import type { FiscalRequest } from "./usecases/domain/fiscal.js";
 import { FiscalError } from "./usecases/domain/fiscal.js";
 import type { ExplicitSDKClient } from "./arca/models/sdk.js";
-import { mapFiscalRequest, voucherType } from "./arca/helpers/mapping.js";
+import {
+  mapFiscalRequest,
+  supportedVoucherTypes,
+  voucherType,
+} from "./arca/helpers/mapping.js";
 import {
   authorizationDecision,
   authorizationFailure,
@@ -28,7 +31,7 @@ import {
   artifactAAD,
   artifactReference,
 } from "./arca/helpers/artifacts.js";
-import { compatibleExplicitClient } from "./arca/helpers/client.js";
+import { validatedExplicitClient } from "./arca/helpers/client.js";
 import { providerErrorName } from "./arca/helpers/errors.js";
 
 export interface CredentialMaterialResolver {
@@ -115,7 +118,8 @@ export class ArcaFiscalAuthority
     input: CredentialProbeInput,
   ): Promise<void> {
     try {
-      const pointsOfSale = await this.client(input.material).listPointsOfSale();
+      const client = this.client(input.material);
+      const pointsOfSale = await client.listPointsOfSale();
       const configured = pointsOfSale.find(
         (point) => point.number === input.pointOfSale,
       );
@@ -125,6 +129,15 @@ export class ArcaFiscalAuthority
         configured.deactivatedOn !== undefined
       ) {
         throw new CredentialError("POINT_OF_SALE_NOT_VALIDATED");
+      }
+      for (const sequenceVoucherType of supportedVoucherTypes) {
+        const baseline = await client.lastAuthorizedVoucher({
+          pointOfSale: input.pointOfSale,
+          voucherType: sequenceVoucherType,
+        });
+        if (baseline.voucherNumber !== 0) {
+          throw new CredentialError("POINT_OF_SALE_NOT_EMPTY");
+        }
       }
     } catch (error) {
       if (error instanceof CredentialError) throw error;
@@ -213,10 +226,7 @@ export class ArcaFiscalAuthority
       retryDelayMs: 1_000,
       onEvent,
     };
-    return compatibleExplicitClient(
-      createExplicitArcaClient(config),
-      new Arca(config),
-    );
+    return validatedExplicitClient(createExplicitArcaClient(config));
   }
 
   private async resolveMaterial(

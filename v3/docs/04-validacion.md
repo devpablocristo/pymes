@@ -44,6 +44,53 @@ PRD sin llamar a GCP; `make replay-smoke` aplica todas las migraciones en una
 base descartable, mueve una DLQ, repite el comando como no-op y demuestra que
 su auditoría no admite mutación.
 
+`make workflow-policy-check` prueba que los workflows manuales de Google y
+ARCA homologación acepten sólo STG, `main` con CI verde para el SHA exacto y un
+`GITHUB_RUN_ATTEMPT` inicial, y que la auditoría completa de environments
+preceda el uso de credenciales. `make protected-live-validation-test` prueba
+sus validadores, sin red ni credenciales reales: mantiene tokens fuera de
+`argv`, usa archivos `0600`, no imprime cuerpos de error y rechaza origen
+`.invalid`, credenciales fiscales de producción o metadata Google que no
+pertenezca a Pymes. El probe ARCA llama exclusivamente la validación WSAA/WSFE
+del punto de venta, comprueba con `FECompUltimoAutorizado` que las nueve
+secuencias A/B/C, NC y ND estén vacías y nunca ejecuta una autorización.
+
+<!-- drift:bind v3/scripts/deploy/release-evidence-test.sh -->
+<!-- drift:bind v3/scripts/deploy/bootstrap-release-evidence.sh -->
+<!-- drift:bind v3/scripts/deploy/retain-release-manifest.sh -->
+
+`make release-evidence-test` usa un adapter `gcloud` falso para probar el
+bootstrap plan-only, el IAM exacto del builder y la separación entre `apply` y
+el Bucket Lock irreversible. El lock falla sin la confirmación literal; la
+publicación exige un bucket ya bloqueado, usa precondición de generación cero,
+rechaza manifiestos alterados o con claves extra, vuelve a descargar la
+generación publicada y emite un receipt sólo si checksum, metadata y retención
+coinciden. El gate demuestra el mecanismo; no acredita que los buckets hayan
+sido creados o bloqueados en GCP.
+
+<!-- drift:bind v3/scripts/deploy/cloud-restore-drill.sh -->
+<!-- drift:bind v3/scripts/deploy/cloud-restore-drill-test.sh -->
+
+`make cloud-restore-drill-test` prueba con adapters que el orquestador cloud
+valida primero el manifiesto de release y los tres backups, crea exactamente
+tres destinos aislados —Pymes, Fiscal y Accounting— y nunca adopta una base
+preexistente. También cubre estado con checksum, ownership marker, validator
+revisado, dos reconciliaciones sin duplicados y cleanup con confirmación
+separada. No conecta Cloud SQL ni sustituye el drill real.
+
+<!-- drift:bind v3/scripts/deploy/collect-pilot-evidence.sh -->
+
+`make pilot-evidence-test` reemplaza `gcloud` y `curl` por adapters
+determinísticos y prueba Agenda, PerGo, Google/Meet y ARCA sin red. Demuestra
+que confirmación, checksum de release, checkout, permisos de tokens y revisión
+activa fallan antes de contactar un adapter; que un resultado no terminal no
+publica evidencia; que los bundles se publican atómicamente sin respuestas
+crudas ni PII; que el piloto PerGo exige una audience HTTPS real para la
+identidad privada de Cloud Run y conserva sólo su referencia SHA-256; y que
+cualquier alteración posterior rompe
+`checksums.sha256`. Este gate valida el collector, no sustituye la ejecución de
+los pilotos reales.
+
 `make scheduling-e2e` cubre también la edición operativa de un turno:
 `expected_version`, RLS y locks se resuelven dentro de PostgreSQL; un replay
 exacto conserva el snapshot de respuesta del adapter, la misma clave con otro
@@ -54,6 +101,18 @@ por el `PATCH`; conservan sus comandos específicos. `make web-ci` prueba el
 formulario separado, el cliente generado y que un rechazo mantiene la edición
 abierta sin dejar una promesa no manejada.
 
+<!-- drift:bind v3/backend/internal/scheduling/calendar_projection/helpers/events.go -->
+<!-- drift:bind v3/backend/internal/calendars/worker/helpers/events.go -->
+
+`make scheduling-e2e` y `make calendars-e2e` cubren la proyección Calendar por
+estado, el par `delete` original/`upsert` reemplazo al reprogramar, la
+expiración de holds, el opt-in inmutable de Meet y la aceptación concurrente de
+waitlist exactamente una vez. El contrato cruzado demuestra que productor y
+consumidor calculan el mismo snapshot; Calendars rechaza campos desconocidos,
+digests no hexadecimales o alterados y deletes que lleven datos de un upsert.
+Las reservas de sesiones no admiten una reunión individual ni emiten
+proyección.
+
 `make security` ejecuta `govulncheck` sobre Pymes y el runtime headless
 contable, además de `npm audit` sobre Fiscal. El gate quedó en cero
 vulnerabilidades alcanzables después de actualizar Go 1.26.5, `pgx`, `x/text`
@@ -63,14 +122,17 @@ versión sin la vulnerabilidad alcanzable detectada por `govulncheck`.
 ## Evidencia H8 disponible
 
 La política de release ya es verificable sin desplegar. `make
-workflow-policy-check` comprueba que el workflow sea manual, parta de `main`,
-exija un CI verde para el SHA exacto y una confirmación escrita para PRD. Build
-y deploy usan identidades WIF separadas por entorno. El primer paso de ambos
-jobs rechaza cualquier `GITHUB_RUN_ATTEMPT` distinto de `1`: Build lo hace
-antes de solicitar la identidad del builder y Deploy antes de checkout,
-descargar artefactos o autenticar. Un job o workflow reejecutado no puede
-reutilizar una validación ni un manifiesto anterior y debe reemplazarse por un
-nuevo `workflow_dispatch`. El builder rechaza
+workflow-policy-check` comprueba que release y validaciones live sean manuales,
+partan de `main`, exijan un CI verde para el SHA exacto y una confirmación
+escrita. Los dos jobs live están fijados al environment `stg`, no solicitan WIF
+ni aceptan tokens como inputs; los secretos se materializan únicamente en el
+paso posterior a la auditoría de controles. Build y deploy usan identidades WIF
+separadas por entorno. El primer paso de todos esos jobs rechaza cualquier
+`GITHUB_RUN_ATTEMPT` distinto de `1`: Build lo hace antes de solicitar la
+identidad del builder y Deploy antes de checkout, descargar artefactos o
+autenticar. Un job o workflow reejecutado no puede reutilizar una validación ni
+un manifiesto anterior y debe reemplazarse por un nuevo `workflow_dispatch`.
+El builder rechaza
 worktrees sucios, fija tanto Pymes como Open Accounting a commits completos,
 publica SBOM y provenance y entrega únicamente referencias
 `@sha256:<digest>` mediante un manifiesto con claves permitidas.
@@ -160,12 +222,12 @@ La release consulta GitHub antes de solicitar una credencial WIF. En cada
 ejecución comprueba mediante la vista pública de la rama que `main` esté
 protegida para todos y exija únicamente `Pymes V3 validate`; también relee las
 reglas del environment seleccionado. La auditoría operativa, obligatoria antes
-de crear WIF, comprueba además una aprobación, revisión del último push,
-resolución de conversaciones, ausencia de bypass y aplicación a
-administradores. Los environments `stg` y `prd` sólo admiten `main`; PRD exige
-el conjunto exacto de reviewers aprobado, impide autoaprobación y no permite
-bypass administrativo. El bootstrap es plan-only por defecto y falla cerrado
-si falta cualquiera de esas reglas.
+de crear WIF, comprueba además que `main` no exija reviewers, mantenga
+resolución de conversaciones, historial lineal, ausencia de force-push/borrado
+y aplicación a administradores. Los environments `stg` y `prd` sólo admiten
+`main`; PRD conserva el conjunto exacto de reviewers de despliegue aprobado,
+impide autoaprobación y no permite bypass administrativo. El bootstrap es
+plan-only por defecto y falla cerrado si falta cualquiera de esas reglas.
 
 `scripts/deploy/cloud-run-security-check.sh` ejecuta `cloud-run.sh` en dry-run
 para STG y PRD sin permitir que se invoque `gcloud`. El gate positivo cubre:
@@ -178,16 +240,18 @@ para STG y PRD sin permitir que se invoque `gcloud`. El gate positivo cubre:
 - imágenes exclusivamente por digest, secretos por versión numérica,
   invokers exactos y ausencia de `roles/run.invoker` a nivel proyecto;
 - API, worker, Fiscal y provisioner con Direct VPC según su necesidad, además
-  de Private Google Access y Public NAT comprobables;
+  de Private Google Access y Public NAT comprobables. El bootstrap exige
+  cobertura `ALL_IP_RANGES` de la única subred y converge de forma segura un
+  recurso propio que hubiera quedado limitado al rango primario;
 - Fiscal `mock` y `arca` usando siempre `fiscal-vault` en producción, con
   primary habilitada, rotación de 90 días e IAM directo; PerGo y Google sólo
   reciben configuración cuando su flag está habilitado.
 
 Los casos negativos rechazan tags mutables, SHA inválido, origen público fuera
-de Clerk, callback Google distinto, CIDR fuera de `/20`–`/26`, modo Fiscal
-inválido, ARCA sin políticas de issuer y creación de Cloud NAT sin aceptación
-explícita del costo. También prueban que bootstrap no admite PRD, ARCA, PerGo,
-Google, origen real ni un secreto Clerk sin
+de Clerk, callback Google distinto, audience PerGo ausente, HTTP o con path,
+CIDR fuera de `/20`–`/26`, modo Fiscal inválido, ARCA sin políticas de issuer y
+creación de Cloud NAT sin aceptación explícita del costo. También prueban que
+bootstrap no admite PRD, ARCA, PerGo, Google, origen real ni un secreto Clerk sin
 `lifecycle=bootstrap-temporary`; operational rechaza ese label y la simulación
 de metadata se acepta únicamente en dry-run. Un negativo adicional simula un
 servicio STG activo y demuestra que bootstrap aborta antes de ejecutar

@@ -48,6 +48,7 @@ export type CredentialErrorCode =
   | "HOMOLOGATION_REQUIRED"
   | "POINT_OF_SALE_NOT_ENABLED"
   | "POINT_OF_SALE_NOT_VALIDATED"
+  | "POINT_OF_SALE_NOT_EMPTY"
   | "VALIDATION_ERROR";
 
 export class CredentialError extends Error {

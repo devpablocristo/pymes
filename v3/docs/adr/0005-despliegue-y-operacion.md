@@ -28,10 +28,11 @@ para build, STG y PRD; no utilizará claves JSON persistentes. PRD requiere una
 aprobación explícita de otro reviewer, impide autoaprobación y bypass
 administrativo, y reconstruye desde la misma fuente y materiales validados,
 no desde fuentes distintas.
-La rama `main` exige el check único `Pymes V3 validate`, review del último push
-y enforcement para administradores. Cada release vuelve a comprobar el check y
-el enforcement visibles en el resumen público de la rama y las reglas del
-environment seleccionado. La auditoría completa de reviews, bypass y
+La rama `main` exige el check único `Pymes V3 validate`, no exige reviewers y
+mantiene historial lineal, resolución de conversaciones y enforcement para
+administradores. Cada release vuelve a comprobar el check y el enforcement
+visibles en el resumen público de la rama y las reglas del environment
+seleccionado. La auditoría completa de reviews de despliegue, bypass y
 allowlists se ejecuta con credencial de operador y bloquea la creación de WIF.
 La automatización WIF está preparada, pero la identidad nueva todavía no está
 aprovisionada. El corte del principal WIF legado requiere un primer canary STG

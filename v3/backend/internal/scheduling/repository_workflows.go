@@ -146,14 +146,14 @@ func (r *PostgresRepository) CreateWaitlistEntry(
 		INSERT INTO app.scheduling_waitlist (
 			org_id,id,branch_id,service_id,party_id,customer_name_snapshot,
 			customer_email_snapshot,customer_phone_snapshot,preferred_from,preferred_until,
-			participants,status,offer_expires_at,offered_starts_at,offered_ends_at,
+			participants,meet_requested,status,offer_expires_at,offered_starts_at,offered_ends_at,
 			offered_allocations,accepted_booking_id,version,created_at,updated_at
 		) VALUES (
-			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
+			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
 		)`,
 		value.OrganizationID, value.ID, value.BranchID, value.ServiceID, value.PartyID,
 		value.CustomerName, value.CustomerEmail, value.CustomerPhone,
-		value.PreferredFrom, value.PreferredUntil, value.Participants, value.Status,
+		value.PreferredFrom, value.PreferredUntil, value.Participants, value.MeetRequested, value.Status,
 		value.OfferExpiresAt, value.OfferedStartAt, value.OfferedEndAt, json.RawMessage("[]"),
 		value.AcceptedBookingID, value.Version, value.CreatedAt, value.UpdatedAt,
 	)
@@ -252,7 +252,7 @@ func getWaitlistTx(
 	query := `
 		SELECT org_id,id,branch_id,service_id,party_id,customer_name_snapshot,
 		       customer_email_snapshot,customer_phone_snapshot,preferred_from,preferred_until,
-		       participants,status,offer_expires_at,offered_starts_at,offered_ends_at,
+		       participants,meet_requested,status,offer_expires_at,offered_starts_at,offered_ends_at,
 		       offered_allocations,accepted_booking_id,version,created_at,updated_at
 		FROM app.scheduling_waitlist
 		WHERE org_id=$1 AND id=$2`
@@ -265,7 +265,7 @@ func getWaitlistTx(
 		&value.OrganizationID, &value.ID, &value.BranchID, &value.ServiceID,
 		&value.PartyID, &value.CustomerName, &value.CustomerEmail, &value.CustomerPhone,
 		&value.PreferredFrom, &value.PreferredUntil,
-		&value.Participants, &value.Status, &value.OfferExpiresAt,
+		&value.Participants, &value.MeetRequested, &value.Status, &value.OfferExpiresAt,
 		&value.OfferedStartAt, &value.OfferedEndAt, &offeredAllocations,
 		&value.AcceptedBookingID, &value.Version, &value.CreatedAt, &value.UpdatedAt,
 	)
@@ -600,9 +600,16 @@ func (r *PostgresRepository) ExpireHolds(
 	ctx context.Context,
 	limit int,
 	now time.Time,
+	planner HoldExpirationPlanner,
 ) ([]domain.Booking, error) {
 	if limit <= 0 {
 		return []domain.Booking{}, nil
+	}
+	if planner == nil {
+		return nil, domain.NewError(
+			domain.CodeValidation,
+			"hold expiration planner is not configured",
+		)
 	}
 	organizations, err := r.organizationIDs(ctx)
 	if err != nil {
@@ -688,24 +695,7 @@ func (r *PostgresRepository) ExpireHolds(
 				CorrelationID:  "worker:holds:" + id.String(),
 				ActorID:        "system:scheduling-worker",
 			}
-			payload := map[string]any{
-				"booking_id": id,
-				"reason":     "hold_expired",
-				"start_at":   booking.StartAt,
-				"end_at":     booking.EndAt,
-				"version":    booking.Version,
-			}
-			events := lifecycleAndProjectionEvents(
-				metadata,
-				id.String(),
-				domain.EventBookingCancelled,
-				payload,
-				bookingNotificationPayload(
-					booking,
-					domain.EventBookingCancelled,
-					map[string]any{"reason": "hold_expired"},
-				),
-			)
+			events := planner(metadata, booking)
 			if err := insertEvents(ctx, tx, events); err != nil {
 				_ = tx.Rollback(ctx)
 				return nil, err

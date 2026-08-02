@@ -346,6 +346,27 @@ test("credential onboarding is tenant-bound, idempotent and requires homologatio
     },
     actor,
   );
+  await assert.rejects(
+    service.uploadCertificate(
+      {
+        organizationId: "org_one",
+        credentialId: productionCSR.credential.id,
+        certificatePem: "certificate-production",
+        expectedVersion: 1,
+      },
+      actor,
+    ),
+    hasCredentialCode("HOMOLOGATION_REQUIRED"),
+  );
+  await service.validatePointOfSale(
+    {
+      organizationId: "org_one",
+      credentialId: first.credential.id,
+      number: 6,
+      enabled: true,
+    },
+    actor,
+  );
   await service.uploadCertificate(
     {
       organizationId: "org_one",
@@ -377,6 +398,37 @@ test("credential onboarding is tenant-bound, idempotent and requires homologatio
     actor,
   );
   assert.equal(validated.validatedAt, "2026-08-01T12:00:00.000Z");
+  const disabled = await service.configurePointOfSale(
+    {
+      organizationId: "org_one",
+      credentialId: productionCSR.credential.id,
+      number: 7,
+      enabled: false,
+    },
+    actor,
+  );
+  assert.equal(disabled.enabled, false);
+  await assert.rejects(
+    service.configurePointOfSale(
+      {
+        organizationId: "org_one",
+        credentialId: productionCSR.credential.id,
+        number: 7,
+        enabled: true,
+      },
+      actor,
+    ),
+    hasCredentialCode("POINT_OF_SALE_NOT_VALIDATED"),
+  );
+  await service.validatePointOfSale(
+    {
+      organizationId: "org_one",
+      credentialId: productionCSR.credential.id,
+      number: 7,
+      enabled: true,
+    },
+    actor,
+  );
   const material = await service.resolveMaterial({
     organizationId: "org_one",
     credentialId: productionCSR.credential.id,
@@ -508,15 +560,25 @@ class MemoryCredentialRepository implements CredentialRepository {
     return updated;
   }
 
-  async hasReadyEnvironment(
+  async hasValidatedPointOfSale(
     organizationId: string,
     environment: CredentialEnvironment,
+    cuit: string,
   ): Promise<boolean> {
     return [...this.values.values()].some(
-      (value) =>
-        value.organizationId === organizationId &&
-        value.environment === environment &&
-        value.status === "ready",
+      (credential) =>
+        credential.organizationId === organizationId &&
+        credential.environment === environment &&
+        credential.cuit === cuit &&
+        credential.status === "ready" &&
+        [...this.points.values()].some(
+          (point) =>
+            point.organizationId === organizationId &&
+            point.credentialId === credential.id &&
+            point.environment === environment &&
+            point.enabled &&
+            point.validatedAt !== undefined,
+        ),
     );
   }
 

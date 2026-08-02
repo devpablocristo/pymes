@@ -195,7 +195,9 @@ paths:
       operationId: validateFiscalPointOfSale
       description: >-
         Valida WSAA y acceso WSFE para el punto de venta sin emitir un
-        comprobante. Sólo una validación exitosa puede habilitarlo.
+        comprobante. Para el MVP exige además que el último comprobante
+        autorizado sea cero para cada tipo A/B/C, NC y ND soportado; sólo un
+        punto de venta dedicado y vacío puede habilitarse.
       parameters:
         - $ref: '#/components/parameters/OrganizationId'
         - $ref: '#/components/parameters/CredentialId'
@@ -566,7 +568,8 @@ components:
              CERTIFICATE_CUIT_MISMATCH, CERTIFICATE_KEY_MISMATCH,
              CERTIFICATE_ENVIRONMENT_MISMATCH, CERTIFICATE_EXPIRED,
              HOMOLOGATION_REQUIRED, POINT_OF_SALE_NOT_ENABLED,
-             POINT_OF_SALE_NOT_VALIDATED, INTERNAL_ERROR]
+             POINT_OF_SALE_NOT_VALIDATED, POINT_OF_SALE_NOT_EMPTY,
+             INTERNAL_ERROR]
         title: { type: string }
         detail: { type: string }
         correlation_id: { type: string }

@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${FAKE_CALL_LOG:?}"
+: "${FAKE_RELEASE_MANIFEST:?}"
+
+known_secrets=(
+  "${FAKE_API_TOKEN_A:-}"
+  "${FAKE_API_TOKEN_B:-}"
+  "${FAKE_API_TOKEN:-}"
+  "${FAKE_GOOGLE_TOKEN:-}"
+)
+for secret in "${known_secrets[@]}"; do
+  if [[ -n "$secret" && " $* " == *"$secret"* ]]; then
+    echo "bearer token reached curl argv" >&2
+    exit 98
+  fi
+done
+
+config=
+while (($#)); do
+  case "$1" in
+    --config)
+      config=$2
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+[[ -n "$config" && -f "$config" ]]
+
+config_value() {
+  local key="$1"
+  awk -v prefix="$key = \"" '
+    index($0,prefix) == 1 {
+      value=substr($0,length(prefix)+1)
+      sub(/"$/, "", value)
+      print value
+    }
+  ' "$config"
+}
+
+url=$(config_value url)
+output=$(config_value output)
+headers=$(config_value dump-header)
+[[ -n "$url" && -n "$output" && -n "$headers" ]]
+printf 'CURL\n' >>"$FAKE_CALL_LOG"
+
+status=200
+body=
+case "$url" in
+  */readyz)
+    body='ready'
+    ;;
+  */organizations/*/features)
+    organization=${url#*/organizations/}
+    organization=${organization%%/*}
+    body=$(jq -cn --arg organization "$organization" '{
+      organization_id:$organization,
+      scheduling_enabled:true,
+      whatsapp_enabled:true,
+      google_calendar_enabled:true,
+      fiscal_real_enabled:true,
+      version:3
+    }')
+    ;;
+  */organizations/org-a/scheduling/bookings/11111111-1111-4111-8111-111111111111)
+    body='{"id":"11111111-1111-4111-8111-111111111111","branch_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","service_id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","party_id":"party-secret-a","status":"confirmed","participants":1,"start_at":"2026-08-03T13:00:00Z","end_at":"2026-08-03T13:45:00Z","version":2,"service_name":"PII service A","price":"100.00","currency":"ARS","duration_minutes":45,"timezone":"America/Argentina/Buenos_Aires","customer_name":"Alice Secret","customer_email":"alice@example.invalid","customer_phone":"+5491111111111","notes":"secret note","allocations":[{"resource_id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","mode":"exclusive","units":1}]}'
+    ;;
+  */organizations/org-b/scheduling/bookings/22222222-2222-4222-8222-222222222222)
+    body='{"id":"22222222-2222-4222-8222-222222222222","branch_id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","service_id":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","party_id":"party-secret-b","status":"completed","participants":2,"start_at":"2026-08-04T14:00:00Z","end_at":"2026-08-04T15:00:00Z","version":4,"service_name":"PII service B","price":"200.00","currency":"ARS","duration_minutes":60,"timezone":"America/Argentina/Buenos_Aires","customer_name":"Bob Secret","customer_email":"bob@example.invalid","customer_phone":"+5491122222222","allocations":[{"resource_id":"ffffffff-ffff-4fff-8fff-ffffffffffff","mode":"capacity","units":2}]}'
+    ;;
+  */organizations/org-a/scheduling/bookings/22222222-2222-4222-8222-222222222222|\
+  */organizations/org-b/scheduling/bookings/11111111-1111-4111-8111-111111111111)
+    status=404
+    body='{"code":"NOT_FOUND"}'
+    ;;
+  */notifications/notification-pilot)
+    notification_status=${FAKE_NOTIFICATION_STATUS:-delivered}
+    body=$(jq -cn --arg status "$notification_status" '{
+      id:"notification-pilot",
+      organization_id:"org-secret",
+      kind:"confirmation",
+      aggregate_type:"booking",
+      aggregate_id:"booking-secret",
+      template_name:"booking.confirmation",
+      template_version:2,
+      locale:"es_AR",
+      send_at:"2026-08-03T12:00:00Z",
+      status:$status,
+      external_message_id:"provider-secret-message-id",
+      correlation_id:"correlation-secret",
+      created_at:"2026-08-03T12:00:00Z",
+      updated_at:"2026-08-03T12:01:00Z"
+    }')
+    ;;
+  */calendars/connections)
+    body='[{"id":"33333333-3333-4333-8333-333333333333","provider":"google","status":"active","calendar_connected":true,"time_zone":"America/Argentina/Buenos_Aires","free_busy_enabled":true,"meet_enabled":true,"access_token_expires_at":"2026-08-03T16:00:00Z","version":2}]'
+    ;;
+  https://www.googleapis.com/calendar/v3/*)
+    body=$(jq -cn --arg id "${FAKE_GOOGLE_EVENT_ID:?}" '{
+      kind:"calendar#event",
+      etag:"provider-etag-secret",
+      id:$id,
+      status:"confirmed",
+      summary:"Customer PII appointment",
+      description:"Sensitive notes",
+      attendees:[{email:"customer@example.invalid"}],
+      created:"2026-08-03T12:00:00Z",
+      updated:"2026-08-03T12:01:00Z",
+      hangoutLink:"https://meet.google.com/abc-defg-hij",
+      conferenceData:{
+        conferenceSolution:{
+          key:{type:"hangoutsMeet"},
+          name:"Google Meet"
+        },
+        entryPoints:[{
+          entryPointType:"video",
+          uri:"https://meet.google.com/abc-defg-hij"
+        }]
+      }
+    }')
+    ;;
+  */fiscal/credentials/fcred_Z9y8X7w6V5u4T3s2R1q0P9o8)
+    body='{"id":"fcred_Z9y8X7w6V5u4T3s2R1q0P9o8","organization_id":"org-secret","cuit":"20123456789","legal_name":"Secret Company SA","common_name":"secret.example","environment":"homologation","status":"ready","version":2,"certificate_fingerprint":"secret-fingerprint","certificate_serial_number":"secret-serial","certificate_valid_from":"2026-08-01T00:00:00Z","certificate_expires_at":"2027-08-01T00:00:00Z","created_at":"2026-08-01T00:00:00Z","updated_at":"2026-08-01T00:01:00Z"}'
+    ;;
+  */sales/sale-pilot)
+    body='{"id":"sale-pilot","organization_id":"org-secret","recipient_ref":"customer-secret","voucher":{"point_of_sale":7,"document_type":"FA","voucher_number":41},"fiscal_environment":"homologation","total":{"amount":"121.00","currency":"ARS"},"status":"posted","snapshot_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cae":"74123456789012","journal_entry_id":"journal-secret","open_item_id":"open-secret"}'
+    ;;
+  *)
+    echo "unexpected curl URL" >&2
+    exit 97
+    ;;
+esac
+
+web_image=$(grep '^PYMES_WEB_IMAGE=' "$FAKE_RELEASE_MANIFEST" | cut -d= -f2-)
+web_digest=${web_image##*@}
+{
+  printf 'HTTP/2 %s\r\n' "$status"
+  printf 'X-Pymes-Release: stg:%s:%s\r\n' "$FAKE_SOURCE_SHA" "$web_digest"
+  printf '\r\n'
+} >"$headers"
+printf '%s\n' "$body" >"$output"
+printf '%s' "$status"

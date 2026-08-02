@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help build migration-image-check test fiscal-test fiscal-real-contract accounting-test web-ci quality workflow-policy-check legacy-wif-test compose-security-check libpq-exec-test security fiscal-e2e accounting-e2e commercial-e2e scheduling-e2e notifications-e2e calendars-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate architecture-check db-integration backup-restore-smoke e2e ci up down backup restore
+.PHONY: help build migration-image-check test fiscal-test fiscal-real-contract accounting-test web-ci quality workflow-policy-check protected-live-validation-test release-evidence-test cloud-restore-drill-test legacy-wif-test project-secret-access-test obsolete-secrets-test compose-security-check libpq-exec-test pilot-evidence-test security fiscal-e2e accounting-e2e commercial-e2e scheduling-e2e notifications-e2e calendars-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate architecture-check db-integration backup-restore-smoke e2e ci up down backup restore
 
 ACCOUNTING_BUILD_CONTEXT ?= ../../open-accounting
 PUBLIC_GO_OPERATION_IDS := getHealthz,getReadyz,createSale,createParty,getParty,createPurchase,getPurchase,createPayment,getPayment,createAccountingReversal,getAccountingFailure,createAccountingAdjustment,getSale,requestFiscalCredentialCSR,getFiscalCredential,uploadFiscalCertificate,configureFiscalPointOfSale,validateFiscalPointOfSale
@@ -15,11 +15,17 @@ help:
 	@echo "  make web-ci          Valida cliente generado, tipos, tests, build, auditoría y E2E browser"
 	@echo "  make quality         Ejecuta vet y valida Compose"
 	@echo "  make workflow-policy-check  Valida Actions, release inmutable e IAM declarativo"
+	@echo "  make protected-live-validation-test  Valida jobs Google/ARCA protegidos sin llamar proveedores"
+	@echo "  make release-evidence-test  Prueba retención create-only y Bucket Lock sin llamar a GCP"
+	@echo "  make cloud-restore-drill-test  Prueba el orquestador cloud de restore con adapters falsos"
 	@echo "  make legacy-wif-test Prueba el corte WIF legado con adapters falsos"
+	@echo "  make project-secret-access-test  Prueba reemplazo de grants Secret Manager a nivel proyecto"
+	@echo "  make obsolete-secrets-test  Prueba el retiro recuperable de secretos obsoletos con gcloud falso"
 	@echo "  make compose-security-check Verifica que Compose publique sólo en loopback"
 	@echo "  make libpq-exec-test Verifica que URLs y passwords no lleguen a argv"
+	@echo "  make pilot-evidence-test  Valida bundles redactados de pilotos sin contactar cloud"
 	@echo "  make security        Verifica vulnerabilidades alcanzables en los tres runtimes"
-	@echo "  make fiscal-e2e      Valida el cliente Go contra el backend fiscal mock"
+	@echo "  make fiscal-e2e      Valida BFF y cliente Go contra Fiscal HTTP/PostgreSQL real con ARCA fake"
 	@echo "  make accounting-e2e  Valida el cliente Go contra Open Accounting headless"
 	@echo "  make commercial-e2e  Recorre la vertical pública completa contra servicios reales/mocks"
 	@echo "  make scheduling-e2e  Valida Agenda HTTP/PostgreSQL, aislamiento y concurrencia"
@@ -77,26 +83,50 @@ quality:
 	done
 	for script in scripts/deploy/*.sh; do bash -n "$$script" || exit 1; done
 	$(MAKE) legacy-wif-test
+	$(MAKE) project-secret-access-test
+	$(MAKE) obsolete-secrets-test
 	$(MAKE) compose-security-check
 	$(MAKE) libpq-exec-test
+	$(MAKE) pilot-evidence-test
 	./scripts/deploy/cloud-run-security-check.sh
 	./scripts/deploy/cloud-run-transaction-test.sh
 	ACCOUNTING_BUILD_CONTEXT="$(ACCOUNTING_BUILD_CONTEXT)" ./scripts/deploy/rollback-cloud-run-test.sh
 	$(MAKE) workflow-policy-check
+	$(MAKE) protected-live-validation-test
+	$(MAKE) release-evidence-test
+	$(MAKE) cloud-restore-drill-test
 	$(MAKE) monitoring-config-check
 	docker compose config --quiet
 
 workflow-policy-check:
 	./scripts/deploy/workflow-policy-check.sh
 
+protected-live-validation-test:
+	./scripts/deploy/protected-live-validation-test.sh
+
+release-evidence-test:
+	bash scripts/deploy/release-evidence-test.sh
+
+cloud-restore-drill-test:
+	bash scripts/deploy/cloud-restore-drill-test.sh
+
 legacy-wif-test:
 	bash scripts/deploy/retire-legacy-pymes-wif-test.sh
+
+project-secret-access-test:
+	bash scripts/deploy/migrate-project-secret-access-test.sh
+
+obsolete-secrets-test:
+	bash scripts/deploy/retire-obsolete-secrets-test.sh
 
 compose-security-check:
 	./scripts/compose-security-check.sh
 
 libpq-exec-test:
 	./scripts/libpq-exec-test.sh
+
+pilot-evidence-test:
+	./scripts/deploy/collect-pilot-evidence-test.sh
 
 security:
 	cd backend && go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...

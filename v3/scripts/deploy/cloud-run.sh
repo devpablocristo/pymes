@@ -124,10 +124,12 @@ case "$pergo_enabled" in
   *) echo "PYMES_PERGO_ENABLED must be true or false" >&2; exit 2 ;;
 esac
 pergo_url=${PYMES_PERGO_URL:-}
+pergo_audience=${PYMES_PERGO_AUDIENCE:-}
 pergo_workspace_id=${PYMES_PERGO_WORKSPACE_ID:-}
 pergo_channel=${PYMES_PERGO_CHANNEL:-whatsapp}
 if [[ "$pergo_enabled" == "true" ]]; then
   : "${pergo_url:?set PYMES_PERGO_URL when PerGo is enabled}"
+  : "${pergo_audience:?set PYMES_PERGO_AUDIENCE when PerGo is enabled}"
   : "${pergo_workspace_id:?set PYMES_PERGO_WORKSPACE_ID when PerGo is enabled}"
   if [[ ! "$pergo_workspace_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]; then
     echo "PYMES_PERGO_WORKSPACE_ID must be one canonical lowercase UUIDv4 without delimiters or control characters" >&2
@@ -147,6 +149,18 @@ if [[ "$pergo_enabled" == "true" ]]; then
         "$pergo_url" == *"?"* ||
         "$pergo_url" == *"#"* ]]; then
     echo "PYMES_PERGO_URL must be an explicit HTTPS URL without credentials, query, fragment or Cloud Run delimiters" >&2
+    exit 2
+  fi
+  if [[ ! "$pergo_audience" =~ $public_origin_pattern ||
+        "$pergo_audience" == *$'\r'* ||
+        "$pergo_audience" == *$'\n'* ||
+        "$pergo_audience" == *[[:space:]]* ||
+        "$pergo_audience" == *"|"* ||
+        "$pergo_audience" == *","* ||
+        "$pergo_audience" == *"@"* ||
+        "$pergo_audience" == *"?"* ||
+        "$pergo_audience" == *"#"* ]]; then
+    echo "PYMES_PERGO_AUDIENCE must be an exact HTTPS origin without path, credentials, query, fragment or Cloud Run delimiters" >&2
     exit 2
   fi
 fi
@@ -1956,7 +1970,7 @@ if [[ "$pergo_enabled" == "true" ]]; then
   api_secrets+=",PERGO_WEBHOOK_SECRETS=$(secret_ref "$prefix-pergo-webhook-secrets")"
   api_environment+="|PYMES_PERGO_ENABLED=true|PERGO_WORKSPACE_ID=$pergo_workspace_id"
   worker_secrets+=",PERGO_API_KEY=$(secret_ref "$prefix-pergo-api-key")"
-  worker_environment+="|PYMES_PERGO_ENABLED=true|PERGO_URL=$pergo_url|PERGO_WORKSPACE_ID=$pergo_workspace_id|PERGO_CHANNEL=$pergo_channel|PERGO_ALLOW_GLOBAL_ROUTE_FALLBACK=false|PERGO_TIMEOUT=5s"
+  worker_environment+="|PYMES_PERGO_ENABLED=true|PERGO_URL=$pergo_url|PYMES_PERGO_AUDIENCE=$pergo_audience|PERGO_WORKSPACE_ID=$pergo_workspace_id|PERGO_CHANNEL=$pergo_channel|PERGO_ALLOW_GLOBAL_ROUTE_FALLBACK=false|PERGO_TIMEOUT=5s"
 else
   api_environment+="|PYMES_PERGO_ENABLED=false"
   worker_environment+="|PYMES_PERGO_ENABLED=false"

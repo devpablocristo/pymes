@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
+	projectionmodels "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/calendar_projection/models"
 	repositoryhelpers "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/repository/helpers"
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/scheduling/usecases/domain"
 	"github.com/google/uuid"
@@ -28,6 +30,9 @@ func TestPostgresSchedulingTenantIsolationConcurrencyAndRecovery(t *testing.T) {
 	}
 	defer pool.Close()
 	repository := NewPostgresRepository(pool)
+	projectionService := &Service{
+		calendars: NewCalendarProjectionAdapter(),
+	}
 	now := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
 	repository.now = func() time.Time { return now }
 
@@ -68,7 +73,11 @@ func TestPostgresSchedulingTenantIsolationConcurrencyAndRecovery(t *testing.T) {
 		}
 		created, err := repository.ReserveBookings(
 			ctx, metadata, nil, []domain.Booking{booking}, []domain.ActionToken{token},
-			bookingEvents(metadata, booking, domain.EventBookingCreated),
+			projectionService.bookingEvents(
+				metadata,
+				booking,
+				domain.EventBookingCreated,
+			),
 		)
 		if err != nil || len(created) != 1 {
 			t.Fatalf("seed tenant booking: result=%+v err=%v", created, err)
@@ -190,7 +199,22 @@ func TestPostgresSchedulingTenantIsolationConcurrencyAndRecovery(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	expired, err := repository.ExpireHolds(ctx, 10, holdExpiry.Add(time.Second))
+	var expiredEvents []domain.Event
+	expired, err := repository.ExpireHolds(
+		ctx,
+		10,
+		holdExpiry.Add(time.Second),
+		func(
+			metadata domain.CommandMetadata,
+			booking domain.Booking,
+		) []domain.Event {
+			expiredEvents = projectionService.expiredHoldEvents(
+				metadata,
+				booking,
+			)
+			return expiredEvents
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,6 +225,16 @@ func TestPostgresSchedulingTenantIsolationConcurrencyAndRecovery(t *testing.T) {
 	if !foundExpired {
 		t.Fatalf("hold %s did not expire: %+v", hold.ID, expired)
 	}
+	assertCalendarOperations(
+		t,
+		expiredEvents,
+		map[string]calendarOperationExpectation{
+			hold.ID.String(): {
+				Operation: "delete",
+				Version:   hold.Version + 1,
+			},
+		},
+	)
 	afterExpiry := testBooking(
 		organizationID, uuid.New(), sharedBranchID, sharedServiceID,
 		partyID, sharedResourceID, holdAt, domain.BookingConfirmed,
@@ -313,6 +347,7 @@ func TestPostgresSchedulingTenantIsolationConcurrencyAndRecovery(t *testing.T) {
 		PreferredFrom:  waitlistAt,
 		PreferredUntil: waitlistAt.Add(2 * time.Hour),
 		Participants:   1,
+		MeetRequested:  true,
 		Status:         domain.WaitlistPending,
 		Version:        1,
 		CreatedAt:      now,
@@ -669,6 +704,7 @@ func TestPostgresPublicBookingActionIsConcurrentAndExactlyOnce(t *testing.T) {
 		algorithmsFake{},
 		codec,
 		WithClock(func() time.Time { return now }),
+		WithCalendarProjection(NewCalendarProjectionAdapter()),
 	)
 	actionMetadata := testMetadata(
 		"",
@@ -828,6 +864,7 @@ func TestPostgresPublicBookingActionRollsBackBeforeTokenConsumption(t *testing.T
 		algorithmsFake{},
 		codec,
 		WithClock(func() time.Time { return now }),
+		WithCalendarProjection(NewCalendarProjectionAdapter()),
 	)
 	actionMetadata := testMetadata(
 		"",
@@ -959,6 +996,7 @@ func TestPostgresPublicWaitlistAcceptanceIsConcurrentAndExactlyOnce(t *testing.T
 		PreferredFrom:  waitlistAt,
 		PreferredUntil: waitlistAt.Add(2 * time.Hour),
 		Participants:   1,
+		MeetRequested:  true,
 		Status:         domain.WaitlistPending,
 		Version:        1,
 		CreatedAt:      now,
@@ -1031,6 +1069,7 @@ func TestPostgresPublicWaitlistAcceptanceIsConcurrentAndExactlyOnce(t *testing.T
 		algorithmsFake{slots: []domain.Slot{slot}},
 		codec,
 		WithClock(func() time.Time { return now }),
+		WithCalendarProjection(NewCalendarProjectionAdapter()),
 	)
 	actionMetadata := testMetadata(
 		"",
@@ -1080,6 +1119,8 @@ func TestPostgresPublicWaitlistAcceptanceIsConcurrentAndExactlyOnce(t *testing.T
 		}
 	}
 	var bookingCount, acceptedEventCount, acceptedAuditCount int
+	var meetRequested bool
+	var calendarPayload []byte
 	tx, err := repositoryhelpers.BeginTenant(ctx, pool, organizationID)
 	if err != nil {
 		t.Fatal(err)
@@ -1113,6 +1154,25 @@ func TestPostgresPublicWaitlistAcceptanceIsConcurrentAndExactlyOnce(t *testing.T
 	).Scan(&acceptedAuditCount); err != nil {
 		t.Fatal(err)
 	}
+	if err := tx.QueryRow(ctx, `
+		SELECT meet_requested
+		FROM app.scheduling_bookings
+		WHERE org_id=$1 AND id=$2`,
+		organizationID,
+		acceptedBookingID,
+	).Scan(&meetRequested); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.QueryRow(ctx, `
+		SELECT payload
+		FROM app.outbox
+		WHERE org_id=$1 AND topic='CalendarSyncRequested'
+		  AND payload->>'booking_id'=$2`,
+		organizationID,
+		acceptedBookingID.String(),
+	).Scan(&calendarPayload); err != nil {
+		t.Fatal(err)
+	}
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -1125,6 +1185,19 @@ func TestPostgresPublicWaitlistAcceptanceIsConcurrentAndExactlyOnce(t *testing.T
 			acceptedEventCount,
 			acceptedAuditCount,
 		)
+	}
+	if !meetRequested {
+		t.Fatal("waitlist acceptance did not preserve the Meet request")
+	}
+	var calendarRequest projectionmodels.CalendarSyncRequested
+	if err := json.Unmarshal(calendarPayload, &calendarRequest); err != nil {
+		t.Fatalf("decode calendar projection: %v", err)
+	}
+	if calendarRequest.BookingID != acceptedBookingID.String() ||
+		calendarRequest.Operation != "upsert" ||
+		calendarRequest.SourceVersion != 1 ||
+		!calendarRequest.MeetRequested {
+		t.Fatalf("unexpected calendar projection: %+v", calendarRequest)
 	}
 }
 

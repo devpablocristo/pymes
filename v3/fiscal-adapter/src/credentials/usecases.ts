@@ -124,9 +124,10 @@ export interface CredentialRepository {
     certificate: SealedValue,
     inspection: CertificateInspection,
   ): Promise<StoredCredential>;
-  hasReadyEnvironment(
+  hasValidatedPointOfSale(
     organizationId: string,
     environment: CredentialEnvironment,
+    cuit: string,
   ): Promise<boolean>;
   upsertPointOfSale(pointOfSale: PointOfSale): Promise<PointOfSale>;
   findPointOfSale(
@@ -305,9 +306,10 @@ export class CredentialService {
     );
     if (
       credential.environment === "production" &&
-      !(await this.repository.hasReadyEnvironment(
+      !(await this.repository.hasValidatedPointOfSale(
         input.organizationId,
         "homologation",
+        credential.cuit,
       ))
     ) {
       throw new CredentialError("HOMOLOGATION_REQUIRED");
@@ -370,7 +372,7 @@ export class CredentialService {
       credential.environment,
       number,
     );
-    if (input.enabled && current?.validatedAt === undefined) {
+    if (input.enabled && current?.enabled !== true) {
       throw new CredentialError("POINT_OF_SALE_NOT_VALIDATED");
     }
     return this.repository.upsertPointOfSale({

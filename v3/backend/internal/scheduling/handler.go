@@ -504,7 +504,8 @@ func (h *HTTPHandler) createBooking(
 		},
 		StartAt: input.StartAt.UTC(), Participants: input.Participants, Status: input.Status,
 		HoldFor:     time.Duration(input.HoldMinutes) * time.Minute,
-		Allocations: dto.Allocations(input.Allocations), Notes: input.Notes,
+		Allocations: dto.Allocations(input.Allocations), MeetRequested: input.MeetRequested,
+		Notes:      input.Notes,
 		Recurrence: input.Recurrence.Domain(),
 	})
 	if err != nil {
@@ -815,7 +816,7 @@ func (h *HTTPHandler) createWaitlist(
 			Phone:   input.Customer.Phone,
 		},
 		PreferredFrom: input.PreferredFrom.UTC(), PreferredUntil: input.PreferredUntil.UTC(),
-		Participants: input.Participants,
+		Participants: input.Participants, MeetRequested: input.MeetRequested,
 	})
 	if err != nil {
 		httphelpers.WriteError(w, err)

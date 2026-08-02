@@ -98,9 +98,10 @@ remoto de `main` `30724823470` verdes contra ese pin.
 - WSAA, WSFE, autorización, consulta exacta e incertidumbre.
 - Número reservado por Pymes; Fiscal nunca autonumera.
 
-**Estado:** cerrado en código; `arca-facturacion` `2.5.0` está publicado y
-fijado por el lockfile de Pymes. Credenciales y homologación permanecen en H8.
-Padrón, FCE, WSFEX y CAEA quedan fuera.
+**Estado:** cerrado en código integrado. La extensión `2.6.0` está fusionada,
+etiquetada, publicada en npm y fijada en el lockfile de Pymes; las suites del
+SDK y Fiscal Adapter son verdes contra ese artefacto. Credenciales y
+homologación permanecen en H8. Padrón, FCE, WSFEX y CAEA quedan fuera.
 
 ### H8 — Release, despliegue y pilotos
 
@@ -139,7 +140,14 @@ contra fakes, Web, builds, migraciones y E2E de Agenda, Notifications,
 Calendars, Comercio, Fiscal, Accounting, recuperación y backup/restore.
 
 Los tests determinísticos usan fakes. Las pruebas con Google real y ARCA
-homologación son jobs protegidos y no forman parte del CI de cada commit.
+homologación son los workflows manuales protegidos
+`v3-google-live.yml` y `v3-arca-homologation.yml`; no forman parte del CI de
+cada commit. Ambos están fijados a STG, aceptan únicamente `main` con CI verde
+para el SHA exacto, auditan los controles GitHub antes de leer secrets y
+rechazan reruns. `make workflow-policy-check` valida esa política y
+`make protected-live-validation-test` ejerce los transportes con fakes sin red.
+La existencia del job no acredita el piloto: sólo un run protegido verde con
+una organización controlada constituye evidencia operativa.
 
 ## Regla de finalización
 

@@ -57,7 +57,12 @@ type Repository interface {
 	CreateQueueTicket(context.Context, domain.CommandMetadata, domain.QueueTicket) (domain.QueueTicket, error)
 	AdvanceQueueTicket(context.Context, domain.CommandMetadata, uuid.UUID, int, domain.QueueStatus) (domain.QueueTicket, error)
 	ListQueue(context.Context, string, uuid.UUID) ([]domain.QueueTicket, error)
-	ExpireHolds(context.Context, int, time.Time) ([]domain.Booking, error)
+	ExpireHolds(
+		context.Context,
+		int,
+		time.Time,
+		HoldExpirationPlanner,
+	) ([]domain.Booking, error)
 	ClaimReminders(context.Context, int, time.Time, time.Time) ([]domain.Event, error)
 	ClaimWaitlistCandidates(context.Context, int, time.Time) ([]domain.WaitlistEntry, error)
 }
@@ -113,6 +118,11 @@ type PublicWaitlistActionPlanner func(
 	domain.WaitlistEntry,
 ) (PublicWaitlistActionPlan, error)
 
+type HoldExpirationPlanner func(
+	domain.CommandMetadata,
+	domain.Booking,
+) []domain.Event
+
 // SchedulingAlgorithms is implemented by platform_scheduling.go. The port uses
 // Pymes-owned types exclusively.
 type SchedulingAlgorithms interface {
@@ -131,6 +141,11 @@ type PartyDirectory interface {
 type ActionTokenCodec interface {
 	Issue() (raw string, hash string, err error)
 	HashVerified(raw string) (string, error)
+}
+
+type CalendarProjection interface {
+	Upsert(domain.CommandMetadata, domain.Booking) domain.Event
+	Delete(domain.CommandMetadata, domain.Booking) domain.Event
 }
 
 type PublicCustomer struct {
@@ -162,6 +177,7 @@ type CreateWaitlistInput struct {
 	PreferredFrom  time.Time
 	PreferredUntil time.Time
 	Participants   int
+	MeetRequested  bool
 }
 
 type Service struct {
@@ -171,6 +187,7 @@ type Service struct {
 	organizations OrganizationDirectory
 	parties       PartyDirectory
 	tokens        ActionTokenCodec
+	calendars     CalendarProjection
 	now           func() time.Time
 }
 
@@ -182,6 +199,10 @@ func WithOrganizationDirectory(value OrganizationDirectory) Option {
 
 func WithPartyDirectory(value PartyDirectory) Option {
 	return func(service *Service) { service.parties = value }
+}
+
+func WithCalendarProjection(value CalendarProjection) Option {
+	return func(service *Service) { service.calendars = value }
 }
 
 func WithClock(value func() time.Time) Option {
@@ -406,6 +427,7 @@ type CreateBookingInput struct {
 	Status         domain.BookingStatus
 	HoldFor        time.Duration
 	Allocations    []domain.Allocation
+	MeetRequested  bool
 	Notes          string
 	Recurrence     *domain.RecurrenceRule
 }
@@ -462,6 +484,12 @@ func (s *Service) CreateBooking(
 	var session *domain.GroupSession
 	allocations := input.Allocations
 	if input.SessionID != nil {
+		if input.MeetRequested {
+			return nil, domain.NewError(
+				domain.CodeValidation,
+				"group session bookings cannot request an individual meeting",
+			)
+		}
 		if input.Recurrence != nil {
 			return nil, domain.NewError(domain.CodeValidation, "group session booking cannot be recurrent")
 		}
@@ -542,7 +570,7 @@ func (s *Service) CreateBooking(
 		actionTokens = append(actionTokens, tokens...)
 		events = append(
 			events,
-			bookingEvents(metadata, booking, domain.EventBookingCreated, rawActions)...,
+			s.bookingEvents(metadata, booking, domain.EventBookingCreated, rawActions)...,
 		)
 	}
 	return s.repository.ReserveBookings(ctx, metadata, series, bookings, actionTokens, events)
@@ -656,6 +684,7 @@ func (s *Service) buildBooking(
 		CustomerName:    strings.TrimSpace(input.Customer.Name),
 		CustomerEmail:   strings.TrimSpace(input.Customer.Email),
 		CustomerPhone:   strings.TrimSpace(input.Customer.Phone),
+		MeetRequested:   input.MeetRequested,
 		Notes:           strings.TrimSpace(input.Notes),
 		Allocations:     append([]domain.Allocation(nil), selected.Allocations...),
 		CreatedBy:       metadata.ActorID,
@@ -807,7 +836,8 @@ func (s *Service) UpdateBooking(
 		input.ExpectedVersion <= 0 {
 		return domain.Booking{}, domain.NewError(domain.CodeValidation, "booking update identity is invalid")
 	}
-	if input.Customer == nil && input.Participants == nil && input.Notes == nil && input.SubstateCode == nil {
+	if input.Customer == nil && input.Participants == nil &&
+		input.Notes == nil && input.SubstateCode == nil {
 		return domain.Booking{}, domain.NewError(domain.CodeValidation, "booking update has no editable fields")
 	}
 	if replayed, ok, err := s.repository.ReplayBookingUpdate(
@@ -936,16 +966,12 @@ func (s *Service) UpdateBooking(
 		"end_at":        projected.EndAt,
 		"version":       projected.Version,
 	}
-	events := []domain.Event{
-		newEvent(metadata, projected.ID.String(), domain.EventBookingUpdated, payload),
-		newProjectionEvent(
-			metadata,
-			projected.ID.String(),
-			domain.EventCalendarSyncRequested,
-			domain.EventBookingUpdated,
-			payload,
-		),
-	}
+	events := attachCalendarEvents(
+		[]domain.Event{
+			newEvent(metadata, projected.ID.String(), domain.EventBookingUpdated, payload),
+		},
+		s.calendarEvents(metadata, projected),
+	)
 	return s.repository.UpdateBooking(
 		ctx,
 		metadata,
@@ -1117,6 +1143,14 @@ func (s *Service) planReschedule(
 			map[string]any{"supersedes_booking_id": current.ID},
 		),
 	)
+	currentProjection := current
+	currentProjection.Status = domain.BookingRescheduled
+	currentProjection.Version = current.Version + 1
+	events = attachCalendarEvents(
+		events,
+		s.calendarEvents(metadata, currentProjection),
+		s.calendarEvents(metadata, replacement),
+	)
 	return PublicBookingActionPlan{
 		ExpectedVersion: input.ExpectedVersion,
 		Replacement:     &replacement,
@@ -1140,7 +1174,7 @@ func (s *Service) TransitionBooking(
 	if err != nil {
 		return domain.Booking{}, err
 	}
-	plan, err := planBookingTransition(
+	plan, err := s.planBookingTransition(
 		metadata,
 		current,
 		expectedVersion,
@@ -1161,7 +1195,7 @@ func (s *Service) TransitionBooking(
 	)
 }
 
-func planBookingTransition(
+func (s *Service) planBookingTransition(
 	metadata domain.CommandMetadata,
 	current domain.Booking,
 	expectedVersion int,
@@ -1233,6 +1267,10 @@ func planBookingTransition(
 			eventType,
 			map[string]any{"reason": reason},
 		),
+	)
+	events = attachCalendarEvents(
+		events,
+		s.calendarEvents(metadata, projected),
 	)
 	return PublicBookingActionPlan{
 		ExpectedVersion: expectedVersion,
@@ -1391,7 +1429,7 @@ func (s *Service) ConsumeBookingAction(
 			}
 			switch purpose {
 			case domain.ActionConfirm:
-				return planBookingTransition(
+				return s.planBookingTransition(
 					lockedMetadata,
 					current,
 					expectedVersion,
@@ -1399,7 +1437,7 @@ func (s *Service) ConsumeBookingAction(
 					"",
 				)
 			case domain.ActionCancel:
-				return planBookingTransition(
+				return s.planBookingTransition(
 					lockedMetadata,
 					current,
 					expectedVersion,
@@ -1590,10 +1628,11 @@ func (s *Service) planWaitlistAcceptance(
 				Email:   current.CustomerEmail,
 				Phone:   current.CustomerPhone,
 			},
-			StartAt:      current.OfferedStartAt.UTC(),
-			Participants: current.Participants,
-			Status:       domain.BookingConfirmed,
-			Allocations:  allocations,
+			StartAt:       current.OfferedStartAt.UTC(),
+			Participants:  current.Participants,
+			Status:        domain.BookingConfirmed,
+			Allocations:   allocations,
+			MeetRequested: current.MeetRequested,
 		},
 		metadata,
 		branch,
@@ -1627,7 +1666,7 @@ func (s *Service) planWaitlistAcceptance(
 		ExpectedVersion: expectedVersion,
 		Booking:         booking,
 		ActionTokens:    actionTokens,
-		BookingEvents: bookingEvents(
+		BookingEvents: s.bookingEvents(
 			metadata,
 			booking,
 			domain.EventBookingCreated,
@@ -1673,6 +1712,7 @@ func (s *Service) CreateWaitlistEntry(
 		PreferredFrom:  input.PreferredFrom,
 		PreferredUntil: input.PreferredUntil,
 		Participants:   input.Participants,
+		MeetRequested:  input.MeetRequested,
 	}
 	if value.OrganizationID != metadata.OrganizationID || value.ID == uuid.Nil ||
 		value.BranchID == uuid.Nil || value.ServiceID == uuid.Nil || value.PartyID == "" ||
@@ -1733,7 +1773,12 @@ func (s *Service) RunMaintenance(ctx context.Context, limit int) (domain.Mainten
 		limit = 100
 	}
 	now := s.now().UTC()
-	expired, err := s.repository.ExpireHolds(ctx, limit, now)
+	expired, err := s.repository.ExpireHolds(
+		ctx,
+		limit,
+		now,
+		s.expiredHoldEvents,
+	)
 	if err != nil {
 		return domain.MaintenanceResult{}, err
 	}
@@ -1845,6 +1890,34 @@ func (s *Service) RunMaintenance(ctx context.Context, limit int) (domain.Mainten
 		ReminderEvents: len(reminders),
 		WaitlistOffers: offers,
 	}, nil
+}
+
+func (s *Service) expiredHoldEvents(
+	metadata domain.CommandMetadata,
+	booking domain.Booking,
+) []domain.Event {
+	payload := map[string]any{
+		"booking_id": booking.ID,
+		"reason":     "hold_expired",
+		"start_at":   booking.StartAt,
+		"end_at":     booking.EndAt,
+		"version":    booking.Version,
+	}
+	events := lifecycleAndProjectionEvents(
+		metadata,
+		booking.ID.String(),
+		domain.EventBookingCancelled,
+		payload,
+		bookingNotificationPayload(
+			booking,
+			domain.EventBookingCancelled,
+			map[string]any{"reason": "hold_expired"},
+		),
+	)
+	return attachCalendarEvents(
+		events,
+		s.calendarEvents(metadata, booking),
+	)
 }
 
 func allocationIDs(values []domain.Allocation) []uuid.UUID {
@@ -2072,6 +2145,62 @@ func bookingEvents(
 	)
 }
 
+func (s *Service) bookingEvents(
+	metadata domain.CommandMetadata,
+	booking domain.Booking,
+	eventType string,
+	rawActions ...map[string]string,
+) []domain.Event {
+	return attachCalendarEvents(
+		bookingEvents(metadata, booking, eventType, rawActions...),
+		s.calendarEvents(metadata, booking),
+	)
+}
+
+func (s *Service) calendarEvents(
+	metadata domain.CommandMetadata,
+	booking domain.Booking,
+) []domain.Event {
+	if s.calendars == nil || booking.SessionID != nil {
+		return nil
+	}
+	switch booking.Status {
+	case domain.BookingConfirmed,
+		domain.BookingCheckedIn,
+		domain.BookingCompleted,
+		domain.BookingNoShow:
+		return []domain.Event{s.calendars.Upsert(metadata, booking)}
+	case domain.BookingCancelled, domain.BookingRescheduled:
+		return []domain.Event{s.calendars.Delete(metadata, booking)}
+	default:
+		return nil
+	}
+}
+
+func attachCalendarEvents(
+	events []domain.Event,
+	projections ...[]domain.Event,
+) []domain.Event {
+	count := len(events)
+	for _, projection := range projections {
+		count += len(projection)
+	}
+	if count == len(events) {
+		return events
+	}
+	result := make([]domain.Event, 0, count)
+	if len(events) > 0 {
+		result = append(result, events[0])
+	}
+	for _, projection := range projections {
+		result = append(result, projection...)
+	}
+	if len(events) > 1 {
+		result = append(result, events[1:]...)
+	}
+	return result
+}
+
 func lifecycleAndProjectionEvents(
 	metadata domain.CommandMetadata,
 	aggregateID, lifecycleType string,
@@ -2084,9 +2213,6 @@ func lifecycleAndProjectionEvents(
 	}
 	return []domain.Event{
 		newEvent(metadata, aggregateID, lifecycleType, payload),
-		newProjectionEvent(
-			metadata, aggregateID, domain.EventCalendarSyncRequested, lifecycleType, payload,
-		),
 		newProjectionEvent(
 			metadata,
 			aggregateID,

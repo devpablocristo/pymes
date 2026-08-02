@@ -1,3 +1,4 @@
+// architecture:adapter external
 package commerce
 
 import (
@@ -7,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	servicehttphelpers "github.com/devpablocristo/pymes/v3/backend/internal/commerce/service_http/helpers"
 	"github.com/devpablocristo/pymes/v3/backend/internal/observability"
 )
 
@@ -35,14 +37,15 @@ type ServiceHTTPClient struct {
 // Callers must keep one instance per dependency so Fiscal and Accounting have
 // independent failure state.
 func NewServiceHTTPClient() *ServiceHTTPClient {
+	settings := servicehttphelpers.DefaultSettings()
 	breaker := &circuitBreakerTransport{
 		base:      http.DefaultTransport,
-		threshold: 5,
-		openFor:   15 * time.Second,
+		threshold: settings.FailureThreshold,
+		openFor:   settings.OpenFor,
 		now:       time.Now,
 	}
 	return &ServiceHTTPClient{client: &http.Client{
-		Timeout:   10 * time.Second,
+		Timeout:   settings.RequestTimeout,
 		Transport: observability.Transport(breaker),
 	}, breaker: breaker}
 }
@@ -58,7 +61,11 @@ func (c *ServiceHTTPClient) CircuitOpen() bool { return c.breaker.open() }
 func (t *circuitBreakerTransport) open() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return !t.openedAt.IsZero() && t.now().UTC().Sub(t.openedAt) < t.openFor
+	return servicehttphelpers.CircuitOpen(
+		t.openedAt,
+		t.now().UTC(),
+		t.openFor,
+	)
 }
 
 type circuitBreakerTransport struct {

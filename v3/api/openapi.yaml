@@ -568,7 +568,10 @@ paths:
   /api/v1/organizations/{organizationId}/fiscal/credentials/{credentialId}/points-of-sale/{pointOfSale}/validate:
     post:
       operationId: validateFiscalPointOfSale
-      description: Valida WSAA/WSFE sin emitir un comprobante y opcionalmente habilita el punto.
+      description: >-
+        Valida WSAA/WSFE sin emitir un comprobante. Para el MVP comprueba
+        además que el último autorizado sea cero en cada secuencia A/B/C, NC y
+        ND soportada; sólo un punto de venta dedicado y vacío puede habilitarse.
       parameters:
         - { $ref: '#/components/parameters/OrganizationId' }
         - { $ref: '#/components/parameters/FiscalCredentialId' }
@@ -656,7 +659,8 @@ components:
       name: credentialId
       in: path
       required: true
-      schema: { type: string, format: uuid }
+      description: Identificador fiscal opaco emitido por Fiscal Adapter; no es un UUID.
+      schema: { type: string, pattern: '^fcred_[A-Za-z0-9_-]{8,80}$' }
     FiscalPointOfSaleNumber:
       name: pointOfSale
       in: path
@@ -757,6 +761,7 @@ components:
             - CERTIFICATE_CUIT_MISMATCH
             - CERTIFICATE_ENVIRONMENT_MISMATCH
             - POINT_OF_SALE_NOT_VALIDATED
+            - POINT_OF_SALE_NOT_EMPTY
             - AUTHORITY_TIMEOUT
             - FISCAL_UNAVAILABLE
             - VALIDATION_ERROR
@@ -951,7 +956,10 @@ components:
         - created_at
         - updated_at
       properties:
-        id: { type: string, format: uuid }
+        id:
+          type: string
+          pattern: '^fcred_[A-Za-z0-9_-]{8,80}$'
+          description: Identificador fiscal opaco emitido por Fiscal Adapter; no es un UUID.
         organization_id: { type: string }
         cuit: { type: string, pattern: '^[0-9]{11}$' }
         legal_name: { type: string }
@@ -997,7 +1005,10 @@ components:
       required: [organization_id, credential_id, environment, number, enabled]
       properties:
         organization_id: { type: string }
-        credential_id: { type: string, format: uuid }
+        credential_id:
+          type: string
+          pattern: '^fcred_[A-Za-z0-9_-]{8,80}$'
+          description: Identificador fiscal opaco emitido por Fiscal Adapter; no es un UUID.
         environment: { type: string, enum: [homologation, production] }
         number: { type: integer, minimum: 1, maximum: 99999 }
         enabled: { type: boolean }

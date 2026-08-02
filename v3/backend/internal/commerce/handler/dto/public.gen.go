@@ -148,6 +148,7 @@ const (
 	ErrorCodePERGOWEBHOOKNOTCONFIGURED      ErrorCode = "PERGO_WEBHOOK_NOT_CONFIGURED"
 	ErrorCodePERGOWEBHOOKSIGNATUREINVALID   ErrorCode = "PERGO_WEBHOOK_SIGNATURE_INVALID"
 	ErrorCodePERIODLOCKED                   ErrorCode = "PERIOD_LOCKED"
+	ErrorCodePOINTOFSALENOTEMPTY            ErrorCode = "POINT_OF_SALE_NOT_EMPTY"
 	ErrorCodePOINTOFSALENOTVALIDATED        ErrorCode = "POINT_OF_SALE_NOT_VALIDATED"
 	ErrorCodeSOURCEVERSIONREQUIRED          ErrorCode = "SOURCE_VERSION_REQUIRED"
 	ErrorCodeVALIDATIONERROR                ErrorCode = "VALIDATION_ERROR"
@@ -223,6 +224,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodePERGOWEBHOOKSIGNATUREINVALID:
 		return true
 	case ErrorCodePERIODLOCKED:
+		return true
+	case ErrorCodePOINTOFSALENOTEMPTY:
 		return true
 	case ErrorCodePOINTOFSALENOTVALIDATED:
 		return true
@@ -833,12 +836,14 @@ type FiscalCredential struct {
 	CreatedAt               *time.Time                  `json:"created_at,omitempty"`
 	Cuit                    string                      `json:"cuit"`
 	Environment             FiscalCredentialEnvironment `json:"environment"`
-	Id                      openapi_types.UUID          `json:"id"`
-	LegalName               string                      `json:"legal_name"`
-	OrganizationId          string                      `json:"organization_id"`
-	Status                  FiscalCredentialStatus      `json:"status"`
-	UpdatedAt               *time.Time                  `json:"updated_at,omitempty"`
-	Version                 int                         `json:"version"`
+
+	// Id Identificador fiscal opaco emitido por Fiscal Adapter; no es un UUID.
+	Id             string                 `json:"id"`
+	LegalName      string                 `json:"legal_name"`
+	OrganizationId string                 `json:"organization_id"`
+	Status         FiscalCredentialStatus `json:"status"`
+	UpdatedAt      *time.Time             `json:"updated_at,omitempty"`
+	Version        int                    `json:"version"`
 }
 
 // FiscalCredentialEnvironment defines model for FiscalCredential.Environment.
@@ -868,7 +873,8 @@ type FiscalCredentialCSRResult struct {
 
 // FiscalPointOfSale defines model for FiscalPointOfSale.
 type FiscalPointOfSale struct {
-	CredentialId   openapi_types.UUID           `json:"credential_id"`
+	// CredentialId Identificador fiscal opaco emitido por Fiscal Adapter; no es un UUID.
+	CredentialId   string                       `json:"credential_id"`
 	Enabled        bool                         `json:"enabled"`
 	Environment    FiscalPointOfSaleEnvironment `json:"environment"`
 	Number         int                          `json:"number"`
@@ -1134,7 +1140,7 @@ type VatBreakdownItem struct {
 type VatBreakdownItemRate string
 
 // FiscalCredentialId defines model for FiscalCredentialId.
-type FiscalCredentialId = openapi_types.UUID
+type FiscalCredentialId = string
 
 // FiscalPointOfSaleNumber defines model for FiscalPointOfSaleNumber.
 type FiscalPointOfSaleNumber = int
@@ -1621,7 +1627,7 @@ func (siw *ServerInterfaceWrapper) GetFiscalCredential(w http.ResponseWriter, r 
 	// ------------- Path parameter "credentialId" -------------
 	var credentialId FiscalCredentialId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "credentialId", Err: err})
 		return
@@ -1656,7 +1662,7 @@ func (siw *ServerInterfaceWrapper) UploadFiscalCertificate(w http.ResponseWriter
 	// ------------- Path parameter "credentialId" -------------
 	var credentialId FiscalCredentialId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "credentialId", Err: err})
 		return
@@ -1691,7 +1697,7 @@ func (siw *ServerInterfaceWrapper) ConfigureFiscalPointOfSale(w http.ResponseWri
 	// ------------- Path parameter "credentialId" -------------
 	var credentialId FiscalCredentialId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "credentialId", Err: err})
 		return
@@ -1735,7 +1741,7 @@ func (siw *ServerInterfaceWrapper) ValidateFiscalPointOfSale(w http.ResponseWrit
 	// ------------- Path parameter "credentialId" -------------
 	var credentialId FiscalCredentialId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", chi.URLParam(r, "credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "credentialId", Err: err})
 		return

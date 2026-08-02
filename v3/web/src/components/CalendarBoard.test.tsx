@@ -71,6 +71,7 @@ const booking: Booking = {
   currency: "ARS",
   duration_minutes: 60,
   timezone: "America/Argentina/Buenos_Aires",
+  meet_requested: false,
   allocations: [],
 };
 

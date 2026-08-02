@@ -37,6 +37,7 @@ export function PublicBookingPage({
   const [professionalId, setProfessionalId] = useState("");
   const [day, setDay] = useState(DateTime.now().plus({ days: 1 }).toISODate() ?? "");
   const [participants, setParticipants] = useState(1);
+  const [meetRequested, setMeetRequested] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -70,6 +71,7 @@ export function PublicBookingPage({
   useEffect(() => {
     setProfessionalId("");
     setSelectedSlot(null);
+    setMeetRequested(false);
   }, [branchId, serviceId]);
 
   const branch = catalog?.branches.find((item) => item.id === branchId);
@@ -123,6 +125,7 @@ export function PublicBookingPage({
         start_at: selectedSlot.start_at,
         participants,
         allocations: selectedSlot.allocations,
+        meet_requested: meetRequested,
         ...(notes ? { notes } : {}),
       };
       const created = await gateway.createPublicBooking(organizationSlug, {
@@ -156,6 +159,7 @@ export function PublicBookingPage({
         preferred_from: from,
         preferred_until: until,
         participants,
+        meet_requested: meetRequested,
       };
       await gateway.createPublicWaitlistEntry(organizationSlug, {
         id: waitlistCommand.current.forPayload(payload),
@@ -399,6 +403,19 @@ export function PublicBookingPage({
                 <span>Comentario para el equipo (opcional)</span>
                 <textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={500} />
               </label>
+              {service?.fulfillment_mode !== "in_person" ? (
+                <label className="resource-choice field--wide">
+                  <input
+                    type="checkbox"
+                    checked={meetRequested}
+                    onChange={(event) => setMeetRequested(event.target.checked)}
+                  />
+                  <span>
+                    <strong>Videollamada por Google Meet</strong>
+                    <small>Solicitar una reunión cuando la empresa confirme el turno.</small>
+                  </span>
+                </label>
+              ) : null}
               <div className="booking-summary">
                 <strong>{service?.name}</strong>
                 <span>

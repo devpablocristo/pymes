@@ -28,6 +28,19 @@ func (tokenSource) Token(_ context.Context, audience, organizationID string) (st
 	return audience + ":" + organizationID, nil
 }
 
+type metadataTokenSource struct {
+	metadata identityusecases.RequestMetadata
+}
+
+func (source *metadataTokenSource) Token(
+	ctx context.Context,
+	audience,
+	organizationID string,
+) (string, error) {
+	source.metadata, _ = identityusecases.RequestMetadataFromContext(ctx)
+	return audience + ":" + organizationID, nil
+}
+
 type platformTokenSource struct{}
 
 func (platformTokenSource) PlatformToken(_ context.Context, audience string) (string, error) {
@@ -579,9 +592,18 @@ func TestFiscalGeneratedClientForwardsUniversalMetadata(t *testing.T) {
 	defer server.Close()
 	snapshot := json.RawMessage(`{"environment":"homologation","issue_date":"2026-07-31","currency":"ARS","totals":{"net":"100","vat":"21","exempt":"0","total":"121"},"recipient":{"document_type":"CUIT","document_number":"20123456789","vat_condition":"registered"},"lines":[{"description":"Servicio","quantity":"1","unit_price":"100","vat_rate":"21","net":"100"}]}`)
 	request := domain.FiscalRequest{RequestID: "fiscal/request:1", OrganizationID: "org_a", IdempotencyKey: idempotencyKey, SourceVersion: 3, CredentialRef: "mock://credential", Voucher: domain.VoucherReference{PointOfSale: 1, DocumentType: "FA", VoucherNumber: 1}, SnapshotDigest: snapshotDigest, CorrelationID: "sale/correlation", FiscalSnapshot: snapshot}
-	result, err := (HTTPFiscalClient{BaseURL: server.URL, Tokens: tokenSource{}}).Authorize(context.Background(), request)
+	tokens := &metadataTokenSource{}
+	requestContext := identityusecases.WithRequestMetadata(
+		context.Background(),
+		identityusecases.RequestMetadata{},
+	)
+	result, err := (HTTPFiscalClient{BaseURL: server.URL, Tokens: tokens}).Authorize(requestContext, request)
 	if err != nil || result.CAE == "" || result.IdempotencyKey != request.IdempotencyKey ||
 		result.SourceVersion != request.SourceVersion || result.SnapshotDigest != request.SnapshotDigest {
 		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	if tokens.metadata.CorrelationID != request.CorrelationID ||
+		tokens.metadata.RequestID != request.CorrelationID {
+		t.Fatalf("token metadata does not match outbound headers: %+v", tokens.metadata)
 	}
 }

@@ -74,6 +74,12 @@ run_dry() {
     prd) default_pergo_workspace=22222222-2222-4222-8222-222222222222 ;;
   esac
   local pergo_workspace="${14:-$default_pergo_workspace}"
+  local pergo_audience
+  if [[ ${PYMES_TEST_PERGO_AUDIENCE+x} ]]; then
+    pergo_audience=$PYMES_TEST_PERGO_AUDIENCE
+  else
+    pergo_audience="https://pergo-audience.$environment.dry-run.invalid"
+  fi
   local -a common_environment=(
     "PYMES_CLOUD_RUN_DRY_RUN=$test_dry_run"
     "PYMES_DEPLOY_ENV=$environment"
@@ -126,6 +132,7 @@ run_dry() {
     common_environment+=(
       "PYMES_PERGO_ENABLED=true"
       "PYMES_PERGO_URL=https://pergo.$environment.dry-run.invalid"
+      "PYMES_PERGO_AUDIENCE=$pergo_audience"
       "PYMES_PERGO_WORKSPACE_ID=$pergo_workspace"
       "PYMES_PERGO_CHANNEL=whatsapp_cloud"
     )
@@ -145,6 +152,7 @@ run_dry() {
       -u PYMES_CLOUD_RUN_ACTIVE_SERVICES_DRY_RUN \
       -u PYMES_FISCAL_ARCA_HOMOLOGATION_ISSUER_PATTERN \
       -u PYMES_FISCAL_ARCA_PRODUCTION_ISSUER_PATTERN \
+      -u PYMES_PERGO_AUDIENCE \
       -u PYMES_GOOGLE_CLIENT_ID \
       -u PYMES_GOOGLE_REDIRECT_URL \
       -u PYMES_CALENDAR_KMS_KEY \
@@ -164,6 +172,7 @@ run_dry() {
       -u PYMES_TRACING_EXPORTER \
       -u OTEL_EXPORTER_OTLP_ENDPOINT \
       -u PYMES_TRACE_SAMPLE_RATIO \
+      -u PYMES_PERGO_AUDIENCE \
       -u PYMES_GOOGLE_CLIENT_ID \
       -u PYMES_GOOGLE_REDIRECT_URL \
       -u PYMES_CALENDAR_KMS_KEY \
@@ -192,11 +201,13 @@ check_pergo_environment() {
      "$api_line" == *"PERGO_WEBHOOK_SECRETS=$prefix-pergo-webhook-secrets:DRY_RUN"* ]] ||
     fail "API is missing PerGo webhook configuration"
   [[ "$api_line" != *"PERGO_API_KEY="* &&
-     "$api_line" != *"PERGO_URL="* ]] ||
+     "$api_line" != *"PERGO_URL="* &&
+     "$api_line" != *"PYMES_PERGO_AUDIENCE="* ]] ||
     fail "API received PerGo delivery credentials"
 
   [[ "$worker_line" == *"PYMES_PERGO_ENABLED=true"* &&
      "$worker_line" == *"PERGO_URL=https://pergo.$environment.dry-run.invalid"* &&
+     "$worker_line" == *"PYMES_PERGO_AUDIENCE=https://pergo-audience.$environment.dry-run.invalid"* &&
      "$worker_line" == *"PERGO_WORKSPACE_ID=$workspace"* &&
      "$worker_line" == *"PERGO_CHANNEL=whatsapp_cloud"* &&
      "$worker_line" == *"PERGO_ALLOW_GLOBAL_ROUTE_FALLBACK=false"* &&
@@ -554,6 +565,33 @@ require_text "$scratch_dir/bootstrap-pergo.err" \
   "bootstrap requires PYMES_PERGO_ENABLED=false"
 echo "PASS Clerk bootstrap pergo_enabled=rejected"
 
+if PYMES_TEST_PERGO_AUDIENCE= \
+  run_dry stg "$scratch_dir/pergo-missing-audience.out" "" false "" true \
+  2>"$scratch_dir/pergo-missing-audience.err"; then
+  fail "enabled PerGo accepted a missing Cloud Run audience"
+fi
+require_text "$scratch_dir/pergo-missing-audience.err" \
+  "set PYMES_PERGO_AUDIENCE when PerGo is enabled"
+echo "PASS PerGo Cloud Run audience missing=rejected"
+
+if PYMES_TEST_PERGO_AUDIENCE=http://pergo.stg.dry-run.invalid \
+  run_dry stg "$scratch_dir/pergo-http-audience.out" "" false "" true \
+  2>"$scratch_dir/pergo-http-audience.err"; then
+  fail "enabled PerGo accepted a non-HTTPS Cloud Run audience"
+fi
+require_text "$scratch_dir/pergo-http-audience.err" \
+  "PYMES_PERGO_AUDIENCE must be an exact HTTPS origin without path"
+echo "PASS PerGo Cloud Run audience non_https=rejected"
+
+if PYMES_TEST_PERGO_AUDIENCE=https://pergo-audience.stg.dry-run.invalid/tenant \
+  run_dry stg "$scratch_dir/pergo-path-audience.out" "" false "" true \
+  2>"$scratch_dir/pergo-path-audience.err"; then
+  fail "enabled PerGo accepted a Cloud Run audience with a path"
+fi
+require_text "$scratch_dir/pergo-path-audience.err" \
+  "PYMES_PERGO_AUDIENCE must be an exact HTTPS origin without path"
+echo "PASS PerGo Cloud Run audience path=rejected"
+
 if PYMES_TEST_DEPLOY_STAGE=bootstrap \
   PYMES_TEST_CLERK_WEBHOOK_LIFECYCLE=bootstrap-temporary \
   run_dry stg "$scratch_dir/bootstrap-google.out" "" true \
@@ -697,6 +735,9 @@ network_plan="$scratch_dir/network-plan.out"
 PATH="$guarded_path" "$script_dir/bootstrap-network-egress.sh" >"$network_plan"
 require_text "$network_plan" "PLAN ONLY resources_created=0"
 require_text "$network_plan" "COST recurring Cloud NAT gateway"
+require_text "$network_plan" "scope=subnet-only ranges=all"
+require_text "$script_dir/bootstrap-network-egress.sh" \
+  '--nat-custom-subnet-ip-ranges="${subnet}:ALL"'
 echo "PASS network bootstrap default=read-only cost_gate=required"
 
 if env "PATH=$guarded_path" PYMES_VPC_SUBNET_CIDR=203.0.113.0/24 \

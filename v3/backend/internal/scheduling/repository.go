@@ -166,10 +166,10 @@ func (r *PostgresRepository) insertBookingTx(ctx context.Context, tx pgx.Tx, boo
 			service_name_snapshot,price_snapshot,currency_snapshot,
 				duration_minutes_snapshot,timezone_snapshot,
 				customer_name_snapshot,customer_email_snapshot,customer_phone_snapshot,
-				notes,cancellation_reason,created_by,created_at,updated_at
+				meet_requested,notes,cancellation_reason,created_by,created_at,updated_at
 			) VALUES (
 				$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
-				$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31
+				$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32
 			)`,
 		booking.OrganizationID, booking.ID, booking.SeriesID, booking.SessionID, booking.SupersedesID,
 		booking.Occurrence, booking.BranchID, booking.ServiceID, booking.PartyID, booking.Status,
@@ -177,7 +177,7 @@ func (r *PostgresRepository) insertBookingTx(ctx context.Context, tx pgx.Tx, boo
 		booking.OccupiesFrom, booking.OccupiesUntil,
 		booking.HoldExpiresAt, booking.Version, booking.ServiceName, booking.Price, booking.Currency,
 		booking.DurationMinutes, booking.Timezone, booking.CustomerName, booking.CustomerEmail,
-		booking.CustomerPhone, booking.Notes, booking.CancellationReason,
+		booking.CustomerPhone, booking.MeetRequested, booking.Notes, booking.CancellationReason,
 		booking.CreatedBy, booking.CreatedAt, booking.UpdatedAt,
 	)
 	if err != nil {

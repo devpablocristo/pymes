@@ -72,7 +72,10 @@ func TestFiscalOnboardingTraversesBFFWithoutExposingPrivateKeyMaterial(t *testin
 	if csr.CsrPem == nil || !strings.Contains(*csr.CsrPem, "BEGIN CERTIFICATE REQUEST") {
 		t.Fatalf("invalid public CSR: %#v", csr)
 	}
-	credentialID := csr.Credential.Id.String()
+	credentialID := csr.Credential.Id
+	if !strings.HasPrefix(credentialID, "fcred_") {
+		t.Fatalf("credential ID does not use the opaque fiscal contract: %q", credentialID)
+	}
 
 	certificateBody, err := json.Marshal(publicapi.FiscalCertificateUpload{
 		CertificatePem:  optionalString("-----BEGIN CERTIFICATE-----\nFAKE\n-----END CERTIFICATE-----\n"),
@@ -127,7 +130,7 @@ func TestFiscalOnboardingTraversesBFFWithoutExposingPrivateKeyMaterial(t *testin
 	}
 	if !point.Enabled || point.ValidatedAt == nil ||
 		point.OrganizationId != organizationID ||
-		point.CredentialId.String() != credentialID {
+		point.CredentialId != credentialID {
 		t.Fatalf("invalid validated point of sale: %#v", point)
 	}
 

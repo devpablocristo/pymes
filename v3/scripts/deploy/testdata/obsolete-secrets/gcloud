@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+"""Stateful fake gcloud used only by retire-obsolete-secrets-test.sh."""
+
+import json
+import os
+import sys
+from pathlib import Path
+
+
+STATE_PATH = Path(os.environ["FAKE_GCLOUD_STATE"])
+
+
+def load_state():
+    return json.loads(STATE_PATH.read_text(encoding="utf-8"))
+
+
+def save_state(state):
+    STATE_PATH.write_text(
+        json.dumps(state, separators=(",", ":"), sort_keys=True),
+        encoding="utf-8",
+    )
+
+
+def emit_json(value):
+    print(json.dumps(value, separators=(",", ":"), sort_keys=True))
+
+
+def flag(args, name):
+    prefix = name + "="
+    for index, value in enumerate(args):
+        if value.startswith(prefix):
+            return value[len(prefix) :]
+        if value == name and index + 1 < len(args):
+            return args[index + 1]
+    return ""
+
+
+def fail(message):
+    print(message, file=sys.stderr)
+    raise SystemExit(1)
+
+
+args = sys.argv[1:]
+state = load_state()
+state.setdefault("calls", []).append(args)
+save_state(state)
+
+if args[:2] == ["config", "get-value"] and len(args) >= 3:
+    prop = args[2]
+    if prop == "project":
+        print(state.get("configured_project", ""))
+    else:
+        print(state.get("config_properties", {}).get(prop, "(unset)"))
+    raise SystemExit(0)
+
+if args[:2] == ["auth", "list"]:
+    print(state.get("active_account", ""))
+    raise SystemExit(0)
+
+if args[:2] == ["projects", "describe"] and len(args) >= 3:
+    emit_json(
+        state.get(
+            "project",
+            {
+                "projectId": "wrong",
+                "projectNumber": "0",
+                "lifecycleState": "DELETE_REQUESTED",
+            },
+        )
+    )
+    raise SystemExit(0)
+
+if args[:2] == ["projects", "get-iam-policy"] and len(args) >= 3:
+    emit_json(state.get("project_policy", {"bindings": []}))
+    raise SystemExit(0)
+
+if args[:3] == ["iam", "roles", "describe"] and len(args) >= 4:
+    role = args[3]
+    permissions = state.get("iam_roles", {}).get(role)
+    if permissions is None:
+        fail("fake IAM role not found")
+    emit_json({"name": role, "includedPermissions": permissions})
+    raise SystemExit(0)
+
+if len(args) >= 3 and args[0] == "run" and args[2] == "list":
+    kind = args[1]
+    if kind not in ("services", "jobs", "revisions"):
+        fail("unsupported fake Cloud Run resource")
+    region = flag(args, "--region")
+    if kind == "revisions":
+        if not region:
+            fail("Cloud Run revision list requires an explicit discovered region")
+    elif os.environ.get("CLOUDSDK_RUN_REGION") != "" or region:
+        fail("Cloud Run global list did not clear inherited region")
+    emit_json(state.get("run", {}).get(kind, []))
+    raise SystemExit(0)
+
+if args[:2] == ["secrets", "describe"] and len(args) >= 3:
+    secret = args[2]
+    secret_state = state.get("secrets", {}).get(secret)
+    if secret_state is None:
+        fail("fake secret not found")
+    emit_json({"name": secret_state["name"]})
+    raise SystemExit(0)
+
+if args[:2] == ["secrets", "get-iam-policy"] and len(args) >= 3:
+    secret = args[2]
+    secret_state = state.get("secrets", {}).get(secret)
+    if secret_state is None:
+        fail("fake secret policy not found")
+    emit_json(secret_state["policy"])
+    raise SystemExit(0)
+
+if args[:2] == ["secrets", "remove-iam-policy-binding"] and len(args) >= 3:
+    secret = args[2]
+    member = flag(args, "--member")
+    role = flag(args, "--role")
+    secret_state = state.get("secrets", {}).get(secret)
+    if secret_state is None or not member or not role:
+        fail("invalid fake IAM removal")
+    removed = False
+    new_bindings = []
+    for binding in secret_state["policy"].get("bindings", []):
+        if binding.get("role") == role and member in binding.get("members", []):
+            binding = dict(binding)
+            binding["members"] = [
+                candidate
+                for candidate in binding.get("members", [])
+                if candidate != member
+            ]
+            removed = True
+            if binding["members"]:
+                new_bindings.append(binding)
+        else:
+            new_bindings.append(binding)
+    if not removed:
+        fail("fake IAM member was absent")
+    secret_state["policy"]["bindings"] = new_bindings
+    loss_key = secret + "|" + member
+    response_loss = state.setdefault("response_loss", {}).setdefault("remove", {})
+    lose_response = bool(response_loss.pop(loss_key, False))
+    save_state(state)
+    if lose_response:
+        fail("simulated IAM response loss")
+    emit_json(secret_state["policy"])
+    raise SystemExit(0)
+
+if args[:3] == ["secrets", "versions", "list"] and len(args) >= 4:
+    secret = args[3]
+    secret_state = state.get("secrets", {}).get(secret)
+    if secret_state is None:
+        fail("fake secret versions not found")
+    emit_json(secret_state["versions"])
+    raise SystemExit(0)
+
+if args[:3] == ["secrets", "versions", "describe"] and len(args) >= 4:
+    version = args[3]
+    secret = flag(args, "--secret")
+    secret_state = state.get("secrets", {}).get(secret)
+    if secret_state is None:
+        fail("fake secret version not found")
+    for candidate in secret_state["versions"]:
+        if candidate["name"].rsplit("/", 1)[-1] == version:
+            emit_json(candidate)
+            raise SystemExit(0)
+    fail("fake secret version not found")
+
+if args[:3] == ["secrets", "versions", "disable"] and len(args) >= 4:
+    version = args[3]
+    secret = flag(args, "--secret")
+    secret_state = state.get("secrets", {}).get(secret)
+    if secret_state is None:
+        fail("fake secret version not found")
+    changed = False
+    for candidate in secret_state["versions"]:
+        if candidate["name"].rsplit("/", 1)[-1] == version:
+            if candidate["state"] != "ENABLED":
+                fail("fake secret version was not enabled")
+            candidate["state"] = "DISABLED"
+            changed = True
+            break
+    if not changed:
+        fail("fake secret version not found")
+    loss_key = secret + "|" + version
+    response_loss = state.setdefault("response_loss", {}).setdefault("disable", {})
+    lose_response = bool(response_loss.pop(loss_key, False))
+    save_state(state)
+    if lose_response:
+        fail("simulated version-disable response loss")
+    emit_json(candidate)
+    raise SystemExit(0)
+
+fail("unsupported fake gcloud command: " + " ".join(args))

@@ -368,7 +368,20 @@ func internalRequestEditor(
 		request.Header.Set("Idempotency-Key", idempotencyKey)
 		request.Header.Set("X-Correlation-ID", correlationID)
 		if tokens != nil {
-			token, err := tokens.Token(ctx, audience, organizationID)
+			requestID := correlationID
+			if metadata, ok := identityusecases.RequestMetadataFromContext(ctx); ok {
+				if metadata.RequestID != "" {
+					requestID = metadata.RequestID
+				}
+			}
+			tokenContext := identityusecases.WithRequestMetadata(
+				ctx,
+				identityusecases.RequestMetadata{
+					RequestID:     requestID,
+					CorrelationID: correlationID,
+				},
+			)
+			token, err := tokens.Token(tokenContext, audience, organizationID)
 			if err != nil {
 				return err
 			}

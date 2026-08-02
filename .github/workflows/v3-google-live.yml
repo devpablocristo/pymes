@@ -1,0 +1,141 @@
+name: Pymes V3 Google live validation
+run-name: Pymes V3 Google STG @ ${{ github.sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      organization_id:
+        description: Opaque STG organization identifier
+        required: true
+        type: string
+      connection_id:
+        description: Existing active Google connection UUID
+        required: true
+        type: string
+      booking_id:
+        description: Existing confirmed booking UUID already projected by Pymes
+        required: true
+        type: string
+      expected_meet:
+        description: Require one completed Google Meet conference
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      confirmation:
+        description: Type VALIDATE_GOOGLE_STG
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: pymes-v3-google-live-stg-${{ inputs.organization_id }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate Google projection in STG
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: stg
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Reject stale, unreviewed or ambiguous intent
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LIVE_CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          [[ "${GITHUB_RUN_ATTEMPT}" == "1" ]] || {
+            echo "Live validation cannot be re-run; dispatch a new workflow with fresh credentials." >&2
+            exit 1
+          }
+          [[ "${GITHUB_REPOSITORY}" == "devpablocristo/pymes" ]]
+          [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]
+          [[ "${GITHUB_REF}" == "refs/heads/main" ]]
+          [[ "${GITHUB_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${LIVE_CONFIRMATION}" == "VALIDATE_GOOGLE_STG" ]]
+
+          runs="$(gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/v3-ci.yml/runs" \
+            -f head_sha="${GITHUB_SHA}" \
+            -f branch=main \
+            -f event=push \
+            -f status=success \
+            -f per_page=100)"
+          jq -e --arg sha "${GITHUB_SHA}" '
+            .workflow_runs
+            | any(
+                .head_sha == $sha and
+                .head_branch == "main" and
+                .event == "push" and
+                .status == "completed" and
+                .conclusion == "success"
+              )
+          ' <<<"${runs}" >/dev/null || {
+            echo "Pymes V3 CI has no successful push run for exact SHA ${GITHUB_SHA}" >&2
+            exit 1
+          }
+
+      - name: Checkout exact Pymes source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact clean source
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${GITHUB_SHA}" ]]
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+
+      - name: Verify complete protected GitHub controls
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PYMES_GITHUB_RELEASE_AUDIT_TOKEN }}
+          PYMES_PRD_REVIEWER_IDS: ${{ vars.PYMES_PRD_REVIEWER_IDS }}
+        run: |
+          set -euo pipefail
+          : "${GH_TOKEN:?configure PYMES_GITHUB_RELEASE_AUDIT_TOKEN in the protected environment}"
+          ./v3/scripts/deploy/verify-github-environments.sh all all-controls
+
+      - name: Validate existing Google Calendar and Meet projection
+        shell: bash
+        env:
+          PYMES_PUBLIC_BASE_URL: ${{ vars.PYMES_PUBLIC_BASE_URL }}
+          PYMES_LIVE_PILOT_API_TOKEN: ${{ secrets.PYMES_LIVE_PILOT_API_TOKEN }}
+          PYMES_GOOGLE_PILOT_ACCESS_TOKEN: ${{ secrets.PYMES_GOOGLE_PILOT_ACCESS_TOKEN }}
+          PYMES_GOOGLE_PILOT_CALENDAR_ID: ${{ secrets.PYMES_GOOGLE_PILOT_CALENDAR_ID }}
+          PYMES_PILOT_ORGANIZATION_ID: ${{ inputs.organization_id }}
+          PYMES_PILOT_CONNECTION_ID: ${{ inputs.connection_id }}
+          PYMES_PILOT_BOOKING_ID: ${{ inputs.booking_id }}
+          PYMES_PILOT_EXPECT_MEET: ${{ inputs.expected_meet }}
+        run: ./v3/scripts/deploy/google-live-validation.sh
+
+      - name: Record non-sensitive evidence
+        shell: bash
+        env:
+          PILOT_ORGANIZATION: ${{ inputs.organization_id }}
+          PILOT_CONNECTION: ${{ inputs.connection_id }}
+          PILOT_BOOKING: ${{ inputs.booking_id }}
+          EXPECTED_MEET: ${{ inputs.expected_meet }}
+        run: |
+          set -euo pipefail
+          {
+            printf '### Google live STG validation\n\n'
+            printf -- '- Source SHA: `%s`\n' "${GITHUB_SHA}"
+            printf -- '- Organization: `%s`\n' "${PILOT_ORGANIZATION}"
+            printf -- '- Connection: `%s`\n' "${PILOT_CONNECTION}"
+            printf -- '- Booking: `%s`\n' "${PILOT_BOOKING}"
+            printf -- '- Meet required: `%s`\n' "${EXPECTED_MEET}"
+            printf -- '- Result: Pymes connection, booking and deterministic Google projection matched.\n'
+            printf -- '- Retained provider payloads or credentials: `none`\n'
+          } >>"${GITHUB_STEP_SUMMARY}"

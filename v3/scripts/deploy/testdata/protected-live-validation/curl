@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+config_file=
+output_file=
+url=
+original_args=("$@")
+while (($# > 0)); do
+  case "$1" in
+    --config)
+      config_file=$2
+      shift 2
+      ;;
+    --output)
+      output_file=$2
+      shift 2
+      ;;
+    --write-out)
+      shift 2
+      ;;
+    *)
+      echo "unexpected fake curl argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+[[ -f "$config_file" && -f "$output_file" ]]
+url=$(sed -n 's/^url = "\(.*\)"$/\1/p' "$config_file")
+[[ -n "$url" ]]
+[[ "$(stat -c '%a' "$config_file")" == "600" ]]
+[[ "$(grep -c '^header = \"Authorization: Bearer ' "$config_file")" -eq 1 ]]
+printf '%q ' "${original_args[@]}" >>"${PYMES_TEST_CURL_ARGV_LOG:?}"
+printf '\n' >>"${PYMES_TEST_CURL_ARGV_LOG:?}"
+printf '%s\n' "$url" >>"${PYMES_TEST_CURL_URL_LOG:?}"
+
+status=200
+fixture=
+case "$url" in
+  */calendars/connections)
+    fixture=${PYMES_TEST_GOOGLE_CONNECTIONS_FIXTURE:?}
+    ;;
+  */scheduling/bookings/*)
+    fixture=${PYMES_TEST_BOOKING_FIXTURE:?}
+    ;;
+  https://www.googleapis.com/calendar/v3/calendars/*/events/*)
+    fixture=${PYMES_TEST_GOOGLE_EVENT_FIXTURE:?}
+    ;;
+  */fiscal/credentials/*/points-of-sale/*/validate)
+    fixture=${PYMES_TEST_ARCA_POINT_FIXTURE:?}
+    [[ "$(grep -c '^request = \"POST\"' "$config_file")" -eq 1 ]]
+    payload_file=$(sed -n 's/^data-binary = "@\(.*\)"$/\1/p' "$config_file")
+    [[ -f "$payload_file" && "$(<"$payload_file")" == '{"enabled":true}' ]]
+    ;;
+  */fiscal/credentials/*)
+    fixture=${PYMES_TEST_ARCA_CREDENTIAL_FIXTURE:?}
+    ;;
+  *)
+    echo "unexpected fake curl URL: $url" >&2
+    exit 2
+    ;;
+esac
+
+if [[ "${PYMES_TEST_FAIL_URL_PATTERN:-}" != "" &&
+      "$url" == *"${PYMES_TEST_FAIL_URL_PATTERN}"* ]]; then
+  status=${PYMES_TEST_FAIL_STATUS:-503}
+  printf '%s' "${PYMES_TEST_FAILURE_BODY:-{\"secret\":\"must-not-leak\"}}" >"$output_file"
+else
+  cp "$fixture" "$output_file"
+fi
+printf '%s' "$status"

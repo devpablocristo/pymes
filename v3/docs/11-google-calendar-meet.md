@@ -1,11 +1,17 @@
 # Google Calendar y Meet
 
+<!-- drift:bind v3/backend/internal/calendars/worker.go -->
+<!-- drift:bind v3/backend/internal/calendars/repository.go -->
+<!-- drift:bind v3/backend/internal/calendars/worker/helpers/events.go -->
+<!-- drift:bind v3/backend/internal/scheduling/calendar_projection/helpers/events.go -->
+
 ## Alcance
 
-Pymes proyecta turnos confirmados hacia un calendario secundario llamado
-`Pymes`. Google no es fuente de verdad: una caída, revocación o inconsistencia
-del proveedor no modifica ni bloquea la reserva local. El MVP es unidireccional
-Pymes → Google; `watch`, `syncToken`, Outlook y Teams quedan fuera.
+Pymes proyecta turnos individuales confirmados y sus estados posteriores hacia
+un calendario secundario llamado `Pymes`. Google no es fuente de verdad: una
+caída, revocación o inconsistencia del proveedor no modifica ni bloquea la
+reserva local. El MVP es unidireccional Pymes → Google; `watch`, `syncToken`,
+Outlook y Teams quedan fuera.
 
 La variable global `PYMES_GOOGLE_CALENDAR_ENABLED` debe configurar el workload
 y la organización debe tener `google_calendar_enabled=true`. Rutas, proyección
@@ -80,6 +86,15 @@ exclusivamente para desarrollo y tests; producción la rechaza al arrancar.
 
 ## Proyección idempotente
 
+- Agenda produce `CalendarSyncRequested` dentro de la transacción del turno.
+  Calendars consume ese snapshot; no consulta tablas de Agenda para
+  reconstruirlo.
+- El snapshot canónico versión `1` contiene booking, operación y
+  `source_version`; un `upsert` agrega summary, intervalo UTC RFC3339Nano, zona
+  IANA y el opt-in de Meet. Un `delete` no acepta campos del evento.
+- El productor calcula `snapshot_digest` como SHA-256 hexadecimal del snapshot.
+  El consumidor rechaza campos desconocidos, digests no hexadecimales y
+  cualquier digest que no coincida con el contenido reconstruido.
 - El ID de evento es base32hex determinístico a partir de organización,
   conexión y turno.
 - El `requestId` de Meet se deriva por separado.
@@ -92,9 +107,47 @@ exclusivamente para desarrollo y tests; producción la rechaza al arrancar.
   invalidar el turno ni el evento.
 - Un refresh token revocado cambia la conexión a `reauth_required`.
 
+El estado resultante determina el comando: `confirmed`, `checked_in`,
+`completed` y `no_show` hacen `upsert`; `cancelled` y `rescheduled` hacen
+`delete`; `held` y `pending_confirmation` no se proyectan. Reprogramar elimina
+el turno original con la versión incrementada y proyecta el reemplazo sólo si
+su estado lo requiere. Los turnos de sesiones grupales quedan fuera: no existe
+un evento Google por participante.
+
+Una versión menor que la ya persistida es no-op y la misma versión con otro
+digest es conflicto. La misma versión y digest sólo es no-op cuando el mapping
+ya está sincronizado o eliminado; si quedó incierto o en reconciliación,
+continúa el intento. Si no existe mapping, `delete` guarda un tombstone local
+sin llamar a Google; un `404` del proveedor también converge a eliminado. El
+payload del delete no conserva summary, descripción, ubicación, horarios, zona,
+attendees ni el opt-in de Meet.
+
 El relay toma exclusivamente `CalendarSyncRequested`; no puede arrendar eventos
 de Commerce o Notifications. Los reintentos usan el outbox durable y conservan
-la misma identidad lógica.
+la misma identidad lógica. Si la feature tenant está deshabilitada o todavía no
+existe una conexión activa, el relay difiere el comando cinco minutos, libera
+el lease y revierte el incremento de intentos; no lo publica, reintenta ni manda
+a DLQ como si hubiera fallado Google.
+
+La primera release de Pymes v3 es greenfield: la migración
+`019_scheduling_calendar_projection.sql` debe ejecutarse antes de iniciar API o
+worker, por lo que no existen turnos históricos que requieran backfill. Después
+de esa migración, incluso los turnos creados con Google deshabilitado quedan
+retenidos por el mecanismo anterior. Una futura importación de turnos desde v2
+deberá incluir su propio backfill y continúa fuera del alcance de este plan.
+
+## Política de Meet
+
+`meet_requested` es opt-in: omitirlo al crear una reserva equivale a `false`.
+Agenda lo congela en el turno; no forma parte del `PATCH` operativo, se conserva
+al reprogramar y pasa de waitlist al turno aceptado. Para sesiones grupales se
+rechaza `true` y no se proyecta un evento individual.
+
+Calendars solicita la conferencia sólo cuando el snapshot inmutable vale
+`true` y la conexión tiene Meet habilitado. El request ID determinístico permite
+reintentar sin crear otra reunión. El estado pendiente se reconcilia por
+polling; un fallo de conferencia no cambia el estado local del turno ni elimina
+el evento Calendar.
 
 ## Configuración
 
@@ -132,4 +185,21 @@ Para una incidencia:
 6. revisar `calendar_sync_attempts` por código estable, nunca por contenido
    sensible.
 
-Los jobs contra Google real son protegidos y separados del CI determinístico.
+## Validación real protegida
+
+`.github/workflows/v3-google-live.yml` es manual, está fijado al environment
+STG y sólo acepta `main`, CI verde para el SHA exacto, confirmación
+`VALIDATE_GOOGLE_STG` y primer intento. Antes de leer credenciales ejecuta la
+auditoría completa de protección GitHub.
+
+El operador debe haber conectado una cuenta controlada y confirmado un turno.
+El job consulta esa conexión y booking con una sesión Clerk corta, deriva el ID
+base32hex y lee el evento mediante un access token de verificación separado.
+Comprueba marker privado, digest, intervalo, ETag y, cuando se solicita,
+`hangoutsMeet` exitoso. No crea, actualiza ni elimina recursos Google, no extrae
+el grant cifrado de Pymes y no conserva payloads. Los tres valores sensibles
+del piloto son secrets temporales de STG y se eliminan después del run.
+
+`make protected-live-validation-test` prueba el job con transporte falso,
+incluidos fallos de proveedor y no filtración de credenciales, sin llamar a
+Google. Un run real verde continúa pendiente hasta ejecutar el piloto H8.

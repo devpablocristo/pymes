@@ -46,10 +46,15 @@ Los bootstrap son explícitos y se ejecutan antes de la primera release:
    Google Access y un Public NAT compartido.
 
 A fecha de esta revisión, las tres claves simétricas ya rotan cada 90 días en
-STG y PRD, y ambos secretos `scheduling-action-token-secret` existen con versión
-1 e IAM mínimo. Todavía deben cargarse y validarse valores reales para Clerk
-webhook, PerGo y Google. La única excepción acotada es el valor aleatorio de
-bootstrap del webhook Clerk en STG: debe llevar el label
+STG y PRD, ambos secretos `scheduling-action-token-secret` existen con versión
+1 e IAM mínimo, las APIs Cloud Asset/Org Policy/Policy Analyzer están
+habilitadas y ambas policies IAM exigidas están forzadas. La subred
+`pymes-v3-serverless` (`10.120.0.0/24`) tiene Private Google Access y el Public
+NAT homónimo cubre `ALL_IP_RANGES` sólo de esa subred. Monitoring ya contiene
+9 métricas y 8 policies con canal por entorno, además de dashboards separados;
+los uptime checks se crean cuando existan las URLs reales. Todavía deben
+cargarse y validarse valores reales para Clerk webhook, PerGo y Google. La única excepción
+acotada es el valor aleatorio de bootstrap del webhook Clerk en STG: debe llevar el label
 `lifecycle=bootstrap-temporary`, queda detrás de ingress interno sin invocadores
 y debe rotarse antes del stage operacional.
 
@@ -58,7 +63,9 @@ consulta ni modifica GCP. Para aplicarlo se requieren simultáneamente
 `PYMES_NETWORK_BOOTSTRAP_APPLY=true` y
 `PYMES_NETWORK_COST_ACK=I_ACCEPT_RECURRING_CLOUD_NAT_COST`, después de aprobar
 ese costo. El CIDR debe estar entre `/20` y `/26`; no se reutiliza una subred
-incompatible.
+incompatible ni un NAT que atienda otra subred. Un rerun converge el recurso
+propio desde `PRIMARY_IP_RANGE` a `ALL_IP_RANGES` y vuelve a leer la
+configuración antes de declarar `NETWORK READY`.
 
 ### Primer alta STG y cierre de Clerk
 
@@ -500,12 +507,170 @@ de deploy. Tampoco se reejecutan Build o Deploy de forma aislada; ambos tienen
 su guarda de `GITHUB_RUN_ATTEMPT` como primer paso y cualquier reintento exige
 un nuevo `workflow_dispatch`.
 
-El manifiesto debe conservarse como evidencia durable de release. El workflow
-retiene actualmente su artifact durante 90 días; si la política de auditoría
-exige una ventana mayor, debe copiarse además a almacenamiento inmutable antes
-de que venza. STG y PRD usan el mismo SHA, pin OA y receta, pero el build actual
+<!-- drift:bind v3/scripts/deploy/bootstrap-release-evidence.sh -->
+<!-- drift:bind v3/scripts/deploy/retain-release-manifest.sh -->
+<!-- drift:bind .github/workflows/v3-release.yml -->
+
+El manifiesto se conserva como evidencia durable antes de publicar el artifact
+de GitHub de 90 días. El build llama a
+`scripts/deploy/retain-release-manifest.sh`; si esa publicación falla, no
+continúa. Cada ambiente usa un bucket determinístico separado con uniform
+access, prevención de acceso público, sin versioning ni reglas lifecycle,
+retención mínima de un año y Bucket Lock. El builder sólo puede listar el
+bucket, crear objetos y leerlos; no recibe permiso para sobrescribir o borrar.
+
+Los buckets todavía son una precondición operativa, no evidencia ya
+provisionada. Prepararlos una sola vez por ambiente:
+
+```bash
+PYMES_RELEASE_EVIDENCE_ENV=stg \
+PYMES_RELEASE_EVIDENCE_MODE=plan \
+./v3/scripts/deploy/bootstrap-release-evidence.sh
+
+PYMES_RELEASE_EVIDENCE_ENV=stg \
+PYMES_RELEASE_EVIDENCE_MODE=apply \
+./v3/scripts/deploy/bootstrap-release-evidence.sh
+
+PYMES_RELEASE_EVIDENCE_ENV=stg \
+PYMES_RELEASE_EVIDENCE_MODE=lock \
+PYMES_RELEASE_EVIDENCE_LOCK_CONFIRMATION=\
+LOCK_RELEASE_EVIDENCE_STG_pymes-v3-release-evidence-stg-884236221349 \
+./v3/scripts/deploy/bootstrap-release-evidence.sh
+
+PYMES_RELEASE_EVIDENCE_ENV=stg \
+PYMES_RELEASE_EVIDENCE_MODE=verify \
+./v3/scripts/deploy/bootstrap-release-evidence.sh
+```
+
+Repetir explícitamente para PRD con `PRD` y
+`pymes-v3-release-evidence-prd-884236221349`. `apply` crea el bucket si falta,
+valida su configuración si ya existe y agrega los bindings requeridos del
+builder, pero deliberadamente no activa el lock. Bloquear la política de
+retención es irreversible y crea un project lien; revisar proyecto, ambiente,
+nombre, plazo e IAM antes de escribir la confirmación. `verify` exige el lock
+ya activo.
+
+La publicación usa un nombre ligado a ambiente, SHA fuente y GitHub run ID y
+envía `--if-generation-match=0`: un segundo objeto con el mismo nombre falla en
+vez de reemplazar evidencia. Después valida tamaño, metadata, fecha de
+retención y generación, descarga esa generación exacta y compara el SHA-256.
+El receipt `0600` registra URI, generación y vencimiento mínimo y acompaña al
+artifact corto. STG y PRD usan el mismo SHA, pin OA y receta, pero el build
 incluye metadata del ambiente y una publishable key Clerk específica en Web:
 se comparan materiales exactos, no se afirma igualdad de digest entre entornos.
+
+## Migración de acceso amplio a Secret Manager
+
+<!-- drift:bind v3/scripts/deploy/migrate-project-secret-access.sh -->
+
+[`migrate-project-secret-access.sh`](../scripts/deploy/migrate-project-secret-access.sh)
+reemplaza los grants históricos a nivel proyecto por accessors directos sobre
+los secretos exactos. No lee payloads ni elimina secretos, versiones,
+workloads o service accounts. El modo por defecto es `plan` y no consulta GCP:
+
+```bash
+PYMES_PROJECT_SECRET_ACCESS_SCOPE=runtime \
+./v3/scripts/deploy/migrate-project-secret-access.sh
+```
+
+La secuencia segura es `runtime` antes del primer despliegue STG y `github`
+sólo después de completar el retiro WIF legado y comprobar que la cuenta
+dedicada está deshabilitada. `apply` inventaría servicios, jobs y todas las
+revisiones retenidas, concede primero cada accessor directo, relee las
+policies y el inventario global y recién entonces retira
+`roles/secretmanager.secretAccessor` a nivel proyecto. Para la cuenta GitHub
+dedicada también retira el `roles/secretmanager.admin` redundante.
+
+```bash
+PYMES_PROJECT_SECRET_ACCESS_MODE=apply \
+PYMES_PROJECT_SECRET_ACCESS_SCOPE=runtime \
+PYMES_PROJECT_SECRET_ACCESS_OPERATOR_EMAIL=softponti@gmail.com \
+PYMES_PROJECT_SECRET_ACCESS_CONFIRM=MIGRATE_PROJECT_SECRET_ACCESS_RUNTIME \
+./v3/scripts/deploy/migrate-project-secret-access.sh
+
+PYMES_PROJECT_SECRET_ACCESS_MODE=audit \
+PYMES_PROJECT_SECRET_ACCESS_SCOPE=runtime \
+PYMES_PROJECT_SECRET_ACCESS_OPERATOR_EMAIL=softponti@gmail.com \
+./v3/scripts/deploy/migrate-project-secret-access.sh
+```
+
+Después de los dos canaries y el retiro WIF, repetir con `scope=github` y
+confirmación `MIGRATE_PROJECT_SECRET_ACCESS_GITHUB`. Cada `AUDIT READY` prueba
+los secrets directos exactos del principal y `project_secret_access=none`.
+`scope=all` existe para auditoría final; no sustituye el orden runtime primero.
+
+## Retiro recuperable de secretos obsoletos
+
+<!-- drift:bind v3/scripts/deploy/retire-obsolete-secrets.sh -->
+
+Los contenedores `pymes-v3-{stg,prd}-fiscal-credential` e
+`internal-jwt-seed` pertenecen a diseños reemplazados. El primero no puede
+tener una versión habilitada y, antes del retiro, sólo puede conservar el
+accessor incondicional de `pymes-v3-fiscal-{env}` de su mismo entorno; Fiscal
+conserva las credenciales de cada tenant cifradas en su propia base. El segundo
+sólo puede tener, antes del retiro, el binding incondicional
+`roles/secretmanager.secretAccessor` para las cuentas API, worker y provisioner
+de su mismo entorno. Cualquier otro miembro, rol, condición o JSON inesperado
+bloquea el procedimiento.
+
+Como gate independiente, el script inspecciona `includedPermissions` de cada
+rol IAM de proyecto y bloquea todo principal no humano que pueda ejecutar
+`secretmanager.versions.access`. La única excepción humana admitida es el
+binding incondicional exacto `roles/owner` cuyo único miembro es
+`user:softponti@gmail.com`.
+
+[`retire-obsolete-secrets.sh`](../scripts/deploy/retire-obsolete-secrets.sh) es
+`plan` por defecto y no consulta GCP en ese modo:
+
+```bash
+PYMES_OBSOLETE_SECRETS_ENV=stg \
+./v3/scripts/deploy/retire-obsolete-secrets.sh
+```
+
+El retiro sólo se ejecuta después de conservar evidencia de una release que use
+exclusivamente `internal-jwt-signing` en KMS; el script no infiere esa
+precondición, pero sí demuestra que ningún workload conserva referencias a los
+secretos obsoletos. Antes de cualquier mutación relee todos los servicios, jobs
+y revisiones Cloud Run del proyecto y falla si cualquiera conserva una
+referencia a alguno de los dos nombres. El inventario Cloud Run y el gate IAM
+de proyecto se revalidan antes de procesar cada secreto y otra vez al final.
+También exige el proyecto exacto `pymes-dev-352318`, región `us-central1`,
+cuenta gcloud directa `softponti@gmail.com`, configuración activa sobre ese
+proyecto y ausencia de impersonación, credential files, access tokens o login
+configs.
+
+Operar STG y PRD por separado permite observar cada postcondición:
+
+```bash
+PYMES_OBSOLETE_SECRETS_MODE=apply \
+PYMES_OBSOLETE_SECRETS_ENV=stg \
+PYMES_OBSOLETE_SECRETS_OPERATOR_EMAIL=softponti@gmail.com \
+PYMES_OBSOLETE_SECRETS_CONFIRM=RETIRE_OBSOLETE_PYMES_V3_STG \
+./v3/scripts/deploy/retire-obsolete-secrets.sh
+
+PYMES_OBSOLETE_SECRETS_MODE=audit \
+PYMES_OBSOLETE_SECRETS_ENV=stg \
+PYMES_OBSOLETE_SECRETS_OPERATOR_EMAIL=softponti@gmail.com \
+./v3/scripts/deploy/retire-obsolete-secrets.sh
+```
+
+Repetir luego con `prd` y
+`RETIRE_OBSOLETE_PYMES_V3_PRD`. Existe una selección explícita `all`, cuya
+confirmación es `RETIRE_OBSOLETE_PYMES_V3_ALL`, pero no sustituye la secuencia
+STG primero. `apply` preflights todos los entornos elegidos antes del primer
+cambio, quita cada accessor conocido de forma individual y deshabilita sólo
+las versiones habilitadas de `internal-jwt-seed`. Nunca usa `set-iam-policy`,
+no elimina contenedores y no destruye versiones.
+
+Cada escritura se relee por su postcondición. Si gcloud pierde la respuesta
+después de aplicar el cambio, el script acepta únicamente el estado exacto ya
+alcanzado y deja una marca `RECOVERED`; un rerun no vuelve a mutar. La
+postcondición auditable es: ambos contenedores preservados, cero bindings IAM,
+cero versiones habilitadas y cero referencias desde servicios, jobs o
+revisiones, además de cero principals no humanos con acceso heredado. La
+incorporación de esta herramienta no prueba que el retiro haya sido aplicado:
+la salida `AUDIT READY ... inherited_nonhuman=none cloud_run_refs=none` de cada
+entorno debe guardarse como evidencia operativa H8.
 
 ## Web pública en el mismo origen
 
@@ -532,6 +697,90 @@ autoriza probes del release y el salto Web candidato → API candidata. El
 middleware API y Nginx aplican el gate únicamente cuando el host comienza por
 el tag de esa revisión; el origen estable sigue usando Clerk/JWT normalmente.
 Nunca copiar la capability a incidentes, argumentos, logs o artefactos.
+
+## Validaciones live protegidas
+
+Google real y ARCA homologación tienen workflows separados del CI
+determinístico:
+
+- `v3-google-live.yml` sólo lee una conexión, un turno y la proyección
+  determinística ya existente en Google. No crea, cambia ni borra eventos;
+- `v3-arca-homologation.yml` ejecuta el probe WSAA/WSFE del punto de venta,
+  lo habilita después de una respuesta válida y no autoriza ningún comprobante.
+
+Ambos jobs están fijados al environment GitHub `stg`. Antes de usar un secreto
+rechazan cualquier fuente distinta de `refs/heads/main`, un SHA sin
+`Pymes V3 validate` verde, un rerun o la confirmación escrita incorrecta; luego
+auditan la protección completa de `main`, `stg` y `prd`. No solicitan WIF ni
+reciben credenciales mediante inputs.
+
+Preparación Google:
+
+1. completar OAuth desde Pymes con una cuenta controlada, conexión `active` y
+   feature flag tenant habilitado;
+2. confirmar desde el producto un turno controlado y esperar la convergencia
+   del worker;
+3. obtener el ID del calendario secundario desde la cuenta Google controlada;
+4. generar para el verificador un access token corto y separado, con lectura
+   Calendar sobre esa cuenta. Nunca extraer ni reutilizar el grant cifrado que
+   Pymes almacena;
+5. cargar temporalmente en el environment STG
+   `PYMES_LIVE_PILOT_API_TOKEN`,
+   `PYMES_GOOGLE_PILOT_ACCESS_TOKEN` y
+   `PYMES_GOOGLE_PILOT_CALENDAR_ID`. El primero es una sesión Clerk corta con
+   acceso al tenant; los tres valores se cargan por canal seguro y se eliminan
+   al terminar;
+6. disparar desde `main`:
+
+   ```bash
+   gh workflow run v3-google-live.yml \
+     --ref main \
+     -f organization_id=ORG_OPACA \
+     -f connection_id=UUID_CONEXION \
+     -f booking_id=UUID_TURNO \
+     -f expected_meet=true \
+     -f confirmation=VALIDATE_GOOGLE_STG
+   ```
+
+El job exige conexión `active`, turno confirmado/atendido/completado, evento
+base32hex exacto, marker privado `pymes_managed`, digest, intervalo y ETag. Si
+se espera Meet, exige `hangoutsMeet`, estado `success` y una URI de video
+válida. No conserva el JSON de Pymes o Google como artifact ni lo imprime.
+
+Preparación ARCA:
+
+1. desplegar Fiscal STG en modo `arca`, completar CSR/certificado de
+   homologación para el tenant y mantener el punto de venta reservado para el
+   piloto;
+2. cargar temporalmente `PYMES_LIVE_PILOT_API_TOKEN` en STG con una sesión
+   Clerk corta de owner/admin del tenant;
+3. disparar:
+
+   ```bash
+   gh workflow run v3-arca-homologation.yml \
+     --ref main \
+     -f organization_id=ORG_OPACA \
+     -f credential_id=fcred_CREDENCIAL_OPACA \
+     -f point_of_sale=NUMERO \
+     -f confirmation=VALIDATE_ARCA_HOMOLOGATION_STG
+   ```
+
+El job rechaza una credencial de producción, vencida o no lista. La única
+mutación es registrar `validated_at` y `enabled=true` para ese punto de venta
+de homologación después del probe; el summary registra explícitamente
+`Voucher emitted: false`. No se cargan certificado, clave, CUIT, XML ni
+respuestas ARCA en GitHub. Si vence cualquiera de los tokens no se usa
+**Re-run jobs**: se rota el secret temporal y se crea un dispatch nuevo.
+
+Validación local, enteramente falsa y sin proveedor:
+
+```bash
+make protected-live-validation-test
+```
+
+Un run protegido verde prueba la integración seleccionada, pero no reemplaza
+el resto del piloto: aislamiento tenant, observabilidad, recuperación y
+evidencia comercial se cierran por separado.
 
 ## Señales y alertas
 
@@ -818,6 +1067,259 @@ directorio temporal con permisos restringidos. El smoke también demuestra que
 fallan de forma segura los restores sin manifiesto, con dump alterado,
 servicio cruzado, sin confirmación o contra un destino que ya contiene
 relaciones.
+
+### Drill cloud de las tres bases
+
+<!-- drift:bind v3/scripts/deploy/cloud-restore-drill.sh -->
+<!-- drift:bind v3/scripts/deploy/cloud-restore-drill-test.sh -->
+
+`scripts/deploy/cloud-restore-drill.sh` orquesta `plan`, `restore`, `verify` y
+`cleanup` para Pymes, Fiscal y Accounting como una sola evidencia. Está
+restringido al proyecto/región versionados y a la instancia
+`pymes-dev-db`; exige autenticación directa del operador revisado, sin
+impersonación, y una conexión administrativa por el socket exacto del Cloud SQL
+Proxy. No cambia tráfico ni secretos y nunca restaura sobre
+`pymes_v3_{stg,prd}`, `pymes_v3_fiscal_{stg,prd}` o
+`pymes_v3_accounting_{stg,prd}`.
+
+Preparar un ID único de 8–16 caracteres alfanuméricos minúsculos que empiece con
+letra, el manifiesto durable de la release y los tres dumps con sus manifiestos:
+
+```bash
+export PYMES_RESTORE_DRILL_ENV=stg
+export PYMES_RESTORE_DRILL_ID=restorea1
+export PYMES_RESTORE_DRILL_SOURCE_SHA='<SHA Pymes completo>'
+export PYMES_RESTORE_DRILL_ACCOUNTING_SHA='<SHA OA completo>'
+export PYMES_RESTORE_DRILL_RELEASE_MANIFEST='/ruta/segura/pymes-v3-images.env'
+export PYMES_RESTORE_DRILL_RELEASE_MANIFEST_SHA256='<SHA-256 independiente>'
+export PYMES_RESTORE_DRILL_PYMES_BACKUP='/ruta/segura/pymes.dump'
+export PYMES_RESTORE_DRILL_FISCAL_BACKUP='/ruta/segura/fiscal.dump'
+export PYMES_RESTORE_DRILL_ACCOUNTING_BACKUP='/ruta/segura/accounting.dump'
+export PYMES_RESTORE_DRILL_STATE='/ruta/segura/restorea1.state.json'
+
+PYMES_RESTORE_DRILL_MODE=plan \
+./v3/scripts/deploy/cloud-restore-drill.sh
+```
+
+El preflight valida las 13 claves allowlisted del manifiesto, los SHA de Pymes y
+Open Accounting, y que cada dump corresponda a la base fuente y schema
+esperados. `plan` no consulta GCP ni PostgreSQL y rechaza un state preexistente.
+Para `restore`, configurar el proxy y las credenciales administrativas por un
+canal seguro, además de tres URLs que apunten exactamente a los nombres destino
+calculados:
+
+```bash
+export PGHOST=/cloudsql/pymes-dev-352318:us-central1:pymes-dev-db
+export PGPORT=5432
+export PGDATABASE=postgres
+export PGUSER='<rol temporal con CREATEDB>'
+export PGPASSWORD='<cargar por canal seguro>'
+export PYMES_RESTORE_DATABASE_URL='postgres://.../pymes_v3_restore_stg_restorea1'
+export FISCAL_RESTORE_DATABASE_URL='postgres://.../pymes_v3_fiscal_restore_stg_restorea1'
+export ACCOUNTING_RESTORE_DATABASE_URL='postgres://.../pymes_v3_accounting_restore_stg_restorea1'
+
+PYMES_RESTORE_DRILL_MODE=restore \
+PYMES_RESTORE_DRILL_CONFIRMATION="RESTORE_CLOUD_STG_restorea1_${PYMES_RESTORE_DRILL_SOURCE_SHA}" \
+./v3/scripts/deploy/cloud-restore-drill.sh
+```
+
+Antes de crear la primera base, `restore` comprueba que ninguno de los tres
+destinos exista. Luego crea los tres con un ownership marker que liga ambiente,
+drill y SHA, invoca `restore-postgres.sh` con la confirmación exacta de cada
+servicio y deja un state privado con checksum. Si una ejecución queda en fase
+`prepared`, no adoptar ni borrar bases manualmente: usar `cleanup`, que sólo
+acepta targets con el marker exacto.
+
+`verify` no incluye un validator de producción implícito. El operador debe
+revisar un ejecutable regular, no symlink, de su propiedad y no escribible por
+grupo/otros; registrar su checksum y pasarlo explícitamente:
+
+```bash
+export PYMES_RESTORE_DRILL_VALIDATOR='/ruta/revisada/validate-restore.sh'
+export PYMES_RESTORE_DRILL_VALIDATOR_SHA256='<SHA-256 del validator revisado>'
+
+PYMES_RESTORE_DRILL_MODE=verify \
+./v3/scripts/deploy/cloud-restore-drill.sh
+```
+
+El witness sólo se acepta si liga los tres destinos y acredita migraciones,
+aislamiento tenant, probes, dos reconciliaciones, cero duplicados de solicitudes
+fiscales, comandos contables o asientos, y cero outbox recuperable sin
+publicar. Se publica una sola vez junto con su checksum y el state pasa a
+`verified`. Esto constituye evidencia del drill, no un cutover.
+
+Finalizada la revisión, eliminar únicamente los tres destinos propios:
+
+```bash
+PYMES_RESTORE_DRILL_MODE=cleanup \
+PYMES_RESTORE_DRILL_CLEANUP_CONFIRMATION="DELETE_RESTORE_DRILL_STG_restorea1_${PYMES_RESTORE_DRILL_SOURCE_SHA}" \
+./v3/scripts/deploy/cloud-restore-drill.sh
+```
+
+`cleanup` vuelve a validar state, checksum, nombres y ownership marker antes de
+cada `DROP DATABASE`, y conserva el state en fase `cleaned` y el witness para
+auditoría. Un drill cloud real continúa pendiente hasta ejecutar este flujo
+contra los tres destinos aislados y revisar su evidencia.
+
+## Evidencia controlada de pilotos
+
+<!-- drift:bind v3/scripts/deploy/collect-pilot-evidence.sh -->
+
+Un piloto sólo cuenta después de ejecutar
+`scripts/deploy/collect-pilot-evidence.sh`. El collector es estrictamente de
+lectura: no crea turnos, mensajes, eventos ni comprobantes y no cambia Cloud
+Run, Google, PerGo o ARCA. Primero se completa el flujo con una cuenta
+controlada; después el collector prueba el estado terminal contra fuentes
+observables y publica un bundle redactado.
+
+Antes de cualquier llamada, el script exige simultáneamente:
+
+- checkout en el SHA desplegado;
+- manifiesto de imágenes original y su SHA-256 copiado de la evidencia
+  independiente del build;
+- origen público HTTPS exacto;
+- directorio destino absoluto, nuevo y con basename seguro;
+- tokens únicamente mediante archivos regulares `0400`/`0600`, propiedad del
+  operador;
+- confirmación exacta
+  `COLLECT_<ENV>_<PILOTO>_<SHA>`.
+
+Si falta una condición, no consulta GCP ni HTTP. El bundle se construye en un
+directorio privado hermano y se publica mediante un único `rename` sólo después
+de verificar todo. Un error elimina respuestas crudas y configuraciones
+temporales; nunca deja un bundle parcial.
+
+Las variables comunes son:
+
+```bash
+export PYMES_PILOT_ENV=stg
+export PYMES_PILOT_SOURCE_SHA='<SHA completo desplegado>'
+export PYMES_PILOT_PUBLIC_BASE_URL='https://ORIGEN-STG'
+export PYMES_PILOT_RELEASE_MANIFEST='/ruta/privada/pymes-v3-images.env'
+export PYMES_PILOT_RELEASE_MANIFEST_SHA256='<SHA-256 del summary de Build>'
+export PYMES_PILOT_EVIDENCE_DIR='/ruta/privada/evidence/agenda-SHA'
+```
+
+No escribir el JWT Clerk ni el access token Google en el historial del shell.
+El operador los carga por su canal seguro en archivos temporales `0600` y los
+destruye al terminar. El collector no los copia al bundle.
+
+### Agenda
+
+La evidencia requiere dos organizaciones distintas y un turno real confirmado,
+atendido, completado o no-show en cada una. Consulta ambos turnos con
+credenciales tenant-scoped y repite las lecturas cruzadas bajo la otra
+organización; ambas deben devolver `404`.
+
+```bash
+PYMES_PILOT_KIND=agenda \
+PYMES_PILOT_CONFIRMATION="COLLECT_STG_AGENDA_${PYMES_PILOT_SOURCE_SHA}" \
+PYMES_PILOT_ORGANIZATION_A='<org A>' \
+PYMES_PILOT_ORGANIZATION_B='<org B>' \
+PYMES_PILOT_BOOKING_A='<UUID turno A>' \
+PYMES_PILOT_BOOKING_B='<UUID turno B>' \
+PYMES_PILOT_BEARER_TOKEN_A_FILE='/ruta/privada/clerk-a.token' \
+PYMES_PILOT_BEARER_TOKEN_B_FILE='/ruta/privada/clerk-b.token' \
+./scripts/deploy/collect-pilot-evidence.sh
+```
+
+El resultado conserva horarios, timezone, duración, estado y cardinalidad/modo
+de asignaciones, pero no party, cliente, contacto, notas, servicio, recurso ni
+IDs en claro.
+
+### PerGo
+
+El runtime debe demostrar PerGo habilitado en API y worker, endpoint HTTPS real,
+audience HTTPS exacta y sin path para la identidad de Cloud Run, canal
+`whatsapp`/`whatsapp_cloud` y ausencia de fallback global. La audience puede ser
+el origen administrado de Cloud Run aunque `PERGO_URL` use un dominio propio: no
+se fuerza igualdad entre ambas. La feature del tenant debe estar activa y la
+proyección pública debe haber convergido a `delivered` o `read` con un external
+message ID. El collector no llama PerGo ni reenvía el mensaje; conserva endpoint
+y audience únicamente como referencias SHA-256.
+
+```bash
+PYMES_PILOT_KIND=pergo \
+PYMES_PILOT_CONFIRMATION="COLLECT_STG_PERGO_${PYMES_PILOT_SOURCE_SHA}" \
+PYMES_PILOT_ORGANIZATION_ID='<org piloto>' \
+PYMES_PILOT_NOTIFICATION_ID='<notification ID>' \
+PYMES_PILOT_BEARER_TOKEN_FILE='/ruta/privada/clerk.token' \
+./scripts/deploy/collect-pilot-evidence.sh
+```
+
+Teléfono, body, variables, workspace, sender y provider message ID quedan fuera;
+los identificadores necesarios se conservan únicamente como referencias
+SHA-256.
+
+### Google Calendar y Meet
+
+Además de la conexión activa y la feature tenant, este camino hace una única
+lectura `GET` contra Google Calendar. Deriva el event ID determinístico desde
+organización, conexión y turno, consulta ese evento exacto y exige estado
+`confirmed`, solución `hangoutsMeet` y un único entry point de video bajo
+`meet.google.com`. Esa llamada adicional requiere la segunda confirmación
+`READ_GOOGLE_<ENV>_<SHA>`.
+
+```bash
+PYMES_PILOT_KIND=google \
+PYMES_PILOT_CONFIRMATION="COLLECT_STG_GOOGLE_${PYMES_PILOT_SOURCE_SHA}" \
+PYMES_PILOT_PROVIDER_CONFIRMATION="READ_GOOGLE_STG_${PYMES_PILOT_SOURCE_SHA}" \
+PYMES_PILOT_ORGANIZATION_ID='<org piloto>' \
+PYMES_PILOT_GOOGLE_CONNECTION_ID='<UUID conexión>' \
+PYMES_PILOT_BOOKING_ID='<UUID turno>' \
+PYMES_PILOT_GOOGLE_CALENDAR_ID='<calendario controlado>' \
+PYMES_PILOT_BEARER_TOKEN_FILE='/ruta/privada/clerk.token' \
+PYMES_PILOT_GOOGLE_TOKEN_FILE='/ruta/privada/google.token' \
+./scripts/deploy/collect-pilot-evidence.sh
+```
+
+Summary, description, attendees, calendar ID, Meet URI, ETag y tokens no se
+retienen; se registran sólo hechos verificables y referencias unidireccionales.
+
+### ARCA
+
+El collector exige Fiscal en modo `arca`, vault KMS del entorno, política de
+issuer de homologación, feature tenant activa, credencial `ready` de
+homologación y una venta con CAE de 14 dígitos que haya convergido a un único
+asiento.
+
+```bash
+PYMES_PILOT_KIND=arca \
+PYMES_PILOT_CONFIRMATION="COLLECT_STG_ARCA_${PYMES_PILOT_SOURCE_SHA}" \
+PYMES_PILOT_ORGANIZATION_ID='<org piloto>' \
+PYMES_PILOT_FISCAL_CREDENTIAL_ID='<fcred_ credencial opaca>' \
+PYMES_PILOT_SALE_ID='<sale ID>' \
+PYMES_PILOT_BEARER_TOKEN_FILE='/ruta/privada/clerk.token' \
+./scripts/deploy/collect-pilot-evidence.sh
+```
+
+No retiene CUIT, razón social, certificado, serial, CAE ni IDs contables en
+claro. La API pública no expone el historial de una consulta fiscal exacta; por
+eso el bundle afirma autorización y contabilización observadas, pero declara
+explícitamente que no prueba una consulta ARCA independiente. No se debe
+convertir ese límite en una afirmación manual.
+
+### Bundle y verificación
+
+Cada directorio final contiene exactamente:
+
+- `manifest.json`: timestamp UTC, SHA fuente, checksum del manifiesto, checksum
+  del collector, origen y las seis revisiones/digests/identidades activas;
+- `pilot.json`: aserciones redactadas propias del piloto;
+- `README.txt`: frontera de lo demostrado;
+- `checksums.sha256`: integridad de los tres archivos anteriores.
+
+Verificación posterior:
+
+```bash
+(cd /ruta/privada/evidence/agenda-SHA &&
+  sha256sum --check checksums.sha256)
+```
+
+Guardar el bundle junto al manifiesto original y al summary independiente del
+workflow. No modificarlo, recomputar checksums ni completar campos a mano.
+`make pilot-evidence-test` ejecuta los cuatro caminos y sus negativos contra
+fakes determinísticos; no usa red ni cloud.
 
 ## Rollback de despliegue
 

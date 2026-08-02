@@ -1,12 +1,12 @@
+// architecture:adapter external
 package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
+	migratehelpers "github.com/devpablocristo/pymes/v3/backend/internal/postgres/migrate/helpers"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -17,23 +17,19 @@ func ApplyMigrations(ctx context.Context, databaseURL, directory string) ([]stri
 		return nil, fmt.Errorf("database connection failed")
 	}
 	defer pool.Close()
-	files, err := os.ReadDir(directory)
+	migrations, err := migratehelpers.Load(directory)
 	if err != nil {
-		return nil, fmt.Errorf("migration directory unavailable")
-	}
-	var applied []string
-	for _, file := range files {
-		if file.IsDir() || !strings.HasSuffix(file.Name(), ".sql") {
-			continue
-		}
-		body, err := os.ReadFile(filepath.Join(directory, file.Name()))
-		if err != nil {
+		if errors.Is(err, migratehelpers.ErrFileUnavailable) {
 			return nil, fmt.Errorf("migration file unavailable")
 		}
-		if _, err := pool.Exec(ctx, string(body)); err != nil {
-			return nil, fmt.Errorf("migration failed: %s", file.Name())
+		return nil, fmt.Errorf("migration directory unavailable")
+	}
+	applied := make([]string, 0, len(migrations))
+	for _, migration := range migrations {
+		if _, err := pool.Exec(ctx, migration.SQL); err != nil {
+			return nil, fmt.Errorf("migration failed: %s", migration.Name)
 		}
-		applied = append(applied, file.Name())
+		applied = append(applied, migration.Name)
 	}
 	return applied, nil
 }

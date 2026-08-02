@@ -629,6 +629,9 @@ components:
         status: { type: string, enum: [held, pending_confirmation, confirmed] }
         hold_minutes: { type: integer, minimum: 0, maximum: 30 }
         allocations: { type: array, items: { $ref: '#/components/schemas/Allocation' } }
+        meet_requested:
+          type: boolean
+          description: Si se omite, no se solicita una reunión de Google Meet.
         notes: { type: string }
         recurrence: { $ref: '#/components/schemas/Recurrence' }
     BookingUpdateInput:
@@ -663,6 +666,9 @@ components:
         participants: { type: integer, minimum: 1, maximum: 100000 }
         hold_minutes: { type: integer, minimum: 0, maximum: 30 }
         allocations: { type: array, items: { $ref: '#/components/schemas/Allocation' } }
+        meet_requested:
+          type: boolean
+          description: Si se omite, no se solicita una reunión de Google Meet.
         notes: { type: string }
         recurrence: { $ref: '#/components/schemas/Recurrence' }
     BookingStatus:
@@ -710,7 +716,7 @@ components:
           pattern: '^$|^[a-z][a-z0-9_-]{0,39}$'
     Booking:
       type: object
-      required: [id, branch_id, service_id, party_id, status, participants, start_at, end_at, version, service_name, price, currency, duration_minutes, timezone, allocations]
+      required: [id, branch_id, service_id, party_id, status, participants, start_at, end_at, version, service_name, price, currency, duration_minutes, timezone, meet_requested, allocations]
       properties:
         id: { type: string, format: uuid }
         series_id: { type: string, format: uuid }
@@ -733,12 +739,13 @@ components:
         customer_name: { type: string }
         customer_email: { type: string, format: email }
         customer_phone: { type: string }
+        meet_requested: { type: boolean }
         notes: { type: string }
         cancellation_reason: { type: string, maxLength: 500 }
         allocations: { type: array, items: { $ref: '#/components/schemas/Allocation' } }
     PublicBooking:
       type: object
-      required: [id, branch_id, service_id, status, participants, start_at, end_at, version, service_name, price, currency, duration_minutes, timezone]
+      required: [id, branch_id, service_id, status, participants, start_at, end_at, version, service_name, price, currency, duration_minutes, timezone, meet_requested]
       properties:
         id: { type: string, format: uuid }
         series_id: { type: string, format: uuid }
@@ -756,6 +763,7 @@ components:
         currency: { type: string }
         duration_minutes: { type: integer, minimum: 1 }
         timezone: { type: string }
+        meet_requested: { type: boolean }
     GroupSessionInput:
       type: object
       required: [branch_id, service_id, start_at, capacity, allocations]
@@ -805,9 +813,12 @@ components:
         preferred_from: { type: string, format: date-time }
         preferred_until: { type: string, format: date-time }
         participants: { type: integer, minimum: 1 }
+        meet_requested:
+          type: boolean
+          description: Si se omite, no se solicita una reunión de Google Meet.
     WaitlistEntry:
       type: object
-      required: [id, branch_id, service_id, party_id, preferred_from, preferred_until, participants, status, version]
+      required: [id, branch_id, service_id, party_id, preferred_from, preferred_until, participants, meet_requested, status, version]
       properties:
         id: { type: string, format: uuid }
         branch_id: { type: string, format: uuid }
@@ -819,6 +830,7 @@ components:
         preferred_from: { type: string, format: date-time }
         preferred_until: { type: string, format: date-time }
         participants: { type: integer, minimum: 1 }
+        meet_requested: { type: boolean }
         status: { type: string, enum: [pending, offered, accepted, cancelled, expired] }
         offer_expires_at: { type: string, format: date-time }
         offered_start_at: { type: string, format: date-time }
@@ -830,7 +842,7 @@ components:
         version: { type: integer, minimum: 1 }
     PublicWaitlistEntry:
       type: object
-      required: [id, branch_id, service_id, preferred_from, preferred_until, participants, status, version]
+      required: [id, branch_id, service_id, preferred_from, preferred_until, participants, meet_requested, status, version]
       properties:
         id: { type: string, format: uuid }
         branch_id: { type: string, format: uuid }
@@ -838,6 +850,7 @@ components:
         preferred_from: { type: string, format: date-time }
         preferred_until: { type: string, format: date-time }
         participants: { type: integer, minimum: 1 }
+        meet_requested: { type: boolean }
         status: { type: string, enum: [pending, offered, accepted, cancelled, expired] }
         offer_expires_at: { type: string, format: date-time }
         offered_start_at: { type: string, format: date-time }

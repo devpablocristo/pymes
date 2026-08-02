@@ -45,14 +45,18 @@ Dentro de Cloud Run se adopta este control compuesto:
 6. Cada llamada lleva dos credenciales distintas:
    - ID token de Cloud Run en `X-Serverless-Authorization`, con la URL destino
      como audience, para autenticar el workload ante la plataforma;
-   - JWT Ed25519 corto de Pymes en `Authorization`, con audience del servicio,
-     organización, actor, roles, request/correlation ID y `jti`, para
-     autorización tenant y auditoría de aplicación.
+   - la credencial de aplicación en `Authorization`: Fiscal y Accounting
+     reciben el JWT Ed25519 corto de Pymes, con audience del servicio,
+     organización, actor, roles, request/correlation ID y `jti`; PerGo recibe
+     su API key técnica de workspace. El segundo caso no reemplaza ni debilita
+     el ID token de plataforma.
 7. La URL de Fiscal se inyecta en API y worker porque el onboarding fiscal
    administrativo entra por el BFF; la de Accounting sólo en worker y la de
    Accounting Admin sólo en provisioner. La Web y el navegador nunca reciben
    ninguna URL privada. API, worker, Fiscal y provisioner usan Direct VPC Egress
-   sobre una subred con Private Google Access y Public NAT verificables.
+   sobre una subred con Private Google Access y Public NAT verificables. Ese NAT
+   cubre todos los rangos de una única subred Pymes; el bootstrap sólo converge
+   recursos propios y rechaza reconfigurar un NAT compartido con otra subred.
 8. La Web usa una service account propia sin `roles/cloudsql.client`, se
    despliega con escala a cero y publica `/healthz` y `/readyz`. El endpoint de
    API no se fija en el bundle: Nginx recibe el upstream del BFF en runtime y

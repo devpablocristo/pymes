@@ -133,23 +133,31 @@ export class PostgresCredentialRepository
     });
   }
 
-  async hasReadyEnvironment(
+  async hasValidatedPointOfSale(
     organizationId: string,
     environment: CredentialEnvironment,
+    cuit: string,
   ): Promise<boolean> {
     return this.withOrganization(organizationId, async (client) => {
-      const result = await client.query<{ ready: boolean }>(
+      const result = await client.query<{ validated: boolean }>(
         `SELECT EXISTS(
            SELECT 1
-             FROM fiscal.credentials
-            WHERE organization_id=$1
-              AND environment=$2
-              AND status='ready'
-              AND certificate_expires_at > now()
-         ) AS ready`,
-        [organizationId, environment],
+             FROM fiscal.credentials AS credential
+             JOIN fiscal.points_of_sale AS point
+               ON point.organization_id=credential.organization_id
+              AND point.credential_id=credential.id
+              AND point.environment=credential.environment
+            WHERE credential.organization_id=$1
+              AND credential.environment=$2
+              AND credential.cuit=$3
+              AND credential.status='ready'
+              AND credential.certificate_expires_at > now()
+              AND point.enabled=true
+              AND point.validated_at IS NOT NULL
+         ) AS validated`,
+        [organizationId, environment, cuit],
       );
-      return result.rows[0]?.ready === true;
+      return result.rows[0]?.validated === true;
     });
   }
 

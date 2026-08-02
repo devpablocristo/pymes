@@ -5,6 +5,8 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(git -C "$script_dir" rev-parse --show-toplevel)
 ci_workflow="$repo_root/.github/workflows/v3-ci.yml"
 release_workflow="$repo_root/.github/workflows/v3-release.yml"
+google_live_workflow="$repo_root/.github/workflows/v3-google-live.yml"
+arca_homologation_workflow="$repo_root/.github/workflows/v3-arca-homologation.yml"
 dependency_pin="$repo_root/.github/dependencies/open-accounting.env"
 pymes_dockerfile="$repo_root/v3/Dockerfile"
 build_script="$repo_root/v3/scripts/deploy/build-push-images.sh"
@@ -24,10 +26,22 @@ github_environment_bootstrap="$repo_root/v3/scripts/deploy/bootstrap-github-envi
 github_environment_verifier="$repo_root/v3/scripts/deploy/verify-github-environments.sh"
 structured_policy="$repo_root/v3/scripts/deploy/workflowpolicy/main.go"
 structured_policy_test="$repo_root/v3/scripts/deploy/workflowpolicy/main_test.go"
+google_live_validation="$repo_root/v3/scripts/deploy/google-live-validation.sh"
+arca_homologation_validation="$repo_root/v3/scripts/deploy/arca-homologation-validation.sh"
+protected_live_validation_test="$repo_root/v3/scripts/deploy/protected-live-validation-test.sh"
+protected_live_fake_curl="$repo_root/v3/scripts/deploy/testdata/protected-live-validation/curl"
+release_evidence_lib="$repo_root/v3/scripts/deploy/release-evidence-lib.sh"
+release_evidence_bootstrap="$repo_root/v3/scripts/deploy/bootstrap-release-evidence.sh"
+release_evidence_publisher="$repo_root/v3/scripts/deploy/retain-release-manifest.sh"
+release_evidence_test="$repo_root/v3/scripts/deploy/release-evidence-test.sh"
+cloud_restore_drill="$repo_root/v3/scripts/deploy/cloud-restore-drill.sh"
+cloud_restore_drill_test="$repo_root/v3/scripts/deploy/cloud-restore-drill-test.sh"
 
 for file in \
   "$ci_workflow" \
   "$release_workflow" \
+  "$google_live_workflow" \
+  "$arca_homologation_workflow" \
   "$dependency_pin" \
   "$pymes_dockerfile" \
   "$build_script" \
@@ -46,7 +60,17 @@ for file in \
   "$github_environment_bootstrap" \
   "$github_environment_verifier" \
   "$structured_policy" \
-  "$structured_policy_test"; do
+  "$structured_policy_test" \
+  "$google_live_validation" \
+  "$arca_homologation_validation" \
+  "$protected_live_validation_test" \
+  "$protected_live_fake_curl" \
+  "$release_evidence_lib" \
+  "$release_evidence_bootstrap" \
+  "$release_evidence_publisher" \
+  "$release_evidence_test" \
+  "$cloud_restore_drill" \
+  "$cloud_restore_drill_test"; do
   [[ -f "$file" ]] || {
     echo "missing release-policy file: $file" >&2
     exit 1
@@ -54,7 +78,12 @@ for file in \
 done
 bash -n "$identity_script" "$deploy_script" "$seed_script" "$seed_test" "$seed_audit_bounds" \
   "$release_authority_policy" \
-  "$authority_verifier" "$authority_test"
+  "$authority_verifier" "$authority_test" \
+  "$google_live_validation" "$arca_homologation_validation" \
+  "$protected_live_validation_test" "$protected_live_fake_curl" \
+  "$release_evidence_lib" "$release_evidence_bootstrap" \
+  "$release_evidence_publisher" "$release_evidence_test" \
+  "$cloud_restore_drill" "$cloud_restore_drill_test"
 
 fail() {
   echo "release workflow policy violation: $*" >&2
@@ -103,10 +132,100 @@ check_docker_base_pins() {
 
 check_action_pins "$ci_workflow"
 check_action_pins "$release_workflow"
+check_action_pins "$google_live_workflow"
+check_action_pins "$arca_homologation_workflow"
 check_docker_base_pins "$pymes_dockerfile"
 
 release_is_manual_only "$release_workflow" ||
   fail "release must be manually dispatched and have no automatic trigger"
+for workflow in "$google_live_workflow" "$arca_homologation_workflow"; do
+  release_is_manual_only "$workflow" ||
+    fail "$(basename "$workflow") must be manually dispatched and have no automatic trigger"
+  [[ "$(grep -Fc 'permissions: {}' "$workflow")" -eq 1 ]] ||
+    fail "$(basename "$workflow") must deny default workflow permissions"
+  [[ "$(grep -Fc 'name: stg' "$workflow")" -eq 1 ]] ||
+    fail "$(basename "$workflow") must use the fixed STG environment exactly once"
+  grep -Fq '[[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]' "$workflow" ||
+    fail "$(basename "$workflow") does not reject non-dispatch events"
+  grep -Fq '[[ "${GITHUB_REF}" == "refs/heads/main" ]]' "$workflow" ||
+    fail "$(basename "$workflow") does not fail closed outside main"
+  grep -Fq '[[ "${GITHUB_RUN_ATTEMPT}" == "1" ]]' "$workflow" ||
+    fail "$(basename "$workflow") permits a stale job rerun"
+  grep -Fq 'Pymes V3 CI has no successful push run for exact SHA' "$workflow" ||
+    fail "$(basename "$workflow") does not gate on exact-SHA V3 CI"
+  grep -Fq '.head_sha == $sha' "$workflow" ||
+    fail "$(basename "$workflow") does not compare the exact CI SHA"
+  grep -Fq 'verify-github-environments.sh all all-controls' "$workflow" ||
+    fail "$(basename "$workflow") does not audit complete protected controls"
+  grep -Fq 'secrets.PYMES_GITHUB_RELEASE_AUDIT_TOKEN' "$workflow" ||
+    fail "$(basename "$workflow") does not use the protected audit credential"
+  grep -Fq 'secrets.PYMES_LIVE_PILOT_API_TOKEN' "$workflow" ||
+    fail "$(basename "$workflow") does not source the pilot API token from STG secrets"
+  if grep -Eq '^[[:space:]]+(push|pull_request|pull_request_target|schedule):' "$workflow"; then
+    fail "$(basename "$workflow") contains an automatic trigger"
+  fi
+  if grep -Fq 'PYMES_CURL_BIN' "$workflow"; then
+    fail "$(basename "$workflow") may override the real HTTPS client with a test adapter"
+  fi
+  if grep -Eq '^[[:space:]]+id-token:[[:space:]]+write' "$workflow"; then
+    fail "$(basename "$workflow") requests unnecessary cloud identity authority"
+  fi
+  audit_line=$(grep -nF 'name: Verify complete protected GitHub controls' "$workflow" | cut -d: -f1)
+  live_token_line=$(grep -nF 'PYMES_LIVE_PILOT_API_TOKEN:' "$workflow" | cut -d: -f1)
+  [[ "$audit_line" =~ ^[0-9]+$ &&
+     "$live_token_line" =~ ^[0-9]+$ &&
+     "$audit_line" -lt "$live_token_line" ]] ||
+    fail "$(basename "$workflow") consumes live credentials before the protection audit"
+done
+
+grep -Fq '[[ "${LIVE_CONFIRMATION}" == "VALIDATE_GOOGLE_STG" ]]' "$google_live_workflow" ||
+  fail "Google live validation lacks an explicit typed STG confirmation"
+grep -Fq 'run: ./v3/scripts/deploy/google-live-validation.sh' "$google_live_workflow" ||
+  fail "Google live workflow does not use the reviewed validator"
+grep -Fq 'secrets.PYMES_GOOGLE_PILOT_ACCESS_TOKEN' "$google_live_workflow" ||
+  fail "Google live token is not sourced from a protected STG secret"
+grep -Fq 'secrets.PYMES_GOOGLE_PILOT_CALENDAR_ID' "$google_live_workflow" ||
+  fail "Google pilot calendar is not sourced from a protected STG secret"
+grep -Fq '[[ "${LIVE_CONFIRMATION}" == "VALIDATE_ARCA_HOMOLOGATION_STG" ]]' "$arca_homologation_workflow" ||
+  fail "ARCA homologation lacks an explicit typed STG confirmation"
+grep -Fq 'run: ./v3/scripts/deploy/arca-homologation-validation.sh' "$arca_homologation_workflow" ||
+  fail "ARCA homologation workflow does not use the reviewed validator"
+
+for workflow in "$google_live_workflow" "$arca_homologation_workflow"; do
+  if grep -Eq '^[[:space:]]+(access_token|api_token|calendar_id|certificate|private_key):' "$workflow"; then
+    fail "$(basename "$workflow") exposes a credential or provider identifier as dispatch input"
+  fi
+  if grep -Eq '(^|[[:space:]])curl([[:space:]]|$)' "$workflow"; then
+    fail "$(basename "$workflow") bypasses the credential-safe validator"
+  fi
+done
+
+for script in "$google_live_validation" "$arca_homologation_validation"; do
+  grep -Fq 'set +x' "$script" ||
+    fail "$(basename "$script") does not disable shell tracing"
+  grep -Fq 'umask 077' "$script" ||
+    fail "$(basename "$script") does not protect temporary credential files"
+  grep -Fq -- '--config "$config_file"' "$script" ||
+    fail "$(basename "$script") does not keep authorization headers out of argv"
+  grep -Fq 'stat -c' "$script" ||
+    fail "$(basename "$script") does not verify credential-file permissions"
+  if grep -Eq -- '--header[=[:space:]].*Authorization|-[Hh][[:space:]].*Authorization' "$script"; then
+    fail "$(basename "$script") puts an authorization credential in curl argv"
+  fi
+done
+grep -Fq 'https://www.googleapis.com/calendar/v3/calendars/' "$google_live_validation" ||
+  fail "Google live validation does not pin the official Calendar API origin"
+grep -Fq '.extendedProperties.private.pymes_managed == "true"' "$google_live_validation" ||
+  fail "Google live validation does not prove Pymes ownership of the event"
+grep -Fq '.conferenceData.conferenceSolution.key.type == "hangoutsMeet"' "$google_live_validation" ||
+  fail "Google live validation does not validate the Meet provider"
+grep -Fq '/points-of-sale/${point_of_sale}/validate' "$arca_homologation_validation" ||
+  fail "ARCA live validation does not use the non-emitting point-of-sale probe"
+grep -Fq "'{\"enabled\":true}'" "$arca_homologation_validation" ||
+  fail "ARCA live validation does not explicitly enable the validated homologation point"
+if grep -Eq '/sales|authorize|FECAESolicitar' "$arca_homologation_validation"; then
+  fail "ARCA homologation validator may issue a voucher"
+fi
 grep -Fq '[[ "${GITHUB_REF}" == "refs/heads/main" ]]' "$release_workflow" ||
   fail "release does not fail closed outside main"
 grep -Fq 'Pymes V3 CI has no successful push run for exact SHA' "$release_workflow" ||
@@ -142,9 +261,33 @@ grep -Fq 'secrets.PYMES_GITHUB_RELEASE_AUDIT_TOKEN' "$release_workflow" ||
 grep -Fq 'run-name: Pymes V3 ${{ inputs.environment }} ${{ inputs.deploy_stage }} @ ${{ github.sha }}' "$release_workflow" ||
   fail "release run name does not bind environment, deployment stage, and exact source SHA"
 for proof in \
+  'name: Retain manifest in locked release evidence' \
+  './v3/scripts/deploy/retain-release-manifest.sh' \
+  'PYMES_RELEASE_EVIDENCE_RUN_ID: ${{ github.run_id }}' \
+  'PYMES_RELEASE_EVIDENCE_RUN_ATTEMPT: ${{ github.run_attempt }}' \
+  'pymes-v3-release-evidence.json'; do
+  grep -Fq "$proof" "$release_workflow" ||
+    fail "release workflow omits durable manifest evidence: $proof"
+done
+retention_step=$(grep -nF \
+  'name: Retain manifest in locked release evidence' "$release_workflow" |
+  head -1 | cut -d: -f1)
+artifact_step=$(grep -nF 'name: Upload digest manifest' "$release_workflow" |
+  head -1 | cut -d: -f1)
+[[ "$retention_step" =~ ^[0-9]+$ &&
+   "$artifact_step" =~ ^[0-9]+$ &&
+   "$retention_step" -lt "$artifact_step" ]] ||
+  fail "durable retention must succeed before the short-lived GitHub artifact"
+grep -Fq -- '--if-generation-match=0' "$release_evidence_publisher" ||
+  fail "release evidence publication is not create-only"
+grep -Fq '.retentionPolicy.isLocked == true' "$release_evidence_lib" ||
+  fail "release evidence does not require an irreversibly locked policy"
+grep -Fq 'PYMES_RELEASE_EVIDENCE_LOCK_CONFIRMATION' "$release_evidence_bootstrap" ||
+  fail "irreversible Bucket Lock lacks explicit operator confirmation"
+for proof in \
   '.protection.required_status_checks.enforcement_level == "everyone"' \
   '.required_status_checks.checks[0].context == "Pymes V3 validate"' \
-  '.required_pull_request_reviews.require_last_push_approval == true' \
+  '.required_pull_request_reviews == null' \
   '.enforce_admins.enabled == true' \
   '.deployment_branch_policy.custom_branch_policies == true' \
   '.branch_policies[0].name == "main"' \
@@ -155,6 +298,8 @@ for proof in \
 done
 grep -Fq 'PYMES_PRD_REVIEWER_IDS' "$github_environment_bootstrap" ||
   fail "GitHub environment bootstrap does not require explicit PRD reviewers"
+grep -Fq 'required_pull_request_reviews: null' "$github_environment_bootstrap" ||
+  fail "GitHub branch protection must not require pull-request reviewers"
 grep -Fq 'checks: [' "$github_environment_bootstrap" ||
   fail "GitHub branch-protection payload omits the exact required check"
 if grep -Eq '^[[:space:]]*contexts:' "$github_environment_bootstrap"; then
@@ -192,8 +337,6 @@ grep -Fq '.restrictions == null' "$github_environment_verifier" ||
   fail "GitHub branch-protection verifier permits actor restrictions"
 grep -Fq '.allow_fork_syncing.enabled == false' "$github_environment_verifier" ||
   fail "GitHub branch-protection verifier permits fork-sync bypass"
-grep -Fq '.required_pull_request_reviews.bypass_pull_request_allowances' "$github_environment_verifier" ||
-  fail "GitHub branch-protection verifier does not reject review bypass allowances"
 grep -Fq '"$script_dir/verify-github-environments.sh" "$target_environment" all-controls' "$identity_script" ||
   fail "WIF bootstrap does not verify the selected GitHub environment before mutating GCP"
 
@@ -755,7 +898,11 @@ run_structured_policy_tests() {
 
 run_structured_policy_tests
 run_structured_policy "$ci_workflow" "$release_workflow"
-run_actionlint "$ci_workflow" "$release_workflow"
+run_actionlint \
+  "$ci_workflow" \
+  "$release_workflow" \
+  "$google_live_workflow" \
+  "$arca_homologation_workflow"
 
 # Exercise the fail-closed controls with disposable negative fixtures. This
 # prevents a future refactor from preserving only the happy-path appearance.

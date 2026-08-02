@@ -23,11 +23,20 @@ type HTTPDoer interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
+// PerGoPlatformTokenSource is owned by the PerGo adapter, which consumes a
+// workload identity to call a private Cloud Run service without replacing the
+// application-level Authorization header.
+type PerGoPlatformTokenSource interface {
+	PlatformToken(context.Context, string) (string, error)
+}
+
 type PerGo struct {
 	BaseURL                  string
 	APIKey                   string
+	Audience                 string
 	Channel                  string
 	AllowGlobalRouteFallback bool
+	PlatformTokens           PerGoPlatformTokenSource
 	Client                   HTTPDoer
 	Timeout                  time.Duration
 }
@@ -35,15 +44,19 @@ type PerGo struct {
 func NewPerGo(
 	baseURL string,
 	apiKey string,
+	audience string,
 	channel string,
 	allowGlobalRouteFallback bool,
+	platformTokens PerGoPlatformTokenSource,
 	client HTTPDoer,
 	timeout time.Duration,
 ) *PerGo {
 	return &PerGo{
-		BaseURL: baseURL, APIKey: apiKey, Channel: channel,
+		BaseURL: baseURL, APIKey: apiKey, Audience: audience, Channel: channel,
 		AllowGlobalRouteFallback: allowGlobalRouteFallback,
-		Client:                   client, Timeout: timeout,
+		PlatformTokens:           platformTokens,
+		Client:                   client,
+		Timeout:                  timeout,
 	}
 }
 
@@ -101,6 +114,33 @@ func (adapter PerGo) Send(
 		return DeliveryReceipt{}, &ProviderError{
 			StableCode: "PERGO_REQUEST_INVALID", Cause: err,
 		}
+	}
+	audience := strings.TrimSpace(adapter.Audience)
+	if audience != "" {
+		if adapter.PlatformTokens == nil {
+			return DeliveryReceipt{}, &ProviderError{
+				StableCode: "PERGO_NOT_CONFIGURED",
+				Cause:      errors.New("PerGo platform identity is required"),
+			}
+		}
+		token, tokenErr := adapter.PlatformTokens.PlatformToken(ctx, audience)
+		if tokenErr != nil {
+			return DeliveryReceipt{}, &ProviderError{
+				StableCode: "PERGO_PLATFORM_IDENTITY_UNAVAILABLE",
+				Retry:      true,
+				Cause:      tokenErr,
+			}
+		}
+		authorization, authorizationErr :=
+			pergohelpers.ServerlessAuthorization(token)
+		if authorizationErr != nil {
+			return DeliveryReceipt{}, &ProviderError{
+				StableCode: "PERGO_PLATFORM_IDENTITY_UNAVAILABLE",
+				Retry:      true,
+				Cause:      authorizationErr,
+			}
+		}
+		request.Header.Set("X-Serverless-Authorization", authorization)
 	}
 	request.Header.Set("Authorization", "Bearer "+adapter.APIKey)
 	request.Header.Set("Content-Type", "application/json")

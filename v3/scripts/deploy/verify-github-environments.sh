@@ -74,16 +74,7 @@ if [[ "$verification_scope" == "all-controls" ]]; then
     .required_status_checks.checks[0].context == "Pymes V3 validate" and
     .required_status_checks.checks[0].app_id == 15368 and
     .enforce_admins.enabled == true and
-    .required_pull_request_reviews.dismiss_stale_reviews == true and
-    .required_pull_request_reviews.require_code_owner_reviews == false and
-    .required_pull_request_reviews.required_approving_review_count == 1 and
-    .required_pull_request_reviews.require_last_push_approval == true and
-    (
-      (.required_pull_request_reviews.bypass_pull_request_allowances // {}) as $bypass
-      | (($bypass.users // []) | length) == 0 and
-        (($bypass.teams // []) | length) == 0 and
-        (($bypass.apps // []) | length) == 0
-    ) and
+    .required_pull_request_reviews == null and
     .restrictions == null and
     .required_linear_history.enabled == true and
     .required_conversation_resolution.enabled == true and

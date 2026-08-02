@@ -12,8 +12,11 @@ import {
   ArcaFiscalAuthority,
   type ArcaClientFactory,
 } from "../../src/fiscal/arca.js";
-import { compatibleExplicitClient } from "../../src/fiscal/arca/helpers/client.js";
-import { mapFiscalRequest } from "../../src/fiscal/arca/helpers/mapping.js";
+import { validatedExplicitClient } from "../../src/fiscal/arca/helpers/client.js";
+import {
+  mapFiscalRequest,
+  supportedVoucherTypes,
+} from "../../src/fiscal/arca/helpers/mapping.js";
 import type {
   ExplicitSDKClient,
   SDKAuthorizationResponse,
@@ -166,7 +169,75 @@ test("consultation rejects an occupied number whose ARCA snapshot differs", asyn
   assert.equal(result.result_code, "VOUCHER_MISMATCH");
 });
 
-test("point-of-sale validation uses FEParamGetPtosVenta without a synthetic voucher", async () => {
+test("consultation compares every scalar returned by the explicit SDK", async () => {
+  const request = fiscalRequest();
+  for (const mutate of [
+    (result: NonNullable<SDKConsultResponse["ResultGet"]>) => {
+      result.Concepto = 2;
+    },
+    (result: NonNullable<SDKConsultResponse["ResultGet"]>) => {
+      result.CbteFch = "20260802";
+    },
+    (result: NonNullable<SDKConsultResponse["ResultGet"]>) => {
+      result.ImpTotConc = 1;
+    },
+    (result: NonNullable<SDKConsultResponse["ResultGet"]>) => {
+      result.ImpTrib = 1;
+    },
+    (result: NonNullable<SDKConsultResponse["ResultGet"]>) => {
+      result.FchServDesde = "20260801";
+    },
+    (result: NonNullable<SDKConsultResponse["ResultGet"]>) => {
+      result.EmisionTipo = "CAEA";
+    },
+    (result: NonNullable<SDKConsultResponse["ResultGet"]>) => {
+      result.CondicionIVAReceptorId = 5;
+    },
+    (result: NonNullable<SDKConsultResponse["ResultGet"]>) => {
+      const values = result.Iva?.AlicIva;
+      const first = Array.isArray(values) ? values[0] : values;
+      if (first !== undefined) first.Importe = 20;
+    },
+  ]) {
+    const existing = consultedVoucher(request);
+    mutate(existing.ResultGet!);
+    const decision = await authorityFor(
+      new ScriptedClient([existing], []),
+      new MemoryArtifacts(),
+    ).consult(request);
+    assert.equal(decision.status, "rejected");
+    assert.equal(decision.result_code, "VOUCHER_MISMATCH");
+  }
+});
+
+test("exact reconciliation compares the associated voucher returned by WSFE", async () => {
+  const request = fiscalRequest();
+  request.document_type = "NCA";
+  request.associated_voucher = {
+    point_of_sale: 4,
+    document_type: "FA",
+    voucher_number: 40,
+    issue_date: "2026-08-01",
+  };
+  const matching = await authorityFor(
+    new ScriptedClient([consultedVoucher(request)], []),
+    new MemoryArtifacts(),
+  ).consult(request);
+  assert.equal(matching.status, "authorized");
+
+  const occupied = consultedVoucher(request);
+  const associated = occupied.ResultGet!.CbtesAsoc!.CbteAsoc;
+  const first = Array.isArray(associated) ? associated[0]! : associated;
+  first.Nro = 39;
+  const mismatched = await authorityFor(
+    new ScriptedClient([occupied], []),
+    new MemoryArtifacts(),
+  ).consult(request);
+  assert.equal(mismatched.status, "rejected");
+  assert.equal(mismatched.result_code, "VOUCHER_MISMATCH");
+});
+
+test("point-of-sale validation proves every supported sequence is empty", async () => {
   const client = new ScriptedClient([], [], [[{
     number: 9,
     emissionType: "CAE",
@@ -178,6 +249,13 @@ test("point-of-sale validation uses FEParamGetPtosVenta without a synthetic vouc
     pointOfSale: 9,
   });
   assert.equal(client.pointsOfSaleListed, 1);
+  assert.deepEqual(
+    client.lastAuthorizedLookups,
+    supportedVoucherTypes.map((voucherType) => ({
+      pointOfSale: 9,
+      voucherType,
+    })),
+  );
   assert.deepEqual(client.consulted, []);
   assert.equal(client.authorized.length, 0);
 
@@ -211,6 +289,37 @@ test("point-of-sale validation uses FEParamGetPtosVenta without a synthetic vouc
     (error: unknown) =>
       error instanceof FiscalError && error.code === "AUTHORITY_TIMEOUT",
   );
+});
+
+test("point-of-sale validation rejects any occupied supported sequence", async () => {
+  const client = new ScriptedClient(
+    [],
+    [],
+    [[{
+      number: 14,
+      emissionType: "CAE",
+      blocked: false,
+    }]],
+    { 7: 18 },
+  );
+  const authority = authorityFor(client, new MemoryArtifacts());
+
+  await assert.rejects(
+    authority.validatePointOfSale({
+      material: credentialMaterial(),
+      pointOfSale: 14,
+    }),
+    (error: unknown) =>
+      error instanceof Error &&
+      "code" in error &&
+      (error as { code: unknown }).code === "POINT_OF_SALE_NOT_EMPTY",
+  );
+  assert.deepEqual(
+    client.lastAuthorizedLookups.map((item) => item.voucherType),
+    [1, 2, 3, 6, 7],
+  );
+  assert.equal(client.authorized.length, 0);
+  assert.deepEqual(client.consulted, []);
 });
 
 test("point-of-sale validation rejects missing, blocked and malformed entries", async () => {
@@ -261,74 +370,38 @@ test("point-of-sale validation rejects missing, blocked and malformed entries", 
   );
 });
 
-test("published SDK compatibility uses FEParamGetPtosVenta until the explicit method is released", async () => {
+test("SDK point-of-sale listing stays on the explicit entrypoint", async () => {
   let consulted = 0;
-  let legacyListed = 0;
-  const compatible = compatibleExplicitClient(
-    {
-      async authorize() {
-        return {};
-      },
-      async consult() {
-        consulted += 1;
-        return {};
-      },
-    },
-    {
-      async getPuntosVenta() {
-        legacyListed += 1;
-        return [{
-          Nro: 15,
-          EmisionTipo: "CAE",
-          Bloqueado: "N",
-          FchBaja: "NULL",
-        }];
-      },
-    },
-  );
-
-  assert.deepEqual(await compatible.listPointsOfSale(), [{
-    number: 15,
-    emissionType: "CAE",
-    blocked: false,
-  }]);
-  assert.equal(legacyListed, 1);
-  assert.equal(consulted, 0);
-});
-
-test("published SDK compatibility prefers the explicit point-of-sale API", async () => {
-  let explicitListed = 0;
-  const futureExplicitClient = {
+  let listed = 0;
+  const delegate: ExplicitSDKClient = {
     async authorize() {
       return {};
     },
     async consult() {
+      consulted += 1;
       return {};
     },
     async listPointsOfSale() {
-      explicitListed += 1;
+      listed += 1;
       return [{
         number: 16,
         emissionType: "CAE",
         blocked: false,
       }];
     },
-  };
-  const compatible = compatibleExplicitClient(
-    futureExplicitClient,
-    {
-      async getPuntosVenta() {
-        throw new Error("legacy point-of-sale API must not be called");
-      },
+    async lastAuthorizedVoucher(reference) {
+      return { ...reference, voucherNumber: 0 };
     },
-  );
+  };
+  const explicit = validatedExplicitClient(delegate);
 
-  assert.deepEqual(await compatible.listPointsOfSale(), [{
+  assert.deepEqual(await explicit.listPointsOfSale(), [{
     number: 16,
     emissionType: "CAE",
     blocked: false,
   }]);
-  assert.equal(explicitListed, 1);
+  assert.equal(listed, 1);
+  assert.equal(consulted, 0);
 });
 
 function authorityFor(
@@ -362,6 +435,10 @@ class ScriptedClient implements ExplicitSDKClient {
     voucherNumber: number;
   }> = [];
   readonly authorized: SDKInvoiceRequest[] = [];
+  readonly lastAuthorizedLookups: Array<{
+    pointOfSale: number;
+    voucherType: number;
+  }> = [];
   pointsOfSaleListed = 0;
   onEvent?: (event: { type: string; method?: string }) => void;
 
@@ -371,6 +448,8 @@ class ScriptedClient implements ExplicitSDKClient {
     private readonly pointOfSaleResults: Array<
       Awaited<ReturnType<ExplicitSDKClient["listPointsOfSale"]>> | Error
     > = [],
+    private readonly lastAuthorizedByVoucherType: Record<number, number | Error> =
+      {},
   ) {}
 
   async consult(reference: {
@@ -399,6 +478,16 @@ class ScriptedClient implements ExplicitSDKClient {
     const result = this.pointOfSaleResults.shift();
     if (result instanceof Error) throw result;
     return result ?? [];
+  }
+
+  async lastAuthorizedVoucher(reference: {
+    pointOfSale: number;
+    voucherType: number;
+  }) {
+    this.lastAuthorizedLookups.push(reference);
+    const result = this.lastAuthorizedByVoucherType[reference.voucherType] ?? 0;
+    if (result instanceof Error) throw result;
+    return { ...reference, voucherNumber: result };
   }
 }
 
@@ -490,23 +579,43 @@ function credentialMaterial() {
 }
 
 function consultedVoucher(request: FiscalRequest): SDKConsultResponse {
+  const mapped = mapFiscalRequest(request);
+  const detail = mapped.invoices[0]!;
   return {
     ResultGet: {
+      Concepto: detail.Concepto,
       PtoVta: request.point_of_sale,
-      CbteTipo: 1,
+      CbteTipo: mapped.CbteTipo,
       CbteDesde: request.voucher_number,
       CbteHasta: request.voucher_number,
-      DocTipo: 80,
-      DocNro: Number(request.recipient.document_number),
-      ImpTotal: 121,
-      ImpNeto: 100,
-      ImpOpEx: 0,
-      ImpIVA: 21,
-      MonId: "PES",
-      MonCotiz: 1,
+      CbteFch: detail.CbteFch,
+      DocTipo: detail.DocTipo,
+      DocNro: detail.DocNro,
+      ImpTotal: detail.ImpTotal,
+      ImpTotConc: detail.ImpTotConc,
+      ImpNeto: detail.ImpNeto,
+      ImpOpEx: detail.ImpOpEx,
+      ImpTrib: detail.ImpTrib,
+      ImpIVA: detail.ImpIVA,
+      FchServDesde: detail.FchServDesde ?? "",
+      FchServHasta: detail.FchServHasta ?? "",
+      FchVtoPago: detail.FchVtoPago ?? "",
+      MonId: detail.MonId,
+      MonCotiz: detail.MonCotiz,
       Resultado: "A",
       CodAutorizacion: "71234567890123",
+      EmisionTipo: "CAE",
       FchVto: "20260815",
+      CondicionIVAReceptorId: detail.CondicionIVAReceptorId,
+      ...(detail.CanMisMonExt === undefined
+        ? {}
+        : { CanMisMonExt: detail.CanMisMonExt }),
+      ...(detail.Iva === undefined
+        ? {}
+        : { Iva: { AlicIva: detail.Iva } }),
+      ...(detail.CbtesAsoc === undefined
+        ? {}
+        : { CbtesAsoc: { CbteAsoc: detail.CbtesAsoc } }),
     },
   };
 }

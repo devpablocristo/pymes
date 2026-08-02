@@ -104,6 +104,18 @@ export function AdminSchedulingPage() {
     queryFn: () => gateway.listBlocks(identity, branchId, range),
     enabled: Boolean(branchId),
   });
+  const upcomingBlocksQuery = useQuery({
+    queryKey: [
+      "scheduling",
+      identity.organizationId,
+      "blocks",
+      branchId,
+      initialRange.from,
+      initialRange.until,
+    ],
+    queryFn: () => gateway.listBlocks(identity, branchId, initialRange),
+    enabled: Boolean(branchId),
+  });
   const rulesQuery = useQuery({
     queryKey: ["scheduling", identity.organizationId, "rules", branchId],
     queryFn: () => gateway.listAvailabilityRules(identity, branchId),
@@ -463,7 +475,7 @@ export function AdminSchedulingPage() {
         {tab === "availability" ? (
           <AvailabilityPanel
             rules={rulesQuery.data ?? []}
-            blocks={blocksQuery.data ?? []}
+            blocks={upcomingBlocksQuery.data ?? []}
             resources={resources}
             timezone={timezone}
             canManage={canManage}

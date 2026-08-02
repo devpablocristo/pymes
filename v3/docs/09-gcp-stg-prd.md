@@ -1,6 +1,6 @@
 # Seguridad y entornos GCP de Pymes v3
 
-Fecha de provisión: 2026-07-31.
+Fecha de provisión: 2026-08-02.
 
 Pymes v3 comparte el proyecto `pymes-dev-352318` con otros productos para
 reducir costes. El aislamiento de v3 se hace por entorno, cuentas de servicio,
@@ -350,11 +350,14 @@ Fiscal/Accounting con JWKS activo+solapado y después el worker con la nueva
 versión firmante; nunca inyecta `PYMES_INTERNAL_SIGNING_SEED_B64` en producción.
 
 API, worker y Fiscal requieren Direct VPC Egress; el job de provisionamiento
-también lo usa. El bootstrap de red es fail-closed y no aplica cambios por
-defecto: valida una subred privada `/20` a `/26`, Private Google Access y Public
-NAT con asignación de IP externa y cobertura de la subred. Crear Cloud NAT tiene
-costo recurrente y requiere aprobación explícita del propietario antes de
-ejecutar `bootstrap-network-egress.sh` con modo apply.
+también lo usa. La red compartida ya está provisionada en la VPC `default`:
+subred `pymes-v3-serverless` `10.120.0.0/24` en `us-central1`, Private Google
+Access, router y Public NAT `pymes-v3-serverless`. El NAT automático cubre
+`ALL_IP_RANGES` únicamente de esa subred. El bootstrap es fail-closed,
+plan-only por defecto y converge de forma segura un NAT propio que hubiese
+quedado limitado al rango primario; rechaza cualquier NAT compartido con otra
+subred. Crear y mantener Cloud NAT tiene costo recurrente y el apply exige la
+aceptación explícita versionada en el runbook.
 
 El bootstrap de identidades se ejecuta primero con
 `bootstrap-workload-identities.sh`; las claves internas se preparan con

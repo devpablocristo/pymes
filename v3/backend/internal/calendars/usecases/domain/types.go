@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/url"
@@ -126,20 +128,36 @@ type CalendarSyncCommand struct {
 func (command CalendarSyncCommand) Valid() bool {
 	if command.CommandID == "" || command.OrganizationID == "" ||
 		command.BookingID == "" || command.SourceVersion < 1 ||
-		len(command.SnapshotDigest) != 64 || command.CorrelationID == "" {
+		!validSHA256(command.SnapshotDigest) || command.CorrelationID == "" {
 		return false
 	}
 	switch command.Operation {
 	case SyncDelete:
-		return true
+		return command.Summary == "" &&
+			command.Description == "" &&
+			command.Location == "" &&
+			command.Start.IsZero() &&
+			command.End.IsZero() &&
+			command.TimeZone == "" &&
+			len(command.AttendeeEmails) == 0 &&
+			!command.MeetRequested
 	case SyncUpsert:
-		return command.Summary != "" &&
+		_, zoneErr := time.LoadLocation(command.TimeZone)
+		return strings.TrimSpace(command.Summary) != "" &&
 			!command.Start.IsZero() &&
 			command.End.After(command.Start) &&
-			command.TimeZone != ""
+			zoneErr == nil
 	default:
 		return false
 	}
+}
+
+func validSHA256(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	decoded, err := hex.DecodeString(value)
+	return err == nil && len(decoded) == sha256.Size
 }
 
 type ExternalEventStatus string
@@ -213,4 +231,5 @@ var (
 	ErrOAuthStateConsumed   = errors.New("OAUTH_STATE_CONSUMED")
 	ErrOrganizationMismatch = errors.New("CALENDAR_ORGANIZATION_MISMATCH")
 	ErrFeatureDisabled      = errors.New("FEATURE_DISABLED")
+	ErrProjectionDeferred   = errors.New("CALENDAR_PROJECTION_DEFERRED")
 )

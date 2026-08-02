@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
@@ -305,6 +306,7 @@ func TestCreateRecurringBookingFreezesSnapshotsAndQueuesIntegrationEvents(t *tes
 		algorithmsFake{slots: slots},
 		codec,
 		WithPartyDirectory(&partyDirectoryFake{partyID: "party-1"}),
+		WithCalendarProjection(NewCalendarProjectionAdapter()),
 		WithClock(func() time.Time { return now }),
 	)
 	metadata := testMetadata(organizationID, "recurrence-create", "source-recurrence")
@@ -425,18 +427,20 @@ func TestCreateWaitlistEnsuresCustomerThroughConsumerOwnedPort(t *testing.T) {
 
 type rescheduleRepositoryFake struct {
 	Repository
-	current      domain.Booking
-	service      domain.Service
-	resource     domain.Resource
-	replacement  domain.Booking
-	reason       string
-	update       BookingUpdate
-	updateEvents []domain.Event
-	updateCalls  int
-	replay       domain.Booking
-	replayID     uuid.UUID
-	replayed     bool
-	replayErr    error
+	current          domain.Booking
+	service          domain.Service
+	resource         domain.Resource
+	replacement      domain.Booking
+	rescheduleEvents []domain.Event
+	transitionEvents []domain.Event
+	reason           string
+	update           BookingUpdate
+	updateEvents     []domain.Event
+	updateCalls      int
+	replay           domain.Booking
+	replayID         uuid.UUID
+	replayed         bool
+	replayErr        error
 }
 
 func (f *rescheduleRepositoryFake) GetBooking(
@@ -522,9 +526,10 @@ func (f *rescheduleRepositoryFake) RescheduleBooking(
 	_ uuid.UUID,
 	_ int,
 	replacement domain.Booking,
-	_ []domain.Event,
+	events []domain.Event,
 ) (domain.Booking, error) {
 	f.replacement = replacement
+	f.rescheduleEvents = events
 	return replacement, nil
 }
 
@@ -535,9 +540,10 @@ func (f *rescheduleRepositoryFake) TransitionBooking(
 	_ int,
 	status domain.BookingStatus,
 	reason string,
-	_ []domain.Event,
+	events []domain.Event,
 ) (domain.Booking, error) {
 	f.reason = reason
+	f.transitionEvents = events
 	result := f.current
 	result.Status = status
 	result.CancellationReason = reason
@@ -601,6 +607,7 @@ func TestResizeRevalidatesAndFreezesDurationAndCancellationReason(t *testing.T) 
 		repository,
 		algorithms,
 		nil,
+		WithCalendarProjection(NewCalendarProjectionAdapter()),
 		WithClock(func() time.Time { return now }),
 	)
 	metadata := testMetadata(current.OrganizationID, "resize", current.ID.String())
@@ -621,6 +628,20 @@ func TestResizeRevalidatesAndFreezesDurationAndCancellationReason(t *testing.T) 
 		resized.SubstateCode != "" {
 		t.Fatalf("resize was not revalidated/frozen: booking=%+v duration=%d", resized, algorithms.duration)
 	}
+	assertCalendarOperations(
+		t,
+		repository.rescheduleEvents,
+		map[string]calendarOperationExpectation{
+			current.ID.String(): {
+				Operation: "delete",
+				Version:   current.Version + 1,
+			},
+			resized.ID.String(): {
+				Operation: "upsert",
+				Version:   resized.Version,
+			},
+		},
+	)
 	repository.current.Status = domain.BookingHeld
 	repository.current.SubstateCode = "awaiting_customer"
 	heldReplacement, err := service.RescheduleBooking(
@@ -652,6 +673,50 @@ func TestResizeRevalidatesAndFreezesDurationAndCancellationReason(t *testing.T) 
 	if err != nil || cancelled.CancellationReason != "Cliente sin disponibilidad" ||
 		repository.reason != "Cliente sin disponibilidad" {
 		t.Fatalf("cancellation reason lost: booking=%+v reason=%q err=%v", cancelled, repository.reason, err)
+	}
+	assertCalendarOperations(
+		t,
+		repository.transitionEvents,
+		map[string]calendarOperationExpectation{
+			current.ID.String(): {
+				Operation: "delete",
+				Version:   current.Version + 1,
+			},
+		},
+	)
+}
+
+type calendarOperationExpectation struct {
+	Operation string
+	Version   int
+}
+
+func assertCalendarOperations(
+	t *testing.T,
+	events []domain.Event,
+	expected map[string]calendarOperationExpectation,
+) {
+	t.Helper()
+	actual := make(map[string]calendarOperationExpectation)
+	for _, event := range events {
+		if event.Type != domain.EventCalendarSyncRequested {
+			continue
+		}
+		var payload struct {
+			BookingID     string `json:"booking_id"`
+			Operation     string `json:"operation"`
+			SourceVersion int    `json:"source_version"`
+		}
+		if err := json.Unmarshal(event.Payload, &payload); err != nil {
+			t.Fatal(err)
+		}
+		actual[payload.BookingID] = calendarOperationExpectation{
+			Operation: payload.Operation,
+			Version:   payload.SourceVersion,
+		}
+	}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("calendar operations=%v want=%v events=%+v", actual, expected, events)
 	}
 }
 
@@ -726,6 +791,7 @@ func TestUpdateBookingEditsOnlyOperationalFieldsAndReplaysBeforePartySideEffects
 		algorithmsFake{},
 		nil,
 		WithPartyDirectory(parties),
+		WithCalendarProjection(NewCalendarProjectionAdapter()),
 	)
 	participants := 2
 	notes := "  Acceso por recepción  "
@@ -1047,6 +1113,7 @@ func (f *maintenanceRepositoryFake) ExpireHolds(
 	context.Context,
 	int,
 	time.Time,
+	HoldExpirationPlanner,
 ) ([]domain.Booking, error) {
 	return []domain.Booking{}, nil
 }

@@ -34,6 +34,48 @@ func TestMetadataIDTokenSourceCachesAudienceToken(t *testing.T) {
 	}
 }
 
+func TestMetadataIDTokenSourceRefreshesExpiringAudienceToken(t *testing.T) {
+	now := time.Unix(2_000_000_000, 0)
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.URL.Query().Get("audience") != "https://pergo.example" {
+			t.Fatalf("audience=%q", r.URL.Query().Get("audience"))
+		}
+		payload := base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf(
+			`{"exp":%d,"generation":%d}`,
+			now.Add(2*time.Minute).Unix(),
+			calls,
+		)))
+		_, _ = fmt.Fprintf(w, "header.%s.signature-%d", payload, calls)
+	}))
+	defer server.Close()
+
+	source := newMetadataIDTokenSource(
+		server.Client(),
+		server.URL,
+		func() time.Time { return now },
+	)
+	first, err := source.PlatformToken(
+		context.Background(),
+		"https://pergo.example",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(61 * time.Second)
+	second, err := source.PlatformToken(
+		context.Background(),
+		"https://pergo.example",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 || first == second {
+		t.Fatalf("calls=%d first=%q second=%q", calls, first, second)
+	}
+}
+
 func TestMetadataIDTokenSourceRejectsInvalidResponseWithoutLeakingBody(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "sensitive metadata body", http.StatusForbidden)

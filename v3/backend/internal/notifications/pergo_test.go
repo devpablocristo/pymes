@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -17,6 +18,15 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (function roundTripFunc) Do(request *http.Request) (*http.Response, error) {
 	return function(request)
+}
+
+type platformTokenFunc func(context.Context, string) (string, error)
+
+func (function platformTokenFunc) PlatformToken(
+	ctx context.Context,
+	audience string,
+) (string, error) {
+	return function(ctx, audience)
 }
 
 func TestPerGoSendsStableIdentityWithoutLoggingOrLeakingProviderTypes(t *testing.T) {
@@ -45,6 +55,8 @@ func TestPerGoSendsStableIdentityWithoutLoggingOrLeakingProviderTypes(t *testing
 	}
 	client := roundTripFunc(func(request *http.Request) (*http.Response, error) {
 		if request.Header.Get("Authorization") != "Bearer secret" ||
+			request.Header.Get("X-Serverless-Authorization") !=
+				"Bearer workload-token" ||
 			request.Header.Get("X-Trace-ID") != expectedTraceID ||
 			request.Header.Get("Idempotency-Key") != expectedIdempotencyKey {
 			t.Fatalf("unexpected headers: %#v", request.Header)
@@ -73,6 +85,15 @@ func TestPerGoSendsStableIdentityWithoutLoggingOrLeakingProviderTypes(t *testing
 	})
 	result, err := (PerGo{
 		BaseURL: "http://pergo", APIKey: "secret",
+		Audience: "https://pergo.example",
+		PlatformTokens: platformTokenFunc(
+			func(_ context.Context, audience string) (string, error) {
+				if audience != "https://pergo.example" {
+					t.Fatalf("audience=%q", audience)
+				}
+				return "workload-token", nil
+			},
+		),
 		Channel: "whatsapp", Client: client,
 	}).Send(context.Background(), intent)
 	if err != nil {
@@ -80,6 +101,77 @@ func TestPerGoSendsStableIdentityWithoutLoggingOrLeakingProviderTypes(t *testing
 	}
 	if result.ExternalMessageID != "external-1" {
 		t.Fatalf("external ID = %q", result.ExternalMessageID)
+	}
+}
+
+func TestPerGoResolvesPlatformIdentityForEverySendAndFailsClosedOnTokenError(
+	t *testing.T,
+) {
+	intent := domain.Intent{
+		ID: "notification-1", OrganizationID: "org-1",
+		Kind: domain.KindConfirmation, RecipientE164: "+5491112345678",
+		TemplateName: "booking.confirmation", TemplateVersion: 1,
+		Locale: "es_AR", Body: "Confirmado", IdempotencyKey: "booking-1",
+		DeliveryChannel: "whatsapp", SenderIdentity: "5491100000000",
+	}
+	tokenCalls := 0
+	requests := 0
+	adapter := PerGo{
+		BaseURL:  "https://pergo.example",
+		APIKey:   "application-api-key",
+		Audience: "https://pergo.example",
+		PlatformTokens: platformTokenFunc(
+			func(_ context.Context, audience string) (string, error) {
+				tokenCalls++
+				if audience != "https://pergo.example" {
+					t.Fatalf("audience=%q", audience)
+				}
+				if tokenCalls == 3 {
+					return "", errors.New("metadata unavailable")
+				}
+				return "workload-token-" + strconv.Itoa(tokenCalls), nil
+			},
+		),
+		Client: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+			requests++
+			if request.Header.Get("Authorization") !=
+				"Bearer application-api-key" {
+				t.Fatalf(
+					"application authorization=%q",
+					request.Header.Get("Authorization"),
+				)
+			}
+			want := "Bearer workload-token-" + strconv.Itoa(requests)
+			if got := request.Header.Get("X-Serverless-Authorization"); got != want {
+				t.Fatalf("serverless authorization=%q want=%q", got, want)
+			}
+			return &http.Response{
+				StatusCode: http.StatusAccepted,
+				Body: io.NopCloser(strings.NewReader(
+					`{"message_id":"external-1","status":"queued","queued_at":"2026-08-01T00:00:00Z"}`,
+				)),
+			}, nil
+		}),
+	}
+	for range 2 {
+		if _, err := adapter.Send(context.Background(), intent); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if tokenCalls != 2 || requests != 2 {
+		t.Fatalf("token calls=%d requests=%d", tokenCalls, requests)
+	}
+
+	_, err := adapter.Send(context.Background(), intent)
+	providerError, ok := AsProviderError(err)
+	if !ok ||
+		providerError.StableCode != "PERGO_PLATFORM_IDENTITY_UNAVAILABLE" ||
+		!providerError.Retry ||
+		providerError.Unknown {
+		t.Fatalf("platform identity error=%#v err=%v", providerError, err)
+	}
+	if requests != 2 {
+		t.Fatalf("request crossed boundary after token error: %d", requests)
 	}
 }
 

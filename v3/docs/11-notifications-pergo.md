@@ -181,6 +181,9 @@ PRD deben existir como versiones separadas de Secret Manager y estar accesibles
 distinta de `PERGO_URL`; en producción debe ser un origen HTTPS sin path, query,
 fragmento, credenciales ni barra final. El servicio privado de PerGo concede
 `roles/run.invoker` únicamente al worker Pymes del mismo ambiente.
+El workflow de release la recibe exclusivamente desde la variable protegida
+`PYMES_PERGO_AUDIENCE` del environment GitHub seleccionado; el gate
+estructurado del workflow falla si esa propagación se elimina.
 `PERGO_CHANNEL` sólo se consulta cuando el fallback explícito está habilitado;
 la ruta normal proviene del snapshot tenant.
 

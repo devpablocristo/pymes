@@ -87,7 +87,7 @@ if [[ "$verification_scope" == "all-controls" ]]; then
     echo "main branch protection differs from the reviewed Pymes V3 release policy" >&2
     exit 1
   }
-  echo "GitHub main protection verified: required=Pymes V3 validate reviews=1 admins=enforced"
+  echo "GitHub main protection verified: required=Pymes V3 validate pull_request_reviews=none admins=enforced"
 fi
 
 for environment in "${environments[@]}"; do

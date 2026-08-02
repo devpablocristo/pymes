@@ -425,6 +425,36 @@ func validateRelease(workflow object) {
 		"${{ inputs.deploy_stage }}",
 		"release.jobs.deploy Cloud Run deployment env",
 	)
+	requireString(
+		deployReleaseEnv,
+		"PYMES_PERGO_ENABLED",
+		"${{ vars.PYMES_PERGO_ENABLED || 'false' }}",
+		"release.jobs.deploy Cloud Run deployment env",
+	)
+	requireString(
+		deployReleaseEnv,
+		"PYMES_PERGO_URL",
+		"${{ vars.PYMES_PERGO_URL }}",
+		"release.jobs.deploy Cloud Run deployment env",
+	)
+	requireString(
+		deployReleaseEnv,
+		"PYMES_PERGO_AUDIENCE",
+		"${{ vars.PYMES_PERGO_AUDIENCE }}",
+		"release.jobs.deploy Cloud Run deployment env",
+	)
+	requireString(
+		deployReleaseEnv,
+		"PYMES_PERGO_WORKSPACE_ID",
+		"${{ vars.PYMES_PERGO_WORKSPACE_ID }}",
+		"release.jobs.deploy Cloud Run deployment env",
+	)
+	requireString(
+		deployReleaseEnv,
+		"PYMES_PERGO_CHANNEL",
+		"${{ vars.PYMES_PERGO_CHANNEL || 'whatsapp' }}",
+		"release.jobs.deploy Cloud Run deployment env",
+	)
 	requireStepLast(deploy, "Deploy exact image digests")
 
 	requireStepBefore(

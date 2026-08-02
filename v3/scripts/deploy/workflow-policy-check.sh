@@ -79,6 +79,7 @@ done
 bash -n "$identity_script" "$deploy_script" "$seed_script" "$seed_test" "$seed_audit_bounds" \
   "$release_authority_policy" \
   "$authority_verifier" "$authority_test" \
+  "$github_environment_bootstrap" "$github_environment_verifier" \
   "$google_live_validation" "$arca_homologation_validation" \
   "$protected_live_validation_test" "$protected_live_fake_curl" \
   "$release_evidence_lib" "$release_evidence_bootstrap" \
@@ -300,6 +301,10 @@ grep -Fq 'PYMES_PRD_REVIEWER_IDS' "$github_environment_bootstrap" ||
   fail "GitHub environment bootstrap does not require explicit PRD reviewers"
 grep -Fq 'required_pull_request_reviews: null' "$github_environment_bootstrap" ||
   fail "GitHub branch protection must not require pull-request reviewers"
+if grep -Fq 'reviews=1' \
+  "$github_environment_bootstrap" "$github_environment_verifier"; then
+  fail "GitHub release-control output contradicts the no-reviewer branch policy"
+fi
 grep -Fq 'checks: [' "$github_environment_bootstrap" ||
   fail "GitHub branch-protection payload omits the exact required check"
 if grep -Eq '^[[:space:]]*contexts:' "$github_environment_bootstrap"; then

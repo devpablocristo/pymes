@@ -155,8 +155,11 @@ for proof in \
 done
 grep -Fq 'PYMES_PRD_REVIEWER_IDS' "$github_environment_bootstrap" ||
   fail "GitHub environment bootstrap does not require explicit PRD reviewers"
-grep -Fq 'contexts: []' "$github_environment_bootstrap" ||
-  fail "GitHub branch-protection payload omits the required contexts field"
+grep -Fq 'checks: [' "$github_environment_bootstrap" ||
+  fail "GitHub branch-protection payload omits the exact required check"
+if grep -Eq '^[[:space:]]*contexts:' "$github_environment_bootstrap"; then
+  fail "GitHub branch-protection payload mixes mutually exclusive contexts and checks schemas"
+fi
 if grep -Fq 'dismissal_restrictions' "$github_environment_bootstrap"; then
   fail "GitHub branch-protection payload must omit dismissal_restrictions for a user-owned repository"
 fi

@@ -97,7 +97,6 @@ trap cleanup EXIT INT TERM
 jq -n '{
   required_status_checks: {
     strict: true,
-    contexts: [],
     checks: [
       {
         context: "Pymes V3 validate",

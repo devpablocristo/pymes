@@ -55,12 +55,13 @@ sea el último en recibir tráfico; recién allí se activa una instancia.
 
 Open Accounting está fusionado y su CI remoto es verde en
 `1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d`. `make ci` también pasa localmente
-en Pymes contra ese pin y los controles actuales. Esto describe capacidad
-implementada, no integración remota ni evidencia operativa: el cambio de Pymes
-todavía debe integrarse y obtener CI remoto verde; no se publicaron las imágenes
-de esta revisión, no se desplegó Pymes v3 en STG ni PRD y no se realizaron los
-pilotos de Agenda, PerGo, Google o ARCA. El plan sólo podrá declararse completo
-después de ejecutar y verificar esas operaciones.
+en Pymes contra ese pin y los controles actuales. Pymes PR #43 está fusionado
+en `fee09579cc8d846e28a704d6f60d640edfac75d0` y su workflow remoto de `main`
+está verde; PerGo también quedó fusionado y `arca-facturacion` `2.5.0` está
+publicado y fijado. Esto demuestra integración, no evidencia operativa: no se
+publicaron las imágenes de esta revisión, no se desplegó Pymes v3 en STG ni PRD
+y no se realizaron los pilotos de Agenda, PerGo, Google o ARCA. El plan sólo
+podrá declararse completo después de ejecutar y verificar esas operaciones.
 
 ## Lectura sugerida
 

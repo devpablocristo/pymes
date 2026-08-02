@@ -10,21 +10,21 @@ fuente autoritativa para medir el plan.
 
 | Requisito | Estado | Evidencia / condición |
 |---|---|---|
-| H0 Baseline y Open Accounting | OA cerrado; Pymes cerrado localmente | Runtime headless fusionado; bases de sus targets privados fijadas por digest en PR #3, disparador CI en PR #4 y SHA OA remoto verde `1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d`. `make ci` de Pymes pasa localmente contra ese pin; falta integrar y validar el nuevo SHA remoto. |
+| H0 Baseline y Open Accounting | cerrado | Runtime headless fusionado y SHA OA remoto verde `1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d`. Pymes PR #43 quedó fusionado en `fee09579cc8d846e28a704d6f60d640edfac75d0`; `make ci` local y el workflow remoto de `main` `30724823470` pasan contra ese pin. |
 | H1 Arquitectura Go | cerrado | árbol vertical y `make architecture-check`; todos los adapters y fragmentos conservan `models`/`helpers`, la composición concreta queda en `wire` y Axis no aparece como dependencia, ruta, checkout, mount, runtime ni en `go list -deps`. |
 | H2 Platform | cerrado | paquetes Go/React 0.2 publicados y consumidos sin `replace`, `file:`, `link:` o rutas locales. |
 | H3 Agenda | cerrado en código | contrato, persistencia, invariantes y E2E determinístico; piloto pendiente en H8. |
 | H4 Web | cerrado en código | cliente generado, alta/edición/reprogramación y transiciones en UI interna, booking público y browser E2E; artefacto cloud pendiente en H8. |
-| H5 PerGo | cerrado en código | adapter/fake/webhook, ledger durable y claim/lease/fencing de entrega; el resultado incierto no se reintenta ni activa fallback. Piloto real pendiente en H8. |
+| H5 PerGo | cerrado en código y fork fusionado | adapter/fake/webhook, ledger durable y claim/lease/fencing de entrega; PerGo PR #3 quedó fusionado en `32de65e2e9c72c476657a57206bc495a7a6d0615` con CI remoto exacto. Piloto real pendiente en H8. |
 | H6 Google | cerrado en código | OAuth/cifrado/eventos/Meet/reconciliación; piloto real pendiente en H8. |
-| H7 ARCA | cerrado en código | onboarding tenant, KMS, WSAA/WSFE, autorización/consulta y contratos con fakes; fork 2.5 validado localmente pero todavía no publicado/fijado; homologación pendiente en H8. |
+| H7 ARCA | cerrado en código y SDK publicado | onboarding tenant, KMS, WSAA/WSFE, autorización/consulta y contratos con fakes; `arca-facturacion` `2.5.0` está publicado como `latest` y fijado por Pymes; homologación pendiente en H8. |
 
 ## H8: puertas todavía abiertas
 
 | Puerta | Estado actual | Evidencia objetiva de cierre |
 |---|---|---|
 | CI local | cerrado | `make ci` verde contra OA `1af6…`, con controles H8 actuales, Docker E2E y backup/restore |
-| CI remoto/integración | pendiente | commit Pymes integrado y workflow `Pymes V3 validate` verde para ese SHA exacto |
+| CI remoto/integración | cerrado | Pymes PR #43 fusionado en `fee09579cc8d846e28a704d6f60d640edfac75d0`; `Pymes V3 validate` verde en el PR y en `main` para el SHA exacto |
 | Release | cerrado y validado localmente; no operado | build por digest, manifiesto de 13 entradas, candidato con tráfico cero, capability pretraffic API/Web, baseline y pin Web → API exactos, `--invoker-iam-check`, señal durable `worker_release_ready`, verificación activa dentro de la transacción, revocación de URLs taggeadas y rollback automático/manual por SHA. Bootstrap termina sin tags y Build/Deploy rechazan reruns aislados. El fault harness stateful prueba restauración exacta y fail-closed; faltan imágenes/manifiesto reales y una ejecución Cloud Run |
 | Identidad de release | cerrada en código, no aplicada | WIF separado y STG-first, condición cerrada al repo/workflow/branch/environment, seed inerte auditado sin Run Admin de proyecto, permisos finales sólo por recurso y análisis inverso fail-closed por recurso/permiso/identidad, incluso ante roles custom e impersonación |
 | Retiro WIF legado | pendiente | primer canary STG con WIF nuevo; retiro del principal Pymes, cuenta exclusiva deshabilitada, segundo canary posterior, Cloud Asset limpio y fase de cierre |

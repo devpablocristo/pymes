@@ -25,16 +25,15 @@ operación desplegada. Ningún componente pasa al tercero por inferencia.
 
 La suite Go, el gate arquitectónico y `make ci` completo pasan localmente contra
 Open Accounting `1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d` y los controles H8
-actuales. El cierre expuso y corrigió una colisión de puerto entre Web y el fake
-de PerGo, además de la ausencia y el tipado incorrecto de la capability local
-pretraffic de Web. La rama remota aún no se considera verde hasta integrar el
-nuevo SHA y observar su workflow exitoso.
+actuales. Pymes PR #43 quedó fusionado en
+`fee09579cc8d846e28a704d6f60d640edfac75d0`, y el workflow remoto de `main`
+`30724823470` quedó verde para ese SHA exacto.
 
 ## Dependencias externas y evidencia pendiente
 
 | Área | Implementación | Evidencia todavía necesaria |
 |---|---|---|
-| Release | workflow y build por SHA/digest; seed inerte; capability pretraffic API/Web; baseline y pin Web → API exactos; invoker IAM/ingress fail-closed; señal durable del worker; revocación de tags/URLs; rollback automático y `rollback-cloud-run.sh` por SHA implementados y validados localmente con una matriz stateful de fallos. La verificación activa ocurre antes de desarmar la transacción, bootstrap termina sin tags y Build/Deploy rechazan reruns aislados | CI remoto verde del SHA exacto; imágenes publicadas, manifiesto durable y evidencia de una transacción real |
+| Release | workflow y build por SHA/digest; seed inerte; capability pretraffic API/Web; baseline y pin Web → API exactos; invoker IAM/ingress fail-closed; señal durable del worker; revocación de tags/URLs; rollback automático y `rollback-cloud-run.sh` por SHA implementados y validados localmente con una matriz stateful de fallos. La verificación activa ocurre antes de desarmar la transacción, bootstrap termina sin tags y Build/Deploy rechazan reruns aislados | CI remoto del SHA exacto verde; faltan imágenes publicadas, manifiesto durable y evidencia de una transacción real |
 | GitHub | bootstrap y auditoría implementados localmente | `main` hoy sólo exige `v2-ci` a no administradores; `stg` no tiene reglas y permite bypass; `prd` no existe. Deben aplicarse y auditarse los controles V3 |
 | GCP | proyecto/región/SQL compartidos; identidades runtime, rotación simétrica de 90 días y secretos HMAC de Agenda v1 provisionados en STG/PRD | cargar valores reales de Clerk webhook/PerGo/Google, completar red y WIF dedicado por entorno |
 | WIF legado | retiro reversible y doble canary especificados | primer canary STG con WIF nuevo, retiro exacto, segundo canary posterior, Cloud Asset limpio y cierre |
@@ -42,7 +41,7 @@ nuevo SHA y observar su workflow exitoso.
 | PRD | no desplegado | preparar sólo después de cerrar STG; mismo SHA/materiales y controles equivalentes, con digests propios del entorno |
 | PerGo real | adapter completo | credenciales cargadas fuera de Git y piloto con número controlado |
 | Google real | adapter completo | clientes OAuth separados, callback autorizado y piloto Calendar/Meet |
-| ARCA real | adapter completo; fork 2.5 local compatible | publicar/fijar el SDK, organización piloto, CSR/certificado, punto de venta y homologación |
+| ARCA real | adapter completo; SDK `2.5.0` publicado y fijado | organización piloto, CSR/certificado, punto de venta y homologación |
 | Recuperación cloud | scripts y smoke local | backup/restore documentado contra destinos aislados del entorno |
 
 No se necesita un CUIT o certificado global de Pymes: en el modelo SaaS cada

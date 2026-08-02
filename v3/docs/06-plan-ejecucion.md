@@ -34,10 +34,10 @@ dependencias.
 - Mantener Pymes v1/v2 en sólo lectura.
 - Establecer contratos, migraciones, Compose y CI.
 
-**Estado:** Open Accounting cerrado y remoto verde en
-`1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d`; `make ci` de Pymes pasa localmente
-contra ese pin, pero el baseline Pymes queda abierto hasta integrar el cambio y
-obtener CI remoto verde.
+**Estado:** cerrado. Open Accounting está fusionado y remoto verde en
+`1af6aadc436e57f0f51c7738ddb2f3d5a61fd46d`; Pymes PR #43 está fusionado en
+`fee09579cc8d846e28a704d6f60d640edfac75d0`, con `make ci` local y workflow
+remoto de `main` `30724823470` verdes contra ese pin.
 
 ### H1 — Arquitectura Go
 
@@ -98,33 +98,32 @@ obtener CI remoto verde.
 - WSAA, WSFE, autorización, consulta exacta e incertidumbre.
 - Número reservado por Pymes; Fiscal nunca autonumera.
 
-**Estado:** cerrado en código; credenciales y homologación en H8. Padrón, FCE,
-WSFEX y CAEA quedan fuera.
+**Estado:** cerrado en código; `arca-facturacion` `2.5.0` está publicado y
+fijado por el lockfile de Pymes. Credenciales y homologación permanecen en H8.
+Padrón, FCE, WSFEX y CAEA quedan fuera.
 
 ### H8 — Release, despliegue y pilotos
 
-1. Integrar el cambio y obtener CI remoto verde para el SHA exacto; conservar el
-   CI local verde contra el mismo pin OA.
-2. Reconciliar la protección de `main` y los environments `stg`/`prd` antes de
+1. Reconciliar la protección de `main` y los environments `stg`/`prd` antes de
    crear WIF.
-3. Auditar KMS e identidades SQL/runtime ya provisionados, cargar los valores
+2. Auditar KMS e identidades SQL/runtime ya provisionados, cargar los valores
    reales pendientes de Clerk webhook, PerGo y Google, y preparar la red por
    entorno.
-4. Preparar WIF separado para build, STG y PRD sin claves JSON persistentes.
-5. Construir imágenes con SBOM/provenance, resolverlas a digest y conservar un
+3. Preparar WIF separado para build, STG y PRD sin claves JSON persistentes.
+4. Construir imágenes con SBOM/provenance, resolverlas a digest y conservar un
    manifiesto durable que vincule Pymes y Open Accounting.
-6. Crear los recursos iniciales inertes de STG desde ese manifiesto con el Owner
+5. Crear los recursos iniciales inertes de STG desde ese manifiesto con el Owner
    preexistente revisado, sin agregar autoridad temporal; auditar sus once
    mutaciones y finalizar únicamente los permisos STG por recurso.
-7. Ejecutar migraciones y crear revisiones candidatas con tráfico cero; verificar
+6. Ejecutar migraciones y crear revisiones candidatas con tráfico cero; verificar
    digest, IAM, red, secretos, probes y release marker antes y después de
    promover.
-8. Ejecutar un canary STG con el WIF nuevo, retirar el acceso WIF legado, ejecutar
+7. Ejecutar un canary STG con el WIF nuevo, retirar el acceso WIF legado, ejecutar
    un segundo canary posterior y cerrar la transición sólo con auditoría limpia.
-9. Restaurar las tres bases a destinos aislados y reconciliar sin duplicados.
-10. Pilotear Agenda, PerGo, Google/Meet y ARCA homologación en STG.
-11. Preparar PRD después del cierre STG y repetir todos los controles con el
-    mismo source SHA, pin OA y receta reproducible.
+8. Restaurar las tres bases a destinos aislados y reconciliar sin duplicados.
+9. Pilotear Agenda, PerGo, Google/Meet y ARCA homologación en STG.
+10. Preparar PRD después del cierre STG y repetir todos los controles con el
+   mismo source SHA, pin OA y receta reproducible.
 
 La configuración de build actual incorpora metadata del ambiente y una
 publishable key Clerk distinta en Web. Por eso STG y PRD producen digests

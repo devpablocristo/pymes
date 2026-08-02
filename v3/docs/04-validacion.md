@@ -165,7 +165,10 @@ Artifact Registry, los catorce Secrets, diez identidades runtime keyless, KMS y
 los once recursos Run. También exige que las políticas efectivas
 `iam.disableCrossProjectServiceAccountUsage` e
 `iam.disableServiceAccountKeyCreation` estén aplicadas y que
-`orgpolicy.googleapis.com` esté disponible. Policy Analyzer debe estar
+`orgpolicy.googleapis.com` esté disponible. El bootstrap enumera primero las
+APIs activas y sólo habilita las ausentes; después tolera exclusivamente la
+ventana acotada de propagación de la lectura efectiva, sin aceptar una policy
+relajada. Policy Analyzer debe estar
 completamente explorado, sin grupos, caminos de impersonación ni pares efectivos
 fuera de la allowlist de builder, deployer y cada identidad runtime. Una
 consulta inversa adicional parte de los permisos sensibles —no del nombre del

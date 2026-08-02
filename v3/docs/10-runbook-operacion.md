@@ -348,7 +348,10 @@ Un barrido por el path completo de `pymes-v3-release-pool` rechaza cualquier
 binding directo `principal://` o `principalSet://`; las únicas excepciones son
 los subjects exactos de la fase con `roles/iam.workloadIdentityUser` en su
 service account destino: Build+STG y cero PRD antes de `close`,
-Build+STG+PRD después. También se releen directamente proyecto, Artifact
+Build+STG+PRD después. Antes de crear identidades, `prepare` sólo admite un
+subconjunto válido del estado previo —incluido el estado vacío inicial—; el
+postcondition exige el conjunto exacto de la fase. También se releen
+directamente proyecto, Artifact
 Registry, Secrets, service accounts runtime, KMS y, en `finalize`, cada
 service/job de Cloud Run. Builder y deployers deben estar keyless y sin
 adjunción a workloads:

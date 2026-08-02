@@ -73,7 +73,7 @@ sig = "3176443ed9cdae50"
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
 target = "v3/scripts/deploy/workflow-policy-check.sh"
-sig = "7922c7175dc5ced6"
+sig = "11605fdd9b427c78"
 
 [[bindings]]
 doc = "v3/docs/05-roadmap.md"
@@ -208,7 +208,7 @@ sig = "72bcc290dc2f5fed"
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
 target = "v3/scripts/deploy/bootstrap-release-identities.sh"
-sig = "7b201e1c3eac2b64"
+sig = "1997219df18eee1a"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"

@@ -12,11 +12,12 @@ on:
           - stg
           - prd
       deploy_stage:
-        description: Bootstrap creates zero-traffic STG candidates; operational promotes after verification
+        description: Initial seed build publishes the inert-seed manifest; bootstrap creates zero-traffic STG candidates; operational promotes after verification
         required: true
         default: operational
         type: choice
         options:
+          - initial-seed-build
           - operational
           - bootstrap
       confirm_production:
@@ -72,6 +73,8 @@ jobs:
               ;;
           esac
           case "${REQUESTED_DEPLOY_STAGE}" in
+            initial-seed-build)
+              ;;
             operational)
               ;;
             bootstrap)
@@ -212,7 +215,7 @@ jobs:
       - name: Set up gcloud for pre-build authority audit
         uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
 
-      - name: Verify complete release authority before builder
+      - name: Verify stage-scoped release authority before builder
         shell: bash
         env:
           PYMES_DEPLOY_ENV: ${{ inputs.environment }}
@@ -365,6 +368,7 @@ jobs:
 
   deploy:
     name: Deploy and verify exact release
+    if: ${{ inputs.deploy_stage != 'initial-seed-build' }}
     needs:
       - validate
       - build
@@ -546,10 +550,16 @@ jobs:
         shell: bash
         env:
           PYMES_ENVIRONMENT: production
+          PYMES_DEPLOY_ENV: ${{ inputs.environment }}
           PYMES_INTERNAL_KMS_KEY_VERSION: ${{ vars.PYMES_INTERNAL_KMS_KEY_VERSION }}
           PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS: ${{ vars.PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS }}
         run: |
           set -euo pipefail
+          source ./v3/scripts/deploy/gcp-target-policy.sh
+          pymes_require_canonical_internal_kms_versions \
+            "${PYMES_DEPLOY_ENV}" \
+            "${PYMES_INTERNAL_KMS_KEY_VERSION}" \
+            "${PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS}"
           jwks="$(cd v3/backend && go run ./cmd/internal-jwks | jq -ceS .)"
           [[ "${jwks}" != *"|"* && "${jwks}" != *$'\n'* ]]
           printf 'PYMES_INTERNAL_JWKS_JSON=%s\n' "${jwks}" >>"${GITHUB_ENV}"

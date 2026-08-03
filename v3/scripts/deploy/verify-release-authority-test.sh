@@ -57,6 +57,7 @@ expect_failure() {
 
 validate_project_authority "$(project_policy)" stg bootstrap
 validate_project_authority "$(project_policy)" stg operational
+validate_project_authority "$(project_policy)" stg initial-seed-build
 
 expect_failure \
   "bootstrap accepted project-wide Run Admin" \
@@ -91,6 +92,22 @@ validate_resource_authority \
   "$empty_resource_policy" "$member" absent "bootstrap fixture"
 validate_resource_authority \
   "$exact_resource_policy" "$member" exact "operational fixture"
+validate_initial_seed_resources_absent \
+  $'unrelated-service\npymes-v3-prd-api' \
+  $'unrelated-job\npymes-v3-prd-migrate' \
+  stg
+expect_failure \
+  "initial seed build accepted an existing Pymes service" \
+  validate_initial_seed_resources_absent \
+  $'unrelated-service\npymes-v3-stg-api' \
+  unrelated-job \
+  stg
+expect_failure \
+  "initial seed build accepted an existing Pymes job" \
+  validate_initial_seed_resources_absent \
+  unrelated-service \
+  $'unrelated-job\npymes-v3-stg-provision-org' \
+  stg
 expect_failure \
   "bootstrap accepted resource-scoped authority before finalize" \
   validate_resource_authority \
@@ -131,28 +148,6 @@ expect_failure \
   "release accepted cryptographic use in the KMS verifier role" \
   validate_kms_custom_role_json \
   "$(jq '.includedPermissions += ["cloudkms.cryptoKeyVersions.useToDecrypt"]' <<<"$kms_role_json")"
-
-organization_role_json=$(jq -cn \
-  --arg name "$organization_iam_read_role" \
-  --argjson permissions "$(pymes_release_organization_iam_read_permissions_json)" '
-    {name: $name, stage: "GA", includedPermissions: $permissions}
-  ')
-validate_organization_iam_custom_role_json "$organization_role_json"
-expect_failure \
-  "release accepted an expanded organization-IAM reader role" \
-  validate_organization_iam_custom_role_json \
-  "$(jq '.includedPermissions += ["resourcemanager.organizations.setIamPolicy"]' <<<"$organization_role_json")"
-
-folder_role_json=$(jq -cn \
-  --arg name "$folder_iam_read_role" \
-  --argjson permissions "$(pymes_release_folder_iam_read_permissions_json)" '
-    {name: $name, stage: "GA", includedPermissions: $permissions}
-  ')
-validate_folder_iam_custom_role_json "$folder_role_json"
-expect_failure \
-  "release accepted a folder-IAM reader role unable to read the ancestor policy" \
-  validate_folder_iam_custom_role_json \
-  "$(jq '.includedPermissions = []' <<<"$folder_role_json")"
 
 wif_pool_json='{
   "name":"projects/884236221349/locations/global/workloadIdentityPools/pymes-v3-release-pool",
@@ -225,30 +220,6 @@ release_pool_assets=$(jq -cn \
     }
   ]
 ')
-pymes_validate_release_pool_iam_assets "$release_pool_assets" stg exact
-pymes_validate_release_pool_iam_assets '[]' stg subset
-expect_failure \
-  "release accepted missing exact release-pool bindings" \
-  pymes_validate_release_pool_iam_assets '[]' stg exact
-expect_failure \
-  "STG release accepted premature PRD WIF trust" \
-  pymes_validate_release_pool_iam_assets \
-  "$(jq --arg principal "$pymes_release_prd_principal" \
-    --arg resource "//iam.googleapis.com/projects/pymes-dev-352318/serviceAccounts/pymes-v3-gh-deploy-prd@pymes-dev-352318.iam.gserviceaccount.com" '
-      . + [{
-        resource: $resource,
-        policy: {
-          bindings: [{
-            role: "roles/iam.workloadIdentityUser",
-            members: [$principal]
-          }]
-        }
-      }]
-    ' <<<"$release_pool_assets")" \
-  stg exact
-expect_failure \
-  "PRD release accepted a missing STG trust root" \
-  pymes_validate_release_pool_iam_assets '[]' prd subset
 prd_release_pool_assets=$(jq \
   --arg principal "$pymes_release_prd_principal" \
   --arg resource "//iam.googleapis.com/projects/pymes-dev-352318/serviceAccounts/pymes-v3-gh-deploy-prd@pymes-dev-352318.iam.gserviceaccount.com" '
@@ -262,6 +233,96 @@ prd_release_pool_assets=$(jq \
       }
     }]
   ' <<<"$release_pool_assets")
+pymes_validate_release_pool_iam_assets "$release_pool_assets" stg exact
+pymes_validate_release_pool_iam_assets "$prd_release_pool_assets" stg exact
+pymes_validate_release_pool_iam_assets '[]' stg subset
+(
+  retry_pool_search_state=$(mktemp)
+  trap 'rm -f "$retry_pool_search_state"' EXIT
+  printf '0\n' >"$retry_pool_search_state"
+  pymes_search_release_pool_iam_assets() {
+    local retry_pool_search_calls
+    read -r retry_pool_search_calls <"$retry_pool_search_state"
+    retry_pool_search_calls=$((retry_pool_search_calls + 1))
+    printf '%s\n' "$retry_pool_search_calls" >"$retry_pool_search_state"
+    case "$retry_pool_search_calls" in
+      1) return 1 ;;
+      2) printf '[]\n' ;;
+      *) printf '%s\n' "$release_pool_assets" ;;
+    esac
+  }
+  pymes_release_asset_retry_attempts=3
+  pymes_release_asset_retry_seconds=0
+  retried_release_pool_assets=$(
+    pymes_read_release_pool_iam_assets_until_valid \
+      pymes-dev-352318 stg exact
+  )
+  [[ "$(jq -cS . <<<"$retried_release_pool_assets")" == \
+     "$(jq -cS . <<<"$release_pool_assets")" ]] || {
+    echo "FAIL: release-pool Cloud Asset retry did not converge" >&2
+    exit 1
+  }
+)
+(
+  retry_pool_search_state=$(mktemp)
+  trap 'rm -f "$retry_pool_search_state"' EXIT
+  printf '0\n' >"$retry_pool_search_state"
+  pymes_search_release_pool_iam_assets() {
+    local retry_pool_search_calls
+    read -r retry_pool_search_calls <"$retry_pool_search_state"
+    retry_pool_search_calls=$((retry_pool_search_calls + 1))
+    printf '%s\n' "$retry_pool_search_calls" >"$retry_pool_search_state"
+    return 1
+  }
+  pymes_release_asset_retry_attempts=2
+  pymes_release_asset_retry_seconds=0
+  expect_failure \
+    "release-pool Cloud Asset retry accepted exhausted read errors" \
+    pymes_read_release_pool_iam_assets_until_valid \
+    pymes-dev-352318 stg exact
+  [[ "$(cat "$retry_pool_search_state")" == "2" ]] || {
+    echo "FAIL: release-pool read errors did not exhaust every retry" >&2
+    exit 1
+  }
+)
+(
+  retry_pool_search_state=$(mktemp)
+  trap 'rm -f "$retry_pool_search_state"' EXIT
+  printf '0\n' >"$retry_pool_search_state"
+  pymes_search_release_pool_iam_assets() {
+    local retry_pool_search_calls
+    read -r retry_pool_search_calls <"$retry_pool_search_state"
+    retry_pool_search_calls=$((retry_pool_search_calls + 1))
+    printf '%s\n' "$retry_pool_search_calls" >"$retry_pool_search_state"
+    printf '[]\n'
+  }
+  pymes_release_asset_retry_attempts=2
+  pymes_release_asset_retry_seconds=0
+  expect_failure \
+    "release-pool Cloud Asset retry accepted exhausted stale reads" \
+    pymes_read_release_pool_iam_assets_until_valid \
+    pymes-dev-352318 stg exact
+  [[ "$(cat "$retry_pool_search_state")" == "2" ]] || {
+    echo "FAIL: release-pool stale reads did not exhaust every retry" >&2
+    exit 1
+  }
+)
+expect_failure \
+  "release accepted missing exact release-pool bindings" \
+  pymes_validate_release_pool_iam_assets '[]' stg exact
+expect_failure \
+  "STG subset preflight accepted premature PRD WIF trust" \
+  pymes_validate_release_pool_iam_assets \
+  "$prd_release_pool_assets" stg subset
+expect_failure \
+  "STG release accepted malformed post-PRD WIF trust" \
+  pymes_validate_release_pool_iam_assets \
+  "$(jq '.[2].policy.bindings[0].role = "roles/owner"' \
+    <<<"$prd_release_pool_assets")" \
+  stg exact
+expect_failure \
+  "PRD release accepted a missing STG trust root" \
+  pymes_validate_release_pool_iam_assets '[]' prd subset
 pymes_validate_release_pool_iam_assets "$release_pool_assets" prd subset
 pymes_validate_release_pool_iam_assets "$prd_release_pool_assets" prd exact
 expect_failure \
@@ -342,69 +403,85 @@ expect_failure \
     name:("//run.googleapis.com/projects/pymes-dev-352318/locations/us-central1/services/attached-" + $account)
   }]' <<<"$account_assets")" \
   '[]' '[]' "$inventory_account" "builder fixture"
-
-ancestry_json='[
-  {"type":"project","id":"pymes-dev-352318"},
-  {"type":"folder","id":"673291958610"},
-  {"type":"organization","id":"663017421195"}
-]'
-validate_project_ancestry_json "$ancestry_json"
-expect_failure \
-  "release accepted ancestry for another project" \
-  validate_project_ancestry_json \
-  "$(jq '.[0].id = "other-project"' <<<"$ancestry_json")"
-expect_failure \
-  "release accepted an unknown ancestry resource type" \
-  validate_project_ancestry_json \
-  "$(jq '.[1].type = "unknown"' <<<"$ancestry_json")"
-
-build_member="serviceAccount:pymes-v3-gh-build@pymes-dev-352318.iam.gserviceaccount.com"
-ancestor_policy='{
-  "bindings":[
-    {
-      "role":"organizations/663017421195/roles/pymesV3ReleaseFolderIamRead",
-      "members":["serviceAccount:pymes-v3-gh-deploy-stg@pymes-dev-352318.iam.gserviceaccount.com"]
-    },
-    {"role":"roles/resourcemanager.folderAdmin","members":["user:softponti@gmail.com"]},
-    {"role":"roles/viewer","members":["serviceAccount:unrelated@example.iam.gserviceaccount.com"]}
-  ]
-}'
-validate_ancestor_policy \
-  "$ancestor_policy" "$build_member" "$member" "$folder_iam_read_role" \
-  "ancestor fixture"
-expect_failure \
-  "release accepted inherited builder authority" \
-  validate_ancestor_policy \
-  "$(jq --arg member "$build_member" '.bindings[0].members += [$member]' <<<"$ancestor_policy")" \
-  "$build_member" "$member" "$folder_iam_read_role" "ancestor fixture"
-expect_failure \
-  "release accepted an unprovable ancestor group" \
-  validate_ancestor_policy \
-  "$(jq '.bindings[1].members += ["group:operators@example.com"]' <<<"$ancestor_policy")" \
-  "$build_member" "$member" "$folder_iam_read_role" "ancestor fixture"
-expect_failure \
-  "release accepted public ancestor authority" \
-  validate_ancestor_policy \
-  "$(jq '.bindings[1].members += ["allAuthenticatedUsers"]' <<<"$ancestor_policy")" \
-  "$build_member" "$member" "$folder_iam_read_role" "ancestor fixture"
-expect_failure \
-  "release accepted ancestor token-minting authority for another principal" \
-  validate_ancestor_policy \
-  "$(jq '.bindings += [{
-    role:"roles/iam.serviceAccountTokenCreator",
-    members:["serviceAccount:attacker@example.iam.gserviceaccount.com"]
-  }]' <<<"$ancestor_policy")" \
-  "$build_member" "$member" "$folder_iam_read_role" "ancestor fixture"
-expect_failure \
-  "release accepted inherited runtime-workload authority" \
-  validate_ancestor_policy \
-  "$(jq '.bindings[1].members += ["serviceAccount:pymes-v3-worker-stg@pymes-dev-352318.iam.gserviceaccount.com"]' <<<"$ancestor_policy")" \
-  "$build_member" "$member" "$folder_iam_read_role" "ancestor fixture"
-expect_failure \
-  "release accepted a second ancestor role for the deployer" \
-  validate_ancestor_policy \
-  "$(jq --arg member "$member" '.bindings[1].members += [$member]' <<<"$ancestor_policy")" \
-  "$build_member" "$member" "$folder_iam_read_role" "ancestor fixture"
+(
+  workload_retry_state=$(mktemp -d)
+  trap 'rm -rf "$workload_retry_state"' EXIT
+  attached_services=$(jq -cn --arg account "$inventory_account" \
+    '[{spec:{template:{spec:{serviceAccountName:$account}}}}]')
+  gcloud() {
+    local kind count_file count=0
+    if [[ "$1" == "asset" && "$2" == "search-all-resources" ]]; then
+      kind=assets
+    elif [[ "$1" == "run" && "$2" == "services" && "$3" == "list" ]]; then
+      kind=services
+    elif [[ "$1" == "run" && "$2" == "jobs" && "$3" == "list" ]]; then
+      kind=jobs
+    elif [[ "$1" == "run" && "$2" == "revisions" && "$3" == "list" ]]; then
+      kind=revisions
+    else
+      return 2
+    fi
+    count_file="$workload_retry_state/$kind"
+    [[ ! -f "$count_file" ]] || read -r count <"$count_file"
+    count=$((count + 1))
+    printf '%s\n' "$count" >"$count_file"
+    if [[ "$kind" == "assets" && "$count" -eq 1 ]]; then
+      return 1
+    fi
+    if [[ "$kind" == "assets" ]]; then
+      printf '%s\n' "$account_assets"
+    elif [[ "$kind" == "services" && "$count" -eq 2 ]]; then
+      printf '%s\n' "$attached_services"
+    else
+      printf '[]\n'
+    fi
+  }
+  pymes_release_asset_retry_attempts=3
+  pymes_release_asset_retry_seconds=0
+  pymes_verify_release_account_not_attached \
+    pymes-dev-352318 "$inventory_account" "builder retry fixture"
+  for kind in assets services jobs revisions; do
+    [[ "$(cat "$workload_retry_state/$kind")" == "3" ]] || {
+      echo "FAIL: workload $kind inventory was not refreshed on every retry" >&2
+      exit 1
+    }
+  done
+)
+(
+  workload_retry_state=$(mktemp -d)
+  trap 'rm -rf "$workload_retry_state"' EXIT
+  gcloud() {
+    local kind count_file count=0
+    if [[ "$1" == "asset" && "$2" == "search-all-resources" ]]; then
+      kind=assets
+    elif [[ "$1" == "run" && "$2" == "services" && "$3" == "list" ]]; then
+      kind=services
+    elif [[ "$1" == "run" && "$2" == "jobs" && "$3" == "list" ]]; then
+      kind=jobs
+    elif [[ "$1" == "run" && "$2" == "revisions" && "$3" == "list" ]]; then
+      kind=revisions
+    else
+      return 2
+    fi
+    count_file="$workload_retry_state/$kind"
+    [[ ! -f "$count_file" ]] || read -r count <"$count_file"
+    count=$((count + 1))
+    printf '%s\n' "$count" >"$count_file"
+    return 1
+  }
+  pymes_release_asset_retry_attempts=2
+  pymes_release_asset_retry_seconds=0
+  expect_failure \
+    "release account inventory accepted exhausted read errors" \
+    pymes_verify_release_account_not_attached \
+    pymes-dev-352318 "$inventory_account" "builder retry fixture"
+  for kind in assets services jobs revisions; do
+    [[ "$(cat "$workload_retry_state/$kind")" == "2" ]] || {
+      echo "FAIL: workload $kind read errors did not exhaust every retry" >&2
+      exit 1
+    }
+  done
+)
 
 build_email=pymes-v3-gh-build@pymes-dev-352318.iam.gserviceaccount.com
 build_principal="principal://iam.googleapis.com/projects/884236221349/locations/global/workloadIdentityPools/pymes-v3-release-pool/subject/${github_build_subject}"
@@ -511,6 +588,24 @@ effective_analysis=$(jq -cn \
 validate_effective_iam_analysis \
   "$effective_analysis" "effective fixture" \
   "$effective_resource"$'\t'"roles/artifactregistry.reader"
+validate_required_effective_iam_pairs \
+  "$effective_analysis" "effective fixture" \
+  "$effective_resource"$'\t'"roles/artifactregistry.reader"
+evidence_bucket_resource="//storage.googleapis.com/pymes-v3-release-evidence-stg-884236221349"
+evidence_bucket_analysis=$(jq \
+  --arg resource "$evidence_bucket_resource" \
+  --arg role "$PYMES_RELEASE_EVIDENCE_IAM_READ_ROLE" '
+    .mainAnalysis.analysisResults[0].attachedResourceFullName = $resource
+    | .mainAnalysis.analysisResults[0].iamBinding.role = $role
+  ' <<<"$effective_analysis")
+validate_required_effective_iam_pairs \
+  "$evidence_bucket_analysis" "evidence bucket fixture" \
+  "$evidence_bucket_resource"$'\t'"$PYMES_RELEASE_EVIDENCE_IAM_READ_ROLE"
+expect_failure \
+  "release accepted a missing required project-scoped role" \
+  validate_required_effective_iam_pairs \
+  "$effective_analysis" "effective fixture" \
+  "$effective_resource"$'\t'"roles/artifactregistry.writer"
 expect_failure \
   "release accepted effective authority outside the allowlist" \
   validate_effective_iam_analysis \
@@ -837,6 +932,8 @@ pymes_read_inverse_permission_analysis() {
 
 pymes_verify_release_inverse_authority \
   pymes-dev-352318 884236221349 us-central1 stg present pymes
+pymes_verify_release_inverse_authority \
+  pymes-dev-352318 884236221349 us-central1 stg absent pymes
 
 inverse_bypass_cases=(
   "//cloudresourcemanager.googleapis.com/projects/pymes-dev-352318"$'\t'"resourcemanager.projects.setIamPolicy"$'\t'"projects/pymes-dev-352318/roles/customProjectAdmin"

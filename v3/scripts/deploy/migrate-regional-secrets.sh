@@ -6,8 +6,13 @@ set -euo pipefail
 # protected by the existing environment-specific regional CMEK keys. It copies
 # only a missing latest value and never prints secret material.
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=gcp-target-policy.sh
+source "$script_dir/gcp-target-policy.sh"
+
 project=${PYMES_GCP_PROJECT:-pymes-dev-352318}
 region=${PYMES_GCP_REGION:-us-central1}
+pymes_require_canonical_project_region "$project" "$region"
 migration_env=${PYMES_SECRET_MIGRATION_ENV:-all}
 case "$migration_env" in
   stg|prd|all) ;;
@@ -15,6 +20,7 @@ case "$migration_env" in
 esac
 project_number=${PYMES_GCP_PROJECT_NUMBER:-$(gcloud projects describe "$project" --format='value(projectNumber)')}
 : "${project_number:?could not resolve GCP project number}"
+pymes_require_canonical_project_number "$project_number"
 service_agent="service-${project_number}@gcp-sa-secretmanager.iam.gserviceaccount.com"
 export CLOUDSDK_CORE_PROJECT="$project"
 regional_secrets=$(CLOUDSDK_API_ENDPOINT_OVERRIDES_SECRETMANAGER="https://secretmanager.${region}.rep.googleapis.com/" \

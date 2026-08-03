@@ -32,9 +32,9 @@ Dentro de Cloud Run se adopta este control compuesto:
    - API y worker → Fiscal;
    - worker → Accounting;
    - provisioner → Accounting Admin.
-4. El proyecto compartido no concede `roles/run.invoker` a nivel proyecto; las
-   políticas heredadas de organización/carpeta deben respetar la misma regla.
-   Cada permiso se asigna en el servicio destino.
+4. El proyecto Pymes no concede `roles/run.invoker` a nivel proyecto. Cada
+   permiso se asigna y valida en el servicio Pymes destino; el workflow normal
+   no consulta IAM de folder, organización u otros proyectos.
 5. El despliegue agrega el invoker requerido y falla cerrado si la auditoría
    encuentra otro principal. No revoca automáticamente identidades
    desconocidas en un servicio preexistente: su propietario debe revisarlas y
@@ -95,6 +95,20 @@ Dentro de Cloud Run se adopta este control compuesto:
     revalida los candidatos y aplica las reglas públicas de los puntos
     anteriores. `bootstrap` está prohibido en PRD.
 
+Todo script mutante normal de esta topología carga `gcp-target-policy.sh` antes
+de escribir. El fusible acepta únicamente proyecto `pymes-dev-352318`, región
+`us-central1`, Artifact Registry `pymes`, Cloud SQL `pymes-dev-db` y el target
+de red `default` con subred/router/NAT `pymes-v3-serverless`; un override fuera
+de esa frontera aborta.
+Los jobs privilegiados de migración y grants reciben un environment
+allowlisted y, antes de cualquier DDL, comparan la URL canónica con
+`current_database()`, `session_user` y `current_user`. Así un secreto
+mal direccionado tampoco puede convertir el socket compartido en acceso a otra
+base o rol.
+`retire-legacy-pymes-wif.sh` y `migrate-project-secret-access.sh` no forman
+parte de este transporte ni del release v3 y no se ejecutan mientras v2 siga
+activo.
+
 HTTPS administrado por Cloud Run + ingress interno + IAM mínimo + JWT interno
 es el equivalente operativo del requisito de mTLS para este runtime. No se
 afirma que exista mTLS terminado por la aplicación. Si cualquiera de estos
@@ -150,6 +164,9 @@ con una policy entrante que contenga sólo el `roles/iam.serviceAccountUser` del
 deployer del mismo entorno. IAM Policy Analyzer expande roles, grupos e
 impersonación y compara su autoridad efectiva con una allowlist por componente:
 únicamente SQL, Secrets, KMS e invocaciones privadas que ese workload necesita.
+La consulta se limita al proyecto Pymes y sus recursos; no afirma cobertura de
+policies definidas en folder u organización ni requiere contacto con esos
+scopes.
 Los deployers keyless no pueden estar adjuntos a un workload y la org policy
 `iam.disableCrossProjectServiceAccountUsage` debe estar efectivamente forzada.
 Así, el ID token aceptado por Cloud Run proviene de una identidad runtime

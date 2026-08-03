@@ -19,9 +19,13 @@ func main() {
 	if directory == "" {
 		directory = "/migrations"
 	}
+	environment := strings.TrimSpace(os.Getenv("PYMES_DEPLOY_ENV"))
+	if environment == "" {
+		log.Fatal("PYMES_DEPLOY_ENV is required")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	files, err := wire.Migrate(ctx, databaseURL, directory)
+	files, err := wire.Migrate(ctx, databaseURL, directory, environment)
 	if err != nil {
 		log.Fatal(err)
 	}

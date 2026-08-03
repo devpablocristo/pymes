@@ -5,6 +5,10 @@ set -euo pipefail
 # Pymes v3 STG/PRD. The default is deliberately read-only because Cloud NAT has
 # a recurring cost even when application traffic is low.
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=gcp-target-policy.sh
+source "$script_dir/gcp-target-policy.sh"
+
 project=${PYMES_GCP_PROJECT:-pymes-dev-352318}
 region=${PYMES_GCP_REGION:-us-central1}
 network=${PYMES_VPC_NETWORK:-default}
@@ -13,6 +17,8 @@ subnet_cidr=${PYMES_VPC_SUBNET_CIDR:-10.120.0.0/24}
 router=${PYMES_VPC_NAT_ROUTER:-pymes-v3-serverless}
 nat=${PYMES_VPC_NAT_NAME:-pymes-v3-serverless}
 apply=${PYMES_NETWORK_BOOTSTRAP_APPLY:-false}
+
+pymes_require_canonical_project_region "$project" "$region"
 
 case "$apply" in
   true|false) ;;
@@ -57,6 +63,8 @@ if (( (address_value & host_mask) != 0 )); then
   echo "PYMES_VPC_SUBNET_CIDR must be aligned to its prefix" >&2
   exit 2
 fi
+pymes_require_canonical_network_target \
+  "$network" "$subnet" "$subnet_cidr" "$router" "$nat"
 
 echo "NETWORK PLAN project=$project region=$region network=$network"
 echo "NETWORK PLAN subnet=$subnet cidr=$subnet_cidr private_google_access=true"

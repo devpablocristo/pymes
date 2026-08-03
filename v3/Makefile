@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help build migration-image-check test fiscal-test fiscal-real-contract accounting-test web-ci quality workflow-policy-check protected-live-validation-test release-evidence-test cloud-restore-drill-test legacy-wif-test project-secret-access-test obsolete-secrets-test compose-security-check libpq-exec-test pilot-evidence-test security fiscal-e2e accounting-e2e commercial-e2e scheduling-e2e notifications-e2e calendars-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate architecture-check db-integration backup-restore-smoke e2e ci up down backup restore
+.PHONY: help build migration-image-check test fiscal-test fiscal-real-contract accounting-test web-ci quality workflow-policy-check gcp-scope-check protected-live-validation-test release-evidence-test cloud-restore-drill-test legacy-wif-test project-secret-access-test obsolete-secrets-test compose-security-check libpq-exec-test pilot-evidence-test security fiscal-e2e accounting-e2e commercial-e2e scheduling-e2e notifications-e2e calendars-e2e observability-e2e recovery-e2e replay-smoke monitoring-config-check api-check api-generate architecture-check db-integration backup-restore-smoke e2e ci up down backup restore
 
 ACCOUNTING_BUILD_CONTEXT ?= ../../open-accounting
 PUBLIC_GO_OPERATION_IDS := getHealthz,getReadyz,createSale,createParty,getParty,createPurchase,getPurchase,createPayment,getPayment,createAccountingReversal,getAccountingFailure,createAccountingAdjustment,getSale,requestFiscalCredentialCSR,getFiscalCredential,uploadFiscalCertificate,configureFiscalPointOfSale,validateFiscalPointOfSale
@@ -15,6 +15,7 @@ help:
 	@echo "  make web-ci          Valida cliente generado, tipos, tests, build, auditoría y E2E browser"
 	@echo "  make quality         Ejecuta vet y valida Compose"
 	@echo "  make workflow-policy-check  Valida Actions, release inmutable e IAM declarativo"
+	@echo "  make gcp-scope-check Verifica el destino canónico de toda mutación GCP"
 	@echo "  make protected-live-validation-test  Valida jobs Google/ARCA protegidos sin llamar proveedores"
 	@echo "  make release-evidence-test  Prueba retención create-only y Bucket Lock sin llamar a GCP"
 	@echo "  make cloud-restore-drill-test  Prueba el orquestador cloud de restore con adapters falsos"
@@ -61,12 +62,13 @@ test:
 
 fiscal-test:
 	cd fiscal-adapter && npm ci --ignore-scripts && npm run ci
+	./fiscal-adapter/scripts/migrate-test.sh
 
 fiscal-real-contract:
 	cd fiscal-adapter && npm ci --ignore-scripts && npm run test:real
 
 accounting-test:
-	cd "$(ACCOUNTING_BUILD_CONTEXT)" && go test ./internal/accounting ./internal/tenant ./internal/pymesaccounting ./internal/database/pymesaccounting ./internal/database/pymesaccountingadmin ./internal/pymesaccountingadminhttp ./cmd/pymes-accounting ./cmd/pymes-accounting-admin
+	cd "$(ACCOUNTING_BUILD_CONTEXT)" && go test ./internal/accounting ./internal/tenant ./internal/pymesaccounting ./internal/pymesaccountingdbguard ./internal/database/pymesaccounting ./internal/database/pymesaccountingadmin ./internal/pymesaccountingadminhttp ./cmd/migrate ./cmd/pymes-accounting ./cmd/pymes-accounting-admin
 	cd "$(ACCOUNTING_BUILD_CONTEXT)" && go test ./docs -run 'TestRuntimePersistenceStaysBehindRepositories|TestRepositoryRawSQLExceptionsAreExplicit'
 
 web-ci:
@@ -74,7 +76,7 @@ web-ci:
 
 quality:
 	cd backend && go vet ./...
-	cd "$(ACCOUNTING_BUILD_CONTEXT)" && go vet ./internal/accounting ./internal/tenant ./internal/pymesaccounting ./internal/database/pymesaccounting ./internal/database/pymesaccountingadmin ./internal/pymesaccountingadminhttp ./cmd/pymes-accounting ./cmd/pymes-accounting-admin
+	cd "$(ACCOUNTING_BUILD_CONTEXT)" && go vet ./internal/accounting ./internal/tenant ./internal/pymesaccounting ./internal/pymesaccountingdbguard ./internal/database/pymesaccounting ./internal/database/pymesaccountingadmin ./internal/pymesaccountingadminhttp ./cmd/migrate ./cmd/pymes-accounting ./cmd/pymes-accounting-admin
 	for script in scripts/*.sh; do \
 		case "$$(head -n 1 "$$script")" in \
 			*"bash") bash -n "$$script" ;; \
@@ -92,6 +94,7 @@ quality:
 	./scripts/deploy/cloud-run-transaction-test.sh
 	ACCOUNTING_BUILD_CONTEXT="$(ACCOUNTING_BUILD_CONTEXT)" ./scripts/deploy/rollback-cloud-run-test.sh
 	$(MAKE) workflow-policy-check
+	$(MAKE) gcp-scope-check
 	$(MAKE) protected-live-validation-test
 	$(MAKE) release-evidence-test
 	$(MAKE) cloud-restore-drill-test
@@ -100,6 +103,9 @@ quality:
 
 workflow-policy-check:
 	./scripts/deploy/workflow-policy-check.sh
+
+gcp-scope-check:
+	./scripts/deploy/gcp-target-policy-test.sh
 
 protected-live-validation-test:
 	./scripts/deploy/protected-live-validation-test.sh
@@ -130,7 +136,7 @@ pilot-evidence-test:
 
 security:
 	cd backend && go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
-	cd "$(ACCOUNTING_BUILD_CONTEXT)" && go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./internal/accounting ./internal/tenant ./internal/pymesaccounting ./internal/database/pymesaccounting ./internal/database/pymesaccountingadmin ./internal/pymesaccountingadminhttp ./cmd/pymes-accounting ./cmd/pymes-accounting-admin
+	cd "$(ACCOUNTING_BUILD_CONTEXT)" && go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./internal/accounting ./internal/tenant ./internal/pymesaccounting ./internal/pymesaccountingdbguard ./internal/database/pymesaccounting ./internal/database/pymesaccountingadmin ./internal/pymesaccountingadminhttp ./cmd/migrate ./cmd/pymes-accounting ./cmd/pymes-accounting-admin
 	cd fiscal-adapter && npm audit --omit=dev
 
 api-check:

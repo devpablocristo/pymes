@@ -5,8 +5,13 @@ set -euo pipefail
 # sign private workload credentials. This script changes GCP only when an
 # operator runs it; application deploys always pin a numeric key version.
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=gcp-target-policy.sh
+source "$script_dir/gcp-target-policy.sh"
+
 project=${PYMES_GCP_PROJECT:-pymes-dev-352318}
 region=${PYMES_GCP_REGION:-us-central1}
+pymes_require_canonical_project_region "$project" "$region"
 bootstrap_env=${PYMES_KMS_BOOTSTRAP_ENV:-all}
 case "$bootstrap_env" in
   stg|prd|all) ;;

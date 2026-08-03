@@ -101,7 +101,7 @@ candidate_tag=$(pymes_release_candidate_tag "$PYMES_RELEASE_SHA")
 dry_run=false
 network=pymes-v3-serverless
 subnet=pymes-v3-serverless
-PYMES_CLOUDSQL_INSTANCE=pymes-dev-352318:us-central1:pymes
+PYMES_CLOUDSQL_INSTANCE=pymes-dev-352318:us-central1:pymes-dev-db
 PYMES_DEPLOY_ENV=stg
 deploy_stage=operational
 PYMES_PREFLIGHT_TOKEN=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
@@ -496,6 +496,36 @@ assert_capability_not_in_argv() {
   record_pass "release capability never appears in gcloud or curl argv"
 }
 
+assert_cloudsql_target_is_canonical() {
+  if ! python3 - "$FAKE_GCLOUD_CALL_LOG" "$PYMES_CLOUDSQL_INSTANCE" <<'PY'
+import json
+import sys
+
+expected = sys.argv[2]
+targets = []
+with open(sys.argv[1], encoding="utf-8") as stream:
+    for raw_line in stream:
+        arguments = json.loads(raw_line)
+        for index, argument in enumerate(arguments):
+            if argument.startswith("--set-cloudsql-instances="):
+                targets.append(argument.split("=", 1)[1])
+            elif argument == "--set-cloudsql-instances" and index + 1 < len(arguments):
+                targets.append(arguments[index + 1])
+if not targets:
+    print("no Cloud SQL target was exercised", file=sys.stderr)
+    raise SystemExit(1)
+foreign = sorted({target for target in targets if target != expected})
+if foreign:
+    print("unexpected Cloud SQL targets: " + ", ".join(foreign), file=sys.stderr)
+    raise SystemExit(1)
+PY
+  then
+    record_failure "release transaction used a non-canonical Cloud SQL target"
+    return
+  fi
+  record_pass "release transaction used only the canonical Cloud SQL target"
+}
+
 assert_secret_files_removed() {
   if ! python3 - "$FAKE_GCLOUD_CALL_LOG" "$FAKE_CURL_CALL_LOG" <<'PY'
 import json
@@ -539,6 +569,7 @@ test_promotion_failure_rollback
 test_settle_failure_rollback
 test_inert_worker_signal_failure
 assert_capability_not_in_argv
+assert_cloudsql_target_is_canonical
 assert_secret_files_removed
 
 if (( failures > 0 )); then

@@ -67,6 +67,11 @@ rechaza manifiestos alterados o con claves extra, vuelve a descargar la
 generación publicada y emite un receipt sólo si checksum, metadata y retención
 coinciden. El gate demuestra el mecanismo; no acredita que los buckets hayan
 sido creados o bloqueados en GCP.
+El IAM exacto incluye el custom role de proyecto
+`pymesV3ReleaseEvidenceIamRead`, cuyo único permiso es
+`storage.buckets.getIamPolicy`, ligado exclusivamente al bucket Pymes del
+entorno objetivo. Así el builder relee la policy real antes de publicar, sin
+recibir el rol en el proyecto ni autoridad sobre otro bucket.
 
 <!-- drift:bind v3/scripts/deploy/cloud-restore-drill.sh -->
 <!-- drift:bind v3/scripts/deploy/cloud-restore-drill-test.sh -->
@@ -135,6 +140,9 @@ Build y deploy usan identidades WIF separadas por entorno. El primer paso de tod
 identidad del builder y Deploy antes de checkout, descargar artefactos o
 autenticar. Un job o workflow reejecutado no puede reutilizar una validación ni
 un manifiesto anterior y debe reemplazarse por un nuevo `workflow_dispatch`.
+El stage `initial-seed-build` exige que los seis servicios y cinco jobs de
+Pymes aún no existan, conserva imágenes y manifiesto y omite Deploy; los stages
+`bootstrap` y `operational` siguen exigiendo los once recursos finalizados.
 El builder rechaza
 worktrees sucios, fija tanto Pymes como Open Accounting a commits completos,
 publica SBOM y provenance y entrega únicamente referencias
@@ -153,16 +161,17 @@ rechazan además otra región, tipo, cuenta, permiso o recurso de autorización.
 La finalización acota inicio y fin con dos minutos de margen superior para
 timestamps fraccionarios y reloj, espera al menos diez minutos de asentamiento
 y exige dos lecturas idénticas de Admin Activity separadas por veinte segundos.
-También prueba que la autoridad recurrente acepte la transición
-seed → bootstrap → operational, pero rechace roles custom ampliados, Run Admin
-de proyecto, condiciones IAM y cualquier administrador o invoker fuera de la
-allowlist.
+También prueba que la autoridad acepte la transición
+initial-seed-build → seed → bootstrap → operational, pero rechace recursos Run
+prematuros en la primera etapa, roles custom ampliados, Run Admin de proyecto,
+condiciones IAM y cualquier administrador o invoker fuera de la allowlist.
 
 La autoridad no se confía sólo al bootstrap. Antes de autenticar al builder, el
 job protegido autentica al deployer exacto del environment y vuelve a comprobar
 pool/provider WIF, cuentas builder/deployer activas y sin claves, trust completo,
 Artifact Registry, los catorce Secrets, diez identidades runtime keyless, KMS y
-los once recursos Run. También exige que las políticas efectivas
+la ausencia o presencia exacta de los once recursos Run según el stage. También
+exige que las políticas efectivas
 `iam.disableCrossProjectServiceAccountUsage` e
 `iam.disableServiceAccountKeyCreation` estén aplicadas y que
 `orgpolicy.googleapis.com` esté disponible. El bootstrap enumera primero las
@@ -170,11 +179,12 @@ APIs activas y sólo habilita las ausentes; después tolera exclusivamente la
 ventana acotada de propagación de la lectura efectiva, sin aceptar una policy
 relajada. Policy Analyzer debe estar
 completamente explorado, sin grupos, caminos de impersonación ni pares efectivos
-fuera de la allowlist de builder, deployer y cada identidad runtime. Una
+definidos en el proyecto Pymes o sus recursos descendientes fuera de la
+allowlist de builder, deployer y cada identidad runtime. Una
 consulta inversa adicional parte de los permisos sensibles —no del nombre del
 rol— y compara cada triple recurso/permiso/identidad sobre proyecto, release y
 runtime service accounts, Run, Secrets, Artifact Registry y KMS. Por eso un rol
-custom o alternativo con el mismo poder, un grant heredado, una identidad
+custom o alternativo con el mismo poder dentro de ese scope, una identidad
 cross-environment o una cadena de impersonación también bloquean. El deploy
 repite el límite KMS inmediatamente antes de usar las claves; cualquier lectura
 incompleta, cuota agotada después del retry acotado o drift falla cerrado.
@@ -183,13 +193,19 @@ El bootstrap IAM incorpora un guarda de fuente y operador antes de cualquier
 mutación: checkout limpio de `main`, HEAD y árbol idénticos al repositorio
 GitHub esperado, cuenta activa directa `softponti@gmail.com` y ausencia de
 impersonación, credential override, access-token file o login config en
-`gcloud`. La cadena de ancestros debe ser exactamente proyecto
-`pymes-dev-352318` → folder `673291958610` → organización `663017421195`.
-Builder no recibe ningún rol de ancestro; el deployer recibe únicamente los
-roles custom de lectura de IAM de organización y folder, sin condiciones. La
-creación o actualización inicial de esos dos roles de organización y sus
-bindings requiere un operador humano con administración de custom roles y
-políticas IAM en esos scopes; el workflow no puede otorgarse esa facultad.
+`gcloud`. Proyecto `pymes-dev-352318`, número `884236221349`, región
+`us-central1`, repositorio Artifact Registry y nombres Pymes son constantes
+versionadas. El bootstrap normal, el workflow y sus identidades sólo leen o
+mutan IAM del proyecto Pymes y de los recursos Pymes explícitamente
+allowlisted; no consultan ni modifican folder, organización u otros proyectos.
+Policy Analyzer y la auditoría inversa se interpretan exclusivamente dentro de
+ese scope project-scoped.
+El gate exige además que cada script mutante normal cargue
+`gcp-target-policy.sh` antes de su primera escritura. Ese fusible común rechaza
+otro proyecto o región y fija Artifact Registry `pymes`, conexión Cloud SQL
+`pymes-dev-352318:us-central1:pymes-dev-db` y el target de red `default` con
+subred/router/NAT `pymes-v3-serverless`; sus tests negativos prueban que una
+variable o argumento no puede redirigir la operación.
 
 El gate busca cualquier `principal://` o `principalSet://` que mencione el pool
 de release y exige el conjunto exacto correspondiente a la fase. Durante STG
@@ -199,7 +215,9 @@ dos más el deployer PRD. Todos son bindings
 `roles/iam.workloadIdentityUser` sobre su service account destino.
 En el preflight de `prepare` se permite únicamente un subconjunto válido del
 estado anterior, incluido el estado vacío; el postcondition siempre exige el
-conjunto exacto recién descrito. Además relee
+conjunto exacto recién descrito. Las comprobaciones que dependen del índice de
+Cloud Asset reintentan durante una ventana fija después de crear identidades o
+bindings y fallan si el estado exacto no converge. Además relee
 las políticas conocidas de proyecto, Artifact Registry, Secrets, KMS, runtime
 y Cloud Run.
 Builder y deployers deben aparecer sin claves y sin adjunción a workloads: se
@@ -208,6 +226,8 @@ Run, mientras la org policy prohíbe adjuntarlos desde otro proyecto. Las
 políticas de cada runtime SA contienen sólo el `actAs` del deployer de su
 entorno y su autoridad efectiva debe coincidir con la allowlist propia del
 componente.
+Después de `close`, una verificación STG acepta y exige el trust canónico
+Build+STG+PRD; la regla de cero PRD aplica únicamente antes de ese corte.
 
 Cloud Asset Search y Policy Analyzer son fuentes de consistencia eventual:
 `fullyExplored` prueba completitud del snapshot analizado, no frescura de un
@@ -221,11 +241,16 @@ deben presentarse como garantía universal de frescura de Cloud Asset.
 `make legacy-wif-test` prueba el corte sin tocar GCP: acepta sólo canaries
 `stg operational` del SHA, árbol y workflow exactos; rechaza `bootstrap`, un
 SHA ancestro, un árbol distinto, análisis IAM incompleto o con autoridad
-residual, un deployer PRD provisionado prematuramente, grupos de ancestros cuya
-membresía no pueda comprobarse, referencias Cloud Asset en otra región, errores
-de Service Usage y marcadores cuyos eventos estén incompletos, desordenados o
-pertenezcan a actores diferentes. También demuestra que el modo interno de test
-no puede usarse al ejecutar directamente el script de retiro.
+residual, un deployer PRD provisionado prematuramente, referencias Cloud Asset
+en otra región, errores de Service Usage y marcadores cuyos eventos estén
+incompletos, desordenados o pertenezcan a actores diferentes. Como excepción
+transitoria, el script humano one-time `retire-legacy-pymes-wif.sh` lee en modo
+read-only las policies de ancestros para cerrar la identidad histórica; no crea
+grants ni muta folder, organización u otros proyectos. Esa excepción no forma
+parte de `prepare`, `finalize` ni de una release normal. Ni ese script ni
+`migrate-project-secret-access.sh` pueden ejecutarse mientras Pymes v2 siga
+activo; sus tests sólo acreditan herramientas futuras, no una acción requerida
+para desplegar v3.
 
 La release consulta GitHub antes de solicitar una credencial WIF. En cada
 ejecución comprueba mediante la vista pública de la rama que `main` esté
@@ -248,6 +273,9 @@ para STG y PRD sin permitir que se invoque `gcloud`. El gate positivo cubre:
   Clerk, PerGo y Google en el mismo origen público;
 - imágenes exclusivamente por digest, secretos por versión numérica,
   invokers exactos y ausencia de `roles/run.invoker` a nivel proyecto;
+- los tres migradores y el job de grants reciben únicamente la variable de
+  entorno que les corresponde, se adjuntan al Cloud SQL canónico y verifican
+  base, `session_user` y `current_user` antes de ejecutar DDL o conceder roles;
 - API, worker, Fiscal y provisioner con Direct VPC según su necesidad, además
   de Private Google Access y Public NAT comprobables. El bootstrap exige
   cobertura `ALL_IP_RANGES` de la única subred y converge de forma segura un

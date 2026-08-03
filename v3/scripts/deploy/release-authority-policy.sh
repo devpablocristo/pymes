@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-pymes_release_expected_folder=673291958610
-pymes_release_expected_organization=663017421195
 pymes_release_expected_project_number=884236221349
+pymes_release_asset_retry_attempts=24
+pymes_release_asset_retry_seconds=5
 pymes_release_pool_path=projects/884236221349/locations/global/workloadIdentityPools/pymes-v3-release-pool
 pymes_release_build_principal="principal://iam.googleapis.com/${pymes_release_pool_path}/subject/repo:devpablocristo/pymes:ref:refs/heads/main"
 pymes_release_stg_principal="principal://iam.googleapis.com/${pymes_release_pool_path}/subject/repo:devpablocristo/pymes:environment:stg"
@@ -37,15 +37,6 @@ pymes_release_kms_policy_read_permissions=(
   cloudkms.keyRings.get
   cloudkms.keyRings.getIamPolicy
   cloudkms.locations.get
-)
-
-pymes_release_organization_iam_read_permissions=(
-  iam.roles.get
-  resourcemanager.organizations.getIamPolicy
-)
-
-pymes_release_folder_iam_read_permissions=(
-  resourcemanager.folders.getIamPolicy
 )
 
 pymes_release_inverse_project_permissions=(
@@ -148,26 +139,6 @@ pymes_release_kms_policy_read_permissions_csv() {
 
 pymes_release_kms_policy_read_permissions_json() {
   printf '%s\n' "${pymes_release_kms_policy_read_permissions[@]}" |
-    jq -Rsc 'split("\n") | map(select(length > 0)) | sort'
-}
-
-pymes_release_organization_iam_read_permissions_csv() {
-  local IFS=,
-  printf '%s\n' "${pymes_release_organization_iam_read_permissions[*]}"
-}
-
-pymes_release_organization_iam_read_permissions_json() {
-  printf '%s\n' "${pymes_release_organization_iam_read_permissions[@]}" |
-    jq -Rsc 'split("\n") | map(select(length > 0)) | sort'
-}
-
-pymes_release_folder_iam_read_permissions_csv() {
-  local IFS=,
-  printf '%s\n' "${pymes_release_folder_iam_read_permissions[*]}"
-}
-
-pymes_release_folder_iam_read_permissions_json() {
-  printf '%s\n' "${pymes_release_folder_iam_read_permissions[@]}" |
     jq -Rsc 'split("\n") | map(select(length > 0)) | sort'
 }
 
@@ -794,6 +765,31 @@ pymes_search_release_pool_iam_assets() {
     --format=json
 }
 
+pymes_read_release_pool_iam_assets_until_valid() {
+  local project="$1" environment="$2" mode="$3"
+  local attempt assets_json last_assets_json read_succeeded=false
+  for ((attempt = 1; attempt <= pymes_release_asset_retry_attempts; attempt++)); do
+    assets_json=
+    if assets_json=$(pymes_search_release_pool_iam_assets "$project"); then
+      read_succeeded=true
+      last_assets_json=$assets_json
+      if pymes_validate_release_pool_iam_assets \
+        "$assets_json" "$environment" "$mode" >/dev/null 2>&1; then
+        printf '%s\n' "$assets_json"
+        return 0
+      fi
+    fi
+    [[ "$attempt" -eq "$pymes_release_asset_retry_attempts" ]] ||
+      sleep "$pymes_release_asset_retry_seconds"
+  done
+  [[ "$read_succeeded" == "true" ]] || {
+    echo "release-pool Cloud Asset inventory could not be read after ${pymes_release_asset_retry_attempts} attempts" >&2
+    return 1
+  }
+  pymes_validate_release_pool_iam_assets \
+    "$last_assets_json" "$environment" "$mode"
+}
+
 pymes_assert_policy_has_no_release_pool_members() {
   local policy_json="$1" description="$2"
   jq -e --arg pool "$pymes_release_pool_path" '
@@ -864,12 +860,13 @@ pymes_validate_release_pool_iam_assets() {
       ($build_count <= 1 and $stg_count <= 1 and $prd_count <= 1) and
       (
         if $required == $stg then
-          $prd_count == 0 and
           (
             if $mode == "exact" then
-              $build_count == 1 and $stg_count == 1
+              $build_count == 1 and
+              $stg_count == 1 and
+              ($prd_count == 0 or $prd_count == 1)
             else
-              true
+              $prd_count == 0
             end
           )
         else
@@ -954,19 +951,54 @@ pymes_validate_release_account_workload_inventory() {
 
 pymes_verify_release_account_not_attached() {
   local project="$1" account="$2" description="$3"
-  local assets_json services_json jobs_json revisions_json
-  assets_json=$(gcloud asset search-all-resources \
-    --scope="projects/${project}" \
-    --query="$account" \
-    --read-mask='name,assetType,location,additionalAttributes' \
-    --format=json)
-  services_json=$(CLOUDSDK_RUN_REGION= gcloud run services list \
-    --project="$project" --format=json)
-  jobs_json=$(CLOUDSDK_RUN_REGION= gcloud run jobs list \
-    --project="$project" --format=json)
-  revisions_json=$(CLOUDSDK_RUN_REGION= gcloud run revisions list \
-    --project="$project" --format=json)
+  local assets_json services_json jobs_json revisions_json attempt
+  local last_assets_json last_services_json last_jobs_json last_revisions_json
+  local snapshot_complete have_complete_snapshot=false
+  for ((attempt = 1; attempt <= pymes_release_asset_retry_attempts; attempt++)); do
+    assets_json=
+    services_json=
+    jobs_json=
+    revisions_json=
+    snapshot_complete=true
+    if ! assets_json=$(gcloud asset search-all-resources \
+      --scope="projects/${project}" \
+      --query="$account" \
+      --read-mask='name,assetType,location,additionalAttributes' \
+      --format=json); then
+      snapshot_complete=false
+    fi
+    if ! services_json=$(CLOUDSDK_RUN_REGION= gcloud run services list \
+      --project="$project" --format=json); then
+      snapshot_complete=false
+    fi
+    if ! jobs_json=$(CLOUDSDK_RUN_REGION= gcloud run jobs list \
+      --project="$project" --format=json); then
+      snapshot_complete=false
+    fi
+    if ! revisions_json=$(CLOUDSDK_RUN_REGION= gcloud run revisions list \
+      --project="$project" --format=json); then
+      snapshot_complete=false
+    fi
+    if [[ "$snapshot_complete" == "true" ]]; then
+      have_complete_snapshot=true
+      last_assets_json=$assets_json
+      last_services_json=$services_json
+      last_jobs_json=$jobs_json
+      last_revisions_json=$revisions_json
+      if pymes_validate_release_account_workload_inventory \
+        "$assets_json" "$services_json" "$jobs_json" "$account" "$description" \
+        "$revisions_json" >/dev/null 2>&1; then
+        return 0
+      fi
+    fi
+    [[ "$attempt" -eq "$pymes_release_asset_retry_attempts" ]] ||
+      sleep "$pymes_release_asset_retry_seconds"
+  done
+  [[ "$have_complete_snapshot" == "true" ]] || {
+    echo "$description inventory could not be read completely after ${pymes_release_asset_retry_attempts} attempts" >&2
+    return 1
+  }
   pymes_validate_release_account_workload_inventory \
-    "$assets_json" "$services_json" "$jobs_json" "$account" "$description" \
-    "$revisions_json"
+    "$last_assets_json" "$last_services_json" "$last_jobs_json" \
+    "$account" "$description" "$last_revisions_json"
 }

@@ -5,8 +5,26 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=release-evidence-lib.sh
 source "$script_dir/release-evidence-lib.sh"
 
+bootstrap_release_evidence_ensure_iam_read_role() {
+  local role_id role_json
+  role_id=${PYMES_RELEASE_EVIDENCE_IAM_READ_ROLE##*/}
+  if ! gcloud iam roles describe "$role_id" \
+    --project="$PYMES_RELEASE_EVIDENCE_PROJECT" >/dev/null 2>&1; then
+    gcloud iam roles create "$role_id" \
+      --project="$PYMES_RELEASE_EVIDENCE_PROJECT" \
+      --title="Pymes v3 release evidence IAM reader" \
+      --description="Read only the IAM policy of an explicitly bound release-evidence bucket" \
+      --stage=GA \
+      --permissions=storage.buckets.getIamPolicy >/dev/null || return
+  fi
+  role_json=$(gcloud iam roles describe "$role_id" \
+    --project="$PYMES_RELEASE_EVIDENCE_PROJECT" --format=json) || return
+  pymes_release_evidence_validate_iam_read_role "$role_json"
+}
+
 bootstrap_release_evidence_main() {
   local mode environment bucket bucket_uri project_json bucket_json policy_json
+  local role_id role_json
   local lock_ack
   mode=${PYMES_RELEASE_EVIDENCE_MODE:-plan}
   environment=${PYMES_RELEASE_EVIDENCE_ENV:-}
@@ -64,6 +82,7 @@ bootstrap_release_evidence_main() {
     pymes_release_evidence_validate_bucket \
       "$bucket_json" "$environment" false || return
 
+    bootstrap_release_evidence_ensure_iam_read_role || return
     gcloud storage buckets add-iam-policy-binding "$bucket_uri" \
       --member="serviceAccount:${PYMES_RELEASE_EVIDENCE_BUILDER}" \
       --role=roles/storage.legacyBucketReader >/dev/null || return
@@ -73,8 +92,15 @@ bootstrap_release_evidence_main() {
     gcloud storage buckets add-iam-policy-binding "$bucket_uri" \
       --member="serviceAccount:${PYMES_RELEASE_EVIDENCE_BUILDER}" \
       --role=roles/storage.objectViewer >/dev/null || return
+    gcloud storage buckets add-iam-policy-binding "$bucket_uri" \
+      --member="serviceAccount:${PYMES_RELEASE_EVIDENCE_BUILDER}" \
+      --role="$PYMES_RELEASE_EVIDENCE_IAM_READ_ROLE" >/dev/null || return
   fi
 
+  role_id=${PYMES_RELEASE_EVIDENCE_IAM_READ_ROLE##*/}
+  role_json=$(gcloud iam roles describe "$role_id" \
+    --project="$PYMES_RELEASE_EVIDENCE_PROJECT" --format=json) || return
+  pymes_release_evidence_validate_iam_read_role "$role_json" || return
   bucket_json=$(gcloud storage buckets describe "$bucket_uri" --format=json) ||
     return
   policy_json=$(gcloud storage buckets get-iam-policy "$bucket_uri" \

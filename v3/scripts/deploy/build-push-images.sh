@@ -4,6 +4,10 @@ set -euo pipefail
 # Builds every deployable Pymes v3 image from reviewed, clean source trees and
 # writes a strict KEY=VALUE manifest containing digest-only image references.
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=gcp-target-policy.sh
+source "$script_dir/gcp-target-policy.sh"
+
 operation=${1:-build}
 case "$operation" in
   build|verify-source-pins|verify-attestations) ;;
@@ -19,6 +23,8 @@ esac
 project=${PYMES_GCP_PROJECT:-pymes-dev-352318}
 region=${PYMES_GCP_REGION:-us-central1}
 repository=${PYMES_ARTIFACT_REPOSITORY:-pymes}
+pymes_require_canonical_project_region "$project" "$region"
+pymes_require_canonical_artifact_repository "$repository"
 source_sha=${PYMES_SOURCE_SHA:-${GITHUB_SHA:-}}
 accounting_context=${OPEN_ACCOUNTING_CONTEXT:-.deps/open-accounting}
 pymes_dockerfile=v3/Dockerfile

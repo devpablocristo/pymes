@@ -245,9 +245,19 @@ paths:
           in: query
           required: true
           schema: { type: string, format: date }
+        - name: limit
+          in: query
+          required: false
+          description: Cantidad de asientos por página para general_ledger.
+          schema: { type: integer, minimum: 1, maximum: 500, default: 200 }
+        - name: cursor
+          in: query
+          required: false
+          description: Cursor opaco de continuación para general_ledger.
+          schema: { type: string, minLength: 1, maxLength: 2048 }
         - $ref: '#/components/parameters/CorrelationId'
       responses:
-        '200': { description: Reporte versionado, content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '200': { description: Reporte versionado, content: { application/json: { schema: { $ref: '#/components/schemas/AccountingReport' } } } }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -355,6 +365,92 @@ components:
       type: string
       pattern: '^-?[0-9]+(\\.[0-9]+)?$'
       description: Decimal base diez exacto; no JSON number.
+    AccountingReport:
+      type: object
+      description: >-
+        Sobre tipado común de reportes. Los campos de general_ledger son
+        opcionales en el schema compartido porque los demás reportes conservan
+        sus payloads propios; cuando report=general_ledger, entries y has_more
+        siempre están presentes y next_cursor sólo aparece si existe otra página.
+      additionalProperties: true
+      properties:
+        organization_id: { type: string }
+        report:
+          type: string
+          enum: [trial_balance, general_ledger, aging_receivables, aging_payables]
+        as_of: { type: string, format: date }
+        entries:
+          type: array
+          items: { $ref: '#/components/schemas/GeneralLedgerEntry' }
+        has_more: { type: boolean }
+        next_cursor: { type: string, minLength: 1, maxLength: 2048 }
+        generated_at: { type: string, format: date-time }
+    GeneralLedgerEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tenant_id
+        - entry_number
+        - entry_date
+        - description
+        - requires_evidence
+        - status
+        - lines
+        - created_at
+        - created_by
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        tenant_id: { type: string }
+        entry_number: { type: string }
+        entry_date: { type: string, format: date-time }
+        description: { type: string }
+        reference: { type: string }
+        source_type: { type: string }
+        source_id: { type: string }
+        requires_evidence: { type: boolean }
+        status: { type: string, enum: [DRAFT, POSTED, VOIDED] }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/GeneralLedgerEntryLine' }
+        posted_at: { type: string, format: date-time }
+        posted_by: { type: string }
+        post_reason: { type: string }
+        voided_at: { type: string, format: date-time }
+        voided_by: { type: string }
+        void_reason: { type: string }
+        created_at: { type: string, format: date-time }
+        created_by: { type: string }
+    GeneralLedgerEntryLine:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tenant_id
+        - journal_entry_id
+        - account_id
+        - debit_amount
+        - credit_amount
+        - currency
+        - exchange_rate
+        - base_debit
+        - base_credit
+        - vat_rate
+        - is_vat_inclusive
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        tenant_id: { type: string }
+        journal_entry_id: { $ref: '#/components/schemas/UUID' }
+        account_id: { $ref: '#/components/schemas/UUID' }
+        description: { type: string }
+        debit_amount: { $ref: '#/components/schemas/Decimal' }
+        credit_amount: { $ref: '#/components/schemas/Decimal' }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        exchange_rate: { $ref: '#/components/schemas/Decimal' }
+        base_debit: { $ref: '#/components/schemas/Decimal' }
+        base_credit: { $ref: '#/components/schemas/Decimal' }
+        vat_rate: { $ref: '#/components/schemas/Decimal' }
+        is_vat_inclusive: { type: boolean }
     Money:
       type: object
       required: [amount, currency]

@@ -932,6 +932,8 @@ verify_service_env_value "$prefix-accounting-admin" "$accounting_admin_json" PYM
 verify_service_env_value "$prefix-accounting-admin" "$accounting_admin_json" PORT 8080
 verify_service_env_value "$prefix-accounting-admin" "$accounting_admin_json" ACCOUNTING_ADMIN_OPERATION serve
 verify_service_env_value "$prefix-accounting-admin" "$accounting_admin_json" \
+  ACCOUNTING_DEPLOY_ENV "$PYMES_DEPLOY_ENV"
+verify_service_env_value "$prefix-accounting-admin" "$accounting_admin_json" \
   ACCOUNTING_RUNTIME_ROLE "pymes_v3_accounting_${PYMES_DEPLOY_ENV}"
 verify_service_env_value "$prefix-accounting-admin" "$accounting_admin_json" \
   ACCOUNTING_OWNER_ROLE "pymes_v3_accounting_owner_${PYMES_DEPLOY_ENV}"
@@ -999,6 +1001,7 @@ accounting_env_allowlist=(
 accounting_admin_env_allowlist=(
   ACCOUNTING_ADMIN_DATABASE_URL
   ACCOUNTING_ADMIN_OPERATION
+  ACCOUNTING_DEPLOY_ENV
   ACCOUNTING_OWNER_ROLE
   ACCOUNTING_RUNTIME_ROLE
   PORT
@@ -1193,14 +1196,18 @@ verify_secret_refs job "$prefix-provision-org" "$(job_json "$prefix-provision-or
 provision_json=$(job_json "$prefix-provision-org")
 grants_json=$(job_json "$prefix-accounting-grants")
 verify_env_allowlist job "$prefix-migrate" "$(job_json "$prefix-migrate")" \
-  PYMES_DATABASE_URL
+  PYMES_DATABASE_URL \
+  PYMES_DEPLOY_ENV
 verify_env_allowlist job "$prefix-fiscal-migrate" "$(job_json "$prefix-fiscal-migrate")" \
-  FISCAL_DATABASE_URL
+  FISCAL_DATABASE_URL \
+  FISCAL_DEPLOY_ENV
 verify_env_allowlist job "$prefix-accounting-migrate" "$(job_json "$prefix-accounting-migrate")" \
-  DATABASE_URL
+  DATABASE_URL \
+  PYMES_DEPLOY_ENV
 verify_env_allowlist job "$prefix-accounting-grants" "$grants_json" \
   ACCOUNTING_ADMIN_DATABASE_URL \
   ACCOUNTING_ADMIN_OPERATION \
+  ACCOUNTING_DEPLOY_ENV \
   ACCOUNTING_OWNER_ROLE \
   ACCOUNTING_RUNTIME_ROLE
 verify_env_allowlist job "$prefix-provision-org" "$provision_json" \
@@ -1212,6 +1219,14 @@ verify_env_allowlist job "$prefix-provision-org" "$provision_json" \
   PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS
 verify_job_env_value "$prefix-accounting-grants" "$grants_json" \
   ACCOUNTING_ADMIN_OPERATION sync-runtime-grants
+verify_job_env_value "$prefix-migrate" "$(job_json "$prefix-migrate")" \
+  PYMES_DEPLOY_ENV "$PYMES_DEPLOY_ENV"
+verify_job_env_value "$prefix-fiscal-migrate" "$(job_json "$prefix-fiscal-migrate")" \
+  FISCAL_DEPLOY_ENV "$PYMES_DEPLOY_ENV"
+verify_job_env_value "$prefix-accounting-migrate" "$(job_json "$prefix-accounting-migrate")" \
+  PYMES_DEPLOY_ENV "$PYMES_DEPLOY_ENV"
+verify_job_env_value "$prefix-accounting-grants" "$grants_json" \
+  ACCOUNTING_DEPLOY_ENV "$PYMES_DEPLOY_ENV"
 verify_job_env_value "$prefix-accounting-grants" "$grants_json" \
   ACCOUNTING_RUNTIME_ROLE "pymes_v3_accounting_${PYMES_DEPLOY_ENV}"
 verify_job_env_value "$prefix-accounting-grants" "$grants_json" \

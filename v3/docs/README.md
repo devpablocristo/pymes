@@ -32,33 +32,51 @@ identidades runtime allowlisted y una única mutación inicial por recurso. La
 evidencia se valida sólo después de diez minutos y dos lecturas estables, con
 un margen superior de dos minutos para timestamps de auditoría. Además, cada
 release verifica la autoridad completa y efectiva de builder y deployer antes
-de usar el builder y nuevamente antes del deploy.
+de usar el builder y nuevamente antes del deploy. Para el alta inicial,
+`initial-seed-build` exige que los once recursos Cloud Run estén ausentes,
+publica imágenes y evidencia desde GitHub y termina con Deploy omitido; así el
+seed humano sólo crea recursos inertes desde el manifiesto retenido.
+El builder valida en vivo el IAM de ese bucket mediante el custom role
+`pymesV3ReleaseEvidenceIamRead`, que contiene sólo
+`storage.buckets.getIamPolicy` y está ligado al bucket Pymes objetivo, no al
+proyecto.
 
 El bootstrap IAM sólo puede ejecutarse desde un checkout limpio cuyo HEAD y
 árbol coincidan con `main` remoto, por el operador directo revisado y sin
-impersonación de `gcloud`. Los gates fijan la cadena proyecto/folder/organización
-y los roles lectores exactos de ancestros; exigen las org policies que bloquean
-claves y adjunción cross-project; rechazan bindings directos del pool WIF;
-inventarían adjunciones de las identidades de release; y comparan la autoridad
-efectiva, incluida impersonación, de las diez identidades runtime contra
-allowlists por componente. La creación inicial de los dos custom roles de
-organización y sus bindings requiere administración humana explícita y
-`orgpolicy.googleapis.com`; esa capacidad no pertenece al workflow.
+impersonación de `gcloud`. Los gates fijan proyecto, número, región y recursos
+Pymes; exigen las org policies efectivas que bloquean claves y adjunción
+cross-project; rechazan bindings directos del pool WIF; inventarían adjunciones
+de las identidades de release; y comparan mediante Policy Analyzer
+project-scoped y auditoría inversa la autoridad definida en el proyecto Pymes o
+sus recursos contra allowlists por componente. Release, `prepare` y `finalize`
+no leen ni modifican folder, organización u otros proyectos. La única excepción
+transitoria es la auditoría humana read-only de ancestros dentro del retiro
+one-time del WIF legado; no crea grants ni forma parte del workflow normal.
+`gcp-target-policy.sh` actúa como fusible común antes de las escrituras normales:
+fija `pymes-dev-352318`, `us-central1`, Artifact Registry `pymes`, la conexión
+Cloud SQL `pymes-dev-db` y el target de red
+`default`/`pymes-v3-serverless`. Los migradores verifican además base y roles
+PostgreSQL efectivos antes de ejecutar DDL. Tanto
+`retire-legacy-pymes-wif.sh` como
+`migrate-project-secret-access.sh` quedan fuera del release v3 y no se ejecutan
+mientras v2 siga activo.
 
 Las reejecuciones de GitHub quedan prohibidas antes de autenticar al builder:
 un fallo se continúa con un nuevo dispatch. Cloud Asset y Policy Analyzer son
 eventualmente consistentes, por lo que una lectura `fullyExplored` no sustituye
 la ventana sin cambios ni la repetición estable exigidas antes de un cutover.
 
-El primer alta de STG se divide deliberadamente en dos ejecuciones. La etapa
-`bootstrap` crea candidatos privados con tráfico cero, Fiscal mock, worker
-detenido e integraciones externas deshabilitadas; esto permite conocer la URL
-estable sin exponer el producto. Después de configurar Clerk y reemplazar el
-secreto temporal del webhook, una ejecución `operational` vuelve a verificar
-todo y recién entonces promueve las revisiones. El worker permanece en
-escalado manual cero, sin health check de despliegue, hasta que su candidato
+El primer alta de STG se divide deliberadamente en tres pasos:
+`initial-seed-build` construye sin desplegar, el seed humano crea los recursos
+inertes y `bootstrap` crea candidatos privados con tráfico cero, Fiscal mock,
+worker detenido e integraciones externas deshabilitadas. Esto permite conocer
+la URL estable sin exponer el producto. Después de configurar Clerk y
+reemplazar el secreto temporal del webhook, una ejecución `operational` vuelve
+a verificar todo y recién entonces promueve las revisiones. El worker permanece
+en escalado manual cero, sin health check de despliegue, hasta que su candidato
 sea el último en recibir tráfico; recién allí se activa una instancia.
-`bootstrap` no está permitido en PRD ni cuenta como canary operativo.
+`initial-seed-build` no cuenta como release ni canary; `bootstrap` no está
+permitido en PRD ni cuenta como canary operativo.
 
 Open Accounting está fusionado y su CI remoto es verde en
 `ad1c182093986279aac7fb6582f7788202112a78`. Para el baseline integrado, Pymes

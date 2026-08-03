@@ -8,6 +8,10 @@ umask 077
 # referenced secret must have an enabled numeric version, private callers use
 # Direct VPC egress, and production fiscal storage always uses Cloud KMS.
 
+target_policy_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=gcp-target-policy.sh
+source "$target_policy_dir/gcp-target-policy.sh"
+
 : "${PYMES_DEPLOY_ENV:?set PYMES_DEPLOY_ENV to stg or prd}"
 case "$PYMES_DEPLOY_ENV" in stg|prd) ;; *) echo "PYMES_DEPLOY_ENV must be stg or prd" >&2; exit 2 ;; esac
 
@@ -181,6 +185,8 @@ subnet=${PYMES_VPC_SUBNET:-pymes-v3-serverless}
 subnet_cidr=${PYMES_VPC_SUBNET_CIDR:-10.120.0.0/24}
 nat_router=${PYMES_VPC_NAT_ROUTER:-pymes-v3-serverless}
 nat_name=${PYMES_VPC_NAT_NAME:-pymes-v3-serverless}
+pymes_require_canonical_project_region "$project" "$region"
+pymes_require_canonical_cloudsql_connection "$PYMES_CLOUDSQL_INSTANCE"
 if [[ ! "$network" =~ ^[a-z]([-a-z0-9]*[a-z0-9])?$ ||
       ! "$subnet" =~ ^[a-z]([-a-z0-9]*[a-z0-9])?$ ||
       ! "$nat_router" =~ ^[a-z]([-a-z0-9]*[a-z0-9])?$ ||
@@ -225,6 +231,8 @@ if (( (subnet_address_value & subnet_host_mask) != 0 )); then
   echo "PYMES_VPC_SUBNET_CIDR must be aligned to its prefix" >&2
   exit 2
 fi
+pymes_require_canonical_network_target \
+  "$network" "$subnet" "$subnet_cidr" "$nat_router" "$nat_name"
 export CLOUDSDK_CORE_PROJECT="$project"
 export PYMES_GCP_PROJECT="$project"
 export PYMES_GCP_REGION="$region"
@@ -330,19 +338,10 @@ else
   echo "DEPLOY STAGE stage=operational environment=$PYMES_DEPLOY_ENV promotion=enabled"
 fi
 
-version_pattern="^projects/${project}/locations/${region}/keyRings/${prefix}/cryptoKeys/internal-jwt-signing/cryptoKeyVersions/[1-9][0-9]*$"
-if [[ ! "$PYMES_INTERNAL_KMS_KEY_VERSION" =~ $version_pattern ]]; then
-  echo "PYMES_INTERNAL_KMS_KEY_VERSION must pin a numeric version in the ${prefix} key ring" >&2
-  exit 2
-fi
-IFS=',' read -r -a overlap_versions <<<"$PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS"
-for version in "${overlap_versions[@]}"; do
-  [[ -z "$version" ]] && continue
-  if [[ ! "$version" =~ $version_pattern ]]; then
-    echo "every PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS entry must pin a numeric version in the ${prefix} key ring" >&2
-    exit 2
-  fi
-done
+pymes_require_canonical_internal_kms_versions \
+  "$PYMES_DEPLOY_ENV" \
+  "$PYMES_INTERNAL_KMS_KEY_VERSION" \
+  "$PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS"
 
 tracing_environment=
 tracing_endpoint=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
@@ -1265,12 +1264,13 @@ deploy_web() {
 }
 
 migrate() {
-  local job="$1" image="$2" service_account="$3" secrets="$4"
+  local job="$1" image="$2" service_account="$3" secrets="$4" environment="$5"
   local -a arguments=(
     --region="$region" --image="$image" --service-account="$service_account" \
     --labels="app=pymes-v3,env=$PYMES_DEPLOY_ENV,pymes-v3-release=$PYMES_RELEASE_SHA" \
     --set-cloudsql-instances="$PYMES_CLOUDSQL_INSTANCE" --set-secrets="$secrets" \
-    --clear-env-vars --command="" --args="" --clear-volumes --clear-volume-mounts \
+    --set-env-vars="^|^$environment" \
+    --command="" --args="" --clear-volumes --clear-volume-mounts \
     --tasks=1 --max-retries=0 --execute-now --wait --quiet
   )
   append_sidecar_removal job "$job" arguments
@@ -1919,15 +1919,18 @@ if [[ "$dry_run" != "true" ]]; then
 fi
 
 migrate "$prefix-migrate" "$PYMES_MIGRATE_IMAGE" "$migrate_sa" \
-  "PYMES_DATABASE_URL=$(secret_ref "$prefix-migrate-database-url")"
+  "PYMES_DATABASE_URL=$(secret_ref "$prefix-migrate-database-url")" \
+  "PYMES_DEPLOY_ENV=$PYMES_DEPLOY_ENV"
 migrate "$prefix-fiscal-migrate" "$PYMES_FISCAL_MIGRATE_IMAGE" "$fiscal_migrate_sa" \
-  "FISCAL_DATABASE_URL=$(secret_ref "$prefix-fiscal-migrate-database-url")"
+  "FISCAL_DATABASE_URL=$(secret_ref "$prefix-fiscal-migrate-database-url")" \
+  "FISCAL_DEPLOY_ENV=$PYMES_DEPLOY_ENV"
 migrate "$prefix-accounting-migrate" "$PYMES_ACCOUNTING_MIGRATE_IMAGE" "$accounting_migrate_sa" \
-  "DATABASE_URL=$(secret_ref "$prefix-accounting-migrate-database-url")"
+  "DATABASE_URL=$(secret_ref "$prefix-accounting-migrate-database-url")" \
+  "PYMES_DEPLOY_ENV=$PYMES_DEPLOY_ENV"
 run_job "$prefix-accounting-grants" "$PYMES_ACCOUNTING_ADMIN_IMAGE" \
   "$accounting_admin_sa" \
   "ACCOUNTING_ADMIN_DATABASE_URL=$(secret_ref "$prefix-accounting-admin-database-url")" \
-  "ACCOUNTING_ADMIN_OPERATION=sync-runtime-grants|ACCOUNTING_RUNTIME_ROLE=pymes_v3_accounting_${PYMES_DEPLOY_ENV}|ACCOUNTING_OWNER_ROLE=pymes_v3_accounting_owner_${PYMES_DEPLOY_ENV}"
+  "ACCOUNTING_ADMIN_OPERATION=sync-runtime-grants|ACCOUNTING_DEPLOY_ENV=$PYMES_DEPLOY_ENV|ACCOUNTING_RUNTIME_ROLE=pymes_v3_accounting_${PYMES_DEPLOY_ENV}|ACCOUNTING_OWNER_ROLE=pymes_v3_accounting_owner_${PYMES_DEPLOY_ENV}"
 
 deploy "$fiscal_service" "$PYMES_FISCAL_IMAGE" "$fiscal_sa" \
   "FISCAL_DATABASE_URL=$(secret_ref "$prefix-fiscal-database-url")" \
@@ -1938,7 +1941,7 @@ deploy "$accounting_service" "$PYMES_ACCOUNTING_IMAGE" "$accounting_sa" \
 deploy "$accounting_admin_service" "$PYMES_ACCOUNTING_ADMIN_IMAGE" \
   "$accounting_admin_sa" \
   "ACCOUNTING_ADMIN_DATABASE_URL=$(secret_ref "$prefix-accounting-admin-database-url")" \
-  "ACCOUNTING_ADMIN_OPERATION=serve|ACCOUNTING_RUNTIME_ROLE=pymes_v3_accounting_${PYMES_DEPLOY_ENV}|ACCOUNTING_OWNER_ROLE=pymes_v3_accounting_owner_${PYMES_DEPLOY_ENV}|PYMES_ENVIRONMENT=production|PYMES_INTERNAL_ISSUER=pymes-v3|PYMES_INTERNAL_JWKS_JSON=$PYMES_INTERNAL_JWKS_JSON|PORT=8080" \
+  "ACCOUNTING_ADMIN_OPERATION=serve|ACCOUNTING_DEPLOY_ENV=$PYMES_DEPLOY_ENV|ACCOUNTING_RUNTIME_ROLE=pymes_v3_accounting_${PYMES_DEPLOY_ENV}|ACCOUNTING_OWNER_ROLE=pymes_v3_accounting_owner_${PYMES_DEPLOY_ENV}|PYMES_ENVIRONMENT=production|PYMES_INTERNAL_ISSUER=pymes-v3|PYMES_INTERNAL_JWKS_JSON=$PYMES_INTERNAL_JWKS_JSON|PORT=8080" \
   internal 0 private throttled none
 
 api_principal="serviceAccount:$api_sa"

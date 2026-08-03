@@ -18,7 +18,7 @@ sig = "099a796338ca72a9"
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
 target = "v3/scripts/deploy/bootstrap-release-evidence.sh"
-sig = "72bcc290dc2f5fed"
+sig = "803541e39174006c"
 
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
@@ -33,7 +33,7 @@ sig = "1300dcdaf847eeba"
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
 target = "v3/scripts/deploy/cloud-run-security-check.sh"
-sig = "e5a4489ac007531d"
+sig = "884400afc19c7609"
 
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
@@ -48,7 +48,7 @@ sig = "2536c44642661aa2"
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
 target = "v3/scripts/deploy/release-evidence-test.sh"
-sig = "205b143837784f9c"
+sig = "23af4687d7bc2f48"
 
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
@@ -68,12 +68,12 @@ sig = "b2f106a6b8914825"
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
 target = "v3/scripts/deploy/verify-cloud-run.sh"
-sig = "3176443ed9cdae50"
+sig = "c50b66101f1ad659"
 
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
 target = "v3/scripts/deploy/workflow-policy-check.sh"
-sig = "11605fdd9b427c78"
+sig = "411123f197034c46"
 
 [[bindings]]
 doc = "v3/docs/05-roadmap.md"
@@ -173,7 +173,7 @@ sig = "b5293e67a11c1e45"
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
 target = ".github/workflows/v3-release.yml"
-sig = "4a60c87ce346276a"
+sig = "533b244c0ceb40ec"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
@@ -193,22 +193,22 @@ sig = "cb0c4d63316c0049"
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
 target = "v3/scripts/deploy/bootstrap-data-encryption.sh"
-sig = "8d637b409df06ea5"
+sig = "ea9064700221d9ec"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
 target = "v3/scripts/deploy/bootstrap-network-egress.sh"
-sig = "244317c84183fd06"
+sig = "f0d2d16943a79880"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
 target = "v3/scripts/deploy/bootstrap-release-evidence.sh"
-sig = "72bcc290dc2f5fed"
+sig = "803541e39174006c"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
 target = "v3/scripts/deploy/bootstrap-release-identities.sh"
-sig = "1997219df18eee1a"
+sig = "83059ed74e678b31"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
@@ -223,7 +223,7 @@ sig = "1300dcdaf847eeba"
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
 target = "v3/scripts/deploy/cloud-run.sh"
-sig = "cf0d54b7991bf914"
+sig = "0d824ab7ae1dfb94"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
@@ -263,7 +263,7 @@ sig = "b2f106a6b8914825"
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
 target = "v3/scripts/deploy/verify-cloud-run.sh"
-sig = "3176443ed9cdae50"
+sig = "c50b66101f1ad659"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
@@ -363,7 +363,7 @@ sig = "aa76c70db088d865"
 [[bindings]]
 doc = "v3/docs/README.md"
 target = ".github/workflows/v3-release.yml"
-sig = "4a60c87ce346276a"
+sig = "533b244c0ceb40ec"
 
 [[bindings]]
 doc = "v3/docs/README.md"
@@ -388,12 +388,12 @@ sig = "b5293e67a11c1e45"
 [[bindings]]
 doc = "v3/docs/adr/0006-transporte-privado-cloud-run.md"
 target = "v3/scripts/deploy/cloud-run-security-check.sh"
-sig = "e5a4489ac007531d"
+sig = "884400afc19c7609"
 
 [[bindings]]
 doc = "v3/docs/adr/0006-transporte-privado-cloud-run.md"
 target = "v3/scripts/deploy/cloud-run.sh"
-sig = "cf0d54b7991bf914"
+sig = "0d824ab7ae1dfb94"
 
 [[bindings]]
 doc = "v3/docs/adr/0011-arquitectura-go-vertical-y-adapters.md"

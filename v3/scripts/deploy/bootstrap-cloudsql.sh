@@ -4,6 +4,10 @@ set -euo pipefail
 # Provisions least-privilege PostgreSQL roles for Pymes v3. Administrative
 # credentials are accepted through libpq environment variables so no password
 # appears in the psql process arguments.
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=gcp-target-policy.sh
+source "$script_dir/gcp-target-policy.sh"
+
 : "${PGHOST:?set PGHOST for the Cloud SQL Auth Proxy or private endpoint}"
 : "${PGPORT:?set PGPORT}"
 : "${PGUSER:?set the administrative PostgreSQL user}"
@@ -39,6 +43,12 @@ fi
 project=${PYMES_GCP_PROJECT:-pymes-dev-352318}
 region=${PYMES_GCP_REGION:-us-central1}
 instance=${PYMES_CLOUDSQL_INSTANCE:-"$project:$region:pymes-dev-db"}
+pymes_require_canonical_project_region "$project" "$region"
+pymes_require_canonical_cloudsql_connection "$instance"
+if [[ "$PGHOST" != "/cloudsql/${instance}" ]]; then
+  echo "PGHOST must be the exact Cloud SQL Unix socket /cloudsql/${instance}" >&2
+  exit 2
+fi
 export CLOUDSDK_CORE_PROJECT="$project"
 
 cleanup_memberships() {

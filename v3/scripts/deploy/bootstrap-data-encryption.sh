@@ -6,8 +6,13 @@ set -euo pipefail
 # It intentionally fails when an inherited or unexpected direct
 # cryptoKeyEncrypterDecrypter grant would weaken workload isolation.
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=gcp-target-policy.sh
+source "$script_dir/gcp-target-policy.sh"
+
 project=${PYMES_GCP_PROJECT:-pymes-dev-352318}
 region=${PYMES_GCP_REGION:-us-central1}
+pymes_require_canonical_project_region "$project" "$region"
 bootstrap_env=${PYMES_DATA_KMS_BOOTSTRAP_ENV:-all}
 case "$bootstrap_env" in
   stg|prd|all) ;;
@@ -18,6 +23,7 @@ rotation_period=7776000s
 next_rotation_time=$(date -u -d '+90 days' '+%Y-%m-%dT%H:%M:%SZ')
 project_number=${PYMES_GCP_PROJECT_NUMBER:-$(gcloud projects describe "$project" --format='value(projectNumber)')}
 : "${project_number:?could not resolve GCP project number}"
+pymes_require_canonical_project_number "$project_number"
 secret_manager_agent="service-${project_number}@gcp-sa-secretmanager.iam.gserviceaccount.com"
 
 export CLOUDSDK_CORE_PROJECT="$project"

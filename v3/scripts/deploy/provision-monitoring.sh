@@ -6,10 +6,16 @@ set -euo pipefail
 # tenant-aggregated `worker_metrics` JSON record per minute; filters below
 # intentionally use only service names, counters and booleans.
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=gcp-target-policy.sh
+source "$script_dir/gcp-target-policy.sh"
+
 : "${PYMES_DEPLOY_ENV:?set PYMES_DEPLOY_ENV to stg or prd}"
 case "$PYMES_DEPLOY_ENV" in stg|prd) ;; *) echo "PYMES_DEPLOY_ENV must be stg or prd" >&2; exit 2 ;; esac
 
 project=${PYMES_GCP_PROJECT:-pymes-dev-352318}
+region=${PYMES_GCP_REGION:-us-central1}
+pymes_require_canonical_project_region "$project" "$region"
 prefix="pymes-v3-${PYMES_DEPLOY_ENV}"
 worker_service="$prefix-worker"
 dry_run=${PYMES_MONITORING_DRY_RUN:-false}
@@ -33,7 +39,11 @@ if [[ -n "$channels" ]]; then
     $channels | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))
   ')
   invalid_channel=$(jq -r --arg project "$project" '
-    map(select(test("^projects/[^/]+/notificationChannels/[^/]+$") | not)) | first // ""
+    map(
+      select(
+        test("^projects/" + $project + "/notificationChannels/[^/]+$") | not
+      )
+    ) | first // ""
   ' <<<"$channels_json")
   if [[ -n "$invalid_channel" ]]; then
     echo "notification channels must be full projects/.../notificationChannels/... resource names" >&2

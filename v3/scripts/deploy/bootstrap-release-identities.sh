@@ -38,8 +38,6 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 source "$script_dir/initial-seed-audit-bounds.sh"
 # shellcheck source=release-authority-policy.sh
 source "$script_dir/release-authority-policy.sh"
-organization_iam_read_role="organizations/${pymes_release_expected_organization}/roles/pymesV3ReleaseOrganizationIamRead"
-folder_iam_read_role="organizations/${pymes_release_expected_organization}/roles/pymesV3ReleaseFolderIamRead"
 
 assert_direct_gcloud_auth() {
   local variable property value
@@ -179,13 +177,13 @@ done
 if [[ "$apply" == "false" ]]; then
   case "$phase:$target_environment" in
     prepare:stg|finalize:stg)
-      plan_next_steps="Prepare STG without project Run Admin; the reviewed existing project Owner seeds the exact zero-traffic resources from a clean main checkout without receiving any new grant; audit that pre-existing authority; finalize resource-scoped IAM; then run the protected WIF bootstrap and operational canaries. The PRD deployer must not exist before close."
+      plan_next_steps="Prepare STG without project Run Admin; the reviewed existing project Owner seeds the exact zero-traffic resources from a clean main checkout without receiving any new grant; audit that pre-existing authority; finalize resource-scoped IAM; then run the protected WIF bootstrap and operational canaries. V2 identities remain untouched."
       ;;
     prepare:prd|finalize:prd)
-      plan_next_steps="PRD is permitted only after the audited legacy-WIF close. Then prepare PRD without project Run Admin, perform and audit the reviewed human zero-traffic seed, finalize resource-scoped IAM, and run protected bootstrap before operational promotion."
+      plan_next_steps="After the reviewed STG acceptance, prepare PRD without project Run Admin, perform and audit the reviewed human zero-traffic seed, finalize resource-scoped IAM, and run protected bootstrap before operational promotion. V2 identities remain untouched."
       ;;
     close:all)
-      plan_next_steps="Verify the post-retirement STG canary and apply close. Only after close may the PRD deployer be created."
+      plan_next_steps="Close the reviewed STG phase without changing GCP or touching v2 identities; PRD preparation remains a separate explicit operation."
       ;;
   esac
   cat <<EOF
@@ -207,10 +205,7 @@ fi
 "$script_dir/verify-github-environments.sh" "$target_environment" all-controls
 
 if [[ "$phase" == "close" ]]; then
-  PYMES_GCP_PROJECT="$project" \
-    PYMES_LEGACY_WIF_MODE=audit \
-    "$script_dir/retire-legacy-pymes-wif.sh"
-  echo "Pymes v3 release identity closure verified; no GCP settings changed"
+  echo "Pymes v3 STG phase closure verified; no GCP settings changed and v2 identities were not inspected or modified"
   exit 0
 fi
 
@@ -263,13 +258,6 @@ jq -e \
 echo "GCP mutation preflight verified: project=${project} number=${project_number} region=${region} repository=${artifact_repository}"
 verify_reviewed_release_source
 
-if [[ "$phase" == "prepare" && "$target_environment" == "prd" ]]; then
-  PYMES_GCP_PROJECT="$project" \
-    PYMES_LEGACY_WIF_MODE=audit \
-    "$script_dir/retire-legacy-pymes-wif.sh"
-  echo "Audited STG cutover and legacy-WIF close verified before creating the PRD deployer"
-fi
-
 export CLOUDSDK_CORE_PROJECT="$project"
 required_services=(
   artifactregistry.googleapis.com
@@ -321,7 +309,8 @@ for constraint in \
   }
 done
 
-release_pool_assets=$(pymes_search_release_pool_iam_assets "$project")
+release_pool_assets=$(pymes_read_release_pool_iam_assets_until_valid \
+  "$project" "$target_environment" subset)
 pymes_validate_release_pool_iam_assets \
   "$release_pool_assets" "$target_environment" subset
 project_policy_json=$(gcloud projects get-iam-policy "$project" --format=json)
@@ -538,33 +527,11 @@ assert_roles_subset() {
   done <<<"$actual"
 }
 
-assert_effective_iam_subset() {
+assert_project_effective_iam_subset() {
   local account_id="$1"
   shift
-  local email ancestors_json analysis_json ancestor_type ancestor_id
-  local expected_ancestor_role resource_audit_role
-  local ancestor_policy actual_pairs allowed_pairs unexpected_pairs
+  local email analysis_json actual_pairs allowed_pairs unexpected_pairs
   email="${account_id}@${project}.iam.gserviceaccount.com"
-  ancestors_json=$(gcloud projects get-ancestors "$project" --format=json)
-  jq -e \
-    --arg project "$expected_project" \
-    --arg folder "$pymes_release_expected_folder" \
-    --arg organization "$pymes_release_expected_organization" '
-    (
-      map({type: .type, id: (.id | tostring)})
-      | sort_by(.type, .id)
-    ) == (
-      [
-        {type: "project", id: $project},
-        {type: "folder", id: $folder},
-        {type: "organization", id: $organization}
-      ]
-      | sort_by(.type, .id)
-    )
-  ' <<<"$ancestors_json" >/dev/null || {
-    echo "cannot prove the complete project ancestry for effective IAM analysis" >&2
-    exit 1
-  }
   analysis_json=$(gcloud asset analyze-iam-policy \
     --project="$project" \
     --identity="serviceAccount:${email}" \
@@ -597,99 +564,6 @@ assert_effective_iam_subset() {
     exit 1
   }
 
-  while IFS=$'\t' read -r ancestor_type ancestor_id; do
-    case "$ancestor_type" in
-      project)
-        continue
-        ;;
-      folder)
-        ancestor_policy=$(gcloud resource-manager folders get-iam-policy \
-          "$ancestor_id" --format=json)
-        resource_audit_role=$folder_iam_read_role
-        ;;
-      organization)
-        ancestor_policy=$(gcloud organizations get-iam-policy \
-          "$ancestor_id" --format=json)
-        resource_audit_role=$organization_iam_read_role
-        ;;
-      *)
-        echo "unsupported project ancestor type: $ancestor_type" >&2
-        exit 1
-        ;;
-    esac
-    expected_ancestor_role=
-    if [[ "$account_id" == pymes-v3-gh-deploy-* ]]; then
-      expected_ancestor_role=$resource_audit_role
-    fi
-    jq -e \
-      --arg member "serviceAccount:${email}" \
-      --arg expected_role "$expected_ancestor_role" \
-      --arg resource_audit_role "$resource_audit_role" \
-      --argjson policy_bindings "$(jq '.bindings // []' <<<"$ancestor_policy")" '
-      (
-        [
-          .bindings[]?
-          | select((.members // []) | index($member) != null)
-          | {
-              role: .role,
-              condition: (.condition // null),
-              occurrences: ([.members[] | select(. == $member)] | length)
-            }
-        ] as $direct
-        | if $expected_role == "" then
-            ($direct | length) == 0
-          else
-            ($direct == [] or $direct == [{
-              role: $expected_role,
-              condition: null,
-              occurrences: 1
-            }])
-          end
-      ) and
-      all(
-        .bindings[]?;
-        all(
-          .members[]?;
-          if startswith("serviceAccount:pymes-v3-gh-deploy-") then
-            (
-              . == "serviceAccount:pymes-v3-gh-deploy-stg@pymes-dev-352318.iam.gserviceaccount.com" or
-              . == "serviceAccount:pymes-v3-gh-deploy-prd@pymes-dev-352318.iam.gserviceaccount.com"
-            ) and
-            (. as $release_member | any(
-              $policy_bindings[]?;
-              .role == $resource_audit_role and
-              (.condition // null) == null and
-              ((.members // []) | index($release_member) != null)
-            ))
-          elif startswith("serviceAccount:pymes-v3-") then
-            false
-          elif . == "user:softponti@gmail.com" then
-            true
-          else
-            (
-              startswith("user:") or startswith("serviceAccount:")
-            ) and
-            (. as $other_member | all(
-              $policy_bindings[]?;
-              if ((.members // []) | index($other_member) != null) then
-                .role == "roles/viewer" or
-                .role == "roles/browser" or
-                .role == "roles/iam.securityReviewer" or
-                .role == "roles/resourcemanager.organizationViewer" or
-                .role == "roles/resourcemanager.folderViewer"
-              else
-                true
-              end
-            ))
-          end
-        )
-      )
-    ' <<<"$ancestor_policy" >/dev/null || {
-      echo "ancestor IAM contains authority outside the exact audit reader, or group/domain/public authority that cannot be proven unrelated to $email: ${ancestor_type}/${ancestor_id}" >&2
-      exit 1
-    }
-  done < <(jq -r '.[] | [.type, (.id | tostring)] | @tsv' <<<"$ancestors_json")
-
   actual_pairs=$(jq -r '
     [
       (
@@ -710,7 +584,7 @@ assert_effective_iam_subset() {
     <(printf '%s\n' "$actual_pairs" | sed '/^[[:space:]]*$/d' | LC_ALL=C sort -u) \
     <(printf '%s\n' "$allowed_pairs" | sed '/^[[:space:]]*$/d' | LC_ALL=C sort -u))
   [[ -z "$unexpected_pairs" ]] || {
-    echo "effective IAM analysis found roles outside the reviewed resource allowlist for $email" >&2
+    echo "project-scoped effective IAM analysis found roles outside the reviewed resource allowlist for $email" >&2
     printf '%s\n' "$unexpected_pairs" >&2
     exit 1
   }
@@ -1027,7 +901,18 @@ build_allowed_pairs=(
   "//artifactregistry.googleapis.com/projects/${project}/locations/${region}/repositories/${artifact_repository}"$'\t'"roles/artifactregistry.writer"
   "//artifactregistry.googleapis.com/projects/${project_number}/locations/${region}/repositories/${artifact_repository}"$'\t'"roles/artifactregistry.writer"
 )
-assert_effective_iam_subset pymes-v3-gh-build "${build_allowed_pairs[@]}"
+for evidence_environment in stg prd; do
+  evidence_bucket="//storage.googleapis.com/pymes-v3-release-evidence-${evidence_environment}-${project_number}"
+  for evidence_role in \
+    "projects/${project}/roles/pymesV3ReleaseEvidenceIamRead" \
+    roles/storage.legacyBucketReader \
+    roles/storage.objectCreator \
+    roles/storage.objectViewer; do
+    build_allowed_pairs+=("$evidence_bucket"$'\t'"$evidence_role")
+  done
+done
+assert_project_effective_iam_subset \
+  pymes-v3-gh-build "${build_allowed_pairs[@]}"
 for environment in "${managed_environments[@]}"; do
   case "$environment" in
     stg) deploy_subject=$github_stg_subject ;;
@@ -1081,7 +966,8 @@ for environment in "${managed_environments[@]}"; do
       )
     done
   fi
-  assert_effective_iam_subset "pymes-v3-gh-deploy-${environment}" "${deploy_allowed_pairs[@]}"
+  assert_project_effective_iam_subset \
+    "pymes-v3-gh-deploy-${environment}" "${deploy_allowed_pairs[@]}"
   preflight_deploy_resources "$environment" "$deploy_email"
   if [[ "$phase" == "finalize" ]]; then
     verify_initial_seed_audit \
@@ -1097,7 +983,7 @@ fi
 pymes_verify_release_inverse_authority \
   "$project" "$project_number" "$region" "$target_environment" \
   "$inverse_run_mode" "$artifact_repository"
-echo "Release service-account preflight verified: enabled, keyless, exact trust, project-effective and inverse-permission IAM plus fail-closed ancestor policies, and exact planned-resource roles"
+echo "Release service-account preflight verified: project=${project} region=${region} enabled=exact keyless=true trust=exact project_effective_iam=allowlisted inverse_permissions=allowlisted resource_roles=exact"
 
 grant_project_role() {
   local account_id="$1" role="$2"
@@ -1126,60 +1012,6 @@ grant_secret_metadata_reader() {
     --member="serviceAccount:${account_id}@${project}.iam.gserviceaccount.com" \
     --role=roles/secretmanager.viewer \
     --condition=None --quiet >/dev/null
-}
-
-ensure_organization_custom_role() {
-  local role_id="$1" title="$2" description="$3"
-  local permissions_csv="$4" expected_permissions_json="$5"
-  local role_json
-  if ! gcloud iam roles describe "$role_id" \
-    --organization="$pymes_release_expected_organization" >/dev/null 2>&1; then
-    [[ "$phase" == "prepare" ]] || {
-      echo "finalize requires prepared organization custom role $role_id" >&2
-      exit 1
-    }
-    gcloud iam roles create "$role_id" \
-      --organization="$pymes_release_expected_organization" \
-      --title="$title" \
-      --description="$description" \
-      --stage=GA \
-      --permissions="$permissions_csv"
-  else
-    role_json=$(gcloud iam roles describe "$role_id" \
-      --organization="$pymes_release_expected_organization" --format=json)
-    if ! jq -e \
-      --arg name "organizations/${pymes_release_expected_organization}/roles/${role_id}" \
-      --argjson expected "$expected_permissions_json" '
-        .name == $name and
-        .deleted != true and
-        (.stage // "GA") == "GA" and
-        (.includedPermissions | sort) == $expected
-      ' <<<"$role_json" >/dev/null; then
-      [[ "$phase" == "prepare" ]] || {
-        echo "existing organization custom role is broader or different: $role_id" >&2
-        exit 1
-      }
-      gcloud iam roles update "$role_id" \
-        --organization="$pymes_release_expected_organization" \
-        --title="$title" \
-        --description="$description" \
-        --stage=GA \
-        --permissions="$permissions_csv"
-    fi
-  fi
-  role_json=$(gcloud iam roles describe "$role_id" \
-    --organization="$pymes_release_expected_organization" --format=json)
-  jq -e \
-    --arg name "organizations/${pymes_release_expected_organization}/roles/${role_id}" \
-    --argjson expected "$expected_permissions_json" '
-      .name == $name and
-      .deleted != true and
-      (.stage // "GA") == "GA" and
-      (.includedPermissions | sort) == $expected
-    ' <<<"$role_json" >/dev/null || {
-      echo "organization custom role did not converge: $role_id" >&2
-      exit 1
-    }
 }
 
 if ! gcloud iam roles describe pymesV3ReleaseProjectIamRead \
@@ -1273,19 +1105,6 @@ jq -e \
     exit 1
   }
 
-ensure_organization_custom_role \
-  pymesV3ReleaseOrganizationIamRead \
-  "Pymes v3 release organization IAM read" \
-  "Read only the organization IAM policy and exact release audit role definitions" \
-  "$(pymes_release_organization_iam_read_permissions_csv)" \
-  "$(pymes_release_organization_iam_read_permissions_json)"
-ensure_organization_custom_role \
-  pymesV3ReleaseFolderIamRead \
-  "Pymes v3 release folder IAM read" \
-  "Read only the exact shared-folder IAM policy for inherited-authority checks" \
-  "$(pymes_release_folder_iam_read_permissions_csv)" \
-  "$(pymes_release_folder_iam_read_permissions_json)"
-
 build_id=pymes-v3-gh-build
 build_email="${build_id}@${project}.iam.gserviceaccount.com"
 build_principal="principal://iam.googleapis.com/projects/${project_number}/locations/global/workloadIdentityPools/${pool}/subject/${github_build_subject}"
@@ -1317,16 +1136,6 @@ for environment in "${managed_environments[@]}"; do
     grant_project_role "$deploy_id" "$role"
   done
   grant_repository_role "$deploy_id" roles/artifactregistry.reader
-  gcloud organizations add-iam-policy-binding \
-    "$pymes_release_expected_organization" \
-    --member="serviceAccount:${deploy_email}" \
-    --role="$organization_iam_read_role" \
-    --condition=None --quiet >/dev/null
-  gcloud resource-manager folders add-iam-policy-binding \
-    "$pymes_release_expected_folder" \
-    --member="serviceAccount:${deploy_email}" \
-    --role="$folder_iam_read_role" \
-    --condition=None --quiet >/dev/null
 
   mapfile -t release_secrets < <(release_secret_names "$environment")
   for secret in "${release_secrets[@]}"; do
@@ -1441,22 +1250,6 @@ assert_project_roles() {
   assert_exact_roles "$account_id project IAM" "$actual" "$@"
 }
 
-legacy_release_email="pymes-github-actions-stg@${project}.iam.gserviceaccount.com"
-if gcloud iam service-accounts describe "$legacy_release_email" \
-  --project="$project" >/dev/null 2>&1; then
-  legacy_roles=$(direct_project_roles "$legacy_release_email")
-  legacy_prohibited=$(grep -E \
-    'roles/(artifactregistry\\.writer|iam\\.serviceAccountUser|run\\.admin|secretmanager\\.(admin|secretAccessor))' \
-    <<<"$legacy_roles" || true)
-  if [[ -n "$legacy_prohibited" ]]; then
-    legacy_disabled=$(gcloud iam service-accounts describe "$legacy_release_email" \
-      --project="$project" --format='value(disabled)')
-    if [[ "$legacy_disabled" != "True" ]]; then
-      echo "TRANSITION WARNING retire legacy Pymes WIF trust and disable $legacy_release_email before phase=close" >&2
-    fi
-  fi
-fi
-
 assert_project_roles pymes-v3-gh-build \
   roles/serviceusage.serviceUsageConsumer
 project_policy_json=$(gcloud projects get-iam-policy "$project" --format=json)
@@ -1507,19 +1300,6 @@ for environment in "${managed_environments[@]}"; do
   assert_exact_roles "$build_email Artifact Registry" "$roles" roles/artifactregistry.writer
   roles=$(filtered_roles "$repository_policy" "serviceAccount:$deploy_email")
   assert_exact_roles "$deploy_email Artifact Registry" "$roles" roles/artifactregistry.reader
-
-  organization_policy=$(gcloud organizations get-iam-policy \
-    "$pymes_release_expected_organization" --format=json)
-  roles=$(filtered_roles "$organization_policy" "serviceAccount:$deploy_email")
-  assert_exact_roles \
-    "$deploy_email organization IAM audit" "$roles" \
-    "$organization_iam_read_role"
-  folder_policy=$(gcloud resource-manager folders get-iam-policy \
-    "$pymes_release_expected_folder" --format=json)
-  roles=$(filtered_roles "$folder_policy" "serviceAccount:$deploy_email")
-  assert_exact_roles \
-    "$deploy_email folder IAM audit" "$roles" \
-    "$folder_iam_read_role"
 
   keyring_policy=$(gcloud kms keyrings get-iam-policy "pymes-v3-${environment}" \
     --project="$project" --location="$region" --format=json)
@@ -1582,7 +1362,8 @@ for environment in "${managed_environments[@]}"; do
   fi
 done
 
-release_pool_assets=$(pymes_search_release_pool_iam_assets "$project")
+release_pool_assets=$(pymes_read_release_pool_iam_assets_until_valid \
+  "$project" "$target_environment" exact)
 pymes_validate_release_pool_iam_assets \
   "$release_pool_assets" "$target_environment" exact
 

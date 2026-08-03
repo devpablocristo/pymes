@@ -5,7 +5,12 @@ set -euo pipefail
 # shared Pymes project. Service accounts are free IAM principals; they do not
 # create projects, networks, SQL instances or always-on workloads.
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=gcp-target-policy.sh
+source "$script_dir/gcp-target-policy.sh"
+
 project=${PYMES_GCP_PROJECT:-pymes-dev-352318}
+pymes_require_canonical_project "$project"
 bootstrap_env=${PYMES_IDENTITY_BOOTSTRAP_ENV:-all}
 case "$bootstrap_env" in
   stg|prd|all) ;;

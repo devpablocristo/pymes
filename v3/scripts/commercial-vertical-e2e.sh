@@ -95,7 +95,7 @@ provision() {
   (
     cd "$root_dir/backend"
     PYMES_DATABASE_URL='postgres://pymes:pymes@127.0.0.1:55434/pymes_v3?sslmode=disable' \
-    ACCOUNTING_PROVISIONING_URL='http://127.0.0.1:18084' \
+    ACCOUNTING_PROVISIONING_URL='http://127.0.0.1:18087' \
     PYMES_ALLOW_INSECURE_LOCAL_SERVICES=true \
     PYMES_ENVIRONMENT=development \
     PYMES_INTERNAL_SIGNING_SEED_B64='AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=' \

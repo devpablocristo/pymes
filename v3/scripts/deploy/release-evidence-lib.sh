@@ -8,6 +8,7 @@ PYMES_RELEASE_EVIDENCE_PROJECT_NUMBER=884236221349
 PYMES_RELEASE_EVIDENCE_REGION=us-central1
 PYMES_RELEASE_EVIDENCE_RETENTION_SECONDS=31557600
 PYMES_RELEASE_EVIDENCE_BUILDER="pymes-v3-gh-build@${PYMES_RELEASE_EVIDENCE_PROJECT}.iam.gserviceaccount.com"
+PYMES_RELEASE_EVIDENCE_IAM_READ_ROLE="projects/${PYMES_RELEASE_EVIDENCE_PROJECT}/roles/pymesV3ReleaseEvidenceIamRead"
 
 pymes_release_evidence_fail() {
   echo "release evidence: $*" >&2
@@ -80,6 +81,7 @@ pymes_release_evidence_validate_bucket_iam() {
   local expected actual
   expected=$(
     printf '%s\n' \
+      "$PYMES_RELEASE_EVIDENCE_IAM_READ_ROLE" \
       roles/storage.legacyBucketReader \
       roles/storage.objectCreator \
       roles/storage.objectViewer |
@@ -113,6 +115,21 @@ pymes_release_evidence_validate_bucket_iam() {
     ' <<<"$policy_json" >/dev/null || {
       pymes_release_evidence_fail \
         "bucket IAM is public, conditional, or differs for the release builder"
+      return 1
+    }
+}
+
+pymes_release_evidence_validate_iam_read_role() {
+  local role_json="$1"
+  jq -e \
+    --arg name "$PYMES_RELEASE_EVIDENCE_IAM_READ_ROLE" '
+      .name == $name and
+      .deleted != true and
+      (.stage // "GA") == "GA" and
+      (.includedPermissions | sort) == ["storage.buckets.getIamPolicy"]
+    ' <<<"$role_json" >/dev/null || {
+      pymes_release_evidence_fail \
+        "release-evidence IAM reader role is missing, deleted, or broader"
       return 1
     }
 }

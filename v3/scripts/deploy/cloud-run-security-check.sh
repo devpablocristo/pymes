@@ -96,7 +96,7 @@ run_dry() {
     "PYMES_MIGRATE_IMAGE=test.invalid/pymes-migrate@sha256:$digest"
     "PYMES_FISCAL_MIGRATE_IMAGE=test.invalid/pymes-fiscal-migrate@sha256:$digest"
     "PYMES_ACCOUNTING_MIGRATE_IMAGE=test.invalid/pymes-accounting-migrate@sha256:$digest"
-    "PYMES_CLOUDSQL_INSTANCE=$project:$region:pymes-v3-dry-run"
+    "PYMES_CLOUDSQL_INSTANCE=$project:$region:pymes-dev-db"
     "PYMES_CLERK_ISSUER=https://clerk.dry-run.invalid"
     "PYMES_CLERK_AUTHORIZED_PARTIES=$authorized_parties"
     "PYMES_PUBLIC_BASE_URL=$public_base"
@@ -279,6 +279,42 @@ check_environment() {
   forbid_text "$output" "allAuthenticatedUsers"
   require_text "$output" "SECURITY PROJECT project=$project direct_roles/run.invoker=none"
 
+  deploy_line=$(grep -F -- "DRY-RUN gcloud run jobs deploy $prefix-migrate " "$output") ||
+    fail "missing Pymes migration job command"
+  [[ "$deploy_line" == *"PYMES_DEPLOY_ENV=$environment"* &&
+     "$deploy_line" == *"--set-cloudsql-instances=$project:$region:pymes-dev-db"* &&
+     "$deploy_line" != *"FISCAL_DEPLOY_ENV="* &&
+     "$deploy_line" != *"ACCOUNTING_DEPLOY_ENV="* ]] ||
+    fail "Pymes migration job is missing its exact deployment environment"
+
+  deploy_line=$(grep -F -- "DRY-RUN gcloud run jobs deploy $prefix-fiscal-migrate " "$output") ||
+    fail "missing Fiscal migration job command"
+  [[ "$deploy_line" == *"FISCAL_DEPLOY_ENV=$environment"* &&
+     "$deploy_line" == *"--set-cloudsql-instances=$project:$region:pymes-dev-db"* &&
+     "$deploy_line" != *"PYMES_DEPLOY_ENV="* &&
+     "$deploy_line" != *"ACCOUNTING_DEPLOY_ENV="* ]] ||
+    fail "Fiscal migration job is missing its exact deployment environment"
+
+  deploy_line=$(grep -F -- "DRY-RUN gcloud run jobs deploy $prefix-accounting-migrate " "$output") ||
+    fail "missing Accounting migration job command"
+  [[ "$deploy_line" == *"PYMES_DEPLOY_ENV=$environment"* &&
+     "$deploy_line" == *"--set-cloudsql-instances=$project:$region:pymes-dev-db"* &&
+     "$deploy_line" != *"FISCAL_DEPLOY_ENV="* &&
+     "$deploy_line" != *"ACCOUNTING_DEPLOY_ENV="* ]] ||
+    fail "Accounting migration job is missing its exact deployment environment"
+
+  deploy_line=$(grep -F -- "DRY-RUN gcloud run jobs deploy $prefix-accounting-grants " "$output") ||
+    fail "missing Accounting grants job command"
+  [[ "$deploy_line" == *"ACCOUNTING_DEPLOY_ENV=$environment"* &&
+     "$deploy_line" == *"ACCOUNTING_ADMIN_OPERATION=sync-runtime-grants"* &&
+     "$deploy_line" == *"--set-cloudsql-instances=$project:$region:pymes-dev-db"* &&
+     "$deploy_line" != *"FISCAL_DEPLOY_ENV="* &&
+     "$deploy_line" != *"PYMES_DEPLOY_ENV="* ]] ||
+    fail "Accounting grants job is missing its exact deployment environment"
+
+  require_count "$output" \
+    "--set-cloudsql-instances=$project:$region:pymes-dev-db" 10
+
   for service in "$prefix-fiscal" "$prefix-accounting" "$prefix-accounting-admin"; do
     deploy_line=$(grep -F -- "DRY-RUN gcloud run deploy $service " "$output") ||
       fail "missing deploy command for $service"
@@ -289,6 +325,11 @@ check_environment() {
     [[ "$deploy_line" != *" --allow-unauthenticated"* ]] ||
       fail "$service contains a public access flag"
   done
+
+  deploy_line=$(grep -F -- "DRY-RUN gcloud run deploy $prefix-accounting-admin " "$output") ||
+    fail "missing accounting-admin deploy command"
+  [[ "$deploy_line" == *"ACCOUNTING_DEPLOY_ENV=$environment"* ]] ||
+    fail "accounting-admin is missing its exact deployment environment"
 
   require_text "$output" "SECURITY SERVICE service=$prefix-fiscal ingress=internal unauthenticated=denied exact_invokers=$api_principal,$worker_principal"
   require_text "$output" "SECURITY SERVICE service=$prefix-accounting ingress=internal unauthenticated=denied exact_invokers=$worker_principal"
@@ -470,6 +511,28 @@ check_fiscal_arca_environment() {
      "$deploy_line" != *"FISCAL_LOCAL_KMS_KEY_B64"* ]] ||
     fail "ARCA mode is not isolated behind the fiscal KMS vault and reviewed issuer policies"
 }
+
+canonical_project=$project
+project=unrelated-project
+if run_dry stg "$scratch_dir/foreign-project.out" \
+  2>"$scratch_dir/foreign-project.err"; then
+  fail "Cloud Run deployment accepted a foreign GCP project"
+fi
+require_text "$scratch_dir/foreign-project.err" \
+  "Pymes v3 GCP operations are restricted to project pymes-dev-352318"
+project=$canonical_project
+echo "PASS Cloud Run target foreign_project=rejected"
+
+canonical_region=$region
+region=europe-west1
+if run_dry stg "$scratch_dir/foreign-region.out" \
+  2>"$scratch_dir/foreign-region.err"; then
+  fail "Cloud Run deployment accepted a foreign GCP region"
+fi
+require_text "$scratch_dir/foreign-region.err" \
+  "Pymes v3 GCP operations are restricted to region us-central1"
+region=$canonical_region
+echo "PASS Cloud Run target foreign_region=rejected"
 
 for environment in stg prd; do
   output="$scratch_dir/$environment.out"

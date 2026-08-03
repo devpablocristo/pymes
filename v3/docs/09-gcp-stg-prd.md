@@ -88,17 +88,27 @@ La topología final usa un pool WIF dedicado y tres identidades:
 `pymes-v3-gh-deploy-prd`. La condición del provider limita repositorio,
 owner, rama `main`, workflow y evento `workflow_dispatch`; además permite
 únicamente el subject de rama para Build y los subjects `environment:stg` y
-`environment:prd` para sus deployers respectivos. Build sólo escribe imágenes;
-cada deploy sólo puede leer imágenes y administrar los recursos de su entorno,
-suplantando las service accounts runtime exactas.
+`environment:prd` para sus deployers respectivos. Build publica imágenes y la
+evidencia durable en los dos destinos Pymes exactos; cada deploy sólo puede
+leer imágenes y administrar los recursos de su entorno, suplantando las
+service accounts runtime exactas.
+Para la evidencia durable, el builder recibe el custom role de proyecto
+`pymesV3ReleaseEvidenceIamRead`, compuesto únicamente por
+`storage.buckets.getIamPolicy`, ligado sobre el bucket Pymes del entorno
+objetivo y nunca sobre el proyecto. Junto con los roles create-only/read de
+objetos, esto le permite validar en vivo IAM, Bucket Lock, metadata y el objeto
+publicado sin alcanzar otro bucket.
 
 La creación y el trust son estrictamente STG-first: mientras se prepara,
 finaliza y cierra STG sólo existen los bindings exactos de Build y deployer
 STG; cualquier trust o service account deployer PRD prematuro bloquea. Se
-ejecutan el canary anterior al retiro, el retiro legado, el canary posterior y
-`close`;
-recién entonces puede crearse `pymes-v3-gh-deploy-prd`. `prepare` para PRD
-repite la auditoría completa del cierre antes de realizar su primera mutación.
+ejecuta el canary v3 dedicado y `close`; recién entonces puede crearse
+`pymes-v3-gh-deploy-prd`. `prepare` para PRD repite la auditoría completa del
+cierre antes de realizar su primera mutación. Este cierre no retira ni modifica
+identidades que todavía pueda usar v2.
+Desde ese momento las releases STG aceptan y exigen el conjunto exacto
+Build+STG+PRD; el trust PRD deja de ser prematuro y cualquier subject adicional
+continúa bloqueado.
 
 Cloud Run no permite conceder `roles/run.admin` sobre un servicio o job que aún
 no existe, y ese rol no puede acotarse por nombre mediante IAM Conditions. Por
@@ -134,20 +144,18 @@ externa en `gcloud`. Antes de conceder permisos rechaza cuentas deshabilitadas,
 claves administradas por usuarios, callers distintos del subject exacto o roles
 preexistentes fuera de la allowlist.
 
-La cadena de recursos se fija a proyecto `pymes-dev-352318`, folder
-`673291958610` y organización `663017421195`. Builder no recibe permisos en
-folder u organización. Cada deployer recibe exactamente, sin condición, los
-roles custom de lectura
-`pymesV3ReleaseFolderIamRead` y
-`pymesV3ReleaseOrganizationIamRead` en el ancestro correspondiente. Los demás
-bindings de esas policies deben ser del Owner directo revisado o roles
-estrictamente de lectura; grupos, dominios, principals federados, otras
-identidades Pymes o roles con autoridad fallan cerrado.
+La frontera normal de release se fija al proyecto `pymes-dev-352318`, número
+`884236221349`, región `us-central1` y recursos Pymes nominalmente
+allowlisted. Builder, deployers, workloads, bootstrap normal y workflow no
+requieren roles, bindings ni lecturas en folder, organización u otros
+proyectos. Todas las consultas y mutaciones IAM normales permanecen en el
+proyecto Pymes o en sus recursos explícitos.
+Todos los scripts mutantes normales cargan `gcp-target-policy.sh` como fusible
+previo a la primera escritura. Sólo admite proyecto `pymes-dev-352318`, región
+`us-central1`, Artifact Registry `pymes`, Cloud SQL `pymes-dev-db` y el target
+de red `default` con subred/router/NAT `pymes-v3-serverless`; cualquier override
+distinto aborta.
 
-Crear o actualizar esos roles custom y sus bindings es una acción humana de
-bootstrap: el operador necesita administración de custom roles en la
-organización y capacidad de leer/escribir IAM en la organización y el folder.
-No se concede esa autoridad al WIF ni puede autoaprovisionársela el workflow.
 `orgpolicy.googleapis.com` forma parte de las APIs requeridas; `prepare` puede
 habilitarla, pero `finalize` y la release sólo leen y fallan si está ausente.
 En cada ejecución deben resultar efectivamente forzadas sobre el proyecto:
@@ -160,9 +168,10 @@ e impersonación expandidos y exige exploración completa. Además de validar la
 autoridad saliente de cada cuenta conocida, ejecuta consultas inversas por
 permisos sensibles y sólo acepta triples recurso/permiso/identidad exactos para
 Project, service accounts, Cloud Run, Secrets, Artifact Registry y KMS. Esto
-rechaza autoridad equivalente obtenida mediante roles custom, herencia,
-service-account impersonation o grants cross-environment. Además lee la cadena
-exacta de ancestros. Un scan del path completo del pool rechaza cualquier
+rechaza autoridad equivalente definida dentro del proyecto Pymes mediante roles
+custom, service-account impersonation o grants cross-environment. No se
+interpreta como auditoría de IAM definido fuera del proyecto. Un scan del path
+completo del pool rechaza cualquier
 binding directo `principal://` o `principalSet://` fuera del conjunto exacto
 de la fase: Build+STG y cero PRD antes de `close`; Build+STG+PRD después.
 Las políticas conocidas de proyecto, Artifact Registry, Secrets, KMS, runtime
@@ -199,12 +208,14 @@ La validación es continua. El job protegido `validate`, inmediatamente antes de
 permitir el builder, autentica al deployer exacto del entorno y verifica tanto
 builder como deployer: pool/provider WIF, cuenta habilitada, cero claves
 administradas, policy completa con un único subject, roles directos de proyecto
-y Artifact Registry, Secrets, runtime identities keyless, KMS y los once
-recursos Run. IAM Policy Analyzer debe quedar completamente explorado, sin
+y Artifact Registry, Secrets, runtime identities keyless, KMS y la ausencia o
+presencia exacta de los once recursos Run según el stage. IAM Policy Analyzer
+debe quedar completamente explorado, sin
 group edges, impersonación residual ni autoridad efectiva fuera de los recursos
-allowlisted. El job `deploy` repite el gate después del build y antes de leer
-attestations o mutar. El rol custom sólo agrega las lecturas exactas necesarias;
-no contiene secretos, uso criptográfico ni mutaciones. El job de build empieza
+allowlisted dentro del proyecto Pymes y sus recursos. Esta prueba es
+project-scoped y no afirma cobertura de policies definidas en folder u
+organización. El job `deploy` repite el gate después del build y antes de leer
+attestations o mutar. El job de build empieza
 rechazando todo `GITHUB_RUN_ATTEMPT != 1`, antes de autenticar al builder; el
 job de deploy aplica el mismo rechazo como primer paso, antes de checkout,
 descarga del manifiesto o autenticación. Para reintentar se dispara una release
@@ -214,28 +225,22 @@ artefactos de un intento anterior.
 Cloud Asset Search y Policy Analyzer tienen consistencia eventual. Un resultado
 `fullyExplored` no demuestra que un grant creado segundos antes ya sea visible.
 Por eso las políticas de los recursos conocidos se releen directamente y,
-antes del seed, retiro legado o cierre, debe existir una ventana operativa sin
-mutaciones seguida de una segunda auditoría estable del scan WIF y del
-inventario de workloads. La espera de diez minutos más la doble lectura de
-veinte segundos implementada por `finalize` cubre Admin Activity del seed; no
-convierte los demás índices de Cloud Asset en lecturas instantáneas.
+antes del seed o `close`, debe existir una ventana operativa sin mutaciones
+seguida de una segunda auditoría estable del scan WIF y del inventario de
+workloads. El retiro legado independiente post-v2 aplicará la misma precaución.
+La espera de diez minutos más la doble lectura de veinte segundos implementada
+por `finalize` cubre Admin Activity del seed; no convierte los demás índices de
+Cloud Asset en lecturas instantáneas.
 
-Las identidades históricas no pueden quedar como ruta alternativa permanente.
-Después de finalizar STG, un canary `operational` debe ejecutar el SHA actual
-exacto de `main`, su árbol completo y el mismo workflow revisado. Antes del
-corte se comprueban las autorizaciones exactas de las identidades nuevas, IAM
-Policy Analyzer completamente explorado, ausencia de bindings `group:` en
-ancestros cuya membresía no pueda demostrarse, cero autoridad efectiva de la
-cuenta compartida sobre Pymes e inventario global sin workloads de la cuenta
-exclusiva. Sólo entonces se elimina el principal legado exacto de las dos
-políticas revisadas y se deshabilita la cuenta exclusiva. Dos
-`SetIAMPolicy` exitosos sin el principal y el `DisableServiceAccount`
-posterior, realizados por el mismo actor, forman el marcador durable. Un
-segundo canary `operational` del mismo SHA debe comenzar después de ese
-marcador; la fase `close` repite Cloud Asset y toda la auditoría. Este cutover
-es STG-first y bloquea si la service account deployer PRD ya existe; `prepare`
-y `finalize` de PRD se ejecutan sólo después de `close`. Este cutover todavía
-no se ejecutó.
+Las identidades históricas no forman parte de la release v3. Mientras Pymes v2
+siga activo, no se ejecutan `retire-legacy-pymes-wif.sh` ni
+`migrate-project-secret-access.sh`, y su estado no bloquea `prepare`,
+`finalize`, `close` ni PRD de v3. Después del retiro definitivo de v2 podrán
+usarse en un cambio one-time independiente: el primero conserva, como excepción
+transitoria, una auditoría humana read-only de policies de ancestros antes de
+retirar el principal histórico. Esa lectura no crea grants ni modifica folder,
+organización u otros proyectos. Ninguna de esas herramientas se invoca desde
+GitHub Actions ni concede autoridad al workflow v3.
 
 El workflow valida primero que el SHA tenga CI V3 verde, construye imágenes
 linux/amd64 con SBOM/provenance, las resuelve a digest y genera un manifiesto.

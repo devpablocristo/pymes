@@ -69,9 +69,13 @@ configuración antes de declarar `NETWORK READY`.
 
 ### Primer alta STG y cierre de Clerk
 
-`PYMES_DEPLOY_STAGE` acepta `bootstrap` u `operational` y vale
-`operational` si se omite. Bootstrap existe sólo para descubrir la URL estable
-de Cloud Run sin fingir que ya existe un endpoint Clerk:
+`PYMES_DEPLOY_STAGE` acepta `initial-seed-build`, `bootstrap` u `operational` y
+vale `operational` si se omite. `initial-seed-build` sólo publica desde GitHub
+Actions las imágenes, attestations y el manifiesto durable necesarios para el
+alta inerte: exige que los once recursos Cloud Run estén ausentes y hace
+`skip` explícito del job Deploy. No reemplaza el seed humano ni cuenta como
+release o canary. Bootstrap existe sólo para descubrir la URL estable de Cloud
+Run sin fingir que ya existe un endpoint Clerk:
 
 1. comprobar que `pymes-v3-stg-clerk-webhook-secret` tiene una versión numérica
    habilitada, aleatoria y no reutilizada, réplica/CMEK correctos y el label
@@ -184,10 +188,10 @@ Antes de ejecutar siquiera el plan de `bootstrap-release-identities.sh`:
 4. habilitar `orgpolicy.googleapis.com` y comprobar que las policies efectivas
    `iam.disableCrossProjectServiceAccountUsage` e
    `iam.disableServiceAccountKeyCreation` estén forzadas en el proyecto;
-5. confirmar que el operador humano dispone temporalmente de administración de
-   custom roles en la organización y de lectura/escritura IAM en organización
-   `663017421195` y folder `673291958610`. Esta autoridad no se entrega al WIF:
-   se necesita para crear o converger los dos roles lectores y sus bindings.
+5. confirmar proyecto `pymes-dev-352318`, número `884236221349`, región
+   `us-central1`, Artifact Registry `pymes` y los nombres Pymes exactos. El
+   bootstrap normal no requiere ni consulta IAM de folder, organización u
+   otros proyectos.
 
 El script falla antes de mutar si no puede probar cualquiera de estas
 condiciones. El bloque siguiente se ejecuta desde la raíz del checkout Pymes:
@@ -200,16 +204,28 @@ PYMES_RELEASE_IDENTITY_APPLY=true \
 PYMES_RELEASE_IDENTITY_PHASE=prepare \
 ./v3/scripts/deploy/bootstrap-release-identities.sh
 
-# Desde un checkout limpio de main, construir el manifiesto fuera del repo.
-# La publishable key de Clerk es pública, pero debe ser la exacta de STG.
+# El bucket STG de evidencia debe estar creado, bloqueado y verificado según la
+# sección "Evidencia durable del manifiesto" antes de ejecutar este dispatch.
+# Construir remotamente y registrar el run ID exacto que termina en verde.
 release_sha="$(git rev-parse HEAD)"
 manifest="/ruta/segura/pymes-v3-stg-${release_sha}.env"
-PYMES_RELEASE_ENV=stg \
-PYMES_SOURCE_SHA="$release_sha" \
-PYMES_IMAGE_MANIFEST="$manifest" \
-OPEN_ACCOUNTING_CONTEXT=/ruta/al/checkout/oa-fijado \
-VITE_CLERK_PUBLISHABLE_KEY="$PYMES_CLERK_PUBLISHABLE_KEY_STG" \
-./v3/scripts/deploy/build-push-images.sh
+gh workflow run v3-release.yml \
+  --repo devpablocristo/pymes \
+  --ref main \
+  -f environment=stg \
+  -f deploy_stage=initial-seed-build
+read -r -p 'GitHub run ID initial-seed-build STG: ' initial_build_run_id
+gh run watch "$initial_build_run_id" \
+  --repo devpablocristo/pymes \
+  --exit-status
+initial_build_artifact="/ruta/segura/pymes-v3-stg-${release_sha}"
+gh run download "$initial_build_run_id" \
+  --repo devpablocristo/pymes \
+  --name "pymes-v3-images-stg-${release_sha}" \
+  --dir "$initial_build_artifact"
+install -m 0600 \
+  "$initial_build_artifact/pymes-v3-images.env" \
+  "$manifest"
 
 # El Owner preexistente revisado crea sólo 6 servicios inertes y 5 jobs no
 # ejecutados. No se crea ni se revoca ningún grant temporal.
@@ -239,21 +255,11 @@ PYMES_INITIAL_SEED_MANIFEST="$manifest" \
 PYMES_INITIAL_SEED_MANIFEST_SHA256="$manifest_sha256_impreso" \
 ./v3/scripts/deploy/bootstrap-release-identities.sh
 
-# Primer canary STG exitoso mediante el WIF dedicado:
-PYMES_STG_CANARY_RUN_ID=30700000001 \
-PYMES_LEGACY_WIF_MODE=apply \
-./v3/scripts/deploy/retire-legacy-pymes-wif.sh
-
-# Segundo canary, ejecutado después del retiro:
-PYMES_STG_CANARY_RUN_ID=30700000001 \
-PYMES_STG_POST_RETIRE_CANARY_RUN_ID=30700000002 \
-PYMES_LEGACY_WIF_MODE=audit \
-./v3/scripts/deploy/retire-legacy-pymes-wif.sh
-
+# Cerrar el rollout dedicado v3 después del primer canary STG exitoso.
+# No retirar ni modificar la identidad histórica mientras v2 siga activo.
 PYMES_PRD_REVIEWER_IDS=123456,789012 \
 PYMES_RELEASE_IDENTITY_OPERATOR_EMAIL=softponti@gmail.com \
 PYMES_STG_CANARY_RUN_ID=30700000001 \
-PYMES_STG_POST_RETIRE_CANARY_RUN_ID=30700000002 \
 PYMES_RELEASE_IDENTITY_APPLY=true \
 PYMES_RELEASE_IDENTITY_PHASE=close \
 ./v3/scripts/deploy/bootstrap-release-identities.sh
@@ -266,16 +272,29 @@ PYMES_RELEASE_IDENTITY_APPLY=true \
 PYMES_RELEASE_IDENTITY_PHASE=prepare \
 ./v3/scripts/deploy/bootstrap-release-identities.sh
 
-# Repetir build + seed para PRD desde el mismo SHA/materiales, usando la
-# publishable key PRD y un manifiesto PRD propio. Luego finalizar con las cinco
+# Repetir build remoto + seed para PRD desde el mismo SHA/materiales, después
+# de crear, bloquear y verificar el bucket PRD de evidencia. El environment
+# protegido exige además confirmación y reviewers. Luego finalizar con las
 # evidencias exactas impresas por ese seed:
 prd_manifest="/ruta/segura/pymes-v3-prd-${release_sha}.env"
-PYMES_RELEASE_ENV=prd \
-PYMES_SOURCE_SHA="$release_sha" \
-PYMES_IMAGE_MANIFEST="$prd_manifest" \
-OPEN_ACCOUNTING_CONTEXT=/ruta/al/checkout/oa-fijado \
-VITE_CLERK_PUBLISHABLE_KEY="$PYMES_CLERK_PUBLISHABLE_KEY_PRD" \
-./v3/scripts/deploy/build-push-images.sh
+gh workflow run v3-release.yml \
+  --repo devpablocristo/pymes \
+  --ref main \
+  -f environment=prd \
+  -f deploy_stage=initial-seed-build \
+  -f confirm_production=DEPLOY_PRD
+read -r -p 'GitHub run ID initial-seed-build PRD: ' prd_initial_build_run_id
+gh run watch "$prd_initial_build_run_id" \
+  --repo devpablocristo/pymes \
+  --exit-status
+prd_initial_build_artifact="/ruta/segura/pymes-v3-prd-${release_sha}"
+gh run download "$prd_initial_build_run_id" \
+  --repo devpablocristo/pymes \
+  --name "pymes-v3-images-prd-${release_sha}" \
+  --dir "$prd_initial_build_artifact"
+install -m 0600 \
+  "$prd_initial_build_artifact/pymes-v3-images.env" \
+  "$prd_manifest"
 PYMES_CLOUD_RUN_SEED_APPLY=true \
 PYMES_CLOUD_RUN_SEED_ENV=prd \
 PYMES_CLOUD_RUN_SEED_MANIFEST="$prd_manifest" \
@@ -306,10 +325,12 @@ aplicarlo crea un pool WIF dedicado a releases, limitado al repositorio Pymes,
 usa tres service accounts diferentes: un builder y un deployer para cada
 entorno. Sin embargo, el postcondition es phase-aware: antes de cerrar STG
 exige exactamente Build+STG y cero trust PRD; después del cierre exige
-Build+STG+PRD. El builder sólo publica en el Artifact Registry seleccionado; el
-deployer puede leer los digests/metadata necesarios, impersonar las identidades
-runtime exactas y administrar Cloud Run, sin reutilizar la identidad CI
-compartida.
+Build+STG+PRD. El builder publica en el Artifact Registry seleccionado y retiene
+el manifiesto en el bucket Pymes exacto; el deployer puede leer los
+digests/metadata necesarios, impersonar las identidades runtime exactas y
+administrar Cloud Run, sin reutilizar la identidad CI compartida.
+Después de `close`, toda release STG conserva y exige el trust PRD exacto; cero
+PRD es una precondición exclusiva del corte previo.
 Tanto `prepare` como `finalize` exigen exactamente un
 `PYMES_RELEASE_IDENTITY_ENV`; no inspeccionan ni conceden permisos al otro
 entorno. Antes del primer grant, el bootstrap exige que las service accounts
@@ -317,17 +338,16 @@ de release estén habilitadas, sin claves administradas por usuarios, con policy
 vacía o el único binding WIF esperado y sin roles preexistentes fuera de la
 allowlist.
 
-La cadena de ancestros debe ser exactamente proyecto `pymes-dev-352318`,
-folder `673291958610` y organización `663017421195`. Builder no recibe rol de
-ancestro. El deployer sólo recibe, sin condición, los roles
-`pymesV3ReleaseFolderIamRead` y
-`pymesV3ReleaseOrganizationIamRead` sobre sus scopes exactos. Los roles se
-comparan permiso por permiso; un rol ampliado, otro binding de una identidad
-Pymes, un principal federado, grupo, dominio o autoridad no demostrablemente de
-sólo lectura bloquea. Como el workflow no administra custom roles de
-organización, su alta o corrección debe efectuarla el operador humano de
-bootstrap con permisos administrativos explícitos y luego retirarlos según la
-política de acceso privilegiado.
+La frontera normal es project-scoped. Builder, deployers, workloads, bootstrap
+y workflow sólo operan sobre `pymes-dev-352318` y los recursos Pymes
+explícitamente allowlisted; no reciben permisos, leen policies ni escriben IAM
+en folder, organización u otros proyectos. Policy Analyzer y la auditoría
+inversa no se presentan como cobertura de IAM definido fuera del proyecto.
+Cada script mutante normal carga `gcp-target-policy.sh` y aborta antes de la
+primera escritura si el target no coincide con proyecto `pymes-dev-352318`,
+región `us-central1`, Artifact Registry `pymes`, conexión Cloud SQL
+`pymes-dev-352318:us-central1:pymes-dev-db` o red `default` con
+subred/router/NAT `pymes-v3-serverless`.
 
 El gate requiere `orgpolicy.googleapis.com`; `prepare` habilita únicamente las
 APIs ausentes y nunca vuelve a habilitar las ya activas. Después de una
@@ -340,9 +360,9 @@ completamente explorada. La validación inversa consulta permisos sensibles en
 chunks y compara triples recurso/permiso/identidad exactos para Project,
 release/runtime service accounts, Run, Secrets, Artifact Registry y las cuatro
 CryptoKeys. Rechaza membresía indirecta, roles custom o alternativos, autoridad
-heredada, grants cross-environment y caminos de impersonación aunque el nombre
-del rol aparente ser inocuo. Un error, una respuesta parcial o cuota persistente
-después del retry acotado bloquean.
+efectiva definida en otro recurso del proyecto, grants cross-environment y
+caminos de impersonación aunque el nombre del rol aparente ser inocuo. Un error,
+una respuesta parcial o cuota persistente después del retry acotado bloquean.
 
 Un barrido por el path completo de `pymes-v3-release-pool` rechaza cualquier
 binding directo `principal://` o `principalSet://`; las únicas excepciones son
@@ -350,7 +370,10 @@ los subjects exactos de la fase con `roles/iam.workloadIdentityUser` en su
 service account destino: Build+STG y cero PRD antes de `close`,
 Build+STG+PRD después. Antes de crear identidades, `prepare` sólo admite un
 subconjunto válido del estado previo —incluido el estado vacío inicial—; el
-postcondition exige el conjunto exacto de la fase. También se releen
+postcondition exige el conjunto exacto de la fase. Como Cloud Asset es
+eventualmente consistente, las comprobaciones posteriores a crear cuentas o
+bindings reintentan durante una ventana fija y después fallan cerrado si el
+inventario exacto no converge. También se releen
 directamente proyecto, Artifact
 Registry, Secrets, service accounts runtime, KMS y, en `finalize`, cada
 service/job de Cloud Run. Builder y deployers deben estar keyless y sin
@@ -364,7 +387,7 @@ pool/provider, builder y deployer activos, keyless y con trust completo exacto;
 roles de proyecto/Artifact Registry; catorce Secrets; diez cuentas runtime
 habilitadas y keyless; KMS; y los once recursos Run. Policy Analyzer debe estar
 completamente explorado, sin group edges, impersonación residual ni pares
-efectivos heredados fuera de la allowlist. Para cada runtime SA, la policy
+efectivos project-scoped fuera de la allowlist. Para cada runtime SA, la policy
 entrante debe contener sólo el `roles/iam.serviceAccountUser` del deployer del
 entorno y su autoridad efectiva debe coincidir con la allowlist del componente:
 SQL, Secrets, KMS e invocaciones privadas estrictamente necesarias. Después del
@@ -381,12 +404,13 @@ de autoridad desde cero.
 Cloud Asset Search y Policy Analyzer son eventualmente consistentes.
 `fullyExplored` describe el snapshot consultado, no prueba que un binding o
 workload creado instantes antes ya esté indexado. Antes de `finalize`, del
-retiro WIF y de `close`, congelar cambios IAM/workloads, esperar el período
-operativo acordado y repetir el scan de principals WIF y el inventario de
-adjunciones hasta obtener dos evidencias estables. No avanzar ante diferencias
-ni tratar una API deshabilitada como ausencia de recursos. Los diez minutos y
-las lecturas separadas por veinte segundos que siguen cubren específicamente
-Admin Activity del seed inicial; no sustituyen esta precaución para Cloud Asset.
+`close`, congelar cambios IAM/workloads, esperar el período operativo acordado y
+repetir el scan de principals WIF y el inventario de adjunciones hasta obtener
+dos evidencias estables. El retiro WIF independiente post-v2 aplicará la misma
+precaución cuando corresponda. No avanzar ante diferencias ni tratar una API
+deshabilitada como ausencia de recursos. Los diez minutos y las lecturas
+separadas por veinte segundos que siguen cubren específicamente Admin Activity
+del seed inicial; no sustituyen esta precaución para Cloud Asset.
 
 Después de `prepare` para STG, el Owner directo preexistente y revisado
 `softponti@gmail.com` crea únicamente los once recursos iniciales mediante
@@ -417,45 +441,22 @@ diez minutos antes de finalizar y el gate exige que dos lecturas separadas por
 veinte segundos sean idénticas.
 Recién entonces se ejecuta el primer canary.
 
-El retiro legado exige un run `operational` exitoso del SHA actual exacto de
-`main`: comprueba commit, árbol completo y blob del workflow contra el checkout
-local limpio. Es un corte STG-first: exige builder y deployer STG exactos y
-finalizados, y falla si la service account deployer PRD ya fue provisionada.
-El subject PRD puede existir en la condición del provider, pero no tiene cuenta
-destino hasta después de `close`. Antes de mutar, verifica las autorizaciones
-directas exactas de las identidades nuevas y una consulta IAM Policy Analyzer
-completamente explorada. También exige que la cuenta compartida no conserve
-autoridad efectiva —directa, por recurso, grupo o
-impersonación— sobre Pymes. Como Policy Analyzer sólo es utilizable en el
-scope del proyecto con el operador actual, el corte falla cerrado ante cualquier
-binding `group:` en políticas de ancestros: no presume que la cuenta compartida
-esté fuera de un grupo cuya membresía no puede probar. Cloud Asset más
-inventarios directos por producto descartan claves o workloads del proyecto en
-cualquier región; una API deshabilitada hace fallar la prueba en lugar de
-interpretarse como inventario vacío. La policy efectiva
-`iam.disableCrossProjectServiceAccountUsage` debe impedir adjunciones desde
-otros proyectos. Debido a la consistencia eventual de Cloud Asset, el cambio se
-ejecuta sólo después de una ventana sin mutaciones y de repetir esos inventarios
-hasta conservar evidencia estable.
-
-`apply` reescribe las dos políticas IAM completas preservando sus `etag`,
-elimina únicamente el principal legado exacto y luego deshabilita la cuenta
-exclusiva. El marcador durable se deriva de los dos eventos auditados
-`SetIAMPolicy` exitosos cuyos requests ya no contienen ese principal y de un
-evento `DisableServiceAccount` posterior, todos ejecutados por el mismo actor.
-`audit` exige un segundo canary `operational`, distinto pero del mismo SHA y
-árbol, iniciado después del marcador; el primero debe haber terminado antes.
-`close` repite la auditoría antes de declarar terminada la transición. Los
-roles de proyecto de la cuenta dedicada quedan inertes mientras está
-deshabilitada y sólo se limpian en un cambio posterior reversible; nunca se
-alteran los roles de la cuenta compartida. PRD se crea/finaliza después de este
-cierre: `prepare prd`, bootstrap inicial revisado y `finalize prd`, todos
-mediante `PYMES_RELEASE_IDENTITY_ENV=prd`.
+`retire-legacy-pymes-wif.sh` no pertenece al release v3 y no es una
+precondición de `close` ni de PRD. Mientras v2 siga activo está prohibido
+ejecutarlo: puede retirar autoridad que v2 todavía necesita. Después del
+retiro definitivo de v2 se operará como un cambio one-time independiente, con
+canaries y evidencia propios. Sólo en ese procedimiento futuro el operador
+humano lee policies de ancestros para descartar grupos o grants ocultos; esa
+excepción es read-only, no concede autoridad a GitHub y no muta folder,
+organización u otros proyectos. El workflow v3 nunca invoca ese script.
 
 La release autoritativa es el workflow manual `Pymes V3 Release`:
 su nombre de run incluye environment, `deploy_stage` y SHA. Sólo
 `Pymes V3 stg operational @ <sha>` puede servir como canary; una ejecución
 `bootstrap` crea candidatos sin tráfico y nunca prueba el camino operacional.
+Antes del seed humano, `initial-seed-build` autentica las identidades WIF
+preparadas, exige cero recursos Cloud Run y cero Run Admin, construye y conserva
+el manifiesto, y termina exitosamente con el job Deploy marcado `skipped`.
 
 1. rechaza un ref distinto de `main`, exige un run exitoso de `Pymes V3 CI`
    para el SHA exacto, valida `deploy_stage`, verifica la política completa de
@@ -464,9 +465,13 @@ su nombre de run incluye environment, `deploy_stage` y SHA. Sólo
 3. construye desde worktrees limpios, publica SBOM y provenance y genera un
    manifiesto allowlisted con imágenes sólo por `@sha256`;
 4. repite la auditoría completa de GitHub inmediatamente antes de autenticar el
-   deployer;
+   deployer. En `initial-seed-build`, conserva la evidencia durable y termina
+   aquí sin descargar el manifiesto al job Deploy ni mutar Cloud Run;
 5. ejecuta migraciones y crea servicios candidatos con tráfico cero y el label
-   `pymes-v3-release=<sha-fuente>`. Cada deploy fuerza el invoker IAM check de
+   `pymes-v3-release=<sha-fuente>`. Cada job privilegiado recibe el environment
+   exacto y la conexión `pymes-dev-352318:us-central1:pymes-dev-db`; Pymes,
+   Fiscal y Accounting validan URL, base, `session_user` y `current_user`
+   antes de cualquier DDL o grant. Cada deploy fuerza el invoker IAM check de
    Cloud Run y el readback posterior valida ingress e invokers. Antes de crear
    candidatos, resuelve de forma exacta los baselines activos: un error de
    lectura no cuenta como ausencia y Web debe apuntar al tag y capability de la
@@ -503,7 +508,9 @@ su nombre de run incluye environment, `deploy_stage` y SHA. Sólo
    limpieza no se limita al control plane: cada URL retirada debe responder
    `404`, incluida la API anterior y la Web candidata.
 
-No se despliega manualmente un tag, `latest` ni un manifiesto editado. Hasta
+No se despliega manualmente un tag, `latest` ni un manifiesto editado. El único
+uso manual del manifiesto descargado es el seed inerte allowlisted previo a
+`finalize`. Hasta
 que ese workflow termine y el verificador pase, H8 está implementado pero no
 operado.
 
@@ -523,8 +530,14 @@ de GitHub de 90 días. El build llama a
 `scripts/deploy/retain-release-manifest.sh`; si esa publicación falla, no
 continúa. Cada ambiente usa un bucket determinístico separado con uniform
 access, prevención de acceso público, sin versioning ni reglas lifecycle,
-retención mínima de un año y Bucket Lock. El builder sólo puede listar el
-bucket, crear objetos y leerlos; no recibe permiso para sobrescribir o borrar.
+retención mínima de un año y Bucket Lock. Para la publicación, el builder sólo
+puede listar, crear y leer objetos del bucket; no recibe permiso para
+sobrescribir o borrar.
+Además recibe el custom role de proyecto
+`pymesV3ReleaseEvidenceIamRead`, con el único permiso
+`storage.buckets.getIamPolicy`, ligado exclusivamente sobre el bucket Pymes del
+entorno objetivo y no sobre el proyecto. La publicación valida en vivo policy,
+lock, metadata y el objeto retenido antes de emitir el receipt.
 
 Los buckets todavía son una precondición operativa, no evidencia ya
 provisionada. Prepararlos una sola vez por ambiente:
@@ -552,10 +565,10 @@ PYMES_RELEASE_EVIDENCE_MODE=verify \
 Repetir explícitamente para PRD con `PRD` y
 `pymes-v3-release-evidence-prd-884236221349`. `apply` crea el bucket si falta,
 valida su configuración si ya existe y agrega los bindings requeridos del
-builder, pero deliberadamente no activa el lock. Bloquear la política de
-retención es irreversible y crea un project lien; revisar proyecto, ambiente,
-nombre, plazo e IAM antes de escribir la confirmación. `verify` exige el lock
-ya activo.
+builder, incluido el custom role de lectura de IAM acotado al bucket, pero
+deliberadamente no activa el lock. Bloquear la política de retención es
+irreversible y crea un project lien; revisar proyecto, ambiente, nombre, plazo
+e IAM antes de escribir la confirmación. `verify` exige el lock ya activo.
 
 La publicación usa un nombre ligado a ambiente, SHA fuente y GitHub run ID y
 envía `--if-generation-match=0`: un segundo objeto con el mismo nombre falla en
@@ -573,18 +586,21 @@ se comparan materiales exactos, no se afirma igualdad de digest entre entornos.
 [`migrate-project-secret-access.sh`](../scripts/deploy/migrate-project-secret-access.sh)
 reemplaza los grants históricos a nivel proyecto por accessors directos sobre
 los secretos exactos. No lee payloads ni elimina secretos, versiones,
-workloads o service accounts. El modo por defecto es `plan` y no consulta GCP:
+workloads o service accounts. No forma parte del release v3 y no debe
+ejecutarse —ni siquiera como paso preparatorio— mientras v2 siga activo. Los
+comandos siguientes son referencia exclusiva para un cambio aprobado posterior
+al retiro definitivo de v2. El modo por defecto es `plan` y no consulta GCP:
 
 ```bash
 PYMES_PROJECT_SECRET_ACCESS_SCOPE=runtime \
 ./v3/scripts/deploy/migrate-project-secret-access.sh
 ```
 
-La secuencia segura es `runtime` antes del primer despliegue STG y `github`
-sólo después de completar el retiro WIF legado y comprobar que la cuenta
-dedicada está deshabilitada. `apply` inventaría servicios, jobs y todas las
-revisiones retenidas, concede primero cada accessor directo, relee las
-policies y el inventario global y recién entonces retira
+En esa operación post-v2, la secuencia segura es `runtime` y luego `github`,
+después de comprobar que la cuenta dedicada histórica está deshabilitada.
+`apply` inventaría servicios, jobs y todas las revisiones retenidas, concede
+primero cada accessor directo, relee las policies y el inventario global y
+recién entonces retira
 `roles/secretmanager.secretAccessor` a nivel proyecto. Para la cuenta GitHub
 dedicada también retira el `roles/secretmanager.admin` redundante.
 
@@ -601,10 +617,11 @@ PYMES_PROJECT_SECRET_ACCESS_OPERATOR_EMAIL=softponti@gmail.com \
 ./v3/scripts/deploy/migrate-project-secret-access.sh
 ```
 
-Después de los dos canaries y el retiro WIF, repetir con `scope=github` y
-confirmación `MIGRATE_PROJECT_SECRET_ACCESS_GITHUB`. Cada `AUDIT READY` prueba
-los secrets directos exactos del principal y `project_secret_access=none`.
-`scope=all` existe para auditoría final; no sustituye el orden runtime primero.
+Dentro de ese cambio post-v2, después de los canaries y el retiro WIF, repetir
+con `scope=github` y confirmación
+`MIGRATE_PROJECT_SECRET_ACCESS_GITHUB`. Cada `AUDIT READY` prueba los secrets
+directos exactos del principal y `project_secret_access=none`. `scope=all`
+existe para auditoría final; no sustituye el orden runtime primero.
 
 ## Retiro recuperable de secretos obsoletos
 

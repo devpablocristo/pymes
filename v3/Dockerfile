@@ -91,5 +91,7 @@ ENTRYPOINT ["node", "dist/src/cmd/api.js"]
 
 FROM postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777 AS fiscal-migrate
 COPY fiscal-adapter/migrations /migrations
+COPY fiscal-adapter/scripts/migrate.sh /migrate.sh
+RUN chmod 0555 /migrate.sh
 USER postgres
-ENTRYPOINT ["sh", "-ec", "for file in /migrations/*.sql; do psql \"$FISCAL_DATABASE_URL\" -v ON_ERROR_STOP=1 -f \"$file\"; done"]
+ENTRYPOINT ["/migrate.sh"]

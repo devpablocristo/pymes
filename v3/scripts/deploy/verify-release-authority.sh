@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Verifies the authority used by the protected release workflow. Neither the
-# zero-traffic bootstrap nor an operational release may receive project-wide
-# Cloud Run administration in the shared project. Both stages run only after
-# the initial resources have been seeded by a reviewed human operator and the
-# deployer has received resource-scoped administration through finalize.
+# Verifies the authority used by the protected release workflow. The initial
+# seed build is allowed only before every Pymes Cloud Run resource exists and
+# while its deployer has no Cloud Run administration. Bootstrap and operational
+# releases run only after the reviewed human seed and resource-scoped finalize.
+# No stage may receive project-wide Cloud Run administration in the shared
+# project.
 
 expected_project=pymes-dev-352318
 expected_project_number=884236221349
@@ -24,10 +25,10 @@ attribute_condition="assertion.repository_id=='${github_repository_id}' && asser
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=release-authority-policy.sh
 source "$script_dir/release-authority-policy.sh"
+# shellcheck source=release-evidence-lib.sh
+source "$script_dir/release-evidence-lib.sh"
 project_iam_read_role="projects/${expected_project}/roles/pymesV3ReleaseProjectIamRead"
 kms_policy_read_role="projects/${expected_project}/roles/pymesV3ReleaseKmsPolicyRead"
-organization_iam_read_role="organizations/${pymes_release_expected_organization}/roles/pymesV3ReleaseOrganizationIamRead"
-folder_iam_read_role="organizations/${pymes_release_expected_organization}/roles/pymesV3ReleaseFolderIamRead"
 runtime_accounts=(
   api web worker provision fiscal accounting accounting-admin
   migrate fiscal-migrate acct-migrate
@@ -89,7 +90,7 @@ validate_project_authority() {
       return 1
     }
 
-  case "$stage" in bootstrap|operational) ;; *)
+  case "$stage" in initial-seed-build|bootstrap|operational) ;; *)
     echo "unsupported release authority stage: $stage" >&2
     return 1
   esac
@@ -104,6 +105,24 @@ validate_project_authority() {
     echo "release workflow forbids every project-scoped roles/run.admin binding" >&2
     return 1
   fi
+}
+
+validate_initial_seed_resources_absent() {
+  local services="$1" jobs="$2" environment="$3" component name
+  for component in "${release_services[@]}"; do
+    name="pymes-v3-${environment}-${component}"
+    if grep -Fxq "$name" <<<"$services"; then
+      echo "initial seed build requires absent Cloud Run service $name" >&2
+      return 1
+    fi
+  done
+  for component in "${release_jobs[@]}"; do
+    name="pymes-v3-${environment}-${component}"
+    if grep -Fxq "$name" <<<"$jobs"; then
+      echo "initial seed build requires absent Cloud Run job $name" >&2
+      return 1
+    fi
+  done
 }
 
 validate_resource_authority() {
@@ -170,36 +189,6 @@ validate_kms_custom_role_json() {
   }
 }
 
-validate_organization_iam_custom_role_json() {
-  local role_json="$1"
-  jq -e \
-    --arg name "$organization_iam_read_role" \
-    --argjson expected "$(pymes_release_organization_iam_read_permissions_json)" '
-    .name == $name and
-    .deleted != true and
-    (.stage // "GA") == "GA" and
-    (.includedPermissions | sort) == $expected
-  ' <<<"$role_json" >/dev/null || {
-    echo "release organization-IAM verifier role differs from the reviewed permission set" >&2
-    return 1
-  }
-}
-
-validate_folder_iam_custom_role_json() {
-  local role_json="$1"
-  jq -e \
-    --arg name "$folder_iam_read_role" \
-    --argjson expected "$(pymes_release_folder_iam_read_permissions_json)" '
-    .name == $name and
-    .deleted != true and
-    (.stage // "GA") == "GA" and
-    (.includedPermissions | sort) == $expected
-  ' <<<"$role_json" >/dev/null || {
-    echo "release folder-IAM verifier role differs from the reviewed permission set" >&2
-    return 1
-  }
-}
-
 validate_wif_pool_json() {
   local pool_json="$1"
   jq -e \
@@ -235,97 +224,6 @@ validate_wif_provider_json() {
       .disabled != true
     ' <<<"$provider_json" >/dev/null || {
       echo "release WIF provider differs from the reviewed GitHub boundary" >&2
-      return 1
-    }
-}
-
-validate_project_ancestry_json() {
-  local ancestry_json="$1"
-  jq -e \
-    --arg project "$expected_project" \
-    --arg folder "$pymes_release_expected_folder" \
-    --arg organization "$pymes_release_expected_organization" '
-      (
-        map({type: .type, id: (.id | tostring)})
-        | sort_by(.type, .id)
-      ) == (
-        [
-          {type: "project", id: $project},
-          {type: "folder", id: $folder},
-          {type: "organization", id: $organization}
-        ]
-        | sort_by(.type, .id)
-      )
-    ' <<<"$ancestry_json" >/dev/null || {
-      echo "release verifier cannot prove the complete expected project ancestry" >&2
-      return 1
-    }
-}
-
-validate_ancestor_policy() {
-  local policy_json="$1" build_member="$2" deploy_member="$3"
-  local expected_deploy_role="$4" description="$5"
-  jq -e \
-    --arg build_member "$build_member" \
-    --arg deploy_member "$deploy_member" \
-    --arg expected_deploy_role "$expected_deploy_role" '
-      [
-        .bindings[]?
-        | select((.members // []) | index($deploy_member) != null)
-        | {
-            role: .role,
-            condition: (.condition // null),
-            occurrences: ([.members[] | select(. == $deploy_member)] | length)
-          }
-      ] == [{
-        role: $expected_deploy_role,
-        condition: null,
-        occurrences: 1
-      }] and
-      all(
-        .bindings[]?;
-        all(
-          .members[]?;
-          . != $build_member and
-          (
-            if startswith("serviceAccount:pymes-v3-gh-deploy-") then
-              (
-                . == "serviceAccount:pymes-v3-gh-deploy-stg@pymes-dev-352318.iam.gserviceaccount.com" or
-                . == "serviceAccount:pymes-v3-gh-deploy-prd@pymes-dev-352318.iam.gserviceaccount.com"
-              ) and
-              (. as $release_member | any(
-                  $policy_bindings[]?;
-                  .role == $expected_deploy_role and
-                  (.condition // null) == null and
-                  ((.members // []) | index($release_member) != null)
-                ))
-          elif startswith("serviceAccount:pymes-v3-") then
-            false
-          elif . == "user:softponti@gmail.com" then
-            true
-          else
-            (
-              startswith("user:") or startswith("serviceAccount:")
-            ) and
-            (. as $other_member | all(
-              $policy_bindings[]?;
-              if ((.members // []) | index($other_member) != null) then
-                .role == "roles/viewer" or
-                .role == "roles/browser" or
-                .role == "roles/iam.securityReviewer" or
-                .role == "roles/resourcemanager.organizationViewer" or
-                .role == "roles/resourcemanager.folderViewer"
-              else
-                true
-              end
-            ))
-          end
-          )
-        )
-      )
-    ' --argjson policy_bindings "$(jq '.bindings // []' <<<"$policy_json")" \
-    <<<"$policy_json" >/dev/null || {
-      echo "$description contains release authority or group, domain, public, principal-set, or otherwise unprovable inherited authority" >&2
       return 1
     }
 }
@@ -555,7 +453,39 @@ validate_effective_iam_analysis() {
   }
 }
 
-read_effective_iam_analysis() {
+validate_required_effective_iam_pairs() {
+  local analysis_json="$1" description="$2"
+  shift 2
+  local actual_pairs required_pairs missing_pairs
+  actual_pairs=$(jq -r '
+    [
+      (
+        .mainAnalysis.analysisResults[]?,
+        .serviceAccountImpersonationAnalysis[]?.analysisResults[]?
+      )
+      | [.attachedResourceFullName, .iamBinding.role]
+      | @tsv
+    ]
+    | unique
+    | sort
+    | .[]
+  ' <<<"$analysis_json")
+  required_pairs=$(printf '%s\n' "$@" |
+    sed '/^[[:space:]]*$/d' |
+    LC_ALL=C sort -u)
+  missing_pairs=$(comm -23 \
+    <(printf '%s\n' "$required_pairs") \
+    <(printf '%s\n' "$actual_pairs" |
+      sed '/^[[:space:]]*$/d' |
+      LC_ALL=C sort -u))
+  [[ -z "$missing_pairs" ]] || {
+    echo "$description is missing required project-scoped IAM" >&2
+    printf '%s\n' "$missing_pairs" >&2
+    return 1
+  }
+}
+
+read_project_effective_iam_analysis() {
   local email="$1"
   gcloud asset analyze-iam-policy \
     --project="$expected_project" \
@@ -657,10 +587,12 @@ main() {
   local deploy_subject member project_policy repository_policy component name
   local policy role_json pool_json provider_json account_json account_policy
   local user_keys runtime_email runtime_json keyring secret analysis_json kms_key
-  local ancestry_json ancestor_type ancestor_id ancestor_policy expected_ancestor_role
   local release_pool_assets
-  local active_account org_policy_json constraint
-  local -a release_secrets build_allowed_pairs deploy_allowed_pairs runtime_pairs
+  local active_account org_policy_json constraint service_names job_names
+  local run_resources resource_run_admin
+  local evidence_bucket evidence_environment evidence_role
+  local -a release_secrets build_allowed_pairs build_required_pairs
+  local -a deploy_allowed_pairs runtime_pairs
 
   [[ "$project" == "$expected_project" ]] || {
     echo "release authority verification is restricted to $expected_project" >&2
@@ -674,8 +606,8 @@ main() {
     echo "PYMES_DEPLOY_ENV must be stg or prd" >&2
     exit 2
   esac
-  case "$stage" in bootstrap|operational) ;; *)
-    echo "PYMES_DEPLOY_STAGE must be bootstrap or operational" >&2
+  case "$stage" in initial-seed-build|bootstrap|operational) ;; *)
+    echo "PYMES_DEPLOY_STAGE must be initial-seed-build, bootstrap or operational" >&2
     exit 2
   esac
   for command in gcloud jq; do
@@ -701,7 +633,8 @@ main() {
     --project="$project" --location=global \
     --workload-identity-pool="$pool" --format=json)
   validate_wif_provider_json "$provider_json"
-  release_pool_assets=$(pymes_search_release_pool_iam_assets "$project")
+  release_pool_assets=$(pymes_read_release_pool_iam_assets_until_valid \
+    "$project" "$environment" exact)
   pymes_validate_release_pool_iam_assets \
     "$release_pool_assets" "$environment" exact
 
@@ -774,39 +707,9 @@ main() {
   role_json=$(gcloud iam roles describe pymesV3ReleaseKmsPolicyRead \
     --project="$project" --format=json)
   validate_kms_custom_role_json "$role_json"
-  role_json=$(gcloud iam roles describe pymesV3ReleaseOrganizationIamRead \
-    --organization="$pymes_release_expected_organization" --format=json)
-  validate_organization_iam_custom_role_json "$role_json"
-  role_json=$(gcloud iam roles describe pymesV3ReleaseFolderIamRead \
-    --organization="$pymes_release_expected_organization" --format=json)
-  validate_folder_iam_custom_role_json "$role_json"
-
-  ancestry_json=$(gcloud projects get-ancestors "$project" --format=json)
-  validate_project_ancestry_json "$ancestry_json"
-  while IFS=$'\t' read -r ancestor_type ancestor_id; do
-    case "$ancestor_type" in
-      project)
-        continue
-        ;;
-      folder)
-        ancestor_policy=$(gcloud resource-manager folders get-iam-policy \
-          "$ancestor_id" --format=json)
-        expected_ancestor_role=$folder_iam_read_role
-        ;;
-      organization)
-        ancestor_policy=$(gcloud organizations get-iam-policy \
-          "$ancestor_id" --format=json)
-        expected_ancestor_role=$organization_iam_read_role
-        ;;
-      *)
-        echo "unsupported project ancestor type: $ancestor_type" >&2
-        exit 1
-        ;;
-    esac
-    validate_ancestor_policy \
-      "$ancestor_policy" "$build_member" "$member" "$expected_ancestor_role" \
-      "release ancestor ${ancestor_type}/${ancestor_id}"
-  done < <(jq -r '.[] | [.type, (.id | tostring)] | @tsv' <<<"$ancestry_json")
+  role_json=$(gcloud iam roles describe pymesV3ReleaseEvidenceIamRead \
+    --project="$project" --format=json)
+  pymes_release_evidence_validate_iam_read_role "$role_json"
 
   mapfile -t release_secrets < <(release_secret_names "$environment")
   for secret in "${release_secrets[@]}"; do
@@ -875,37 +778,53 @@ main() {
       "$policy" "release KMS key $kms_key IAM"
   done
 
-  for component in "${release_services[@]}"; do
-    name="pymes-v3-${environment}-${component}"
-    if ! gcloud run services describe "$name" \
-      --project="$project" --region="$region" >/dev/null 2>&1; then
-      echo "release workflow is missing finalized Cloud Run service $name" >&2
-      exit 1
-    fi
-    policy=$(gcloud run services get-iam-policy "$name" \
-      --project="$project" --region="$region" --format=json)
-    pymes_assert_policy_has_no_release_pool_members \
-      "$policy" "release Cloud Run service $name IAM"
-    validate_complete_resource_authority \
-      "$policy" "$member" service "$component" "$environment" "$stage"
-  done
-  for component in "${release_jobs[@]}"; do
-    name="pymes-v3-${environment}-${component}"
-    if ! gcloud run jobs describe "$name" \
-      --project="$project" --region="$region" >/dev/null 2>&1; then
-      echo "release workflow is missing finalized Cloud Run job $name" >&2
-      exit 1
-    fi
-    policy=$(gcloud run jobs get-iam-policy "$name" \
-      --project="$project" --region="$region" --format=json)
-    pymes_assert_policy_has_no_release_pool_members \
-      "$policy" "release Cloud Run job $name IAM"
-    validate_complete_resource_authority \
-      "$policy" "$member" job "$component" "$environment" "$stage"
-  done
+  if [[ "$stage" == "initial-seed-build" ]]; then
+    service_names=$(CLOUDSDK_RUN_REGION= gcloud run services list \
+      --project="$project" --region="$region" \
+      --format='value(metadata.name)')
+    job_names=$(CLOUDSDK_RUN_REGION= gcloud run jobs list \
+      --project="$project" --region="$region" \
+      --format='value(metadata.name)')
+    validate_initial_seed_resources_absent \
+      "$service_names" "$job_names" "$environment"
+    run_resources=absent
+    resource_run_admin=absent
+  else
+    for component in "${release_services[@]}"; do
+      name="pymes-v3-${environment}-${component}"
+      if ! gcloud run services describe "$name" \
+        --project="$project" --region="$region" >/dev/null 2>&1; then
+        echo "release workflow is missing finalized Cloud Run service $name" >&2
+        exit 1
+      fi
+      policy=$(gcloud run services get-iam-policy "$name" \
+        --project="$project" --region="$region" --format=json)
+      pymes_assert_policy_has_no_release_pool_members \
+        "$policy" "release Cloud Run service $name IAM"
+      validate_complete_resource_authority \
+        "$policy" "$member" service "$component" "$environment" "$stage"
+    done
+    for component in "${release_jobs[@]}"; do
+      name="pymes-v3-${environment}-${component}"
+      if ! gcloud run jobs describe "$name" \
+        --project="$project" --region="$region" >/dev/null 2>&1; then
+        echo "release workflow is missing finalized Cloud Run job $name" >&2
+        exit 1
+      fi
+      policy=$(gcloud run jobs get-iam-policy "$name" \
+        --project="$project" --region="$region" --format=json)
+      pymes_assert_policy_has_no_release_pool_members \
+        "$policy" "release Cloud Run job $name IAM"
+      validate_complete_resource_authority \
+        "$policy" "$member" job "$component" "$environment" "$stage"
+    done
+    run_resources=present
+    resource_run_admin=exact
+  fi
 
   pymes_verify_release_inverse_authority \
-    "$project" "$expected_project_number" "$region" "$environment" present \
+    "$project" "$expected_project_number" "$region" "$environment" \
+    "$run_resources" \
     "$artifact_repository"
 
   build_allowed_pairs=(
@@ -914,9 +833,26 @@ main() {
     "//artifactregistry.googleapis.com/projects/${project}/locations/${region}/repositories/${artifact_repository}"$'\t'"roles/artifactregistry.writer"
     "//artifactregistry.googleapis.com/projects/${expected_project_number}/locations/${region}/repositories/${artifact_repository}"$'\t'"roles/artifactregistry.writer"
   )
-  analysis_json=$(read_effective_iam_analysis "$build_email")
+  build_required_pairs=()
+  for evidence_environment in stg prd; do
+    evidence_bucket="//storage.googleapis.com/pymes-v3-release-evidence-${evidence_environment}-${expected_project_number}"
+    for evidence_role in \
+      "$PYMES_RELEASE_EVIDENCE_IAM_READ_ROLE" \
+      roles/storage.legacyBucketReader \
+      roles/storage.objectCreator \
+      roles/storage.objectViewer; do
+      build_allowed_pairs+=("$evidence_bucket"$'\t'"$evidence_role")
+      if [[ "$evidence_environment" == "$environment" ]]; then
+        build_required_pairs+=("$evidence_bucket"$'\t'"$evidence_role")
+      fi
+    done
+  done
+  analysis_json=$(read_project_effective_iam_analysis "$build_email")
   validate_effective_iam_analysis \
     "$analysis_json" "release builder" "${build_allowed_pairs[@]}"
+  validate_required_effective_iam_pairs \
+    "$analysis_json" "release builder evidence bucket" \
+    "${build_required_pairs[@]}"
 
   deploy_allowed_pairs=(
     "//cloudresourcemanager.googleapis.com/projects/${project}"$'\t'"roles/serviceusage.serviceUsageConsumer"
@@ -944,21 +880,23 @@ main() {
       "//iam.googleapis.com/projects/-/serviceAccounts/${runtime_email}"$'\t'"roles/iam.serviceAccountUser"
     )
   done
-  for component in "${release_services[@]}"; do
-    name="pymes-v3-${environment}-${component}"
-    deploy_allowed_pairs+=(
-      "//run.googleapis.com/projects/${project}/locations/${region}/services/${name}"$'\t'"roles/run.admin"
-      "//run.googleapis.com/projects/${expected_project_number}/locations/${region}/services/${name}"$'\t'"roles/run.admin"
-    )
-  done
-  for component in "${release_jobs[@]}"; do
-    name="pymes-v3-${environment}-${component}"
-    deploy_allowed_pairs+=(
-      "//run.googleapis.com/projects/${project}/locations/${region}/jobs/${name}"$'\t'"roles/run.admin"
-      "//run.googleapis.com/projects/${expected_project_number}/locations/${region}/jobs/${name}"$'\t'"roles/run.admin"
-    )
-  done
-  analysis_json=$(read_effective_iam_analysis "$deploy_email")
+  if [[ "$stage" != "initial-seed-build" ]]; then
+    for component in "${release_services[@]}"; do
+      name="pymes-v3-${environment}-${component}"
+      deploy_allowed_pairs+=(
+        "//run.googleapis.com/projects/${project}/locations/${region}/services/${name}"$'\t'"roles/run.admin"
+        "//run.googleapis.com/projects/${expected_project_number}/locations/${region}/services/${name}"$'\t'"roles/run.admin"
+      )
+    done
+    for component in "${release_jobs[@]}"; do
+      name="pymes-v3-${environment}-${component}"
+      deploy_allowed_pairs+=(
+        "//run.googleapis.com/projects/${project}/locations/${region}/jobs/${name}"$'\t'"roles/run.admin"
+        "//run.googleapis.com/projects/${expected_project_number}/locations/${region}/jobs/${name}"$'\t'"roles/run.admin"
+      )
+    done
+  fi
+  analysis_json=$(read_project_effective_iam_analysis "$deploy_email")
   validate_effective_iam_analysis \
     "$analysis_json" "release deployer" "${deploy_allowed_pairs[@]}"
 
@@ -967,12 +905,12 @@ main() {
     mapfile -t runtime_pairs < <(
       runtime_effective_iam_allowlist "$component" "$environment"
     )
-    analysis_json=$(read_effective_iam_analysis "$runtime_email")
+    analysis_json=$(read_project_effective_iam_analysis "$runtime_email")
     validate_effective_iam_analysis \
       "$analysis_json" "runtime identity $runtime_email" "${runtime_pairs[@]}"
   done
 
-  echo "Release authority verified: environment=${environment} stage=${stage} builder=keyless-exact wif=exact effective_iam=allowlisted inverse_permissions=allowlisted runtime_iam=allowlisted project_run_admin=absent resource_run_admin=exact"
+  echo "Release authority verified: environment=${environment} stage=${stage} project=${project} region=${region} builder=keyless-exact wif=exact project_effective_iam=allowlisted inverse_permissions=allowlisted runtime_iam=allowlisted project_run_admin=absent resource_run_admin=${resource_run_admin}"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

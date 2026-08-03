@@ -23,11 +23,18 @@ build. El manifiesto por entorno vincula Pymes, Open Accounting y las diez
 imágenes; debe conservarse como evidencia durable y la retención actual del
 artifact durante 90 días en GitHub Actions debe complementarse con
 almacenamiento inmutable si la política de auditoría exige una ventana mayor.
+El builder valida en vivo el IAM de cada bucket de evidencia con el custom role
+de proyecto `pymesV3ReleaseEvidenceIamRead`, compuesto únicamente por
+`storage.buckets.getIamPolicy` y ligado al bucket Pymes objetivo, nunca al
+proyecto.
 GitHub Actions usará identidades WIF separadas
 para build, STG y PRD; no utilizará claves JSON persistentes. PRD requiere una
 aprobación explícita de otro reviewer, impide autoaprobación y bypass
 administrativo, y reconstruye desde la misma fuente y materiales validados,
 no desde fuentes distintas.
+La frontera reproduce el patrón project-scoped observado en Pymes v2, pero con
+pool, cuentas y recursos exclusivos de v3 y sin dependencia de código, runtime
+o configuración de v2.
 La rama `main` exige el check único `Pymes V3 validate`, no exige reviewers y
 mantiene historial lineal, resolución de conversaciones y enforcement para
 administradores. Cada release vuelve a comprobar el check y el enforcement
@@ -35,30 +42,29 @@ visibles en el resumen público de la rama y las reglas del environment
 seleccionado. La auditoría completa de reviews de despliegue, bypass y
 allowlists se ejecuta con credencial de operador y bloquea la creación de WIF.
 La automatización WIF está preparada, pero la identidad nueva todavía no está
-aprovisionada. El corte del principal WIF legado requiere un primer canary STG
-`operational` ligado al SHA, árbol y workflow actuales exactos, autorización
-efectiva nueva limitada y un inventario global sin workloads legados. El
-rollout es STG-first: para este corte sólo existen builder y deployer STG; el
-deployer PRD se provisiona después de `close`. El
-retiro reversible del principal exacto queda marcado por los dos eventos
-`SetIAMPolicy` exitosos sin ese principal y el
-`DisableServiceAccount` posterior del mismo actor. Un segundo canary
-`operational` del mismo SHA debe comenzar después de ese marcador y Cloud Asset
-debe demostrar que no queda acceso residual.
+aprovisionada. El rollout dedicado v3 es STG-first: sólo existen builder y
+deployer STG hasta que un canary v3 permita ejecutar `close`; después se
+provisiona el deployer PRD y las verificaciones STG aceptan y exigen exactamente
+Build+STG+PRD. `close` no retira ni modifica identidades históricas que pueda
+seguir usando v2.
 
 La autoridad nueva se vuelve a auditar en cada ejecución. El bootstrap exige
 un checkout limpio cuyo HEAD y árbol sean el `main` remoto exacto, la identidad
 GitHub esperada y el operador directo `softponti@gmail.com`; rechaza
 impersonación, credential overrides y archivos de token/configuración
-alternativos de `gcloud`. La cadena de ancestros es parte de la decisión:
-proyecto `pymes-dev-352318`, folder `673291958610` y organización
-`663017421195`. Builder no recibe rol en ancestros y cada deployer recibe sólo
-los custom roles exactos de lectura de IAM de folder y organización, sin
-condiciones.
-
-Crear o corregir inicialmente esos roles y bindings requiere un operador humano
-con administración de custom roles y policies IAM en los scopes de organización
-y folder. Esa autoridad no se concede al workflow. La Org Policy API debe estar
+alternativos de `gcloud`. La frontera normal se fija a proyecto
+`pymes-dev-352318`, número
+`884236221349`, región `us-central1` y recursos Pymes explícitos. Builder,
+deployers, workloads, `prepare`, `finalize` y el workflow no requieren roles,
+bindings ni lecturas en folder, organización u otros proyectos. La única
+excepción transitoria es la auditoría humana read-only de ancestros que ejecuta
+el retiro one-time del WIF legado; no crea grants ni realiza mutaciones
+externas. Ese retiro y `migrate-project-secret-access.sh` no pertenecen al
+release v3 y están prohibidos mientras v2 siga activo.
+`gcp-target-policy.sh` es el fusible común de los scripts mutantes normales:
+antes de escribir fija proyecto `pymes-dev-352318`, región `us-central1`,
+Artifact Registry `pymes`, Cloud SQL `pymes-dev-db` y red `default` con
+subred/router/NAT `pymes-v3-serverless`. La Org Policy API debe estar
 habilitada y las constraints efectivas
 `iam.disableCrossProjectServiceAccountUsage` e
 `iam.disableServiceAccountKeyCreation` deben estar forzadas antes de crear o
@@ -76,21 +82,22 @@ cross-project cierra la ruta externa al proyecto.
 
 Policy Analyzer debe quedar completamente explorado. La auditoría inversa
 consulta permisos sensibles y compara triples recurso/permiso/identidad, por lo
-que también rechaza grupos, roles custom o alternativos, herencia,
-cross-environment e impersonación fuera de la allowlist. La policy entrante de
+que también rechaza grupos, roles custom o alternativos, cross-environment e
+impersonación fuera de la allowlist project-scoped. La policy entrante de
 cada runtime SA contiene únicamente el `actAs` del deployer de su entorno y su
-autoridad saliente se limita por componente. Los roles lectores custom sólo
-contienen metadata/IAM y análisis; no permiten leer payloads secretos, cifrar,
-firmar ni mutar recursos. Build y Deploy rechazan todo
+autoridad saliente se limita por componente. El análisis es project-scoped:
+evalúa IAM definido en el proyecto Pymes y en sus recursos, sin enumerar ni
+afirmar cobertura de políticas externas. Build y Deploy rechazan todo
 `GITHUB_RUN_ATTEMPT != 1` como primer paso, antes de checkout, artifacts o
 autenticación: un reintento es siempre un nuevo dispatch con validación nueva.
 
 Cloud Asset Search y Policy Analyzer son eventualmente consistentes:
 `fullyExplored` no equivale a frescura. La decisión exige lecturas directas para
 recursos conocidos y una ventana sin mutaciones con scans repetidos y evidencia
-estable antes de seed, retiro o cierre. La espera de diez minutos y la doble
-lectura de Admin Activity son una protección específica del seed, no una
-garantía general sobre los índices de Cloud Asset.
+estable antes de seed o cierre; el retiro legado independiente aplicará la misma
+regla sólo después de retirar v2. La espera de diez minutos y la doble lectura
+de Admin Activity son una protección específica del seed, no una garantía
+general sobre los índices de Cloud Asset.
 
 El primer alta de recursos no usa un grant temporal de proyecto. Como Cloud Run
 no admite una condición segura por nombre para `roles/run.admin`, el Owner

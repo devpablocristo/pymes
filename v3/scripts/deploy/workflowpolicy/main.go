@@ -176,6 +176,7 @@ func validateRelease(workflow object) {
 		),
 		"release.on.workflow_dispatch.inputs.deploy_stage.options",
 		"bootstrap",
+		"initial-seed-build",
 		"operational",
 	)
 	requirePermissions(workflow, "release", map[string]string{})
@@ -191,6 +192,12 @@ func validateRelease(workflow object) {
 		fatalf("release.jobs.build must not reference a GitHub environment")
 	}
 	requireEnvironment(deploy, "release.jobs.deploy", "${{ inputs.environment }}")
+	requireString(
+		deploy,
+		"if",
+		"${{ inputs.deploy_stage != 'initial-seed-build' }}",
+		"release.jobs.deploy",
+	)
 	requireNeeds(build, "release.jobs.build", "validate")
 	requireNeeds(deploy, "release.jobs.deploy", "build", "validate")
 	requirePermissions(validate, "release.jobs.validate", map[string]string{
@@ -280,7 +287,7 @@ func validateRelease(workflow object) {
 	)
 	preBuildAuthority := requireStep(
 		validate,
-		"Verify complete release authority before builder",
+		"Verify stage-scoped release authority before builder",
 	)
 	preBuildAuthorityEnv := requireObject(
 		preBuildAuthority,
@@ -327,7 +334,7 @@ func validateRelease(workflow object) {
 	requireStepBefore(
 		validate,
 		"Authenticate pre-build authority auditor",
-		"Verify complete release authority before builder",
+		"Verify stage-scoped release authority before builder",
 	)
 
 	buildPush := requireStep(build, "Build and push release digests")
@@ -413,6 +420,50 @@ func validateRelease(workflow object) {
 		"release.jobs.deploy auth",
 	)
 
+	resolveJWKS := requireStep(deploy, "Resolve exact internal JWKS")
+	resolveJWKSEnv := requireObject(
+		resolveJWKS,
+		"env",
+		"release.jobs.deploy internal JWKS resolution",
+	)
+	requireString(
+		resolveJWKSEnv,
+		"PYMES_DEPLOY_ENV",
+		"${{ inputs.environment }}",
+		"release.jobs.deploy internal JWKS resolution env",
+	)
+	requireString(
+		resolveJWKSEnv,
+		"PYMES_INTERNAL_KMS_KEY_VERSION",
+		"${{ vars.PYMES_INTERNAL_KMS_KEY_VERSION }}",
+		"release.jobs.deploy internal JWKS resolution env",
+	)
+	requireString(
+		resolveJWKSEnv,
+		"PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS",
+		"${{ vars.PYMES_INTERNAL_KMS_OVERLAP_KEY_VERSIONS }}",
+		"release.jobs.deploy internal JWKS resolution env",
+	)
+	resolveJWKSRun := requireScalarString(
+		resolveJWKS,
+		"run",
+		"release.jobs.deploy internal JWKS resolution",
+	)
+	targetValidationIndex := strings.Index(
+		resolveJWKSRun,
+		"pymes_require_canonical_internal_kms_versions",
+	)
+	kmsReadIndex := strings.Index(resolveJWKSRun, "go run ./cmd/internal-jwks")
+	if !strings.Contains(
+		resolveJWKSRun,
+		"source ./v3/scripts/deploy/gcp-target-policy.sh",
+	) ||
+		targetValidationIndex < 0 ||
+		kmsReadIndex < 0 ||
+		targetValidationIndex >= kmsReadIndex {
+		fatalf("release must validate the canonical KMS FQNs before resolving JWKS")
+	}
+
 	deployRelease := requireStep(deploy, "Deploy exact image digests")
 	deployReleaseEnv := requireObject(
 		deployRelease,
@@ -465,6 +516,11 @@ func validateRelease(workflow object) {
 	requireStepBefore(
 		deploy,
 		"Verify stage-scoped deployment authority",
+		"Deploy exact image digests",
+	)
+	requireStepBefore(
+		deploy,
+		"Resolve exact internal JWKS",
 		"Deploy exact image digests",
 	)
 

@@ -36,6 +36,19 @@ release_evidence_publisher="$repo_root/v3/scripts/deploy/retain-release-manifest
 release_evidence_test="$repo_root/v3/scripts/deploy/release-evidence-test.sh"
 cloud_restore_drill="$repo_root/v3/scripts/deploy/cloud-restore-drill.sh"
 cloud_restore_drill_test="$repo_root/v3/scripts/deploy/cloud-restore-drill-test.sh"
+gcp_target_policy="$repo_root/v3/scripts/deploy/gcp-target-policy.sh"
+gcp_target_policy_test="$repo_root/v3/scripts/deploy/gcp-target-policy-test.sh"
+gcp_guarded_mutators=(
+  "$repo_root/v3/scripts/deploy/bootstrap-data-encryption.sh"
+  "$repo_root/v3/scripts/deploy/bootstrap-internal-identity.sh"
+  "$repo_root/v3/scripts/deploy/bootstrap-workload-identities.sh"
+  "$repo_root/v3/scripts/deploy/bootstrap-network-egress.sh"
+  "$repo_root/v3/scripts/deploy/migrate-regional-secrets.sh"
+  "$repo_root/v3/scripts/deploy/provision-monitoring.sh"
+  "$repo_root/v3/scripts/deploy/build-push-images.sh"
+  "$repo_root/v3/scripts/deploy/bootstrap-cloudsql.sh"
+  "$repo_root/v3/scripts/deploy/cloud-run.sh"
+)
 
 for file in \
   "$ci_workflow" \
@@ -70,7 +83,10 @@ for file in \
   "$release_evidence_publisher" \
   "$release_evidence_test" \
   "$cloud_restore_drill" \
-  "$cloud_restore_drill_test"; do
+  "$cloud_restore_drill_test" \
+  "$gcp_target_policy" \
+  "$gcp_target_policy_test" \
+  "${gcp_guarded_mutators[@]}"; do
   [[ -f "$file" ]] || {
     echo "missing release-policy file: $file" >&2
     exit 1
@@ -84,12 +100,41 @@ bash -n "$identity_script" "$deploy_script" "$seed_script" "$seed_test" "$seed_a
   "$protected_live_validation_test" "$protected_live_fake_curl" \
   "$release_evidence_lib" "$release_evidence_bootstrap" \
   "$release_evidence_publisher" "$release_evidence_test" \
-  "$cloud_restore_drill" "$cloud_restore_drill_test"
+  "$cloud_restore_drill" "$cloud_restore_drill_test" \
+  "$gcp_target_policy" "$gcp_target_policy_test" \
+  "${gcp_guarded_mutators[@]}"
 
 fail() {
   echo "release workflow policy violation: $*" >&2
   exit 1
 }
+
+for guarded_mutator in "${gcp_guarded_mutators[@]}"; do
+  grep -Fq 'gcp-target-policy.sh' "$guarded_mutator" ||
+    fail "$(basename "$guarded_mutator") does not source the canonical GCP target policy"
+  if [[ "$(basename "$guarded_mutator")" == bootstrap-workload-identities.sh ]]; then
+    grep -Fq 'pymes_require_canonical_project "$project"' "$guarded_mutator" ||
+      fail "$(basename "$guarded_mutator") does not enforce the canonical project"
+  else
+    grep -Fq 'pymes_require_canonical_project_region "$project" "$region"' "$guarded_mutator" ||
+      fail "$(basename "$guarded_mutator") does not enforce the canonical project and region"
+  fi
+done
+grep -Fq 'pymes_require_canonical_artifact_repository "$repository"' "$build_script" ||
+  fail "build-push-images.sh does not restrict Artifact Registry to the Pymes repository"
+for network_mutator in \
+  "$repo_root/v3/scripts/deploy/bootstrap-network-egress.sh" \
+  "$deploy_script"; do
+  grep -Fq 'pymes_require_canonical_network_target' "$network_mutator" ||
+    fail "$(basename "$network_mutator") does not restrict shared network resources"
+done
+for cloudsql_mutator in \
+  "$repo_root/v3/scripts/deploy/bootstrap-cloudsql.sh" \
+  "$deploy_script"; do
+  grep -Fq 'pymes_require_canonical_cloudsql_connection' "$cloudsql_mutator" ||
+    fail "$(basename "$cloudsql_mutator") does not restrict Cloud SQL to the Pymes instance"
+done
+bash "$gcp_target_policy_test"
 
 check_action_pins() {
   local workflow="$1" line action owner
@@ -237,6 +282,10 @@ grep -Fq '[[ "${PRODUCTION_CONFIRMATION}" == "DEPLOY_PRD" ]]' "$release_workflow
   fail "production does not require explicit typed confirmation"
 grep -Fq '[[ "${REQUESTED_ENVIRONMENT}" == "stg" ]]' "$release_workflow" ||
   fail "bootstrap release stage is not restricted to STG"
+grep -Fq -- '- initial-seed-build' "$release_workflow" ||
+  fail "release omits the reviewed remote initial-seed build stage"
+grep -Fq "if: \${{ inputs.deploy_stage != 'initial-seed-build' }}" "$release_workflow" ||
+  fail "initial-seed build is not guaranteed to skip the deploy job"
 grep -Fq 'PYMES_DEPLOY_STAGE: ${{ inputs.deploy_stage }}' "$release_workflow" ||
   fail "release does not pass the reviewed deploy stage to Cloud Run"
 grep -Fq 'PYMES_CLOUD_RUN_VERIFY_PHASE=pretraffic' "$deploy_script" ||
@@ -285,6 +334,17 @@ grep -Fq '.retentionPolicy.isLocked == true' "$release_evidence_lib" ||
   fail "release evidence does not require an irreversibly locked policy"
 grep -Fq 'PYMES_RELEASE_EVIDENCE_LOCK_CONFIRMATION' "$release_evidence_bootstrap" ||
   fail "irreversible Bucket Lock lacks explicit operator confirmation"
+for proof in \
+  'pymesV3ReleaseEvidenceIamRead' \
+  'storage.buckets.getIamPolicy' \
+  'pymes_release_evidence_validate_iam_read_role' \
+  'gcloud storage buckets add-iam-policy-binding "$bucket_uri"'; do
+  grep -Fq "$proof" \
+    "$release_evidence_lib" "$release_evidence_bootstrap" ||
+    fail "release evidence lacks bucket-scoped live-IAM proof: $proof"
+done
+grep -Fq 'source "$script_dir/release-evidence-lib.sh"' "$authority_verifier" ||
+  fail "release authority verifier does not load the exact evidence policy"
 for proof in \
   '.protection.required_status_checks.enforcement_level == "everyone"' \
   '.required_status_checks.checks[0].context == "Pymes V3 validate"' \
@@ -409,7 +469,7 @@ deploy_auth_line=$(grep -nF 'name: Authenticate least-privilege deployer' "$rele
   fail "release must repeat the full GitHub audit exactly once before pre-build authority authentication"
 pre_build_audit_line=$(grep -nF 'name: Reverify protected GitHub controls before authority audit identity' "$release_workflow" | cut -d: -f1)
 pre_build_auth_line=$(grep -nF 'name: Authenticate pre-build authority auditor' "$release_workflow" | cut -d: -f1)
-pre_build_authority_line=$(grep -nF 'name: Verify complete release authority before builder' "$release_workflow" | cut -d: -f1)
+pre_build_authority_line=$(grep -nF 'name: Verify stage-scoped release authority before builder' "$release_workflow" | cut -d: -f1)
 build_auth_line=$(grep -nF 'name: Authenticate immutable image builder' "$release_workflow" | cut -d: -f1)
 build_rerun_guard_line=$(grep -nF 'name: Reject standalone build reruns' "$release_workflow" | cut -d: -f1)
 deploy_rerun_guard_line=$(grep -nF 'name: Reject standalone deploy reruns' "$release_workflow" | cut -d: -f1)
@@ -513,28 +573,31 @@ deploy_line=$(grep -nF 'run: ./scripts/deploy/cloud-run.sh' "$release_workflow" 
 if grep -Eiq 'axis' "$legacy_wif_retirement"; then
   fail "legacy Pymes WIF retirement must not reference Axis"
 fi
-grep -Fq 'PYMES_LEGACY_WIF_MODE=audit' "$identity_script" ||
-  fail "release close phase does not audit retired legacy Pymes WIF trust"
-grep -Fq '"$script_dir/retire-legacy-pymes-wif.sh"' "$identity_script" ||
-  fail "release close phase does not invoke the dedicated legacy WIF retirement audit"
-retirement_gate_line=$(awk '
+if grep -Fq 'retire-legacy-pymes-wif.sh' "$identity_script" ||
+  grep -Fq 'pymes-github-actions-stg@' "$identity_script"; then
+  fail "Pymes v3 release identity bootstrap must not inspect or modify v2 release identities"
+fi
+close_block=$(awk '
   $0 ~ /^if \[\[ "\$phase" == "close" \]\]; then$/ { in_close=1; next }
-  in_close && /PYMES_LEGACY_WIF_MODE=audit/ { saw_audit=1 }
-  in_close && /retire-legacy-pymes-wif\.sh/ && saw_audit { print NR; exit }
-  in_close && /^fi$/ { in_close=0; saw_audit=0 }
+  in_close && /^fi$/ { exit }
+  in_close { print }
 ' "$identity_script")
+if grep -Eq '(^|[[:space:]])(gcloud|gsutil)([[:space:]]|$)|retire-|migrate-' \
+  <<<"$close_block"; then
+  fail "close must not contact or mutate GCP or legacy resources"
+fi
+grep -Fq 'v2 identities were not inspected or modified' <<<"$close_block" ||
+  fail "close does not state the independent v2 boundary"
 retirement_exit_line=$(awk '
   $0 ~ /^if \[\[ "\$phase" == "close" \]\]; then$/ { in_close=1; next }
   in_close && /exit 0/ { print NR; exit }
   in_close && /^fi$/ { in_close=0 }
 ' "$identity_script")
 services_enable_line=$(grep -nF 'gcloud services enable ' "$identity_script" | head -1 | cut -d: -f1)
-[[ "$retirement_gate_line" =~ ^[0-9]+$ &&
-   "$retirement_exit_line" =~ ^[0-9]+$ &&
+[[ "$retirement_exit_line" =~ ^[0-9]+$ &&
    "$services_enable_line" =~ ^[0-9]+$ &&
-   "$retirement_gate_line" -lt "$retirement_exit_line" &&
    "$retirement_exit_line" -lt "$services_enable_line" ]] ||
-  fail "close must audit legacy Pymes WIF retirement before any GCP mutation"
+  fail "close must exit without GCP mutation before release bootstrap"
 bash "$legacy_wif_test" >/dev/null ||
   fail "legacy Pymes WIF retirement behavioral safety tests failed"
 
@@ -589,21 +652,10 @@ if grep -Fq 'prepare manages both environments' "$identity_script" ||
   grep -Fq 'managed_environments=(stg prd)' "$identity_script"; then
   fail "release identity bootstrap still couples STG and PRD"
 fi
-grep -Fq 'The PRD deployer must not exist before close.' "$identity_script" ||
-  fail "release identity plan does not preserve the STG-first cutover sequence"
-grep -Fq 'PRD is permitted only after the audited legacy-WIF close.' "$identity_script" ||
-  fail "release identity plan permits preparing PRD before the audited cutover"
-prd_close_gate_line=$(awk '
-  /^if \[\[ "\$phase" == "prepare" && "\$target_environment" == "prd" \]\]; then$/ {
-    in_prd_prepare=1
-    next
-  }
-  in_prd_prepare && /PYMES_LEGACY_WIF_MODE=audit/ { saw_audit=1 }
-  in_prd_prepare && /retire-legacy-pymes-wif\.sh/ && saw_audit { print NR; exit }
-  in_prd_prepare && /^fi$/ { in_prd_prepare=0; saw_audit=0 }
-' "$identity_script")
-[[ "$prd_close_gate_line" =~ ^[0-9]+$ ]] ||
-  fail "PRD prepare does not audit the completed STG legacy-WIF cutover"
+grep -Fq 'After the reviewed STG acceptance, prepare PRD' "$identity_script" ||
+  fail "release identity plan does not preserve reviewed STG-before-PRD sequencing"
+[[ "$(grep -Fc 'V2 identities remain untouched.' "$identity_script")" -eq 2 ]] ||
+  fail "STG and PRD release plans do not preserve the v2 identity boundary"
 grep -Fq 'GCP mutation preflight verified:' "$identity_script" ||
   fail "release identity bootstrap does not prove the immutable GCP target before mutation"
 for proof in \
@@ -628,8 +680,6 @@ services_enable_line=$(grep -nF 'gcloud services enable ' "$identity_script" | h
    "$gcp_preflight_line" -lt "$reviewed_source_line" &&
    "$reviewed_source_line" -lt "$services_enable_line" ]] ||
   fail "GCP identity and reviewed-source checks must complete before the first release mutation"
-[[ "$prd_close_gate_line" -lt "$services_enable_line" ]] ||
-  fail "PRD close audit must complete before the first release mutation"
 for proof in \
   'PYMES_RELEASE_IDENTITY_OPERATOR_EMAIL' \
   'assert_direct_gcloud_auth' \
@@ -640,6 +690,7 @@ for proof in \
   'local release helpers must equal the exact reviewed GitHub main tree' \
   'IAM mutation is restricted to the reviewed direct operator softponti@gmail.com' \
   'pymes_validate_release_pool_iam_assets' \
+  'pymes_read_release_pool_iam_assets_until_valid' \
   '"$release_pool_assets" "$target_environment" subset' \
   '"$release_pool_assets" "$target_environment" exact' \
   'pymes_verify_release_account_not_attached' \
@@ -649,14 +700,12 @@ for proof in \
   'gcloud services enable "${missing_services[@]}"' \
   'for attempt in 1 2 3 4 5 6' \
   '[[ "$attempt" -eq 6 ]] || sleep 5' \
-  'pymesV3ReleaseOrganizationIamRead' \
-  'pymesV3ReleaseFolderIamRead' \
   'assert_release_account_preflight' \
   '.disabled != true' \
   '--managed-by=user' \
   'policy must be empty or exactly the reviewed WIF binding' \
   'assert_roles_subset' \
-  'assert_effective_iam_subset' \
+  'assert_project_effective_iam_subset' \
   'pymes_verify_release_inverse_authority' \
   'gcloud asset analyze-iam-policy' \
   '--expand-groups' \
@@ -673,6 +722,27 @@ for proof in \
   'Release service-account preflight verified:'; do
   grep -Fq -- "$proof" "$identity_script" ||
     fail "release account preflight lacks proof: $proof"
+done
+for forbidden in \
+  'gcloud organizations' \
+  'gcloud resource-manager folders' \
+  'gcloud projects get-ancestors' \
+  'ensure_organization_custom_role' \
+  'pymes_validate_ancestor_policy_for_release' \
+  '--organization=' \
+  '--organization ' \
+  '--folder=' \
+  '--folder '; do
+  if grep -Fq -- "$forbidden" "$identity_script"; then
+    fail "release bootstrap must remain scoped to the fixed Pymes project: $forbidden"
+  fi
+done
+for proof in \
+  'pymes_release_asset_retry_attempts=24' \
+  'pymes_release_asset_retry_seconds=5' \
+  'pymes_read_release_pool_iam_assets_until_valid'; do
+  grep -Fq -- "$proof" "$release_authority_policy" ||
+    fail "shared release authority policy lacks Cloud Asset convergence proof: $proof"
 done
 [[ "$(grep -Fc '"$release_pool_assets" "$target_environment" subset' "$identity_script")" -eq 1 &&
    "$(grep -Fc '"$release_pool_assets" "$target_environment" exact' "$identity_script")" -eq 1 ]] ||
@@ -813,8 +883,14 @@ if grep -Eq -- '--execute-now|gcloud run jobs execute|--allow-unauthenticated|--
 fi
 grep -Fq 'release workflow forbids every project-scoped roles/run.admin binding' "$authority_verifier" ||
   fail "protected workflow may accept project-scoped Cloud Run administration"
-grep -Fq 'resource_run_admin=exact' "$authority_verifier" ||
-  fail "protected workflow does not require finalized resource-scoped authority"
+for proof in \
+  'resource_run_admin=absent' \
+  'resource_run_admin=exact' \
+  'resource_run_admin=${resource_run_admin}' \
+  'validate_initial_seed_resources_absent'; do
+  grep -Fq "$proof" "$authority_verifier" ||
+    fail "protected workflow does not enforce stage-scoped Cloud Run authority: $proof"
+done
 for proof in \
   'validate_custom_role_json' \
   'validate_kms_custom_role_json' \
@@ -823,6 +899,8 @@ for proof in \
   'validate_release_account' \
   'validate_exact_member_role' \
   'validate_effective_iam_analysis' \
+  'validate_required_effective_iam_pairs' \
+  'pymes_release_evidence_validate_iam_read_role' \
   'pymes_verify_release_inverse_authority' \
   'pymes_validate_release_pool_iam_assets' \
   'pymes_verify_release_account_not_attached' \
@@ -834,11 +912,10 @@ for proof in \
   'runtime_effective_iam_allowlist' \
   'validate_runtime_account_policy' \
   'runtime_iam=allowlisted' \
-  'gcloud projects get-ancestors' \
   'release authority verifier must run as the exact environment deployer' \
   '--managed-by=user' \
-  'read_effective_iam_analysis "$build_email"' \
-  'read_effective_iam_analysis "$deploy_email"' \
+  'read_project_effective_iam_analysis "$build_email"' \
+  'read_project_effective_iam_analysis "$deploy_email"' \
   'release_secret_names' \
   'runtime_accounts' \
   'builder=keyless-exact' \
@@ -847,8 +924,32 @@ for proof in \
   grep -Fq -- "$proof" "$authority_verifier" ||
     fail "protected workflow does not revalidate complete release authority: $proof"
 done
+for forbidden in \
+  'pymesV3ReleaseOrganizationIamRead' \
+  'pymesV3ReleaseFolderIamRead' \
+  'validate_no_ancestor_iam_authority' \
+  'pymes_validate_ancestor_policy_for_release' \
+  'gcloud projects get-ancestors' \
+  'gcloud organizations get-iam-policy' \
+  'gcloud resource-manager folders get-iam-policy' \
+  '--organization=' \
+  '--organization ' \
+  '--folder=' \
+  '--folder '; do
+  if grep -Fq -- "$forbidden" "$authority_verifier"; then
+    fail "protected workflow may not require shared ancestor IAM authority: $forbidden"
+  fi
+done
 grep -Fq 'inverse_permissions=allowlisted' "$authority_verifier" ||
   fail "protected workflow does not report the inverse effective-permission gate"
+for scoped_file in "$identity_script" "$authority_verifier"; do
+  grep -Fq '//storage.googleapis.com/pymes-v3-release-evidence-' \
+    "$scoped_file" ||
+    fail "$(basename "$scoped_file") does not use the canonical Pymes evidence bucket resource"
+  if grep -Fq '//storage.googleapis.com/projects/_/buckets/' "$scoped_file"; then
+    fail "$(basename "$scoped_file") uses a non-canonical Cloud Asset bucket resource"
+  fi
+done
 grep -Fq 'source "$script_dir/release-authority-policy.sh"' "$deploy_script" ||
   fail "Cloud Run deployment does not load the shared inverse-authority policy"
 grep -Fq 'pymes_verify_release_inverse_authority' "$deploy_script" ||
@@ -857,8 +958,6 @@ bash "$seed_test" >/dev/null ||
   fail "inert Cloud Run seed policy tests failed"
 bash "$authority_test" >/dev/null ||
   fail "release authority policy tests failed"
-grep -Fq 'TRANSITION WARNING retire legacy Pymes WIF trust' "$identity_script" ||
-  fail "release bootstrap does not surface the temporary legacy authority"
 
 for proof in \
   'does not run the exact release digest' \
@@ -963,6 +1062,20 @@ sed '0,/default: operational/s//default: bootstrap/' \
   "$release_workflow" >"$unsafe_stage_default_fixture"
 if run_structured_policy "$ci_workflow" "$unsafe_stage_default_fixture" >/dev/null 2>&1; then
   fail "negative fixture: bootstrap was accepted as the default deploy stage"
+fi
+
+unsafe_initial_seed_deploy_fixture="$fixture_directory/unsafe-initial-seed-deploy.yml"
+sed "0,/if: \${{ inputs.deploy_stage != 'initial-seed-build' }}/s//if: \${{ true }}/" \
+  "$release_workflow" >"$unsafe_initial_seed_deploy_fixture"
+if run_structured_policy "$ci_workflow" "$unsafe_initial_seed_deploy_fixture" >/dev/null 2>&1; then
+  fail "negative fixture: initial-seed build could execute the deploy job"
+fi
+
+foreign_jwks_fixture="$fixture_directory/foreign-jwks.yml"
+sed '/pymes_require_canonical_internal_kms_versions/,+3d' \
+  "$release_workflow" >"$foreign_jwks_fixture"
+if run_structured_policy "$ci_workflow" "$foreign_jwks_fixture" >/dev/null 2>&1; then
+  fail "negative fixture: JWKS resolution without canonical KMS validation was accepted"
 fi
 
 misordered_deploy_guard_fixture="$fixture_directory/misordered-deploy-guard.yml"

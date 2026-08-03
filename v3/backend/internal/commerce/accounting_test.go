@@ -15,11 +15,13 @@ import (
 	"testing"
 	"time"
 
+	accountingapi "github.com/devpablocristo/pymes/v3/backend/internal/commerce/accounting/models"
 	domain "github.com/devpablocristo/pymes/v3/backend/internal/commerce/usecases/domain"
 	identityaccess "github.com/devpablocristo/pymes/v3/backend/internal/identity"
 	identityusecases "github.com/devpablocristo/pymes/v3/backend/internal/identity"
 	organizationdomain "github.com/devpablocristo/pymes/v3/backend/internal/organization/usecases/domain"
 	"github.com/google/uuid"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 type tokenSource struct{}
@@ -111,6 +113,98 @@ func TestAccountingClientAgainstHeadlessService(t *testing.T) {
 	if err != nil || duplicate.JournalEntryID != posted.JournalEntryID || len(duplicate.OpenItemIDs) != 1 {
 		t.Fatalf("duplicate=%+v err=%v", duplicate, err)
 	}
+	secondCommand := command
+	secondCommand.CommandID = uuid.NewString()
+	secondCommand.IdempotencyKey = "accounting-contract-" + uuid.NewString()
+	secondCommand.SourceID = "sale-contract-2"
+	secondCommand.SnapshotDigest = strings.Repeat("c", 64)
+	secondPosted, err := client.Post(ctx, secondCommand)
+	if err != nil || secondPosted.JournalEntryID == "" ||
+		secondPosted.JournalEntryID == posted.JournalEntryID {
+		t.Fatalf("second posted=%+v err=%v", secondPosted, err)
+	}
+
+	reportClient, err := client.generatedClient(
+		organizationID,
+		"accounting-report-"+uuid.NewString(),
+		command.CorrelationID,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	limit := 1
+	asOf := openapi_types.Date{Time: time.Now().UTC().AddDate(0, 0, 1)}
+	firstPage, err := reportClient.GetReportWithResponse(
+		ctx,
+		organizationID,
+		accountingapi.GeneralLedger,
+		&accountingapi.GetReportParams{
+			AsOf:           asOf,
+			Limit:          &limit,
+			XCorrelationID: command.CorrelationID,
+		},
+	)
+	if err != nil {
+		t.Fatalf("first general ledger page: %v", err)
+	}
+	if firstPage.StatusCode() != http.StatusOK || firstPage.JSON200 == nil {
+		t.Fatalf(
+			"first general ledger response=%d %s",
+			firstPage.StatusCode(),
+			firstPage.Body,
+		)
+	}
+	if firstPage.JSON200.Entries == nil ||
+		len(*firstPage.JSON200.Entries) != 1 ||
+		firstPage.JSON200.HasMore == nil ||
+		!*firstPage.JSON200.HasMore ||
+		firstPage.JSON200.NextCursor == nil ||
+		*firstPage.JSON200.NextCursor == "" ||
+		firstPage.JSON200.OrganizationId == nil ||
+		*firstPage.JSON200.OrganizationId != organizationID ||
+		firstPage.JSON200.Report == nil ||
+		*firstPage.JSON200.Report != accountingapi.AccountingReportReportGeneralLedger ||
+		firstPage.JSON200.AsOf == nil ||
+		firstPage.JSON200.AsOf.Time.Format("2006-01-02") !=
+			asOf.Time.Format("2006-01-02") {
+		t.Fatalf("first general ledger page=%#v", firstPage.JSON200)
+	}
+	nextCursor := *firstPage.JSON200.NextCursor
+
+	secondPage, err := reportClient.GetReportWithResponse(
+		ctx,
+		organizationID,
+		accountingapi.GeneralLedger,
+		&accountingapi.GetReportParams{
+			AsOf:           asOf,
+			Limit:          &limit,
+			Cursor:         &nextCursor,
+			XCorrelationID: command.CorrelationID,
+		},
+	)
+	if err != nil {
+		t.Fatalf("second general ledger page: %v", err)
+	}
+	if secondPage.StatusCode() != http.StatusOK || secondPage.JSON200 == nil {
+		t.Fatalf(
+			"second general ledger response=%d %s",
+			secondPage.StatusCode(),
+			secondPage.Body,
+		)
+	}
+	if secondPage.JSON200.Entries == nil ||
+		len(*secondPage.JSON200.Entries) != 1 ||
+		secondPage.JSON200.HasMore == nil ||
+		*secondPage.JSON200.HasMore ||
+		secondPage.JSON200.NextCursor != nil {
+		t.Fatalf("second general ledger page=%#v", secondPage.JSON200)
+	}
+	firstEntry := (*firstPage.JSON200.Entries)[0]
+	secondEntry := (*secondPage.JSON200.Entries)[0]
+	if firstEntry.Id == secondEntry.Id {
+		t.Fatalf("general ledger pages overlap: first=%#v second=%#v", firstEntry, secondEntry)
+	}
+
 	changed := command
 	changed.SnapshotDigest = strings.Repeat("b", 64)
 	if _, err := client.Post(ctx, changed); err == nil || !strings.Contains(err.Error(), "IDEMPOTENCY_KEY_REUSED") {

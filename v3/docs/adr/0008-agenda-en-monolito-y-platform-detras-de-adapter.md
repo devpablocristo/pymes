@@ -17,7 +17,7 @@ Agenda vive como contexto vertical `internal/scheduling` dentro del backend Go
 de Pymes. PostgreSQL de Pymes es dueño de sus datos y aplica RLS, constraints de
 exclusión, locks de capacidad e idempotencia.
 
-`github.com/devpablocristo/platform/scheduling/go v0.2.0` se consume
+`github.com/devpablocristo/platform/features/scheduling/go v0.2.0` se consume
 exclusivamente desde el adapter `platform_scheduling.go`, con `models` y
 `helpers` propios. El puerto pertenece a los casos de uso de Agenda y usa sólo
 tipos de dominio Pymes. No se admiten `replace`, rutas locales ni tipos

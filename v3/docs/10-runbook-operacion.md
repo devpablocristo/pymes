@@ -144,11 +144,10 @@ El workflow publica el check estable `Pymes V3 validate` en cada PR y push a
 con enforcement para administradores, historial lineal, resolución de
 conversaciones y políticas de deployment limitadas a `main`. Actualmente esa
 protección de `main` ya está aplicada; `stg` y `prd` existen y sólo aceptan
-`main`, y PRD exige reviewers de despliegue e impide autoaprobación. Sigue
-pendiente desactivar el bypass administrativo de PRD y cargar
-`PYMES_GITHUB_RELEASE_AUDIT_TOKEN` en ambos environments. GitHub no expone en su
-REST documentado el switch de bypass administrativo: un administrador debe
-desmarcarlo para PRD en Settings → Environments y luego ejecutar:
+`main`, y PRD exige reviewers de despliegue, tiene
+`prevent_self_review=true` y `can_admins_bypass=false`.
+`PYMES_GITHUB_RELEASE_AUDIT_TOKEN` existe en ambos environments y su valor no
+se documenta. Antes de cada release se debe releer esa configuración mediante:
 
 ```bash
 PYMES_GITHUB_ENVIRONMENT_MODE=audit \

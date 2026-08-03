@@ -4,8 +4,11 @@ package fakeservice
 import (
 	"fmt"
 	"net/http"
+	"sort"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	accountingapi "github.com/devpablocristo/pymes/v3/backend/internal/commerce/accounting/models"
 	accountinghelpers "github.com/devpablocristo/pymes/v3/backend/internal/fakeservice/accounting/helpers"
@@ -17,19 +20,22 @@ import (
 var _ accountingapi.ServerInterface = (*accountingFakeServer)(nil)
 
 type accountingFakeServer struct {
-	mu          sync.Mutex
-	provisioned map[string]bool
-	events      map[string]accountingapi.AccountingEvent
-	periods     map[string]map[uuid.UUID]accountingapi.Period
-	periodByKey map[string]uuid.UUID
+	mu            sync.Mutex
+	provisioned   map[string]bool
+	events        map[string]accountingapi.AccountingEvent
+	periods       map[string]map[uuid.UUID]accountingapi.Period
+	periodByKey   map[string]uuid.UUID
+	reportPages   []accountingmodels.ReportPageRequest
+	reportEntries map[string]map[uuid.UUID]accountingapi.GeneralLedgerEntry
 }
 
 func newAccountingFakeServer() *accountingFakeServer {
 	return &accountingFakeServer{
-		provisioned: make(map[string]bool),
-		events:      make(map[string]accountingapi.AccountingEvent),
-		periods:     make(map[string]map[uuid.UUID]accountingapi.Period),
-		periodByKey: make(map[string]uuid.UUID),
+		provisioned:   make(map[string]bool),
+		events:        make(map[string]accountingapi.AccountingEvent),
+		periods:       make(map[string]map[uuid.UUID]accountingapi.Period),
+		periodByKey:   make(map[string]uuid.UUID),
+		reportEntries: make(map[string]map[uuid.UUID]accountingapi.GeneralLedgerEntry),
 	}
 }
 
@@ -105,13 +111,14 @@ func (s *accountingFakeServer) SubmitPostingCommand(
 			openItemIDs = append(openItemIDs, accountinghelpers.StableUUID("open-item", organizationID, body.CommandId.String(), fmt.Sprint(index)))
 		}
 	}
+	occurredAt := time.Now().UTC()
 	event := accountingapi.AccountingEvent{
 		CommandId:      body.CommandId,
 		CorrelationId:  body.CorrelationId,
 		EventId:        accountinghelpers.StableUUID("event", organizationID, body.CommandId.String()),
 		IdempotencyKey: body.IdempotencyKey,
 		JournalEntryId: &journalEntryID,
-		OccurredAt:     time.Now().UTC(),
+		OccurredAt:     occurredAt,
 		OpenItemIds:    &openItemIDs,
 		OrganizationId: organizationID,
 		SnapshotDigest: body.SnapshotDigest,
@@ -119,7 +126,20 @@ func (s *accountingFakeServer) SubmitPostingCommand(
 		SourceVersion:  body.SourceVersion,
 		Status:         accountingapi.Posted,
 	}
-	s.writeAccountingEvent(w, "posting", organizationID, body.IdempotencyKey, event)
+	reportEntry := accountinghelpers.GeneralLedgerEntryFromPosting(
+		organizationID,
+		body,
+		journalEntryID,
+		occurredAt,
+	)
+	s.writeAccountingEvent(
+		w,
+		"posting",
+		organizationID,
+		body.IdempotencyKey,
+		event,
+		&reportEntry,
+	)
 }
 
 func (s *accountingFakeServer) ReverseJournalEntry(
@@ -148,7 +168,7 @@ func (s *accountingFakeServer) ReverseJournalEntry(
 		SourceVersion:  body.SourceVersion,
 		Status:         accountingapi.Reversed,
 	}
-	s.writeAccountingEvent(w, "reversal", organizationID, body.IdempotencyKey, event)
+	s.writeAccountingEvent(w, "reversal", organizationID, body.IdempotencyKey, event, nil)
 }
 
 func (s *accountingFakeServer) ApplyOpenItem(
@@ -177,7 +197,7 @@ func (s *accountingFakeServer) ApplyOpenItem(
 		SourceVersion:  body.SourceVersion,
 		Status:         accountingapi.Applied,
 	}
-	s.writeAccountingEvent(w, "application", organizationID, body.IdempotencyKey, event)
+	s.writeAccountingEvent(w, "application", organizationID, body.IdempotencyKey, event, nil)
 }
 
 func (s *accountingFakeServer) ReverseOpenItemApplication(
@@ -204,7 +224,14 @@ func (s *accountingFakeServer) ReverseOpenItemApplication(
 		SourceVersion:  body.SourceVersion,
 		Status:         accountingapi.Reversed,
 	}
-	s.writeAccountingEvent(w, "application-reversal", organizationID, body.IdempotencyKey, event)
+	s.writeAccountingEvent(
+		w,
+		"application-reversal",
+		organizationID,
+		body.IdempotencyKey,
+		event,
+		nil,
+	)
 }
 
 func (s *accountingFakeServer) ListPeriods(
@@ -293,12 +320,162 @@ func (s *accountingFakeServer) GetReport(
 	report accountingapi.GetReportParamsReport,
 	params accountingapi.GetReportParams,
 ) {
-	accountinghelpers.WriteJSON(w, http.StatusOK, map[string]any{
+	if report != accountingapi.GeneralLedger &&
+		(params.Limit != nil || params.Cursor != nil) {
+		accountinghelpers.WriteProblem(
+			w,
+			http.StatusBadRequest,
+			params.XCorrelationID,
+			"VALIDATION_ERROR",
+			"pagination is only supported for general_ledger",
+			"limit and cursor require report=general_ledger",
+		)
+		return
+	}
+
+	response := map[string]any{
 		"as_of":           params.AsOf,
 		"organization_id": organizationID,
 		"report":          report,
 		"rows":            []any{},
-	})
+	}
+	if report == accountingapi.GeneralLedger {
+		limit := 200
+		if params.Limit != nil {
+			limit = *params.Limit
+		}
+		if limit < 1 || limit > 500 {
+			accountinghelpers.WriteProblem(
+				w,
+				http.StatusBadRequest,
+				params.XCorrelationID,
+				"VALIDATION_ERROR",
+				"invalid general_ledger limit",
+				"limit must be between 1 and 500",
+			)
+			return
+		}
+		cursor := ""
+		afterEntryID := ""
+		if params.Cursor != nil {
+			cursor = strings.TrimSpace(*params.Cursor)
+			if cursor == "" || utf8.RuneCountInString(cursor) > 2048 {
+				accountinghelpers.WriteProblem(
+					w,
+					http.StatusBadRequest,
+					params.XCorrelationID,
+					"VALIDATION_ERROR",
+					"invalid general_ledger cursor",
+					"cursor must contain between 1 and 2048 characters",
+				)
+				return
+			}
+			var err error
+			afterEntryID, err = accountinghelpers.DecodeReportCursor(
+				cursor,
+				organizationID,
+				params.AsOf.Time.UTC().Format("2006-01-02"),
+			)
+			if err != nil {
+				accountinghelpers.WriteProblem(
+					w,
+					http.StatusUnprocessableEntity,
+					params.XCorrelationID,
+					"VALIDATION_ERROR",
+					"invalid general_ledger cursor",
+					"cursor does not match this report request",
+				)
+				return
+			}
+		}
+
+		asOf := params.AsOf.Time.UTC().Format("2006-01-02")
+		s.mu.Lock()
+		s.reportPages = append(s.reportPages, accountingmodels.ReportPageRequest{
+			OrganizationID: organizationID,
+			Report:         string(report),
+			Limit:          limit,
+			Cursor:         cursor,
+		})
+		entries := make([]accountingapi.GeneralLedgerEntry, 0, len(s.reportEntries[organizationID]))
+		for _, entry := range s.reportEntries[organizationID] {
+			if entry.EntryDate.UTC().Format("2006-01-02") <= asOf {
+				entries = append(entries, entry)
+			}
+		}
+		s.mu.Unlock()
+		sort.Slice(entries, func(left, right int) bool {
+			if !entries[left].EntryDate.Equal(entries[right].EntryDate) {
+				return entries[left].EntryDate.After(entries[right].EntryDate)
+			}
+			if !entries[left].CreatedAt.Equal(entries[right].CreatedAt) {
+				return entries[left].CreatedAt.After(entries[right].CreatedAt)
+			}
+			return entries[left].Id.String() > entries[right].Id.String()
+		})
+
+		start := 0
+		if afterEntryID != "" {
+			found := false
+			for index := range entries {
+				if entries[index].Id.String() == afterEntryID {
+					start = index + 1
+					found = true
+					break
+				}
+			}
+			if !found {
+				accountinghelpers.WriteProblem(
+					w,
+					http.StatusUnprocessableEntity,
+					params.XCorrelationID,
+					"VALIDATION_ERROR",
+					"invalid general_ledger cursor",
+					"cursor boundary is no longer available",
+				)
+				return
+			}
+		}
+		end := start + limit
+		if end > len(entries) {
+			end = len(entries)
+		}
+		pageEntries := append([]accountingapi.GeneralLedgerEntry(nil), entries[start:end]...)
+		hasMore := end < len(entries)
+		generatedAt := time.Now().UTC()
+		organization := string(organizationID)
+		reportName := accountingapi.AccountingReportReportGeneralLedger
+		reportResponse := accountingapi.AccountingReport{
+			AsOf:           &params.AsOf,
+			Entries:        &pageEntries,
+			GeneratedAt:    &generatedAt,
+			HasMore:        &hasMore,
+			OrganizationId: &organization,
+			Report:         &reportName,
+		}
+		if hasMore {
+			nextCursor, err := accountinghelpers.EncodeReportCursor(
+				organizationID,
+				asOf,
+				pageEntries[len(pageEntries)-1].Id.String(),
+			)
+			if err != nil {
+				accountinghelpers.WriteProblem(
+					w,
+					http.StatusInternalServerError,
+					params.XCorrelationID,
+					"INTERNAL_ERROR",
+					"failed to encode general_ledger cursor",
+					"cursor generation failed",
+				)
+				return
+			}
+			reportResponse.NextCursor = &nextCursor
+		}
+		accountinghelpers.WriteJSON(w, http.StatusOK, reportResponse)
+		return
+	}
+	accountinghelpers.WriteJSON(w, http.StatusOK, response)
 }
 
 func (s *accountingFakeServer) writeAccountingEvent(
@@ -307,6 +484,7 @@ func (s *accountingFakeServer) writeAccountingEvent(
 	organizationID string,
 	idempotencyKey string,
 	event accountingapi.AccountingEvent,
+	reportEntry *accountingapi.GeneralLedgerEntry,
 ) {
 	key := organizationID + "\x00" + operation + "\x00" + idempotencyKey
 	s.mu.Lock()
@@ -314,6 +492,14 @@ func (s *accountingFakeServer) writeAccountingEvent(
 	if !found {
 		s.events[key] = event
 		stored = event
+		if reportEntry != nil {
+			if s.reportEntries[organizationID] == nil {
+				s.reportEntries[organizationID] = make(
+					map[uuid.UUID]accountingapi.GeneralLedgerEntry,
+				)
+			}
+			s.reportEntries[organizationID][reportEntry.Id] = *reportEntry
+		}
 	}
 	s.mu.Unlock()
 

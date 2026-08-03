@@ -13,7 +13,9 @@ import (
 
 	accountingapi "github.com/devpablocristo/pymes/v3/backend/internal/commerce/accounting/models"
 	fiscalapi "github.com/devpablocristo/pymes/v3/backend/internal/commerce/fiscal/models"
+	accountingmodels "github.com/devpablocristo/pymes/v3/backend/internal/fakeservice/accounting/models"
 	"github.com/google/uuid"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 func TestHandlerForKindUsesGeneratedRouters(t *testing.T) {
@@ -125,6 +127,316 @@ func TestAccountingGeneratedClientServerConformance(t *testing.T) {
 		"X-Correlation-ID",
 		command.CorrelationId,
 	)
+}
+
+func TestAccountingGeneratedReportPaginationConformance(t *testing.T) {
+	t.Parallel()
+
+	fake := newAccountingFakeServer()
+	server := httptest.NewServer(accountingapi.Handler(fake))
+	t.Cleanup(server.Close)
+	client, err := accountingapi.NewClientWithResponses(server.URL)
+	if err != nil {
+		t.Fatalf("new accounting client: %v", err)
+	}
+
+	const organizationID = "org_report_pagination"
+	asOf := openapi_types.Date{
+		Time: time.Date(2026, time.July, 31, 0, 0, 0, 0, time.UTC),
+	}
+	for index := 0; index < 3; index++ {
+		postAccountingFakeLedgerEntry(
+			t,
+			client,
+			organizationID,
+			index,
+			time.Date(2026, time.July, 31, 12-index, 0, 0, 0, time.UTC),
+		)
+	}
+
+	defaultPage, err := client.GetReportWithResponse(
+		context.Background(),
+		organizationID,
+		accountingapi.GeneralLedger,
+		&accountingapi.GetReportParams{
+			AsOf:           asOf,
+			XCorrelationID: "corr-report-default",
+		},
+	)
+	if err != nil {
+		t.Fatalf("get default report page: %v", err)
+	}
+	if defaultPage.StatusCode() != http.StatusOK || defaultPage.JSON200 == nil {
+		t.Fatalf(
+			"default report response = %d %s",
+			defaultPage.StatusCode(),
+			defaultPage.Body,
+		)
+	}
+	if defaultPage.JSON200.Entries == nil ||
+		len(*defaultPage.JSON200.Entries) != 3 ||
+		defaultPage.JSON200.HasMore == nil ||
+		*defaultPage.JSON200.HasMore ||
+		defaultPage.JSON200.NextCursor != nil ||
+		defaultPage.JSON200.OrganizationId == nil ||
+		*defaultPage.JSON200.OrganizationId != organizationID ||
+		defaultPage.JSON200.Report == nil ||
+		*defaultPage.JSON200.Report != accountingapi.AccountingReportReportGeneralLedger ||
+		defaultPage.JSON200.AsOf == nil ||
+		defaultPage.JSON200.AsOf.Time.Format("2006-01-02") != "2026-07-31" {
+		t.Fatalf("default report page = %#v", defaultPage.JSON200)
+	}
+
+	limit := 2
+	firstPage, err := client.GetReportWithResponse(
+		context.Background(),
+		organizationID,
+		accountingapi.GeneralLedger,
+		&accountingapi.GetReportParams{
+			AsOf:           asOf,
+			Limit:          &limit,
+			XCorrelationID: "corr-report-explicit",
+		},
+	)
+	if err != nil {
+		t.Fatalf("get first report page: %v", err)
+	}
+	if firstPage.StatusCode() != http.StatusOK || firstPage.JSON200 == nil ||
+		firstPage.JSON200.Entries == nil ||
+		len(*firstPage.JSON200.Entries) != limit ||
+		firstPage.JSON200.HasMore == nil ||
+		!*firstPage.JSON200.HasMore ||
+		firstPage.JSON200.NextCursor == nil ||
+		*firstPage.JSON200.NextCursor == "" {
+		t.Fatalf(
+			"first report response = %d %s %#v",
+			firstPage.StatusCode(),
+			firstPage.Body,
+			firstPage.JSON200,
+		)
+	}
+	cursor := *firstPage.JSON200.NextCursor
+
+	repeatedFirstPage, err := client.GetReportWithResponse(
+		context.Background(),
+		organizationID,
+		accountingapi.GeneralLedger,
+		&accountingapi.GetReportParams{
+			AsOf:           asOf,
+			Limit:          &limit,
+			XCorrelationID: "corr-report-repeat",
+		},
+	)
+	if err != nil || repeatedFirstPage.JSON200 == nil ||
+		repeatedFirstPage.JSON200.NextCursor == nil ||
+		*repeatedFirstPage.JSON200.NextCursor != cursor {
+		t.Fatalf("non-deterministic first-page cursor: response=%#v err=%v", repeatedFirstPage, err)
+	}
+
+	secondPage, err := client.GetReportWithResponse(
+		context.Background(),
+		organizationID,
+		accountingapi.GeneralLedger,
+		&accountingapi.GetReportParams{
+			AsOf:           asOf,
+			Limit:          &limit,
+			Cursor:         &cursor,
+			XCorrelationID: "corr-report-continuation",
+		},
+	)
+	if err != nil {
+		t.Fatalf("get continuation report page: %v", err)
+	}
+	if secondPage.StatusCode() != http.StatusOK || secondPage.JSON200 == nil ||
+		secondPage.JSON200.Entries == nil ||
+		len(*secondPage.JSON200.Entries) != 1 ||
+		secondPage.JSON200.HasMore == nil ||
+		*secondPage.JSON200.HasMore ||
+		secondPage.JSON200.NextCursor != nil {
+		t.Fatalf(
+			"continuation response = %d %s %#v",
+			secondPage.StatusCode(),
+			secondPage.Body,
+			secondPage.JSON200,
+		)
+	}
+	seen := make(map[uuid.UUID]struct{}, 3)
+	for _, entry := range *firstPage.JSON200.Entries {
+		seen[entry.Id] = struct{}{}
+	}
+	for _, entry := range *secondPage.JSON200.Entries {
+		if _, duplicate := seen[entry.Id]; duplicate {
+			t.Fatalf("entry %s repeated across report pages", entry.Id)
+		}
+		seen[entry.Id] = struct{}{}
+	}
+	if len(seen) != 3 {
+		t.Fatalf("paginated entries=%d, want 3", len(seen))
+	}
+
+	fake.mu.Lock()
+	reportPages := append([]accountingmodels.ReportPageRequest(nil), fake.reportPages...)
+	fake.mu.Unlock()
+	if len(reportPages) != 4 ||
+		reportPages[0].Limit != 200 || reportPages[0].Cursor != "" ||
+		reportPages[1].Limit != limit || reportPages[1].Cursor != "" ||
+		reportPages[2].Limit != limit || reportPages[2].Cursor != "" ||
+		reportPages[3].Limit != limit || reportPages[3].Cursor != cursor {
+		t.Fatalf("normalized report pages = %#v", reportPages)
+	}
+
+	invalidLimit := 501
+	rejected, err := client.GetReportWithResponse(
+		context.Background(),
+		organizationID,
+		accountingapi.GeneralLedger,
+		&accountingapi.GetReportParams{
+			AsOf:           asOf,
+			Limit:          &invalidLimit,
+			XCorrelationID: "corr-report-invalid",
+		},
+	)
+	if err != nil {
+		t.Fatalf("get invalid report page: %v", err)
+	}
+	if rejected.StatusCode() != http.StatusBadRequest ||
+		rejected.ApplicationproblemJSON400 == nil {
+		t.Fatalf(
+			"invalid limit response = %d %s",
+			rejected.StatusCode(),
+			rejected.Body,
+		)
+	}
+
+	emptyCursor := ""
+	rejected, err = client.GetReportWithResponse(
+		context.Background(),
+		organizationID,
+		accountingapi.GeneralLedger,
+		&accountingapi.GetReportParams{
+			AsOf:           asOf,
+			Cursor:         &emptyCursor,
+			XCorrelationID: "corr-report-empty-cursor",
+		},
+	)
+	if err != nil {
+		t.Fatalf("get empty-cursor report page: %v", err)
+	}
+	if rejected.StatusCode() != http.StatusBadRequest ||
+		rejected.ApplicationproblemJSON400 == nil {
+		t.Fatalf(
+			"empty cursor response = %d %s",
+			rejected.StatusCode(),
+			rejected.Body,
+		)
+	}
+
+	longCursor := strings.Repeat("x", 2049)
+	rejected, err = client.GetReportWithResponse(
+		context.Background(),
+		organizationID,
+		accountingapi.GeneralLedger,
+		&accountingapi.GetReportParams{
+			AsOf:           asOf,
+			Cursor:         &longCursor,
+			XCorrelationID: "corr-report-long-cursor",
+		},
+	)
+	if err != nil {
+		t.Fatalf("get long-cursor report page: %v", err)
+	}
+	if rejected.StatusCode() != http.StatusBadRequest ||
+		rejected.ApplicationproblemJSON400 == nil {
+		t.Fatalf(
+			"long cursor response = %d %s",
+			rejected.StatusCode(),
+			rejected.Body,
+		)
+	}
+
+	rejected, err = client.GetReportWithResponse(
+		context.Background(),
+		organizationID,
+		accountingapi.TrialBalance,
+		&accountingapi.GetReportParams{
+			AsOf:           asOf,
+			Limit:          &limit,
+			XCorrelationID: "corr-report-incompatible",
+		},
+	)
+	if err != nil {
+		t.Fatalf("get incompatible report pagination: %v", err)
+	}
+	if rejected.StatusCode() != http.StatusBadRequest ||
+		rejected.ApplicationproblemJSON400 == nil {
+		t.Fatalf(
+			"incompatible report response = %d %s",
+			rejected.StatusCode(),
+			rejected.Body,
+		)
+	}
+}
+
+func postAccountingFakeLedgerEntry(
+	t *testing.T,
+	client *accountingapi.ClientWithResponses,
+	organizationID string,
+	index int,
+	effectiveAt time.Time,
+) {
+	t.Helper()
+	digest := strings.Repeat(string(rune('a'+index)), 64)
+	commandID := uuid.New()
+	command := accountingapi.PostingCommand{
+		CommandId:      commandID,
+		CorrelationId:  "corr-report-posting",
+		Description:    "report posting",
+		EffectiveAt:    effectiveAt,
+		IdempotencyKey: "accounting-report-" + commandID.String(),
+		Lines: []accountingapi.PostingLine{
+			{
+				AccountCode: "1200",
+				Credit:      "0",
+				Currency:    "ARS",
+				Debit:       "1",
+			},
+			{
+				AccountCode: "4100",
+				Credit:      "1",
+				Currency:    "ARS",
+				Debit:       "0",
+			},
+		},
+		OrganizationId: organizationID,
+		SnapshotDigest: digest,
+		Source: accountingapi.SourceRef{
+			Digest:  &digest,
+			Id:      "sale-report-" + commandID.String(),
+			Type:    "sales_invoice",
+			Version: 1,
+		},
+		SourceVersion: 1,
+	}
+	response, err := client.SubmitPostingCommandWithResponse(
+		context.Background(),
+		organizationID,
+		&accountingapi.SubmitPostingCommandParams{
+			IdempotencyKey: command.IdempotencyKey,
+			XCorrelationID: command.CorrelationId,
+		},
+		command,
+	)
+	if err != nil {
+		t.Fatalf("post report fixture %d: %v", index, err)
+	}
+	if response.StatusCode() != http.StatusCreated || response.JSON201 == nil {
+		t.Fatalf(
+			"post report fixture %d response=%d %s",
+			index,
+			response.StatusCode(),
+			response.Body,
+		)
+	}
 }
 
 func TestFiscalGeneratedClientServerConformance(t *testing.T) {

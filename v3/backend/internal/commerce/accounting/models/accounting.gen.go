@@ -63,6 +63,30 @@ func (e AccountingEventStatus) Valid() bool {
 	}
 }
 
+// Defines values for AccountingReportReport.
+const (
+	AccountingReportReportAgingPayables    AccountingReportReport = "aging_payables"
+	AccountingReportReportAgingReceivables AccountingReportReport = "aging_receivables"
+	AccountingReportReportGeneralLedger    AccountingReportReport = "general_ledger"
+	AccountingReportReportTrialBalance     AccountingReportReport = "trial_balance"
+)
+
+// Valid indicates whether the value is a known member of the AccountingReportReport enum.
+func (e AccountingReportReport) Valid() bool {
+	switch e {
+	case AccountingReportReportAgingPayables:
+		return true
+	case AccountingReportReportAgingReceivables:
+		return true
+	case AccountingReportReportGeneralLedger:
+		return true
+	case AccountingReportReportTrialBalance:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ErrorCode.
 const (
 	ACCOUNTINACTIVE          ErrorCode = "ACCOUNT_INACTIVE"
@@ -108,6 +132,27 @@ func (e ErrorCode) Valid() bool {
 	case UNBALANCEDPOSTING:
 		return true
 	case VALIDATIONERROR:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GeneralLedgerEntryStatus.
+const (
+	DRAFT  GeneralLedgerEntryStatus = "DRAFT"
+	POSTED GeneralLedgerEntryStatus = "POSTED"
+	VOIDED GeneralLedgerEntryStatus = "VOIDED"
+)
+
+// Valid indicates whether the value is a known member of the GeneralLedgerEntryStatus enum.
+func (e GeneralLedgerEntryStatus) Valid() bool {
+	switch e {
+	case DRAFT:
+		return true
+	case POSTED:
+		return true
+	case VOIDED:
 		return true
 	default:
 		return false
@@ -200,22 +245,22 @@ func (e TransitionPeriodJSONBodyTargetStatus) Valid() bool {
 
 // Defines values for GetReportParamsReport.
 const (
-	AgingPayables    GetReportParamsReport = "aging_payables"
-	AgingReceivables GetReportParamsReport = "aging_receivables"
-	GeneralLedger    GetReportParamsReport = "general_ledger"
-	TrialBalance     GetReportParamsReport = "trial_balance"
+	GetReportParamsReportAgingPayables    GetReportParamsReport = "aging_payables"
+	GetReportParamsReportAgingReceivables GetReportParamsReport = "aging_receivables"
+	GetReportParamsReportGeneralLedger    GetReportParamsReport = "general_ledger"
+	GetReportParamsReportTrialBalance     GetReportParamsReport = "trial_balance"
 )
 
 // Valid indicates whether the value is a known member of the GetReportParamsReport enum.
 func (e GetReportParamsReport) Valid() bool {
 	switch e {
-	case AgingPayables:
+	case GetReportParamsReportAgingPayables:
 		return true
-	case AgingReceivables:
+	case GetReportParamsReportAgingReceivables:
 		return true
-	case GeneralLedger:
+	case GetReportParamsReportGeneralLedger:
 		return true
-	case TrialBalance:
+	case GetReportParamsReportTrialBalance:
 		return true
 	default:
 		return false
@@ -255,6 +300,21 @@ type AccountingEvent struct {
 // AccountingEventStatus defines model for AccountingEvent.Status.
 type AccountingEventStatus string
 
+// AccountingReport Sobre tipado común de reportes. Los campos de general_ledger son opcionales en el schema compartido porque los demás reportes conservan sus payloads propios; cuando report=general_ledger, entries y has_more siempre están presentes y next_cursor sólo aparece si existe otra página.
+type AccountingReport struct {
+	AsOf                 *openapi_types.Date     `json:"as_of,omitempty"`
+	Entries              *[]GeneralLedgerEntry   `json:"entries,omitempty"`
+	GeneratedAt          *time.Time              `json:"generated_at,omitempty"`
+	HasMore              *bool                   `json:"has_more,omitempty"`
+	NextCursor           *string                 `json:"next_cursor,omitempty"`
+	OrganizationId       *string                 `json:"organization_id,omitempty"`
+	Report               *AccountingReportReport `json:"report,omitempty"`
+	AdditionalProperties map[string]interface{}  `json:"-"`
+}
+
+// AccountingReportReport defines model for AccountingReport.Report.
+type AccountingReportReport string
+
 // Decimal Decimal base diez exacto; no JSON number.
 type Decimal = string
 
@@ -268,6 +328,61 @@ type Error struct {
 
 // ErrorCode defines model for Error.Code.
 type ErrorCode string
+
+// GeneralLedgerEntry defines model for GeneralLedgerEntry.
+type GeneralLedgerEntry struct {
+	CreatedAt        time.Time                `json:"created_at"`
+	CreatedBy        string                   `json:"created_by"`
+	Description      string                   `json:"description"`
+	EntryDate        time.Time                `json:"entry_date"`
+	EntryNumber      string                   `json:"entry_number"`
+	Id               UUID                     `json:"id"`
+	Lines            []GeneralLedgerEntryLine `json:"lines"`
+	PostReason       *string                  `json:"post_reason,omitempty"`
+	PostedAt         *time.Time               `json:"posted_at,omitempty"`
+	PostedBy         *string                  `json:"posted_by,omitempty"`
+	Reference        *string                  `json:"reference,omitempty"`
+	RequiresEvidence bool                     `json:"requires_evidence"`
+	SourceId         *string                  `json:"source_id,omitempty"`
+	SourceType       *string                  `json:"source_type,omitempty"`
+	Status           GeneralLedgerEntryStatus `json:"status"`
+	TenantId         string                   `json:"tenant_id"`
+	VoidReason       *string                  `json:"void_reason,omitempty"`
+	VoidedAt         *time.Time               `json:"voided_at,omitempty"`
+	VoidedBy         *string                  `json:"voided_by,omitempty"`
+}
+
+// GeneralLedgerEntryStatus defines model for GeneralLedgerEntry.Status.
+type GeneralLedgerEntryStatus string
+
+// GeneralLedgerEntryLine defines model for GeneralLedgerEntryLine.
+type GeneralLedgerEntryLine struct {
+	AccountId UUID `json:"account_id"`
+
+	// BaseCredit Decimal base diez exacto; no JSON number.
+	BaseCredit Decimal `json:"base_credit"`
+
+	// BaseDebit Decimal base diez exacto; no JSON number.
+	BaseDebit Decimal `json:"base_debit"`
+
+	// CreditAmount Decimal base diez exacto; no JSON number.
+	CreditAmount Decimal `json:"credit_amount"`
+	Currency     string  `json:"currency"`
+
+	// DebitAmount Decimal base diez exacto; no JSON number.
+	DebitAmount Decimal `json:"debit_amount"`
+	Description *string `json:"description,omitempty"`
+
+	// ExchangeRate Decimal base diez exacto; no JSON number.
+	ExchangeRate   Decimal `json:"exchange_rate"`
+	Id             UUID    `json:"id"`
+	IsVatInclusive bool    `json:"is_vat_inclusive"`
+	JournalEntryId UUID    `json:"journal_entry_id"`
+	TenantId       string  `json:"tenant_id"`
+
+	// VatRate Decimal base diez exacto; no JSON number.
+	VatRate Decimal `json:"vat_rate"`
+}
 
 // HealthStatus defines model for HealthStatus.
 type HealthStatus struct {
@@ -539,6 +654,12 @@ type SubmitPostingCommandParams struct {
 type GetReportParams struct {
 	AsOf openapi_types.Date `form:"as_of" json:"as_of"`
 
+	// Limit Cantidad de asientos por página para general_ledger.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Cursor opaco de continuación para general_ledger.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
 	// XCorrelationID Identificador estable propagado de extremo a extremo.
 	XCorrelationID CorrelationId `json:"X-Correlation-ID"`
 }
@@ -574,6 +695,164 @@ type SubmitPostingCommandJSONRequestBody = PostingCommand
 
 // ReverseJournalEntryJSONRequestBody defines body for ReverseJournalEntry for application/json ContentType.
 type ReverseJournalEntryJSONRequestBody = ReversalCommand
+
+// Getter for additional properties for AccountingReport. Returns the specified
+// element and whether it was found
+func (a AccountingReport) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for AccountingReport
+func (a *AccountingReport) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for AccountingReport to handle AdditionalProperties
+func (a *AccountingReport) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["as_of"]; found {
+		err = json.Unmarshal(raw, &a.AsOf)
+		if err != nil {
+			return fmt.Errorf("error reading 'as_of': %w", err)
+		}
+		delete(object, "as_of")
+	}
+
+	if raw, found := object["entries"]; found {
+		err = json.Unmarshal(raw, &a.Entries)
+		if err != nil {
+			return fmt.Errorf("error reading 'entries': %w", err)
+		}
+		delete(object, "entries")
+	}
+
+	if raw, found := object["generated_at"]; found {
+		err = json.Unmarshal(raw, &a.GeneratedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'generated_at': %w", err)
+		}
+		delete(object, "generated_at")
+	}
+
+	if raw, found := object["has_more"]; found {
+		err = json.Unmarshal(raw, &a.HasMore)
+		if err != nil {
+			return fmt.Errorf("error reading 'has_more': %w", err)
+		}
+		delete(object, "has_more")
+	}
+
+	if raw, found := object["next_cursor"]; found {
+		err = json.Unmarshal(raw, &a.NextCursor)
+		if err != nil {
+			return fmt.Errorf("error reading 'next_cursor': %w", err)
+		}
+		delete(object, "next_cursor")
+	}
+
+	if raw, found := object["organization_id"]; found {
+		err = json.Unmarshal(raw, &a.OrganizationId)
+		if err != nil {
+			return fmt.Errorf("error reading 'organization_id': %w", err)
+		}
+		delete(object, "organization_id")
+	}
+
+	if raw, found := object["report"]; found {
+		err = json.Unmarshal(raw, &a.Report)
+		if err != nil {
+			return fmt.Errorf("error reading 'report': %w", err)
+		}
+		delete(object, "report")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for AccountingReport to handle AdditionalProperties
+func (a AccountingReport) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.AsOf != nil {
+		object["as_of"], err = json.Marshal(a.AsOf)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'as_of': %w", err)
+		}
+	}
+
+	if a.Entries != nil {
+		object["entries"], err = json.Marshal(a.Entries)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'entries': %w", err)
+		}
+	}
+
+	if a.GeneratedAt != nil {
+		object["generated_at"], err = json.Marshal(a.GeneratedAt)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'generated_at': %w", err)
+		}
+	}
+
+	if a.HasMore != nil {
+		object["has_more"], err = json.Marshal(a.HasMore)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'has_more': %w", err)
+		}
+	}
+
+	if a.NextCursor != nil {
+		object["next_cursor"], err = json.Marshal(a.NextCursor)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'next_cursor': %w", err)
+		}
+	}
+
+	if a.OrganizationId != nil {
+		object["organization_id"], err = json.Marshal(a.OrganizationId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'organization_id': %w", err)
+		}
+	}
+
+	if a.Report != nil {
+		object["report"], err = json.Marshal(a.Report)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'report': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -1652,6 +1931,30 @@ func NewGetReportRequest(server string, organizationId OrganizationId, report Ge
 			}
 		}
 
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
@@ -2679,7 +2982,7 @@ type GetReportResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *map[string]interface{}
+	JSON200 *AccountingReport
 	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
 	ApplicationproblemJSON400 *InvalidRequest
 	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
@@ -2695,7 +2998,7 @@ type GetReportResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetReportResponse) GetJSON200() *map[string]interface{} {
+func (r GetReportResponse) GetJSON200() *AccountingReport {
 	return r.JSON200
 }
 
@@ -3758,7 +4061,7 @@ func ParseGetReportResponse(rsp *http.Response) (*GetReportResponse, error) {
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest map[string]interface{}
+		var dest AccountingReport
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

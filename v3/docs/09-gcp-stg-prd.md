@@ -186,11 +186,11 @@ Ese pool y sus service accounts de release todavía no existen en GCP. En GitHub
 `main` exige exactamente `Pymes V3 validate` para todos, no exige reviewers de
 PR y conserva enforcement administrativo, historial lineal y resolución de
 conversaciones. Los environments `stg` y `prd` existen y sólo aceptan `main`;
-PRD exige reviewers de despliegue e impide autoaprobación, pero todavía permite
-bypass administrativo. Falta además
-`PYMES_GITHUB_RELEASE_AUDIT_TOKEN` en ambos environments. Por eso el bootstrap
-WIF debe permanecer bloqueado hasta desactivar ese bypass, cargar la credencial
-de auditoría y volver a verificar los controles V3.
+PRD exige reviewers de despliegue, tiene `prevent_self_review=true` y
+`can_admins_bypass=false`. `PYMES_GITHUB_RELEASE_AUDIT_TOKEN` existe en ambos
+environments; su valor no se documenta. Desde el lado GitHub no queda una
+corrección manual conocida antes del bootstrap WIF, pero su auditoría completa
+debe volver a verificar estos controles antes de cualquier mutación.
 
 Antes de autenticar contra WIF, cada release comprueba que `main` esté
 protegida para todos por el único check `Pymes V3 validate` y que ambos

@@ -1,5 +1,9 @@
 # Auditoría de cierre de Pymes v3
 
+> Esta auditoría conserva evidencia del baseline anterior; no acredita el nuevo
+> cierre Foundation. La auditoría definitiva deberá usar los criterios de
+> [plan-foundation-migration.md](plan-foundation-migration.md).
+
 <!-- drift:bind v3/backend/internal/scheduling/calendar_projection/helpers/events.go -->
 <!-- drift:bind v3/scripts/deploy/retain-release-manifest.sh -->
 <!-- drift:bind v3/scripts/deploy/cloud-restore-drill.sh -->

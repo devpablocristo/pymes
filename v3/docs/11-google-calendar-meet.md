@@ -24,6 +24,10 @@ outbox, idempotencia y reconciliación. El SDK publicado
 técnico de bajo nivel y queda detrás de `google_calendar.go`; ningún tipo del
 SDK ingresa al dominio, handler o repositorio.
 
+Éste es el baseline transitorio. ADR 0014 mueve esa infraestructura y el adapter
+al contexto Scheduling y sustituye el SDK por su publicación Foundation; Google
+continúa siendo sólo una proyección externa.
+
 ## Modelo y aislamiento
 
 - `calendar_connections`: configuración y grant cifrado por organización.

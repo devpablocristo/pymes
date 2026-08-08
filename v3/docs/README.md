@@ -12,6 +12,15 @@ implementada es:
 - **Pymes v2**, **pyafipws** y **LedgerSMB** son referencias de comportamiento,
   no dependencias de ejecución ni fuentes de código copiadas.
 
+La continuación aceptada el 2026-08-08 migra las capacidades compartidas al
+repositorio privado Foundation. Accounting, Fiscal ARCA y Communications serán
+services Foundation instanciados para Pymes; Scheduling seguirá dentro del
+monolito y Google Calendar/Meet serán sus adapters. El baseline descrito arriba
+permanece operativo durante la transición, pero no es la topología final. La
+decisión completa está en
+[ADR 0014](adr/0014-foundation-como-nucleo-unico.md) y el orden ejecutable en el
+[plan Foundation](plan-foundation-migration.md).
+
 ## Estado de entrega
 
 <!-- drift:bind v3/scripts/deploy/retain-release-manifest.sh -->
@@ -98,25 +107,27 @@ y verificar esas operaciones.
 
 ## Lectura sugerida
 
-1. [Evidencia e inventario](01-evidencia.md)
-2. [Arquitectura y contratos de comportamiento](02-arquitectura.md)
-3. [Destino de cada módulo](03-disposicion-modulos.md)
-4. [Pendientes operativos pausados](pendiente.md)
-5. [Validación y spikes descartables](04-validacion.md)
-6. [Roadmap](05-roadmap.md)
-7. [Plan de ejecución](06-plan-ejecucion.md)
-8. [Estado verificable de implementación](07-estado-implementacion.md)
-9. [Auditoría de cierre](08-auditoria-cierre.md)
-10. [Seguridad GCP STG/PRD](09-gcp-stg-prd.md)
-11. [Runbook de operación y recuperación](10-runbook-operacion.md)
-12. [Arquitectura vertical Go](go-architecture.md)
-13. [Agenda multi-tenant](scheduling.md)
-14. [Web de Pymes v3](web-v3.md)
-15. [Notificaciones WhatsApp mediante PerGo](11-notifications-pergo.md)
-16. [Google Calendar y Meet](11-google-calendar-meet.md)
-17. [Rollout de capacidades por organización](12-feature-flags.md)
-18. [ADRs](adr/)
-19. [Contratos OpenAPI internos](../contracts/)
+1. [Plan Foundation activo](plan-foundation-migration.md)
+2. [ADR Foundation](adr/0014-foundation-como-nucleo-unico.md)
+3. [Evidencia e inventario](01-evidencia.md)
+4. [Arquitectura y contratos de comportamiento](02-arquitectura.md)
+5. [Destino de cada módulo](03-disposicion-modulos.md)
+6. [Pendientes operativos pausados](pendiente.md)
+7. [Validación y spikes descartables](04-validacion.md)
+8. [Roadmap](05-roadmap.md)
+9. [Plan de ejecución anterior](06-plan-ejecucion.md)
+10. [Estado verificable de implementación](07-estado-implementacion.md)
+11. [Auditoría de cierre](08-auditoria-cierre.md)
+12. [Seguridad GCP STG/PRD](09-gcp-stg-prd.md)
+13. [Runbook de operación y recuperación](10-runbook-operacion.md)
+14. [Arquitectura vertical Go](go-architecture.md)
+15. [Agenda multi-tenant](scheduling.md)
+16. [Web de Pymes v3](web-v3.md)
+17. [Notificaciones WhatsApp mediante PerGo](11-notifications-pergo.md)
+18. [Google Calendar y Meet](11-google-calendar-meet.md)
+19. [Rollout de capacidades por organización](12-feature-flags.md)
+20. [ADRs](adr/)
+21. [Contratos OpenAPI internos](../contracts/)
 
 Los diagramas Mermaid describen la arquitectura objetivo. Toda API marcada
 `internal` sólo admite credenciales de servicio: ningún navegador llega a los

@@ -23,6 +23,10 @@ Platform Scheduling `v0.2.0` aporta algoritmos puros detrás de
 de sus tipos cruza el adapter. Agenda no es un microservicio: API, worker,
 transacciones y despliegue pertenecen a Pymes.
 
+Ese paquete representa el baseline transitorio. ADR 0014 ordena publicar los
+algoritmos equivalentes desde Foundation y reemplazar el adapter sin cambiar el
+ownership: Scheduling permanece en Pymes.
+
 ## Integridad
 
 - Todas las PK/FK tenant son compuestas con `org_id` y todas las tablas tenant

@@ -151,6 +151,8 @@ api-generate:
 	cd backend && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 --package fiscalapi --generate chi-server -o internal/commerce/fiscal/models/fiscal.server.gen.go ../contracts/fiscal.openapi.yaml
 
 architecture-check:
+	bash scripts/check-foundation-migration-boundary-test.sh
+	bash scripts/check-foundation-migration-boundary.sh ..
 	cd backend && go test -count=1 ./internal/architecture
 
 up:

@@ -2,7 +2,8 @@
 
 ## Estado
 
-Aceptada.
+Parcialmente reemplazada por ADR 0014. La proyección sigue vigente, pero
+Calendar y Meet pasan a ser adapters de Scheduling.
 
 ## Contexto
 

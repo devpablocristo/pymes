@@ -28,12 +28,11 @@ operación desplegada. Ningún componente pasa al tercero por inferencia.
 | Calendars | OAuth tenant, tokens cifrados con KMS, Google Calendar/Meet, IDs determinísticos, validación del snapshot Agenda, ETag, deletes y reconciliación. | `make calendars-e2e` |
 | Operación | Probes, métricas, alertas, DLQ/replay, migraciones separadas, publicación create-only de evidencia de release, restore coordinado de tres bases y collectors redactados de pilotos. | gates de operación dentro de `make ci` |
 
-Para el candidato local integrado, Open Accounting
-`7a914c4617c5252b3ba97d00d3895fbcbf381ff7` pasó unitarias/race/vet/lint,
-build, integración PostgreSQL y Docker; Pymes pasó `make accounting-test`,
-`make accounting-e2e` y el `make ci` completo del 2026-08-08 contra ese
-checkout exacto. La publicación e integración de ambos cambios y su CI remota
-siguen pendientes.
+Open Accounting `6647992c75bee76bb70a6baafdb6b0d94fc0acab` quedó fusionado y
+pasó CI remota, unitarias/race/vet/lint, build, integración PostgreSQL y Docker;
+Pymes pasó `make accounting-test`, `make accounting-e2e` y el `make ci`
+completo del 2026-08-08 contra ese checkout exacto. El pin definitivo de Pymes
+está en cierre remoto mediante el PR #52.
 
 ## Dependencias externas y evidencia pendiente
 

@@ -73,7 +73,7 @@ sig = "c50b66101f1ad659"
 [[bindings]]
 doc = "v3/docs/04-validacion.md"
 target = "v3/scripts/deploy/workflow-policy-check.sh"
-sig = "411123f197034c46"
+sig = "c309bb94d006fca1"
 
 [[bindings]]
 doc = "v3/docs/05-roadmap.md"
@@ -173,7 +173,7 @@ sig = "b5293e67a11c1e45"
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
 target = ".github/workflows/v3-release.yml"
-sig = "533b244c0ceb40ec"
+sig = "137d2ac258fa3324"
 
 [[bindings]]
 doc = "v3/docs/10-runbook-operacion.md"
@@ -363,7 +363,7 @@ sig = "aa76c70db088d865"
 [[bindings]]
 doc = "v3/docs/README.md"
 target = ".github/workflows/v3-release.yml"
-sig = "533b244c0ceb40ec"
+sig = "137d2ac258fa3324"
 
 [[bindings]]
 doc = "v3/docs/README.md"

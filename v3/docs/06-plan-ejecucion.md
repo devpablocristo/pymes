@@ -34,11 +34,11 @@ dependencias.
 - Mantener Pymes v1/v2 en sólo lectura.
 - Establecer contratos, migraciones, Compose y CI.
 
-**Estado:** cerrado localmente; publicación pendiente. Open Accounting está
-fijado localmente en `7a914c4617c5252b3ba97d00d3895fbcbf381ff7` y tiene
-unitarias/race/vet/lint, build, integración PostgreSQL y Docker verdes. Pymes
-pasó `make accounting-test`, `make accounting-e2e` y `make ci` contra ese
-commit. Falta publicar e integrar ambos cambios y obtener CI remoto verde.
+**Estado:** Open Accounting fusionado; pin Pymes en cierre remoto. Open
+Accounting está fijado en `6647992c75bee76bb70a6baafdb6b0d94fc0acab` y tiene
+CI remota, unitarias/race/vet/lint, build, integración PostgreSQL y Docker
+verdes. Pymes pasó `make accounting-test`, `make accounting-e2e` y `make ci`
+contra ese commit; el pin definitivo se integra mediante el PR #52.
 
 ### H1 — Arquitectura Go
 

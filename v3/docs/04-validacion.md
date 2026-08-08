@@ -387,5 +387,6 @@ una release real exitosa.
 Open Accounting `6647992c75bee76bb70a6baafdb6b0d94fc0acab` quedó fusionado y
 pasó CI remota, unitarias/race/vet/lint, build, integración PostgreSQL y los
 tres builds Docker. Pymes pasó `make accounting-test`, `make accounting-e2e`
-y el `make ci` integral del 2026-08-08 contra ese checkout exacto. El pin
-definitivo de Pymes está en cierre remoto mediante el PR #52.
+y el `make ci` integral del 2026-08-08 contra ese checkout exacto. El required
+check remoto volvió a pasar para el pin canónico y el baseline quedó integrado
+mediante el PR #52.

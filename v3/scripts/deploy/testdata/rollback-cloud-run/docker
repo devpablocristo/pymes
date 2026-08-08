@@ -56,7 +56,7 @@ case "$format" in
                 "io.pymes.release.pymes-revision": $pymes_sha,
                 "io.pymes.release.open-accounting-revision": $accounting_sha,
                 "io.pymes.release.pymes-repository-id": "1173650578",
-                "io.pymes.release.open-accounting-repository-id": "1317775856"
+                "io.pymes.release.open-accounting-repository-id": "1321683582"
               }
             }
           }
@@ -85,7 +85,7 @@ case "$format" in
             pymesSha: $pymes_sha,
             accountingSha: $accounting_sha,
             pymesRepositoryId: "1173650578",
-            accountingRepositoryId: "1317775856",
+            accountingRepositoryId: "1321683582",
             materials: [
               material("pkg:docker/golang@"; $pymes_go),
               material("pkg:docker/node@"; $pymes_node),

@@ -384,10 +384,8 @@ desplegados, restores administrados ni pilotos de Agenda, PerGo, Google o
 ARCA. `verify-cloud-run.sh` sólo constituirá evidencia de runtime después de
 una release real exitosa.
 
-El candidato local de Open Accounting
-`7a914c4617c5252b3ba97d00d3895fbcbf381ff7` pasó unitarias/race/vet/lint,
-build, integración PostgreSQL y los tres builds Docker. Pymes pasó
-`make accounting-test`, `make accounting-e2e` y el `make ci` integral del
-2026-08-08 contra ese checkout exacto. El commit contable y los cambios de
-Pymes todavía no están publicados, por lo que no existe CI remota que acredite
-este candidato.
+Open Accounting `6647992c75bee76bb70a6baafdb6b0d94fc0acab` quedó fusionado y
+pasó CI remota, unitarias/race/vet/lint, build, integración PostgreSQL y los
+tres builds Docker. Pymes pasó `make accounting-test`, `make accounting-e2e`
+y el `make ci` integral del 2026-08-08 contra ese checkout exacto. El pin
+definitivo de Pymes está en cierre remoto mediante el PR #52.

@@ -78,13 +78,13 @@ sea el último en recibir tráfico; recién allí se activa una instancia.
 `initial-seed-build` no cuenta como release ni canary; `bootstrap` no está
 permitido en PRD ni cuenta como canary operativo.
 
-El candidato local actual de Open Accounting está fijado en
-`7a914c4617c5252b3ba97d00d3895fbcbf381ff7`. En ese commit pasaron localmente
-las suites unitarias/race/vet/lint, el build, la integración PostgreSQL y los
-tres targets Docker. Pymes pasó `make accounting-test`, `make accounting-e2e`
-y el `make ci` integral el 2026-08-08 contra ese checkout exacto. El commit
-contable y los cambios de Pymes todavía no están publicados; su integración y
-CI remotas permanecen pendientes. PerGo quedó fusionado con su automatización
+Open Accounting quedó fusionado en `main` mediante el PR #2 y Pymes fija el
+commit canónico `6647992c75bee76bb70a6baafdb6b0d94fc0acab`. En OA quedaron
+verdes su CI remota y las suites locales unitarias/race/vet/lint, build,
+integración PostgreSQL y los tres targets Docker. Pymes pasó
+`make accounting-test`, `make accounting-e2e` y el `make ci` integral del
+2026-08-08 contra ese checkout exacto. El pin definitivo está en cierre remoto
+en el PR #52 de Pymes. PerGo quedó fusionado con su automatización
 de despliegue segura
 en `622296b8fd52ffb84b0e2dae1b81d0926af4675b`, con el run final de `master`
 `30746001931` verde; la extensión

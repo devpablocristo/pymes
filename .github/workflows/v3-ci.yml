@@ -46,7 +46,7 @@ jobs:
           [[ "$(grep -c '^OPEN_ACCOUNTING_REPOSITORY_ID=' "${pin_file}")" -eq 1 ]]
           [[ "$(grep -c '^OPEN_ACCOUNTING_REF=' "${pin_file}")" -eq 1 ]]
           [[ "${repository}" == "devpablocristo/open-accounting" ]]
-          [[ "${repository_id}" == "1317775856" ]]
+          [[ "${repository_id}" == "1321683582" ]]
           if [[ ! "${revision}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "Open Accounting must be pinned to one full commit SHA" >&2
             exit 1

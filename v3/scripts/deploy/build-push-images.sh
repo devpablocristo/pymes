@@ -95,7 +95,7 @@ if [[ $(grep -c '^OPEN_ACCOUNTING_REPOSITORY=' "$pin_file") -ne 1 ||
   exit 1
 fi
 if [[ "$accounting_repository" != "devpablocristo/open-accounting" ||
-      "$accounting_repository_id" != "1317775856" ]]; then
+      "$accounting_repository_id" != "1321683582" ]]; then
   echo "Open Accounting repository identity differs from the reviewed fork" >&2
   exit 1
 fi

@@ -417,8 +417,8 @@ grep -Fq 'git -C "$accounting_context" status --porcelain=v1 --untracked-files=a
   fail "image builder does not prove a clean Open Accounting checkout"
 [[ "$(sed -n 's/^OPEN_ACCOUNTING_REPOSITORY=//p' "$dependency_pin")" == "devpablocristo/open-accounting" ]] ||
   fail "Open Accounting dependency is not fixed to the reviewed fork"
-[[ "$(sed -n 's/^OPEN_ACCOUNTING_REPOSITORY_ID=//p' "$dependency_pin")" == "1317775856" ]] ||
-  fail "Open Accounting dependency is not fixed to repository_id 1317775856"
+[[ "$(sed -n 's/^OPEN_ACCOUNTING_REPOSITORY_ID=//p' "$dependency_pin")" == "1321683582" ]] ||
+  fail "Open Accounting dependency is not fixed to repository_id 1321683582"
 [[ "$(grep -c '^OPEN_ACCOUNTING_REPOSITORY=' "$dependency_pin")" -eq 1 &&
    "$(grep -c '^OPEN_ACCOUNTING_REPOSITORY_ID=' "$dependency_pin")" -eq 1 &&
    "$(grep -c '^OPEN_ACCOUNTING_REF=' "$dependency_pin")" -eq 1 ]] ||
@@ -426,7 +426,7 @@ grep -Fq 'git -C "$accounting_context" status --porcelain=v1 --untracked-files=a
 for workflow in "$ci_workflow" "$release_workflow"; do
   grep -Fq '[[ "${repository}" == "devpablocristo/open-accounting" ]]' "$workflow" ||
     fail "$(basename "$workflow") does not reject a different Open Accounting owner/repository"
-  grep -Fq '[[ "${repository_id}" == "1317775856" ]]' "$workflow" ||
+  grep -Fq '[[ "${repository_id}" == "1321683582" ]]' "$workflow" ||
     fail "$(basename "$workflow") does not reject a different Open Accounting repository_id"
   grep -Fq '.full_name == $repository and .id == $repository_id' "$workflow" ||
     fail "$(basename "$workflow") does not verify Open Accounting identity against GitHub"

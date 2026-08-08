@@ -5,7 +5,7 @@
 <!-- drift:bind v3/scripts/deploy/cloud-restore-drill.sh -->
 <!-- drift:bind v3/scripts/deploy/collect-pilot-evidence.sh -->
 
-Fecha de revisión: 2026-08-02.
+Fecha de revisión: 2026-08-08.
 
 La implementación se divide en H0–H8. “Completo en código” significa que el
 comportamiento y sus pruebas viven en la rama de integración; no equivale a un
@@ -13,7 +13,7 @@ despliegue ni a un piloto.
 
 | Hito | Estado verificable | Evidencia / cierre restante |
 |---|---|---|
-| H0. Baseline | cerrado | Open Accounting headless quedó fusionado y fijado en `ad1c182093986279aac7fb6582f7788202112a78`; su `CI gate` y cobertura están verdes. Pymes PR #47 quedó fusionado en `ccff2c106da92f3bfc74b2d12b5f4409aa743050`; `make ci` y el workflow remoto de `main` `30744384829` quedaron verdes para ese baseline. |
+| H0. Baseline | cerrado localmente; publicación pendiente | Open Accounting headless está fijado localmente en `7a914c4617c5252b3ba97d00d3895fbcbf381ff7`; sus suites unitarias/race/vet/lint, build, integración PostgreSQL y Docker están verdes. Pymes pasó `make accounting-test`, `make accounting-e2e` y `make ci` contra ese commit. Faltan publicar e integrar ambos cambios y obtener CI remoto verde. |
 | H1. Arquitectura Go | completo | Contextos verticales, adapters con `models`/`helpers`, puertos consumer-owned, composición exclusiva en `wire` y gate `make architecture-check`; cero dependencia de Axis. |
 | H2. Platform Scheduling | completo | Scheduling Go 0.2, Calendar Board 0.2 y Scheduling React 0.2 se consumen como versiones publicadas, sin rutas locales. |
 | H3. Agenda | completo en código | Catálogo, disponibilidad, recursos múltiples, holds, recurrencia, sesiones con cupo, waitlist, cola, tokens, aislamiento tenant y contrato Agenda→Calendars con digest validado; falta evidencia de piloto desplegado. |
@@ -21,7 +21,7 @@ despliegue ni a un piloto.
 | H5. PerGo | completo en código y fork fusionado | Adapter, outbox, fake contractual, firma/inbox de webhooks, ledger durable de ingreso y claim/lease/fencing PostgreSQL de entrega. El worker conserva la API key PerGo en `Authorization` y autentica el workload privado por separado mediante un ID token en `X-Serverless-Authorization`, con audience HTTPS explícita. El fork quedó fusionado en `622296b8fd52ffb84b0e2dae1b81d0926af4675b`, incluido el despliegue fail-closed; el run de `master` `30746001931` quedó verde. Falta desplegar PerGo, configurar un workspace/número controlado y ejecutar el piloto real. |
 | H6. Google Calendar/Meet | completo en código | OAuth tenant, envelope encryption, calendario secundario, proyección por estado, delete/reschedule idempotente, Meet opt-in inmutable, ETag y reconciliación; faltan clientes OAuth STG/PRD y piloto real. |
 | H7. ARCA real multi-tenant | cerrado en código; no homologado | Onboarding CSR/certificado por organización, KMS fiscal, WSAA/WSFE, autorización/consulta exacta y modo mock comparten contrato. `arca-facturacion` 2.6.0 quedó fusionado en `69a0d4cf5110aa280fa50420dc0d13f8010115d0`, etiquetado, publicado en npm y fijado por lockfile; Fiscal exige un POS dedicado vacío en las nueve secuencias soportadas. Falta el piloto de homologación con una organización en H8. |
-| H8. Release, despliegue y pilotos | cierre local verde; integración y operación pendientes | La transacción de release implementa capability pretraffic API/Web, baseline y pin Web → API exactos, invoker IAM/ingress fail-closed, señal durable `worker_release_ready`, rollback por SHA y retención create-only del manifiesto en un bucket bloqueado. El restore cloud coordina tres bases y los collectors redactan evidencia de Agenda, PerGo, Google/Meet y ARCA. El `make ci` integral del diff actual pasó localmente el 2026-08-02; Cloud Asset, Org Policy y Policy Analyzer quedaron habilitadas, ambas policies IAM requeridas están forzadas y la subred/NAT compartida quedó verificada. Faltan su CI remoto, aplicar y bloquear los buckets, reconciliar GitHub, cargar valores reales de Clerk webhook/PerGo/Google, crear WIF, retirar WIF legado con dos canaries, desplegar STG/PRD, ejecutar el drill cloud y realizar los pilotos. |
+| H8. Release, despliegue y pilotos | cierre local verde; integración remota y operación pendientes | La transacción de release implementa capability pretraffic API/Web, baseline y pin Web → API exactos, invoker IAM/ingress fail-closed, señal durable `worker_release_ready`, rollback por SHA y retención create-only del manifiesto en un bucket bloqueado. El restore cloud coordina tres bases y los collectors redactan evidencia de Agenda, PerGo, Google/Meet y ARCA. El `make ci` integral del diff actual pasó localmente el 2026-08-08 contra OA `7a914c4617c5252b3ba97d00d3895fbcbf381ff7`; Cloud Asset, Org Policy y Policy Analyzer quedaron habilitadas, ambas policies IAM requeridas están forzadas y la subred/NAT compartida quedó verificada. Faltan publicar el baseline, obtener su CI remota, aplicar y bloquear los buckets, reconciliar GitHub, cargar valores reales de Clerk webhook/PerGo/Google, crear WIF, retirar WIF legado con dos canaries, desplegar STG/PRD, ejecutar el drill cloud y realizar los pilotos. |
 
 ## Orden de cierre
 

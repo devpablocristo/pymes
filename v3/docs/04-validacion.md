@@ -384,11 +384,10 @@ desplegados, restores administrados ni pilotos de Agenda, PerGo, Google o
 ARCA. `verify-cloud-run.sh` sólo constituirá evidencia de runtime después de
 una release real exitosa.
 
-El SHA fijado de Open Accounting
-`ad1c182093986279aac7fb6582f7788202112a78` tiene CI remoto verde en el run
-`30745457821`: pasaron backend, lint, integración PostgreSQL, E2E, frontend, el
-runtime Pymes headless y el gate agregado. `make ci` de Pymes también pasa
-contra el runtime incluido por ese checkout exacto y los controles H8 actuales.
-Pymes PR #47 quedó fusionado en
-`ccff2c106da92f3bfc74b2d12b5f4409aa743050`, y el workflow remoto de `main`
-`30744384829` quedó verde para ese baseline.
+El candidato local de Open Accounting
+`7a914c4617c5252b3ba97d00d3895fbcbf381ff7` pasó unitarias/race/vet/lint,
+build, integración PostgreSQL y los tres builds Docker. Pymes pasó
+`make accounting-test`, `make accounting-e2e` y el `make ci` integral del
+2026-08-08 contra ese checkout exacto. El commit contable y los cambios de
+Pymes todavía no están publicados, por lo que no existe CI remota que acredite
+este candidato.

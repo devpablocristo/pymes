@@ -157,7 +157,7 @@ func TestAccountingGeneratedReportPaginationConformance(t *testing.T) {
 	defaultPage, err := client.GetReportWithResponse(
 		context.Background(),
 		organizationID,
-		accountingapi.GeneralLedger,
+		accountingapi.GetReportParamsReportGeneralLedger,
 		&accountingapi.GetReportParams{
 			AsOf:           asOf,
 			XCorrelationID: "corr-report-default",
@@ -191,7 +191,7 @@ func TestAccountingGeneratedReportPaginationConformance(t *testing.T) {
 	firstPage, err := client.GetReportWithResponse(
 		context.Background(),
 		organizationID,
-		accountingapi.GeneralLedger,
+		accountingapi.GetReportParamsReportGeneralLedger,
 		&accountingapi.GetReportParams{
 			AsOf:           asOf,
 			Limit:          &limit,
@@ -220,7 +220,7 @@ func TestAccountingGeneratedReportPaginationConformance(t *testing.T) {
 	repeatedFirstPage, err := client.GetReportWithResponse(
 		context.Background(),
 		organizationID,
-		accountingapi.GeneralLedger,
+		accountingapi.GetReportParamsReportGeneralLedger,
 		&accountingapi.GetReportParams{
 			AsOf:           asOf,
 			Limit:          &limit,
@@ -236,7 +236,7 @@ func TestAccountingGeneratedReportPaginationConformance(t *testing.T) {
 	secondPage, err := client.GetReportWithResponse(
 		context.Background(),
 		organizationID,
-		accountingapi.GeneralLedger,
+		accountingapi.GetReportParamsReportGeneralLedger,
 		&accountingapi.GetReportParams{
 			AsOf:           asOf,
 			Limit:          &limit,
@@ -289,7 +289,7 @@ func TestAccountingGeneratedReportPaginationConformance(t *testing.T) {
 	rejected, err := client.GetReportWithResponse(
 		context.Background(),
 		organizationID,
-		accountingapi.GeneralLedger,
+		accountingapi.GetReportParamsReportGeneralLedger,
 		&accountingapi.GetReportParams{
 			AsOf:           asOf,
 			Limit:          &invalidLimit,
@@ -312,7 +312,7 @@ func TestAccountingGeneratedReportPaginationConformance(t *testing.T) {
 	rejected, err = client.GetReportWithResponse(
 		context.Background(),
 		organizationID,
-		accountingapi.GeneralLedger,
+		accountingapi.GetReportParamsReportGeneralLedger,
 		&accountingapi.GetReportParams{
 			AsOf:           asOf,
 			Cursor:         &emptyCursor,
@@ -335,7 +335,7 @@ func TestAccountingGeneratedReportPaginationConformance(t *testing.T) {
 	rejected, err = client.GetReportWithResponse(
 		context.Background(),
 		organizationID,
-		accountingapi.GeneralLedger,
+		accountingapi.GetReportParamsReportGeneralLedger,
 		&accountingapi.GetReportParams{
 			AsOf:           asOf,
 			Cursor:         &longCursor,
@@ -357,7 +357,7 @@ func TestAccountingGeneratedReportPaginationConformance(t *testing.T) {
 	rejected, err = client.GetReportWithResponse(
 		context.Background(),
 		organizationID,
-		accountingapi.TrialBalance,
+		accountingapi.GetReportParamsReportTrialBalance,
 		&accountingapi.GetReportParams{
 			AsOf:           asOf,
 			Limit:          &limit,

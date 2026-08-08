@@ -137,7 +137,7 @@ func TestAccountingClientAgainstHeadlessService(t *testing.T) {
 	firstPage, err := reportClient.GetReportWithResponse(
 		ctx,
 		organizationID,
-		accountingapi.GeneralLedger,
+		accountingapi.GetReportParamsReportGeneralLedger,
 		&accountingapi.GetReportParams{
 			AsOf:           asOf,
 			Limit:          &limit,
@@ -174,7 +174,7 @@ func TestAccountingClientAgainstHeadlessService(t *testing.T) {
 	secondPage, err := reportClient.GetReportWithResponse(
 		ctx,
 		organizationID,
-		accountingapi.GeneralLedger,
+		accountingapi.GetReportParamsReportGeneralLedger,
 		&accountingapi.GetReportParams{
 			AsOf:           asOf,
 			Limit:          &limit,

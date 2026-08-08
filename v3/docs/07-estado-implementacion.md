@@ -5,7 +5,7 @@
 <!-- drift:bind v3/scripts/deploy/cloud-restore-drill.sh -->
 <!-- drift:bind v3/scripts/deploy/collect-pilot-evidence.sh -->
 
-Fecha de auditoría: 2026-08-02.
+Fecha de auditoría: 2026-08-08.
 
 Este documento separa tres estados: código implementado, evidencia automática y
 operación desplegada. Ningún componente pasa al tercero por inferencia.
@@ -19,7 +19,7 @@ operación desplegada. Ningún componente pasa al tercero por inferencia.
 | Tenancy | `org_id` transaccional, RLS forzado y referencias compuestas tenant-aware; Accounting usa mapping explícito sin fallback de schema. | `make db-integration` |
 | Consistencia | Outbox/inbox, leases, backoff, circuit breaker, hash de payload, idempotencia y reconciliación de respuestas perdidas. | `make e2e` |
 | Identidad interna | JWT Ed25519 corto; producción firma con una versión KMS explícita y publica JWKS con overlap; semillas sólo locales. | tests Go y checks de despliegue |
-| Accounting | Servicio headless fusionado: cuentas, períodos, posteos, reversas, partidas, aplicaciones y reportes. | `make accounting-test` y `make accounting-e2e` |
+| Accounting | Servicio headless implementado en el candidato local: cuentas, períodos, posteos, reversas, partidas, aplicaciones y reportes. | `make accounting-test` y `make accounting-e2e` |
 | Comercio | Parties, ventas, compras, A/B/C, NC/ND, cobros, pagos parciales, reversas, numeración y estados. | `make commercial-e2e` |
 | Fiscal | Mock durable y adapter ARCA real detrás del mismo puerto; onboarding por tenant, WSAA/WSFE, número explícito, consulta exacta, incertidumbre y gate de POS dedicado vacío. La extensión requerida quedó publicada y fijada exactamente como `@devpablocristo/arca-facturacion@2.6.0`. | `make fiscal-test`, `make fiscal-real-contract`, `make fiscal-e2e` |
 | Agenda | Sucursales, servicios, disponibilidad, recursos múltiples, holds, recurrencia, grupos, waitlist, cola, edición optimista, acciones públicas y proyección Calendar por estado con digest validado y Meet opt-in inmutable. | `make scheduling-e2e` |
@@ -28,11 +28,12 @@ operación desplegada. Ningún componente pasa al tercero por inferencia.
 | Calendars | OAuth tenant, tokens cifrados con KMS, Google Calendar/Meet, IDs determinísticos, validación del snapshot Agenda, ETag, deletes y reconciliación. | `make calendars-e2e` |
 | Operación | Probes, métricas, alertas, DLQ/replay, migraciones separadas, publicación create-only de evidencia de release, restore coordinado de tres bases y collectors redactados de pilotos. | gates de operación dentro de `make ci` |
 
-Para el baseline integrado, la suite Go, el gate arquitectónico y `make ci`
-completo pasaron localmente contra Open Accounting
-`ad1c182093986279aac7fb6582f7788202112a78`. Pymes PR #47 quedó fusionado en
-`ccff2c106da92f3bfc74b2d12b5f4409aa743050`, y el workflow remoto de `main`
-`30744384829` quedó verde para ese baseline.
+Para el candidato local integrado, Open Accounting
+`7a914c4617c5252b3ba97d00d3895fbcbf381ff7` pasó unitarias/race/vet/lint,
+build, integración PostgreSQL y Docker; Pymes pasó `make accounting-test`,
+`make accounting-e2e` y el `make ci` completo del 2026-08-08 contra ese
+checkout exacto. La publicación e integración de ambos cambios y su CI remota
+siguen pendientes.
 
 ## Dependencias externas y evidencia pendiente
 

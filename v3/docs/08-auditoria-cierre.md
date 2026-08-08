@@ -9,7 +9,7 @@
 <!-- drift:bind v3/scripts/deploy/retire-obsolete-secrets.sh -->
 <!-- drift:bind v3/scripts/deploy/retire-obsolete-secrets-test.sh -->
 
-Fecha: 2026-08-02.
+Fecha: 2026-08-08.
 
 Un requisito sólo figura como cerrado cuando existe código integrado, un gate
 reproducible y, si es operativo, evidencia del entorno real. Esta tabla es la
@@ -19,7 +19,7 @@ fuente autoritativa para medir el plan.
 
 | Requisito | Estado | Evidencia / condición |
 |---|---|---|
-| H0 Baseline y Open Accounting | cerrado | Runtime headless fusionado y SHA OA remoto verde `ad1c182093986279aac7fb6582f7788202112a78`, con `CI gate` y cobertura verdes. Pymes PR #47 quedó fusionado en `ccff2c106da92f3bfc74b2d12b5f4409aa743050`; `make ci` y el workflow remoto de `main` `30744384829` pasan contra ese baseline. |
+| H0 Baseline y Open Accounting | cerrado localmente; publicación pendiente | Runtime headless fijado localmente en `7a914c4617c5252b3ba97d00d3895fbcbf381ff7`; OA pasó unitarias/race/vet/lint, build, integración PostgreSQL y Docker. Pymes pasó `make accounting-test`, `make accounting-e2e` y `make ci` contra ese checkout. Faltan publicación, integración y CI remota. |
 | H1 Arquitectura Go | cerrado | árbol vertical y `make architecture-check`; todos los adapters y fragmentos conservan `models`/`helpers`, la composición concreta queda en `wire` y Axis no aparece como dependencia, ruta, checkout, mount, runtime ni en `go list -deps`. |
 | H2 Platform | cerrado | paquetes Go/React 0.2 publicados y consumidos sin `replace`, `file:`, `link:` o rutas locales. |
 | H3 Agenda | cerrado en código | contrato, persistencia, waitlist exactamente una vez y proyección Calendar por estado con digest validado; piloto pendiente en H8. |
@@ -32,8 +32,8 @@ fuente autoritativa para medir el plan.
 
 | Puerta | Estado actual | Evidencia objetiva de cierre |
 |---|---|---|
-| CI local | cerrado para el baseline | `make ci` pasó integralmente el 2026-08-02 contra OA `ad1c…`, incluyendo arquitectura, seguridad, contratos, Web, PostgreSQL, Agenda→Calendars, PerGo fake, fiscal, restore local, replay y recuperación |
-| CI remoto/integración | cerrado para el baseline; obligatorio por cada cambio | Pymes PR #47 fusionado en `ccff2c106da92f3bfc74b2d12b5f4409aa743050`, con `Pymes V3 validate` verde; cada SHA posterior debe obtener el mismo gate verde en PR y `main` |
+| CI local | cerrado para el candidato actual | `make ci` pasó integralmente el 2026-08-08 contra OA `7a914c4617c5252b3ba97d00d3895fbcbf381ff7`, incluyendo arquitectura, seguridad, contratos, Web, PostgreSQL, Agenda→Calendars, PerGo fake, fiscal, restore local, replay y recuperación |
+| CI remoto/integración | pendiente para el candidato actual | OA `7a914c4617c5252b3ba97d00d3895fbcbf381ff7` y los cambios de Pymes aún no están publicados; no existe un workflow remoto que acredite este baseline |
 | Release | cerrado y validado localmente; no operado | build por digest, manifiesto de 13 entradas, publicación create-only con receipt y Bucket Lock requerido, candidato con tráfico cero, capability pretraffic API/Web, señal durable `worker_release_ready`, verificación dentro de la transacción y rollback por SHA. Los adapters prueban fail-closed; faltan buckets bloqueados, imágenes/manifiesto reales y una ejecución Cloud Run |
 | Identidad de release | cerrada en código, no aplicada | WIF separado y STG-first, condición cerrada al repo/workflow/branch/environment, seed inerte auditado sin Run Admin de proyecto, permisos finales sólo por recurso y análisis inverso fail-closed por recurso/permiso/identidad, incluso ante roles custom e impersonación |
 | Retiro WIF legado | pendiente | primer canary STG con WIF nuevo; retiro del principal Pymes, cuenta exclusiva deshabilitada, segundo canary posterior, Cloud Asset limpio y fase de cierre |

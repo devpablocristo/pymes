@@ -6,7 +6,7 @@ subject="$script_dir/rollback-cloud-run.sh"
 fixture_dir="$script_dir/testdata/rollback-cloud-run"
 
 release_sha=1111111111111111111111111111111111111111
-accounting_sha=ad1c182093986279aac7fb6582f7788202112a78
+accounting_sha=7a914c4617c5252b3ba97d00d3895fbcbf381ff7
 token=2222222222222222222222222222222222222222222222222222222222222222
 project=pymes-dev-352318
 region=us-central1

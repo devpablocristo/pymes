@@ -1,6 +1,6 @@
 # Plan de ejecución de Pymes v3
 
-Fecha de revisión: 2026-08-01.
+Fecha de revisión: 2026-08-08.
 
 ## Objetivo
 
@@ -34,10 +34,11 @@ dependencias.
 - Mantener Pymes v1/v2 en sólo lectura.
 - Establecer contratos, migraciones, Compose y CI.
 
-**Estado:** cerrado. Open Accounting está fusionado y remoto verde en
-`ad1c182093986279aac7fb6582f7788202112a78`; Pymes PR #47 está fusionado en
-`ccff2c106da92f3bfc74b2d12b5f4409aa743050`, con `make ci` y workflow remoto
-de `main` `30744384829` verdes contra ese baseline.
+**Estado:** cerrado localmente; publicación pendiente. Open Accounting está
+fijado localmente en `7a914c4617c5252b3ba97d00d3895fbcbf381ff7` y tiene
+unitarias/race/vet/lint, build, integración PostgreSQL y Docker verdes. Pymes
+pasó `make accounting-test`, `make accounting-e2e` y `make ci` contra ese
+commit. Falta publicar e integrar ambos cambios y obtener CI remoto verde.
 
 ### H1 — Arquitectura Go
 

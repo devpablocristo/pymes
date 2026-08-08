@@ -78,11 +78,14 @@ sea el último en recibir tráfico; recién allí se activa una instancia.
 `initial-seed-build` no cuenta como release ni canary; `bootstrap` no está
 permitido en PRD ni cuenta como canary operativo.
 
-Open Accounting está fusionado y su CI remoto es verde en
-`ad1c182093986279aac7fb6582f7788202112a78`. Para el baseline integrado, Pymes
-PR #47 está fusionado en `ccff2c106da92f3bfc74b2d12b5f4409aa743050`,
-`make ci` pasó contra ese pin y su workflow remoto de `main` `30744384829`
-quedó verde. PerGo quedó fusionado con su automatización de despliegue segura
+El candidato local actual de Open Accounting está fijado en
+`7a914c4617c5252b3ba97d00d3895fbcbf381ff7`. En ese commit pasaron localmente
+las suites unitarias/race/vet/lint, el build, la integración PostgreSQL y los
+tres targets Docker. Pymes pasó `make accounting-test`, `make accounting-e2e`
+y el `make ci` integral el 2026-08-08 contra ese checkout exacto. El commit
+contable y los cambios de Pymes todavía no están publicados; su integración y
+CI remotas permanecen pendientes. PerGo quedó fusionado con su automatización
+de despliegue segura
 en `622296b8fd52ffb84b0e2dae1b81d0926af4675b`, con el run final de `master`
 `30746001931` verde; la extensión
 `arca-facturacion` `2.6.0` quedó fusionada, publicada y fijada por Pymes, con

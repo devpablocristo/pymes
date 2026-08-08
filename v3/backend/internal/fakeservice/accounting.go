@@ -320,7 +320,7 @@ func (s *accountingFakeServer) GetReport(
 	report accountingapi.GetReportParamsReport,
 	params accountingapi.GetReportParams,
 ) {
-	if report != accountingapi.GeneralLedger &&
+	if report != accountingapi.GetReportParamsReportGeneralLedger &&
 		(params.Limit != nil || params.Cursor != nil) {
 		accountinghelpers.WriteProblem(
 			w,
@@ -339,7 +339,7 @@ func (s *accountingFakeServer) GetReport(
 		"report":          report,
 		"rows":            []any{},
 	}
-	if report == accountingapi.GeneralLedger {
+	if report == accountingapi.GetReportParamsReportGeneralLedger {
 		limit := 200
 		if params.Limit != nil {
 			limit = *params.Limit

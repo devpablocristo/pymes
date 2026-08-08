@@ -8,8 +8,11 @@
 | pyafipws | ninguno en producción | librería como dependencia/segundo emisor | fixtures, catálogos WSAA/WSFE/padrón/FCE/WSFEX/CAEA |
 | LedgerSMB | ninguno en producción | cualquier copia, por GPLv2 | casos de diario, pagos parciales, reversas y cierre |
 
-La adaptación de OA quedó concretada en el fork mantenido por el equipo. El SHA
-remoto verde `ad1c182093986279aac7fb6582f7788202112a78` conserva el runtime
-headless aislado y sus tres targets privados; Pymes fija exactamente ese commit.
+La adaptación de OA quedó concretada en el fork mantenido por el equipo. El
+candidato local `7a914c4617c5252b3ba97d00d3895fbcbf381ff7` conserva el runtime
+headless aislado y sus tres targets privados; Pymes fija localmente ese commit.
+En OA están verdes unitarias/race/vet/lint, build, integración PostgreSQL y
+Docker; Pymes pasó `make accounting-test`, `make accounting-e2e` y `make ci`.
+La publicación de ambos cambios, su integración y el CI remoto están pendientes.
 El repositorio sigue siendo público, pero el servicio contable se despliega
 privado y no expone UI ni superficies comerciales de OA.

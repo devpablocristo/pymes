@@ -1,5 +1,8 @@
 # Roadmap y estado
 
+> Este roadmap acredita el baseline anterior. La continuación vigente es el
+> [plan Foundation](plan-foundation-migration.md), aceptado por ADR 0014.
+
 <!-- drift:bind v3/backend/internal/scheduling/calendar_projection/helpers/events.go -->
 <!-- drift:bind v3/scripts/deploy/retain-release-manifest.sh -->
 <!-- drift:bind v3/scripts/deploy/cloud-restore-drill.sh -->

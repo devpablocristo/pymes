@@ -1,6 +1,6 @@
 # ADR 0008: Agenda en el monolito y Platform detrás de un adapter
 
-**Estado:** aceptada.
+**Estado:** parcialmente reemplazada por ADR 0014; Agenda sigue en el monolito.
 **Fecha:** 2026-08-01.
 
 ## Contexto

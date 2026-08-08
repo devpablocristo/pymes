@@ -8,15 +8,21 @@
 - No copiar código de v1/v2 por defecto: recuperar comportamientos mediante
   casos de aceptación y reconstruirlos con los contratos de v3.
 
-## Platform
+## Foundation
 
-- Consumir únicamente versiones publicadas de
-  `github.com/devpablocristo/platform/*` y `@devpablocristo/platform-*`.
+- `foundation` es la única fuente activa de capacidades compartidas. Consumir
+  únicamente versiones o digests publicados de
+  `github.com/devpablocristo/foundation/*` y paquetes privados Foundation.
+- El repositorio histórico `github.com/devpablocristo/platform` está deprecado.
+  Las referencias transitorias ya registradas en v3 sólo pueden disminuir y el
+  gate `check-foundation-migration-boundary.sh` impide que se propaguen.
 - No commitear `replace`, `file:`, `link:`, `workspace:` ni rutas absolutas.
 - Una capacidad agnóstica se implementa, prueba, versiona y publica primero en
-  `platform`; luego se adopta en un PR separado de Pymes.
-- Marca, copy, rutas y reglas privadas del producto nunca pertenecen a
-  `platform`.
+  Foundation; luego se adopta en un cambio separado de Pymes.
+- Los services Foundation se consumen por contrato y por imagen fijada por
+  digest, nunca importando su módulo de dominio ni accediendo a su base.
+- Marca, copy, rutas, datos y reglas privadas del producto nunca pertenecen a
+  Foundation.
 
 ## V3
 
@@ -40,7 +46,8 @@
   Cada adapter conserva un archivo raíz y subdirectorios `models/` y
   `helpers/`; los tipos del proveedor nunca entran al dominio.
 - Las entidades e invariantes viven en `usecases/domain`; ese paquete no
-  importa HTTP, SQL, pgx, Clerk, Platform, Google, PerGo, Accounting ni Fiscal.
+  importa HTTP, SQL, pgx, Clerk, Foundation, Platform histórico, Google,
+  Communications, Accounting ni Fiscal.
 - Toda construcción concreta ocurre en `v3/backend/wire`. `cmd` sólo carga
   configuración, invoca `wire` y controla el ciclo de vida.
 - No crear capas horizontales globales `ports`, `access`, `companion`,

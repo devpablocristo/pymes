@@ -1,6 +1,6 @@
 # ADR 0012: PerGo como servicio de entrega de WhatsApp
 
-**Estado:** aceptada.  
+**Estado:** reemplazada por ADR 0014 y Foundation Communications.
 **Fecha:** 2026-08-01.
 
 ## Contexto

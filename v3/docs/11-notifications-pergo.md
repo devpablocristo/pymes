@@ -1,5 +1,9 @@
 # Notificaciones WhatsApp mediante PerGo
 
+> Este documento describe el baseline PerGo vigente durante la transición. ADR
+> 0014 lo reemplaza por una instancia Foundation Communications sin cambiar el
+> ownership comercial de Pymes Notifications.
+
 Pymes conserva la intención comercial de cada notificación y PerGo se encarga
 del transporte. La integración no forma parte de la transacción que crea o
 modifica el turno: esa transacción persiste la intención y

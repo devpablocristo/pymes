@@ -1,5 +1,9 @@
 # Estado verificable de implementación
 
+> Los estados de este documento describen el baseline previo a la consolidación.
+> La migración activa y sus criterios están en
+> [plan-foundation-migration.md](plan-foundation-migration.md).
+
 <!-- drift:bind v3/backend/internal/scheduling/calendar_projection/helpers/events.go -->
 <!-- drift:bind v3/scripts/deploy/retain-release-manifest.sh -->
 <!-- drift:bind v3/scripts/deploy/cloud-restore-drill.sh -->

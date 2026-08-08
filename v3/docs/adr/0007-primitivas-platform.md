@@ -1,6 +1,6 @@
 # ADR 0007: adopción selectiva de primitivas platform
 
-**Estado:** aceptada.  
+**Estado:** reemplazada por ADR 0014.
 **Fecha:** 2026-07-31.
 
 ## Contexto

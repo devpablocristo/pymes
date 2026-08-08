@@ -1,5 +1,9 @@
 # Plan de ejecución de Pymes v3
 
+> Este plan produjo el baseline actual y queda conservado como evidencia. La
+> continuación vigente es el [plan Foundation](plan-foundation-migration.md),
+> aceptado por ADR 0014.
+
 Fecha de revisión: 2026-08-08.
 
 ## Objetivo

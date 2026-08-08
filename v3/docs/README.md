@@ -83,8 +83,9 @@ commit canónico `6647992c75bee76bb70a6baafdb6b0d94fc0acab`. En OA quedaron
 verdes su CI remota y las suites locales unitarias/race/vet/lint, build,
 integración PostgreSQL y los tres targets Docker. Pymes pasó
 `make accounting-test`, `make accounting-e2e` y el `make ci` integral del
-2026-08-08 contra ese checkout exacto. El pin definitivo está en cierre remoto
-en el PR #52 de Pymes. PerGo quedó fusionado con su automatización
+2026-08-08 contra ese checkout exacto. El required check remoto volvió a pasar
+para el pin canónico y el baseline se integró mediante el PR #52 de Pymes.
+PerGo quedó fusionado con su automatización
 de despliegue segura
 en `622296b8fd52ffb84b0e2dae1b81d0926af4675b`, con el run final de `master`
 `30746001931` verde; la extensión
@@ -100,21 +101,22 @@ y verificar esas operaciones.
 1. [Evidencia e inventario](01-evidencia.md)
 2. [Arquitectura y contratos de comportamiento](02-arquitectura.md)
 3. [Destino de cada módulo](03-disposicion-modulos.md)
-4. [Validación y spikes descartables](04-validacion.md)
-5. [Roadmap](05-roadmap.md)
-6. [Plan de ejecución](06-plan-ejecucion.md)
-7. [Estado verificable de implementación](07-estado-implementacion.md)
-8. [Auditoría de cierre](08-auditoria-cierre.md)
-9. [Seguridad GCP STG/PRD](09-gcp-stg-prd.md)
-10. [Runbook de operación y recuperación](10-runbook-operacion.md)
-11. [Arquitectura vertical Go](go-architecture.md)
-12. [Agenda multi-tenant](scheduling.md)
-13. [Web de Pymes v3](web-v3.md)
-14. [Notificaciones WhatsApp mediante PerGo](11-notifications-pergo.md)
-15. [Google Calendar y Meet](11-google-calendar-meet.md)
-16. [Rollout de capacidades por organización](12-feature-flags.md)
-17. [ADRs](adr/)
-18. [Contratos OpenAPI internos](../contracts/)
+4. [Pendientes operativos pausados](pendiente.md)
+5. [Validación y spikes descartables](04-validacion.md)
+6. [Roadmap](05-roadmap.md)
+7. [Plan de ejecución](06-plan-ejecucion.md)
+8. [Estado verificable de implementación](07-estado-implementacion.md)
+9. [Auditoría de cierre](08-auditoria-cierre.md)
+10. [Seguridad GCP STG/PRD](09-gcp-stg-prd.md)
+11. [Runbook de operación y recuperación](10-runbook-operacion.md)
+12. [Arquitectura vertical Go](go-architecture.md)
+13. [Agenda multi-tenant](scheduling.md)
+14. [Web de Pymes v3](web-v3.md)
+15. [Notificaciones WhatsApp mediante PerGo](11-notifications-pergo.md)
+16. [Google Calendar y Meet](11-google-calendar-meet.md)
+17. [Rollout de capacidades por organización](12-feature-flags.md)
+18. [ADRs](adr/)
+19. [Contratos OpenAPI internos](../contracts/)
 
 Los diagramas Mermaid describen la arquitectura objetivo. Toda API marcada
 `internal` sólo admite credenciales de servicio: ningún navegador llega a los

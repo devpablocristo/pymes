@@ -13,6 +13,7 @@ commit canónico `6647992c75bee76bb70a6baafdb6b0d94fc0acab` conserva el runtime
 headless aislado y sus tres targets privados; Pymes fija ese commit. En OA
 están verdes CI remota, unitarias/race/vet/lint, build, integración PostgreSQL
 y Docker; Pymes pasó `make accounting-test`, `make accounting-e2e` y `make ci`.
-El pin definitivo de Pymes está en cierre remoto mediante su PR #52.
+El required check remoto volvió a pasar para el pin canónico y el baseline de
+Pymes quedó integrado mediante su PR #52.
 El repositorio sigue siendo público, pero el servicio contable se despliega
 privado y no expone UI ni superficies comerciales de OA.

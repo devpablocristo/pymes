@@ -19,7 +19,7 @@ fuente autoritativa para medir el plan.
 
 | Requisito | Estado | Evidencia / condición |
 |---|---|---|
-| H0 Baseline y Open Accounting | OA fusionado; pin Pymes en cierre remoto | Runtime headless fusionado y fijado en `6647992c75bee76bb70a6baafdb6b0d94fc0acab`; OA pasó CI remota, unitarias/race/vet/lint, build, integración PostgreSQL y Docker. Pymes pasó `make accounting-test`, `make accounting-e2e` y `make ci` contra ese checkout; el pin final se integra mediante el PR #52. |
+| H0 Baseline y Open Accounting | cerrado | Runtime headless fusionado y fijado en `6647992c75bee76bb70a6baafdb6b0d94fc0acab`; OA pasó CI remota, unitarias/race/vet/lint, build, integración PostgreSQL y Docker. Pymes pasó `make accounting-test`, `make accounting-e2e` y `make ci` contra ese checkout; el required check remoto volvió a pasar y el baseline se integró mediante el PR #52. |
 | H1 Arquitectura Go | cerrado | árbol vertical y `make architecture-check`; todos los adapters y fragmentos conservan `models`/`helpers`, la composición concreta queda en `wire` y Axis no aparece como dependencia, ruta, checkout, mount, runtime ni en `go list -deps`. |
 | H2 Platform | cerrado | paquetes Go/React 0.2 publicados y consumidos sin `replace`, `file:`, `link:` o rutas locales. |
 | H3 Agenda | cerrado en código | contrato, persistencia, waitlist exactamente una vez y proyección Calendar por estado con digest validado; piloto pendiente en H8. |
@@ -33,7 +33,7 @@ fuente autoritativa para medir el plan.
 | Puerta | Estado actual | Evidencia objetiva de cierre |
 |---|---|---|
 | CI local | cerrado para el candidato actual | `make ci` pasó integralmente el 2026-08-08 contra OA `6647992c75bee76bb70a6baafdb6b0d94fc0acab`, incluyendo arquitectura, seguridad, contratos, Web, PostgreSQL, Agenda→Calendars, PerGo fake, fiscal, restore local, replay y recuperación |
-| CI remoto/integración | OA cerrado; Pymes en validación final | OA `6647992c75bee76bb70a6baafdb6b0d94fc0acab` está fusionado con CI verde; el pin final de Pymes se valida e integra mediante el PR #52 |
+| CI remoto/integración | cerrado para el baseline | OA `6647992c75bee76bb70a6baafdb6b0d94fc0acab` está fusionado con CI verde; el required check remoto de Pymes volvió a pasar y el pin final se integró mediante el PR #52 |
 | Release | cerrado y validado localmente; no operado | build por digest, manifiesto de 13 entradas, publicación create-only con receipt y Bucket Lock requerido, candidato con tráfico cero, capability pretraffic API/Web, señal durable `worker_release_ready`, verificación dentro de la transacción y rollback por SHA. Los adapters prueban fail-closed; faltan buckets bloqueados, imágenes/manifiesto reales y una ejecución Cloud Run |
 | Identidad de release | cerrada en código, no aplicada | WIF separado y STG-first, condición cerrada al repo/workflow/branch/environment, seed inerte auditado sin Run Admin de proyecto, permisos finales sólo por recurso y análisis inverso fail-closed por recurso/permiso/identidad, incluso ante roles custom e impersonación |
 | Retiro WIF legado | pendiente | primer canary STG con WIF nuevo; retiro del principal Pymes, cuenta exclusiva deshabilitada, segundo canary posterior, Cloud Asset limpio y fase de cierre |
@@ -50,7 +50,7 @@ fuente autoritativa para medir el plan.
 | Piloto Google/Meet | pendiente de OAuth | conexión, evento y Meet con cuenta controlada |
 | Piloto ARCA | pendiente de cliente | CSR/certificado/punto de venta del tenant y autorización/consulta en homologación |
 | PRD | pendiente | preparación posterior al cierre STG y release desde el mismo SHA/pin/materiales; la Web y metadata por entorno producen digests distintos |
-| Documentación | actualizada y enlazada localmente | prosa revisada contra scripts y código; anchors Drift actualizados, sin afirmar despliegues, buckets, restores o pilotos no demostrados |
+| Documentación | actualizada e integrada | prosa revisada contra scripts y código; anchors Drift actualizados, sin afirmar despliegues, buckets, restores o pilotos no demostrados; la operación pausada está inventariada en [`pendiente.md`](pendiente.md) |
 
 ## Restricciones externas
 
